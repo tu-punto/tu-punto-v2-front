@@ -1,0 +1,19 @@
+.sidebar {
+    top: 0;
+    left: 0;
+    height: 100vh;
+    background-color: #094f89;
+    transition: width 0.3s;
+    overflow-x: hidden;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+.sidebar.open {
+    width: 200px;
+}
+
+.sidebar.closed {
+    width: 80px;
+}
+

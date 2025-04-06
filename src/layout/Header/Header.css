@@ -1,0 +1,43 @@
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    /* background-color: cus; */
+    height: 64px;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.left-section {
+    display: flex;
+    align-items: center;
+}
+
+.app-header h1 {
+    margin: 10px;
+    font-size: 18px;
+    color: white;
+}
+
+.logo {
+    width: 40px;
+    height: auto;
+}
+
+.search-section {
+    flex-grow: 1;
+    max-width: 600px;
+    margin: 20px;
+}
+
+.right-section {
+    display: flex;
+    align-items: center;
+}
+
+.icon {
+    color: white;
+    font-size: 20px;
+    margin-left: 15px;
+    cursor: pointer;
+}
