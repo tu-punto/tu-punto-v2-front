@@ -83,6 +83,11 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
     useEffect(() => {
         fetchCategories();
     }, []);
+    useEffect(() => {
+        if (visible) {
+            form.resetFields();
+        }
+    }, [visible]);
 
     return (
         <Modal
@@ -101,14 +106,14 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
                 <Form.Item
                     name="nombre_producto"
                     label="Nombre del Producto"
-                    rules={[{ required: true, message: 'Por favor ingrese el nombre del producto' }]}
+                    rules={[{ required: true, message: 'Por favor ingrese el name del producto' }]}
                 >
                     <Input placeholder="Nombre del Producto" />
                 </Form.Item>
                 <Form.Item
                     name="precio"
                     label="Precio del producto"
-                    rules={[{ required: true, message: 'Por favor ingrese el precio del producto' }]}
+                    rules={[{ required: false, message: 'Por favor ingrese el precio del producto' }]}
                 >
                     <InputNumber
                         suffix="Bs."
@@ -117,7 +122,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
                 <Form.Item
                     name="cantidad_por_sucursal"
                     label="Cantidad de ingreso del producto" 
-                    rules={[{ required: true, message: 'Por favor ingrese la cantidad de ingreso del producto' }]}
+                    rules={[{ required: false, message: 'Por favor ingrese la cantidad de ingreso del producto' }]}
                 >
                     <InputNumber
                         min={1}
@@ -161,7 +166,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
                 <Form.Item
                     name="id_categoria"
                     label="Categoría"
-                    rules={[{ required: true, message: 'Por favor seleccione una categoría' }]}
+                    rules={[{ required: false, message: 'Por favor seleccione una categoría' }]}
                 >
                     <Select
                         placeholder="Selecciona una categoría"
