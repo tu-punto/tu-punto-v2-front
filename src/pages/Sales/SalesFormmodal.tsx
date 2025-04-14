@@ -37,7 +37,7 @@ function SalesFormModal({ visible, onCancel, onSuccess, selectedProducts, totalA
             "subtotal_efectivo": 0,
             // "id_trabajador": 1,
             // ToDo: SUCURSAL PRADO POR DEFECTO, CAMBIAR CUANDO EXISTAN MAS SUCURSALES
-            "id_sucursal": parseInt(form.getFieldValue('sucursal')),
+            "id_sucursal": parseInt(salesData.sucursal),
             "cliente": salesData.cliente || "",
             "telefono_cliente": salesData.celular
         }
