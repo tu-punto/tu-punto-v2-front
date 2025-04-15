@@ -20,7 +20,7 @@ import {
 } from "@ant-design/icons";
 import { registerSellerAPI } from "../../api/seller";
 import { useState } from "react";
-import { sellerModel } from "../../models/sellerModels";
+import { ISeller } from "../../models/sellerModels";
 import { registerFinanceFluxAPI } from "../../api/financeFlux";
 import { roles } from "../../constants/roles";
 import { registerUserAPI } from "../../api/user";
@@ -29,7 +29,7 @@ function SellerFormModal({ visible, onCancel, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const { SELLER } = roles;
 
-  const handleFinish = async (sellerData: sellerModel) => {
+  const handleFinish = async (sellerData: ISeller) => {
     setLoading(true);
     const newUser = {
       email: sellerData.mail,
@@ -143,6 +143,7 @@ function SellerFormModal({ visible, onCancel, onSuccess }: any) {
               name="carnet"
               label="Carnet"
               tooltip="El número de carnet será la contraseña para la cuenta del vendedor"
+              rules={[{ required: true, message: "Este campo es obligatorio" }]}
             >
               <InputNumber
                 style={{ width: "100%" }}
@@ -181,11 +182,7 @@ function SellerFormModal({ visible, onCancel, onSuccess }: any) {
               <InputNumber style={{ width: "100%" }} min={0} />
             </Form.Item>
           </Col>
-          <Col xs={24} sm={6}>
-            <Form.Item name="adelanto_servicio" label="Adelanto Servicio">
-              <InputNumber style={{ width: "100%" }} min={0} />
-            </Form.Item>
-          </Col>
+
         </Row>
 
         <Row gutter={[16, 16]}>
@@ -199,11 +196,7 @@ function SellerFormModal({ visible, onCancel, onSuccess }: any) {
               />
             </Form.Item>
           </Col>
-          <Col xs={24} sm={12}>
-            <Form.Item name="comision_fija" label="Comisión Fija">
-              <InputNumber style={{ width: "100%" }} min={0} />
-            </Form.Item>
-          </Col>
+
         </Row>
 
         <Row gutter={[16, 16]}>
@@ -211,7 +204,7 @@ function SellerFormModal({ visible, onCancel, onSuccess }: any) {
             <Form.Item
               name="comentario"
               label="Comentario"
-              rules={[{ required: true, message: "Este campo es obligatorio" }]}
+
             >
               <Input.TextArea rows={1} />
             </Form.Item>
