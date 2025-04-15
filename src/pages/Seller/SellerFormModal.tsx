@@ -31,13 +31,16 @@ function SellerFormModal({ visible, onCancel, onSuccess }: any) {
 
   const handleFinish = async (sellerData: ISeller) => {
     setLoading(true);
+    console.log("Data del vendedor",sellerData);
     const newUser = {
+
       email: sellerData.mail,
       password: `${sellerData.carnet}`,
       role: SELLER,
     };
     const userResponse = await registerUserAPI(newUser);
     if (!userResponse?.success) {
+      console.log(newUser);
       message.error("Error al crear la cuenta del vendedor");
       setLoading(false);
       return;

@@ -88,7 +88,7 @@ const SellerTable = ({ refreshKey, setRefreshKey, isFactura }: any) => {
     try {
       const response = await getSellersAPI();
       const sellersData = response.data || response;
-
+       // console.log("Los datos:", sellersData);
       if (!Array.isArray(sellersData)) {
         console.error("Los datos de vendedores no son un array:", sellersData);
         return;
@@ -100,7 +100,7 @@ const SellerTable = ({ refreshKey, setRefreshKey, isFactura }: any) => {
             const advances = await getSellerAdvancesById(seller.id_vendedor);
             const date = new Date(seller.fecha);
             return {
-              key: seller.id_vendedor.toString(),
+              key: seller._id,
               nombre: `${seller.nombre} ${seller.apellido}`,
               deuda: `Bs. ${seller.deuda}`,
               deudaInt: seller.deuda,
@@ -179,9 +179,11 @@ const SellerTable = ({ refreshKey, setRefreshKey, isFactura }: any) => {
   }, [refreshKey]);
 
   const filteredSellers = (data: ISeller[]) => {
+      console.log((seller) => seller.emite_factura);
     return isFactura
         ? data.filter((seller) => seller.emite_factura)
         : data.filter((seller) => !seller.emite_factura);
+
   };
 
   return (

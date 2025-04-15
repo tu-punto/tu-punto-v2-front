@@ -6,6 +6,7 @@ import { IWorker } from "./workerModel";
 
 
 export interface IBranch {
+  _id?:string;
   id_sucursal: number;
   nombre: string;
   direccion: string;
