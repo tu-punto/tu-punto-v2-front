@@ -47,6 +47,9 @@ const Product = () => {
             //TODO Add Sucursal Field in the form
             id_sucursal: 3
         }
+        console.log("Stock por producto:",product.stock);
+        console.log("Stock:",stock);
+        console.log("Variante:",newVariant);
         const {newProduct} = await registerVariantAPI({product,stock})
         await addProductFeaturesAPI({productId: newProduct.id_producto, features})
 
@@ -84,7 +87,8 @@ const Product = () => {
                     />
                 )
             }
-            <ProductFormModal
+            <Product
+                FormModal
                 visible={isModalVisible}
                 onCancel={handleCancel}
                 onSuccess={handleSuccess}

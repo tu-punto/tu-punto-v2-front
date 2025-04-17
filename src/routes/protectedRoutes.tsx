@@ -39,14 +39,7 @@ const protectedRoutes = [
           </RoleGuard>
         ),
       },
-      {
-        path: "/sellerFactura",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <Seller isFactura={true} />
-          </RoleGuard>
-        ),
-      },
+
       {
         path: "/sales",
         element: (
@@ -82,11 +75,20 @@ const protectedRoutes = [
       {
         path: "/stats",
         element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <StatsPage />
-          </RoleGuard>
+            <RoleGuard allowedRoles={["admin"]}>
+              <StatsPage />
+            </RoleGuard>
+        )
+      },
+      {
+        path: "/sellerFactura",
+        element: (
+            <RoleGuard allowedRoles={["admin"]}>
+              <Seller isFactura={true} />
+            </RoleGuard>
         ),
       },
+
       {
         path: "/seller-info",
         element: (

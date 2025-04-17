@@ -182,7 +182,7 @@ export const Sales = () => {
                 const { id_vendedor } = producto;
                 if (!acc[id_vendedor]) {
                     acc[id_vendedor] = {
-                        vendedor: sellers.find((seller: any) => seller.id_vendedor === id_vendedor) || id_vendedor,
+                        vendedor: sellers.find((seller: any) => seller._id === id_vendedor) || id_vendedor,
                         productos: []
                     };
                 }
@@ -198,7 +198,7 @@ export const Sales = () => {
             //         acc + (producto.cantidad * producto.precio_unitario), product_seller.vendedor.deuda)
             // }))
             const debtBySeller = await Promise.all(Object.values(productsBySeller).map(async (product_seller: any) => {
-                const id_vendedor = product_seller.vendedor.id_vendedor || product_seller.vendedor;
+                const id_vendedor = product_seller.vendedor._id || product_seller.vendedor;
                 // const sellerDebtFinanceFlux = await calculateSellerDebt(id_vendedor);
                 // const sellerProductsDebt = await previousProductsDebt(id_vendedor);
                 const sellerInfo = await getSellerAPI(id_vendedor);
@@ -257,7 +257,7 @@ export const Sales = () => {
                                                 <Select
                                                     placeholder="Selecciona un vendedor"
                                                     options={sellers.map((vendedor: any) => ({
-                                                        value: vendedor.id_vendedor,
+                                                        value: vendedor._id,
                                                         label: vendedor.nombre,
                                                     }))}
                                                     filterOption={(input, option: any) =>
@@ -273,7 +273,7 @@ export const Sales = () => {
                                                 <Select
                                                     placeholder="Selecciona una sucursal"
                                                     options={branches.map((branch: IBranch) => ({
-                                                        value: branch.id_sucursal,
+                                                        value: branch._id,
                                                         label: branch.nombre,
                                                     }))}
                                                     filterOption={(input, option: any) =>

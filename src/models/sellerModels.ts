@@ -16,7 +16,7 @@ export interface ISeller {
   alquiler: number;
   exhibicion: number;
   delivery: number;
-  adelanto_servicio: number;
+  entrega_simple: number;
   comision_porcentual: number;
   comision_fija: number;
   fecha: Date;

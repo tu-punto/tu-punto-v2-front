@@ -122,14 +122,14 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                     <Input placeholder="Nombre del Producto" />
                 </Form.Item>
                 <Form.Item
-                    name='sucursal'
+                    name='_idSucursal'
                     label="Sucursal"
                     rules={[{ required: true, message: 'Por favor seleccione una sucursal' }]}
                 >
                     <Select
                         placeholder='Selecciona una sucursal'
                         options={branches.map((branch: any) => ({
-                            value: branch.id_sucursal,
+                            value: branch._id,
                             label: branch.nombre
                         }))}
                         showSearch
@@ -139,15 +139,15 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
 
                 </Form.Item>
                 <Form.Item
-                    name="id_vendedor"
-                    label="Marca"
-                    rules={[{ required: true, message: 'Por favor seleccione una marca' }]}
+                    name="_idVendedor"
+                    label="Vendedor"
+                    rules={[{ required: true, message: 'Por favor seleccione un vendedor' }]}
                 >
                     <Select
-                        placeholder="Selecciona una marca"
+                        placeholder="Selecciona un vendedor"
                         options={sellers.map((seller: any) => ({
-                            value: seller.id_vendedor,
-                            label: seller.marca,
+                            value: seller._id,
+                            label: seller.nombre, // usa `nombre` si tu modelo de seller lo tiene
                         }))}
                         showSearch
                         filterOption={(input, option: any) =>
@@ -155,8 +155,9 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                         }
                     />
                 </Form.Item>
+
                 <Form.Item
-                    name="id_categoria"
+                    name="_idCategoria"
                     label="Categoría"
                     rules={[{ required: true, message: 'Por favor seleccione una categoría' }]}
                 >
@@ -182,7 +183,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                             </>
                         )}
                         options={categories.map((category: any) => ({
-                            value: category.id_categoria,
+                            value: category._id,
                             label: category.categoria,
                         }))}
                         showSearch

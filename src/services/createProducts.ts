@@ -8,7 +8,7 @@ export const createVariant = async (newVariant) => {
         //TODO Add Sucursal Field in the form
         id_sucursal: 3
     }
-
+    console.log("Llegué aquí, newVariant", newVariant);
     const response = await registerVariantAPI({ product, stock })
     const { newProduct } = response
     await addProductFeaturesAPI({ productId: newProduct.id_producto, features })
@@ -16,7 +16,7 @@ export const createVariant = async (newVariant) => {
 
 const createProductFeatures = async (products: any, features: any) => {
     const promises = products.map((product: any) => {
-        const id_producto = product.id_producto
+        const id_producto = product._id
         const productFeatures: any = features.get(id_producto)
         return addProductFeaturesAPI({
             productId: id_producto, features: productFeatures
@@ -108,6 +108,8 @@ export const createProductsFromGroup = async (productData, combinations, selecte
     const res = await registerProductAPI(formattedProductData)
     res.products = res.products.map((product) => product.newProduct)
     if (res.products) {
+        console.log("Aqui estoy",formattedProductData);
+        console.log("Res",res);
         message.success('Producto registrado con variantes')
 
         const productFeaturesMap = new Map();

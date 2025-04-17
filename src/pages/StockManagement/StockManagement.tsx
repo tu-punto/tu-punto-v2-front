@@ -8,7 +8,7 @@ import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
-import { Option } from 'antd/es/mentions';
+//const { Option } = Select;
 import { getGroupByIdAPI, getGroupsAPI } from '../../api/group';
 import { getSellersAPI } from '../../api/seller';
 import { getCategoriesAPI } from '../../api/category';
@@ -99,7 +99,7 @@ const StockManagement = () => {
         return sellerId === null || product.groupId === sellerId
     }
 
-    const handleSelectSeller = (sellerId: number) => {
+    const handleSelectSeller = (sellerId: any) => {
         setSelectedSeller(sellerId);
     };
 
@@ -114,7 +114,7 @@ const StockManagement = () => {
     // TODO: This updates the inforamtion of the product, but it restores the filters to the default
     // so, try to improve this to mantain the filters
     // const handleSaveSuccess = () => {
-    //     fetchData(); 
+    //     fetchData();
     //   };
     useEffect(() => {
         filter()
@@ -170,7 +170,7 @@ const StockManagement = () => {
                 filter: filterBySeller,
                 group: sellers,
                 groupFunction: (seller, products) => {
-                    return products.filter((product) => product.id_vendedor == seller.id_vendedor)
+                    return products.filter((product) => product.id_vendedor == seller._id)
                 }
             });
         }
@@ -212,9 +212,9 @@ const StockManagement = () => {
                     defaultValue={0}
                 >
                     {options.map((option, index) => (
-                        <Option key={option.option} value={index}>
+                        <Select.Option key={option.option} value={index}>
                             {option.option}
-                        </Option>
+                        </Select.Option>
                     ))}
                 </Select>
             </div>
@@ -300,7 +300,7 @@ const StockManagement = () => {
                 showVariantModal={showVariantModal}
                 productsList={
                     isSeller
-                        ? products.filter((product) => product.id_vendedor === user.id)
+                        ? products.filter((product) => product._id === user._id)
                         : filteredProducts
                 }
                 handleUpdate={(ingresoData: { [key: number]: number }) => {

@@ -13,7 +13,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
     const [form] = Form.useForm();
 
     const handleFinish = async (productData: any) => {
-        console.log(productData);
+        //console.log(productData);
         Modal.confirm({
             title: 'Confirmación',
             content: '¿Está seguro de que desea registrar este producto?',

@@ -53,7 +53,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
         }
     };
     const handleTipoChange = () => {
-        form.validateFields(['id_trabajador']); 
+        form.validateFields(['_id']);
     };
 
     useEffect(() => {
@@ -103,7 +103,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
                 <Row gutter={16}>
                     <Col span={12}>
                         <Form.Item
-                            name='id_vendedor'
+                            name='_id'
                             label='Vendedor'
                         >
                             <Select
@@ -128,7 +128,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
                                     </>
                                 )}
                                 options={sellers.map((seller: any) => ({
-                                    value: seller.id_vendedor,
+                                    value: seller._id,
                                     label: seller.nombre + " " + seller.apellido,
                                 }))}
                                 showSearch
@@ -197,7 +197,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
                             <Select
                                 placeholder="Selecciona un Trabajador"
                                 options={workers.map((worker: any) => ({
-                                    value: worker.id_trabajador,
+                                    value: worker._id,
                                     label: worker.nombre,
                                 }))}
                                 showSearch
