@@ -77,7 +77,8 @@ const LoginPage = () => {
               onFinish={handleFinish}
               className="mt-8 space-y-6"
           >
-            {/* ComboBox de sucursales al inicio */}
+            {/* ComboBox de sucursales al inicio
+
             <Form.Item
                 name="sucursalId"
                 rules={[{ required: true, message: "¡Por favor seleccione una sucursal!" }]}
@@ -99,7 +100,7 @@ const LoginPage = () => {
                 ))}
               </Select>
             </Form.Item>
-
+            */}
             <Form.Item
                 name="email"
                 rules={[{ required: true, message: "¡Por favor ingrese su email!" }]}

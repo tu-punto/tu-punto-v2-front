@@ -15,7 +15,7 @@ export const menu = [
   //   roles: ["admin"],
   // },
   { path: "/seller", label: "Vendedores", icon: sellerIcon, roles: ["admin"] },
-  { path: "/sellerFactura", label: "Vendedores de Factura", icon: sellerIcon, roles: ["admin"] },
+  //{ path: "/sellerFactura", label: "Vendedores de Factura", icon: sellerIcon, roles: ["admin"] },
   { path: "/sales", label: "Ventas", icon: cartIcon, roles: ["admin"] },
   { path: "/shipping", label: "Pedidos", icon: shippingIcon, roles: ["admin"] },
   {
@@ -54,12 +54,7 @@ export const menu = [
     icon: boxIcon,
     roles: ["admin"],
   },
-  {
-    path: "/cierreCaja",
-    label: "Reconciliación de Caja",
-    icon: boxIcon,
-    roles: ["admin"],
-  },
+  //{ path: "/cierreCaja",label: "Reconciliación de Caja",icon: boxIcon,roles: ["admin"] },
   {
     path: "/branch",
     label: "Sucursales",

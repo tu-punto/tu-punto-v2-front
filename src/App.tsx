@@ -5,6 +5,7 @@ import { UserContextProvider } from "./context/userContext";
 import "./App.css";
 import publicRoutes from "./routes/publicRoutes";
 import protectedRoutes from "./routes/protectedRoutes";
+import {Suspense} from "react";
 
 export const App = () => {
   const router = createHashRouter([...publicRoutes, ...protectedRoutes]);
@@ -21,7 +22,8 @@ export const App = () => {
             },
           }}
         >
-          <RouterProvider router={router} />
+                <RouterProvider router={router} />
+
         </ConfigProvider>
       </UserContextProvider>
     </AntdApp>

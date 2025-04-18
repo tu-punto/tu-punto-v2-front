@@ -69,7 +69,7 @@ const updateShippingAPI = async (
   }
 };
 
-const getShippingsBySellerIdAPI = async (sellerId: number) => {
+const getShippingsBySellerIdAPI = async (sellerId: any) => {
   try {
     const res = await apiClient.get(`/shipping/seller/${sellerId}`);
     return res;

@@ -1,7 +1,7 @@
 import { message } from "antd";
 import { getShippingsBySellerIdAPI } from "../api/shipping";
 
-export const getSellerAdvancesById = async (sellerId: number) => {
+export const getSellerAdvancesById = async (sellerId: any) => {
   const res = await getShippingsBySellerIdAPI(sellerId);
   if (res?.status !== 200) {
     message.error("Fallo al calcular los adelantos del vendedor");

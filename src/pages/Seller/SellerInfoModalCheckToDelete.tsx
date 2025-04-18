@@ -63,7 +63,7 @@ const SellerInfoModal = ({ visible, onSuccess, onCancel, seller }: any) => {
 
             const pedidos = response.map((product: any) => product.id_pedido);
             const uniquePedidos = Array.from(new Set<number>(pedidos));
-            console.log(productos)
+            //console.log(productos)
             const shippingsResponse = await getShipingByIdsAPI(uniquePedidos);
             if (shippingsResponse.success) {
                 const totalAdelanto = shippingsResponse.data.reduce((total: number, pedido: any) => {

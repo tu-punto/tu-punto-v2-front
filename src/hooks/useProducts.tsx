@@ -6,10 +6,11 @@ const useProducts = () => {
 
     const mapApiDataToProductoData = async (apiData: any) => {
         const productDataPromises = apiData.map(async (item: any) => {
+            console.log("Llegué aqui",item);
             const categoria = item.categoria.categoria
 
             return {
-                key: item.id_producto,
+                key: item._id,
                 producto: item.nombre_producto,
                 precio: item.precio,
                 stockActual: item.producto_sucursal.reduce((acc: number, prodSuc: any) => acc + prodSuc.cantidad_por_sucursal, 0),

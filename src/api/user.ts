@@ -13,12 +13,14 @@ export const checkLoginAPI = async (userData: any) => {
 };
 export const getUserByCookieAPI = async () => {
   try {
-    const res = await apiClient.get("/user/info");
+    const res = await apiClient.get("/user/info"); // o como se llame tu endpoint
     return { success: true, data: res.data };
   } catch (error) {
-    parseError(error as AxiosError);
+    console.log(error);
+    return { success: false };
   }
 };
+
 
 export const logoutUserAPI = async () => {
   try {

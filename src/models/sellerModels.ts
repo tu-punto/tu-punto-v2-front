@@ -4,6 +4,15 @@ import { Shipping } from "./shippingModel";
 import { ISale } from "./saleModel";
 import { IWorker } from "./workerModel";
 
+// ✅ Definimos la estructura del array
+export interface ISucursalPago {
+  id_sucursal: string; // o number si usás otro tipo
+  alquiler: number;
+  exhibicion: number;
+  delivery: number;
+  entrega_simple: number;
+}
+
 export interface ISeller {
   id_vendedor: number;
   marca: string;
@@ -13,10 +22,14 @@ export interface ISeller {
   carnet: number;
   direccion: string;
   mail: string;
-  alquiler: number;
-  exhibicion: number;
-  delivery: number;
-  adelanto_servicio: number;
+
+  // alquiler: number;
+  // exhibicion: number;
+  // delivery: number;
+  // entrega_simple: number;
+
+  pago_sucursales: ISucursalPago[];
+
   comision_porcentual: number;
   comision_fija: number;
   fecha: Date;
@@ -24,14 +37,8 @@ export interface ISeller {
   almacen_caja: number;
   emite_factura: boolean;
   deuda: number;
-  //TODO QUITAR LOS NULLS DE ID_TRABAJADOR Y DE TRABAJADOR
   id_trabajador: number;
 
-  // TODO: add missing interfaces
-  //   user: IUser;
-  //   comprobante_entrada?: IComprobanteEntrada[];
-  //   comprobante_pago?: IComprobantePago[];
-  //   flujoFinanciero?: IFlujoFinanciero[];
   trabajador: IWorker;
   pedido?: Shipping[];
   producto?: IProduct[];
