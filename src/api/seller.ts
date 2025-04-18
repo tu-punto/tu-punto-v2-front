@@ -21,6 +21,7 @@ export const getSellerAPI = async (sellerId:number) => {
 
 export const registerSellerAPI = async (sellerData: any) => {
     try {
+        console.log("Seller Data",sellerData);
         const res = await apiClient.post(`/seller/register`, sellerData)
         return res.data
     } catch (error) {
