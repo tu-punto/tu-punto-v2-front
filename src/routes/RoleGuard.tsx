@@ -1,27 +1,32 @@
-import React, { useContext } from "react";
+import React, { useContext, ReactNode } from "react";
 import { Navigate } from "react-router-dom";
+import { Spin } from "antd";
 import { UserContext } from "../context/userContext";
 
 interface RoleGuardProps {
   allowedRoles: string[];
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) => {
-  const userContext = useContext(UserContext);
-  if (!userContext) {
-    return <Navigate to="/login" replace />;
+const RoleGuard: React.FC<RoleGuardProps> = ({
+  allowedRoles,
+  children,
+}) => {
+  const { user, loading } = useContext(UserContext);
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Spin size="large" />
+      </div>
+    );
   }
 
-  const { user } = userContext;
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login-admin" replace />;
   }
 
-  const hasRole = allowedRoles.includes(user.role);
-
-  if (!hasRole) {
-    // TODO: setup this page
+  if (!allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

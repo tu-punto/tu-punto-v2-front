@@ -77,8 +77,6 @@ const LoginPage = () => {
               onFinish={handleFinish}
               className="mt-8 space-y-6"
           >
-            {/* ComboBox de sucursales al inicio
-
             <Form.Item
                 name="sucursalId"
                 rules={[{ required: true, message: "¡Por favor seleccione una sucursal!" }]}
@@ -93,14 +91,14 @@ const LoginPage = () => {
                     boxShadow: "0 1px 4px rgba(59, 130, 246, 0.2)"
                   }}
               >
-                {branches.map((branch) => (
+                {branches.map((branch:any) => (
                     <Option key={branch._id} value={branch._id}>
                       {branch.nombre}
                     </Option>
                 ))}
               </Select>
             </Form.Item>
-            */}
+           
             <Form.Item
                 name="email"
                 rules={[{ required: true, message: "¡Por favor ingrese su email!" }]}

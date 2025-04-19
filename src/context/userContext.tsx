@@ -1,34 +1,28 @@
-import { createContext, ReactNode, useEffect, useState } from "react";
+import { createContext, ReactNode, useState, useEffect } from "react";
 import { getUserByCookieAPI } from "../api/user";
-interface UserContextType {
-  user: any;
-  setUser: React.Dispatch<React.SetStateAction<any>>;
-}
-export const UserContext = createContext<UserContextType | null>(null);
 
-interface UserContextProviderProps {
-  children: ReactNode;
-}
+export const UserContext = createContext<any>(null);
 
-export const UserContextProvider = ({ children }: UserContextProviderProps) => {
-  const [user, setUser] = useState(null);
-  const fetchUser = async () => {
-    try {
-      const userData = await getUserByCookieAPI();
-      if (!userData?.success) {
-        return;
-      }
-      setUser(userData!.data);
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      setUser(null);
-    }
-  };
+export const UserContextProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    fetchUser();
+    (async () => {
+      try {
+        const res = await getUserByCookieAPI();
+        if (res?.success) setUser(res.data);
+      } catch (e) {
+        console.error("Error fetching user:", e);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
+
   return (
-    <UserContext.Provider value={{ user, setUser }}>
+    <UserContext.Provider value={{ user, setUser, loading }}>
       {children}
     </UserContext.Provider>
   );

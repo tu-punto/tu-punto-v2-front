@@ -21,7 +21,7 @@ const protectedRoutes = [
     children: [
       {
         index: true,
-        element: <Navigate to="/login" replace />,
+        element: <Navigate to="/login-admin" replace />,
       },
       {
         path: "/product",
@@ -35,7 +35,7 @@ const protectedRoutes = [
         path: "/seller",
         element: (
           <RoleGuard allowedRoles={["admin"]}>
-            <Seller />
+            <Seller isFactura={false}/>
           </RoleGuard>
         ),
       },

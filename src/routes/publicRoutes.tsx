@@ -1,11 +1,16 @@
 import { Navigate } from "react-router-dom";
-import LoginPage from "../pages/Login/LoginPage";
 import ErrorPage from "../pages/ErrorPage";
+import AdminLoginPage from "../pages/Login/AdminLoginPage";
+import SellerLoginPage from "../pages/Login/SellerLoginPage";
 
 const publicRoutes = [
   {
-    path: "/login",
-    element: <LoginPage />,
+    path: "/login-admin",
+    element: <AdminLoginPage />,
+  },
+  {
+    path: "/login-seller",
+    element: <SellerLoginPage />,
   },
   {
     path: "*",
@@ -13,7 +18,7 @@ const publicRoutes = [
   },
   {
     path: "/",
-    element: <Navigate to="/login" replace />,
+    element: <Navigate to="/login-admin" replace />,
   },
 ];
 
