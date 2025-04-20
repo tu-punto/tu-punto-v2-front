@@ -1,13 +1,16 @@
 .sidebar {
+    position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
+    bottom: 0;
+    height: auto;
     background-color: #094f89;
     transition: width 0.3s;
     overflow-x: hidden;
     white-space: nowrap;
     z-index: 1000;
 }
+
 
 .sidebar.open {
     width: 200px;

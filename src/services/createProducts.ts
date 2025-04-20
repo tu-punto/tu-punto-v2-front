@@ -9,6 +9,7 @@ export const createVariant = async (newVariant) => {
         id_sucursal: 3
     }
     console.log("Llegué aquí, newVariant", newVariant);
+
     const response = await registerVariantAPI({ product, stock })
     const { newProduct } = response
     await addProductFeaturesAPI({ productId: newProduct.id_producto, features })
@@ -66,8 +67,8 @@ export const getProductsFromGroup = (productData, combinations, selectedFeatures
             "precio": combination.price,
             "imagen": '',
             "cantidad_por_sucursal": combination.stock,
-            "id_categoria": productData.id_categoria,
-            "id_vendedor": productData.id_vendedor,
+            "id_categoria": productData._idCategoria,
+            "id_vendedor": productData._idVendedor,
             "id_variant": index,
         }
     })
@@ -75,66 +76,75 @@ export const getProductsFromGroup = (productData, combinations, selectedFeatures
 }
 
 export const createProductsFromGroup = async (productData, combinations, selectedFeatures, features) => {
-    const realCombinations = combinations
-        .filter((combination: any) => combination.price !== 0 || combination.stock !== 0)
+    console.log("ProductData",productData);
+    const realCombinations = combinations.filter(
+        (c: any) => c.price !== 0 || c.stock !== 0
+    );
 
-    const productVariants = realCombinations.map((combination: any, index: number) => {
-        const featureValues = selectedFeatures.map((featureId: any) => {
-            const feature = features.find((f: any) => f.id_caracteristicas.toString() == featureId).feature
+    if (realCombinations.length === 0) {
+        message.warning("No se encontró ninguna combinación válida para registrar.");
+        return;
+    }
+
+    const productVariants = realCombinations.map((combination, index) => {
+        const featureValues = selectedFeatures.map(featureId => {
+            const feature = features.find(f => f.id_caracteristicas.toString() == featureId)?.feature;
             return {
-                feature: feature,
+                feature,
                 value: combination[featureId.toString()]
-            }
-        })
+            };
+        });
 
-        const joinedFeatureValues = featureValues.map(f => f.value).join(' ')
-
+        const joinedFeatureValues = featureValues.map(f => f.value).join(' ');
         return {
-            "nombre_producto": `${productData.nombre_producto} ${joinedFeatureValues}`,
-            "precio": combination.price,
-            "imagen": '',
-            "cantidad_por_sucursal": combination.stock,
-            "id_categoria": productData.id_categoria,
-            "id_vendedor": productData.id_vendedor,
-            "id_variant": index,
-        }
-    })
+            nombre_producto: `${productData.nombre_producto} ${joinedFeatureValues}`,
+            precio: combination.price,
+            imagen: '',
+            cantidad_por_sucursal: combination.stock,
+            id_categoria: productData._idCategoria,
+            id_vendedor: productData._idVendedor,
+            id_variant: index,
+        };
+    });
 
     const formattedProductData = {
-        "group": productData.nombre_producto,
-        "variants": productVariants,
-        "id_sucursal": productData.sucursal
+        group: productData.nombre_producto,
+        variants: productVariants,
+        id_sucursal: productData._idSucursal
+    };
+
+    console.log("Datos para API:", formattedProductData);
+
+    const res = await registerProductAPI(formattedProductData);
+
+    if (!res?.products || res.products.length === 0) {
+        message.error('Error al crear los productos. Verifica tu información.');
+        return;
     }
-    const res = await registerProductAPI(formattedProductData)
-    res.products = res.products.map((product) => product.newProduct)
-    if (res.products) {
-        console.log("Aqui estoy",formattedProductData);
-        console.log("Res",res);
-        message.success('Producto registrado con variantes')
 
-        const productFeaturesMap = new Map();
+    res.products = res.products.map(p => p.newProduct);
 
-        realCombinations.forEach((combination: any) => {
-            const featuresForProduct = selectedFeatures.map((featureId: any) => {
-                const feature = features.find((f: any) => f.id_caracteristicas.toString() == featureId);
-                return {
-                    feature: feature?.feature,
-                    value: combination[featureId.toString()]
-                };
-            });
-            const productId = res.products.find((p: any) => p.nombre_producto.includes(`${productData.nombre_producto} ${featuresForProduct.map(f => f.value).join(' ')}`)).id_producto;
+    const productFeaturesMap = new Map();
 
-            if (!productFeaturesMap.has(productId)) {
-                productFeaturesMap.set(productId, [])
-            }
+    realCombinations.forEach((combination, index) => {
+        const featuresForProduct = selectedFeatures.map((featureId) => {
+            const feature = features.find((f) => f.id_caracteristicas.toString() == featureId)?.feature;
+            return {
+                feature,
+                value: combination[featureId.toString()]
+            };
+        });
 
-            productFeaturesMap.get(productId).push(...featuresForProduct)
-        })
+        const product = res.products[index]; // Usa el índice directamente
 
-        const products = await createProductStock(res.products, productVariants, productData.sucursal)
-        await createProductFeatures(res.products, productFeaturesMap)
-        console.log("New Producst", products)
-    } else {
-        message.error('Error al crear los productos, inténtelo de nuevo')
-    }
-}
+        if (product) {
+            productFeaturesMap.set(product.id_producto, featuresForProduct);
+        }
+    });
+
+    await createProductStock(res.products, productVariants, productData.sucursal);
+    await createProductFeatures(res.products, productFeaturesMap);
+
+    message.success('Producto registrado con variantes');
+};
+

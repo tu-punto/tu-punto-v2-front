@@ -109,6 +109,7 @@ const StockManagement = () => {
         const newList = products.filter(product =>
             filter(product, selectedSeller)
         )
+        console.log("Lista que se muestra en ProductTable:", (newList));
         setFilteredProducts(newList)
     }
     // TODO: This updates the inforamtion of the product, but it restores the filters to the default
@@ -200,6 +201,7 @@ const StockManagement = () => {
     }
 
     const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
+
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
