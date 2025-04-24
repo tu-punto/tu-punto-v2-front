@@ -2,13 +2,13 @@ import React, { useContext, useEffect, useState } from 'react';
 import { Row, Col } from 'antd';
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
+import MoveProductsModal from './MoveProductsModal';
 import { addProductFeaturesAPI, getProductsAPI, registerVariantAPI, updateProductStockAPI } from '../../api/product';
 import { Button, Input, Select } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
-//const { Option } = Select;
 import { getGroupByIdAPI, getGroupsAPI } from '../../api/group';
 import { getSellersAPI } from '../../api/seller';
 import { getCategoriesAPI } from '../../api/category';
@@ -22,130 +22,62 @@ const StockManagement = () => {
 
     const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
-    const [selectedGroup, setSelectedGroup] = useState(null)
-
+    const [selectedGroup, setSelectedGroup] = useState(null);
     const [selectedSeller, setSelectedSeller] = useState<number | null>(null);
     const [infoModalVisible, setInfoModalVisible] = useState<boolean>(false);
     const [isProductFormVisible, setProductFormVisible] = useState<boolean>(false);
-    const [isVariantModalVisible, setIsVariantModalVisible] = useState<boolean>(false)
-    const [prevKey, setPrevKey] = useState(0)
-    const [criteriaFilter, setCriteriaFilter] = useState(0)
-    const [criteriaGroup, setCriteriaGroup] = useState(0)
+    const [isVariantModalVisible, setIsVariantModalVisible] = useState<boolean>(false);
+    const [prevKey, setPrevKey] = useState(0);
+    const [criteriaFilter, setCriteriaFilter] = useState(0);
+    const [criteriaGroup, setCriteriaGroup] = useState(0);
 
-    const [options, setOptions] = useState<any[]>([{ option: "Vendedor", group: [], groupFunction: () => { } }])
-    const [productsToUpdate, setProductsToUpdate] = useState<{ [key: number]: number }>({})
-    const [stock, setStock] = useState([])
-    const [newProducts, setNewProducts] = useState<any[]>([])
-    const [newVariants, setNewVariants] = useState<any[]>([])
-    const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false)
+    const [options, setOptions] = useState<any[]>([{ option: "Vendedor", group: [], groupFunction: () => { } }]);
+    const [productsToUpdate, setProductsToUpdate] = useState<{ [key: number]: number }>({});
+    const [stock, setStock] = useState([]);
+    const [newProducts, setNewProducts] = useState<any[]>([]);
+    const [newVariants, setNewVariants] = useState<any[]>([]);
+    const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
 
-    const showVariantModal = async (product: any) => {
-        const group = await getGroupByIdAPI(product.groupId)
-        group.product = product
-        setSelectedGroup(group)
-        setIsVariantModalVisible(true)
-    }
-    const closeConfirmProduct = async () => {
-
-
-        const productsResponse = await getProductsAPI()
-
-        setProducts(productsResponse)
-        setFilteredProducts(productsResponse)
-
-        setNewVariants([])
-        setProductsToUpdate({})
-        setNewProducts([])
-        setStock([])
-        setIsConfirmModalVisible(false)
-    }
-
-    const cancelConfirmProduct = async () => {
-        setIsConfirmModalVisible(false)
-    }
-
-    const succesAddVariant = async (newVariant) => {
-
-        setProducts([...products, newVariant.product])
-        setFilteredProducts([...filteredProducts, newVariant.product])
-
-        setNewVariants([...newVariants, newVariant])
-
-        closeModal()
-    }
-
-    const showModal = (product: any) => {
-        setSelectedProduct(product)
-        setInfoModalVisible(true)
-    }
-
-    const closeModal = () => {
-        setSelectedProduct(null)
-        setInfoModalVisible(false)
-
-        setSelectedGroup(null)
-        setIsVariantModalVisible(false)
-    }
-
-    const filterBySeller = (product, sellerId) => {
-        return sellerId === null || product.id_vendedor === sellerId
-    }
-
-    const filterByCategoria = (product, sellerId) => {
-        return sellerId === null || product.id_categoria === sellerId
-    }
-
-    const filterByGroup = (product, sellerId) => {
-        return sellerId === null || product.groupId === sellerId
-    }
-
-    const handleSelectSeller = (sellerId: any) => {
-        setSelectedSeller(sellerId);
-    };
-
-    const filter = () => {
-
-        const filter = options[criteriaFilter].filter
-        const newList = products.filter(product =>
-            filter(product, selectedSeller)
-        )
-        console.log("Lista que se muestra en ProductTable:", (newList));
-        setFilteredProducts(newList)
-    }
-    // TODO: This updates the inforamtion of the product, but it restores the filters to the default
-    // so, try to improve this to mantain the filters
-    // const handleSaveSuccess = () => {
-    //     fetchData();
-    //   };
-    useEffect(() => {
-        filter()
-
-    }, [selectedSeller])
-
-    useEffect(() => {
-        fetchData()
-    }, [prevKey])
-
-    const [products, setProducts] = useState<any[]>([])
-    const [sellers, setSellers] = useState<any[]>([])
-    const [categories, setCategories] = useState<any[]>([])
-    const [groups, setGroups] = useState<any[]>([])
+    const [products, setProducts] = useState<any[]>([]);
+    const [sellers, setSellers] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [groups, setGroups] = useState<any[]>([]);
 
     const fetchData = async () => {
-        const sellersResponse = await getSellersAPI()
-        const categoriesResponse = await getCategoriesAPI()
-        const groupsResponse = await getGroupsAPI()
-        const productsResponse = await getProductsAPI()
-        setSellers(sellersResponse)
-        setCategories(categoriesResponse)
-        setGroups(groupsResponse)
-        setProducts(productsResponse)
-        setFilteredProducts(productsResponse)
+        try {
+            const sellersResponse = await getSellersAPI();
+            const categoriesResponse = await getCategoriesAPI();
+            const groupsResponse = await getGroupsAPI();
+            const productsResponse = await getProductsAPI();
+
+            console.log("Sellers", sellersResponse);
+            console.log("Categories", categoriesResponse);
+            console.log("Groups", groupsResponse);
+            console.log("Products", productsResponse);
+
+            setSellers(sellersResponse);
+            setCategories(categoriesResponse);
+            setGroups(groupsResponse);
+            setProducts(productsResponse);
+            setFilteredProducts(productsResponse);
+        } catch (error) {
+            console.error("Error al cargar los datos:", error);
+            // Podés mostrar una notificación, etc.
+        }
+    };
 
 
-    }
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    useEffect(() => { fetchData() }, [])
+    useEffect(() => {
+        filter();
+    }, [selectedSeller]);
+
+    useEffect(() => {
+        fetchData();
+    }, [prevKey]);
 
     useEffect(() => {
         const newOptions = [
@@ -154,14 +86,14 @@ const StockManagement = () => {
                 filter: filterByCategoria,
                 group: categories,
                 groupFunction: (category, products) =>
-                    products.filter((product) => product.id_categoria == category.id_categoria)
+                    products.filter((product) => product.id_categoria == category._id)
             },
             {
                 option: 'Grupo',
                 filter: filterByGroup,
                 group: groups,
                 groupFunction: (group, products) =>
-                    products.filter((product) => product.groupId == group.id)
+                    products.filter((product) => product.groupId == group._id)
             }
         ];
 
@@ -170,39 +102,115 @@ const StockManagement = () => {
                 option: 'Vendedor',
                 filter: filterBySeller,
                 group: sellers,
-                groupFunction: (seller, products) => {
-                    return products.filter((product) => product.id_vendedor == seller._id)
-                }
+                groupFunction: (seller, products) =>
+                    products.filter((product) => product.id_vendedor == seller._id)
             });
         }
 
         setOptions(newOptions);
-    }, [filteredProducts])
+
+        // NUEVO: aplicar filtro por defecto cuando se cargan
+        setTimeout(() => filter(), 100);
+    }, [sellers, categories, groups]);
+
+
+    const showVariantModal = async (product: any) => {
+        const group = await getGroupByIdAPI(product.groupId);
+        group.product = product;
+        setSelectedGroup(group);
+        setIsVariantModalVisible(true);
+    };
+
+    const closeConfirmProduct = async () => {
+        const productsResponse = await getProductsAPI();
+        setProducts(productsResponse);
+        setFilteredProducts(productsResponse);
+        setNewVariants([]);
+        setProductsToUpdate({});
+        setNewProducts([]);
+        setStock([]);
+        setIsConfirmModalVisible(false);
+    };
+
+    const cancelConfirmProduct = async () => {
+        setIsConfirmModalVisible(false);
+    };
+
+    const succesAddVariant = async (newVariant) => {
+        setProducts([...products, newVariant.product]);
+        setFilteredProducts([...filteredProducts, newVariant.product]);
+        setNewVariants([...newVariants, newVariant]);
+        closeModal();
+    };
+
+    const showModal = (product: any) => {
+        setSelectedProduct(product);
+        setInfoModalVisible(true);
+    };
+
+    const closeModal = () => {
+        setSelectedProduct(null);
+        setInfoModalVisible(false);
+        setSelectedGroup(null);
+        setIsVariantModalVisible(false);
+    };
+
+    const filterBySeller = (product, sellerId) => {
+        return sellerId === null || product.id_vendedor === sellerId;
+    };
+
+    const filterByCategoria = (product, sellerId) => {
+        return sellerId === null || product.id_categoria === sellerId;
+    };
+
+    const filterByGroup = (product, sellerId) => {
+        return sellerId === null || product.groupId === sellerId;
+    };
+
+    const handleSelectSeller = (sellerId: any) => {
+        setSelectedSeller(sellerId);
+    };
+
+    const filter = () => {
+        const filter = options[criteriaFilter]?.filter;
+        if (!filter) return;
+        const newList = products.filter(product => filter(product, selectedSeller));
+        console.log("Lista que se muestra en ProductTable:", newList);
+        setFilteredProducts(newList);
+    };
 
     const handleChangeFilter = (index: number) => {
-        setCriteriaFilter(index)
-    }
+        setCriteriaFilter(index);
+    };
 
     const handleChangeGroup = (index: number) => {
-        setCriteriaGroup(index)
-    }
+        setCriteriaGroup(index);
+    };
 
     const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
-
-        await createProductsFromGroup(productData, combinations, selectedFeatures, features)
-        setProductFormVisible(false)
+        await createProductsFromGroup(productData, combinations, selectedFeatures, features);
+        setProductFormVisible(false);
         setNewProducts([...newProducts, {
             productData,
             combinations,
             selectedFeatures,
             features
-        }])
-        setPrevKey(key => key + 1)
-    }
+        }]);
+        setPrevKey(key => key + 1);
+    };
 
     const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
 
+    const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
 
+    const handleMoveSuccess = () => {
+        fetchData();
+        setIsMoveModalVisible(false);
+    };
+
+    console.log("CRITERIA GROUP:", criteriaGroup);
+    console.log("GROUP ENVIADO A PRODUCTTABLE:", options[criteriaGroup]?.group);
+    console.log("FUNCIÓN DE AGRUPACIÓN:", options[criteriaGroup]?.groupFunction);
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div className="block xl:flex justify-center">
@@ -229,37 +237,30 @@ const StockManagement = () => {
                 </Col>
             </Row>
 
-            <Row
-                gutter={[16, 16]}
-                justify="center"
-                align="middle"
-                style={{ marginBottom: "16px" }}
-            >
-                <Col {...controlSpan}>
-                    <Select
-                        style={{ width: 200 }}
-                        placeholder="Select an option"
-                        onChange={handleChangeGroup}
-                        defaultValue={0}
-                    >
-                        {options.map((option, index) => (
-                            <Option key={option.option} value={index}>
-                                {option.option}
-                            </Option>
-                        ))}
-                    </Select>
-                </Col>
+            <Row gutter={[16, 16]} justify="center" align="middle" style={{ marginBottom: "16px" }}>
+
 
                 {!isSeller && (
-                    <Col xs={24} sm={12} lg={6}>
-                        <Button
-                            onClick={() => setProductFormVisible(true)}
-                            type="primary"
-                            className='text-mobile-base xl:text-mobile-base'
-                        >
-                            Agregar Producto
-                        </Button>
-                    </Col>
+                    <>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Button
+                                onClick={() => setProductFormVisible(true)}
+                                type="primary"
+                                className='text-mobile-base xl:text-mobile-base'
+                            >
+                                Agregar Producto
+                            </Button>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Button
+                                onClick={() => setIsMoveModalVisible(true)}
+                                type="default"
+                                className='text-mobile-base xl:text-mobile-base'
+                            >
+                                Mover Productos
+                            </Button>
+                        </Col>
+                    </>
                 )}
 
                 <Col {...controlSpan}>
@@ -272,7 +273,6 @@ const StockManagement = () => {
                                 );
 
                                 if (product.producto_sucursal[0]) {
-                                    // product.producto_sucursal[0].cantidad_por_sucursal += productsToUpdate[productId]
                                     product.entrance = productsToUpdate[productId];
                                 }
 
@@ -296,8 +296,10 @@ const StockManagement = () => {
             </Row>
 
             <ProductTable
-                groupList={options[criteriaGroup].group}
-                groupCriteria={options[criteriaGroup].groupFunction}
+                groupList={options[criteriaFilter]?.group || []}
+                groupCriteria={(group) =>
+                    (options[criteriaFilter]?.groupFunction || (() => []))(group, filteredProducts)
+                }
                 showModal={showModal}
                 showVariantModal={showVariantModal}
                 productsList={
@@ -310,12 +312,12 @@ const StockManagement = () => {
                 }}
             />
 
+
             {infoModalVisible && (
                 <ProductInfoModal
                     visible={infoModalVisible}
                     onClose={closeModal}
                     product={selectedProduct}
-                // onSaveSuccess={handleSaveSuccess}
                 />
             )}
 
@@ -335,14 +337,24 @@ const StockManagement = () => {
                     visible={isVariantModalVisible}
                 />
             )}
+
             {isConfirmModalVisible && (
                 <ConfirmProductsModal
                     visible={isConfirmModalVisible}
                     onClose={cancelConfirmProduct}
-                    onSuccess={() => closeConfirmProduct()}
+                    onSuccess={closeConfirmProduct}
                     newVariants={newVariants}
                     newProducts={newProducts}
                     newStock={stock}
+                />
+            )}
+
+            {isMoveModalVisible && (
+                <MoveProductsModal
+                    visible={isMoveModalVisible}
+                    onClose={() => setIsMoveModalVisible(false)}
+                    onSuccess={handleMoveSuccess}
+                    products={products}
                 />
             )}
         </div>

@@ -1,77 +1,74 @@
 import { useContext, useEffect, useState } from 'react';
 import { Button, Input, Table } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { updateProductStockAPI } from '../../api/product';
-import ProductSearcher from './ProductSearcher';
 import { UserContext } from '../../context/userContext';
-import { IProduct } from '../../models/productModel';
+import ProductSearcher from './ProductSearcher';
 
-const ProductTable = ({ groupList, groupCriteria, showModal, showVariantModal, productsList, handleUpdate }: any) => {
+interface ProductTableProps {
+    productsList: any[];
+    groupList: any[];
+}
 
-    const [ingresoData, setIngresoData] = useState<{ [key: number]: number }>({});
-    const [searcher, setSearcher] = useState([])
-    const [tableGroup, setTableGroup] = useState<any[]>([])
+const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
+    const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
+    const [searcher, setSearcher] = useState<any>({}); // ✅ Inicializado como objeto, no array
+    const [tableGroup, setTableGroup] = useState<any[]>([]);
 
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
 
+    //console.log("PRODUCTS EN ProductTable:", productsList);
+    //console.log("GROUPLIST EN ProductTable:", groupList);
 
+    const groupCriteria = (group: any, products: any[]) => {
+        //console.log(`jajsjsjasaProductos en grupojsjsjs ${group.nombre}:`, products);
+        const result = products.filter(p => p.id_vendedor === group._id);
+        //console.log(`Productos en grupojsjsjs ${group.nombre} y ${group._id}:`, result);
 
+        return result;
+    };
 
     const handleIngresoChange = (productId: number, value: number) => {
         setIngresoData((prev) => ({ ...prev, [productId]: value }));
     };
-    useEffect(() => {
-        handleUpdate(ingresoData)
-    }, [ingresoData])
 
-    const handleStockUpdate = async () => {
+    const handleStockUpdate = () => {
+        console.log("Ingreso data:", ingresoData);
+        const newStock = [];
 
-        const updatedProducts = products
-
-        const newStock = [] as any[];
-        for (const product of updatedProducts) {
-            if (product.producto_sucursal[0]) {
-                // TODO Change when there will be more than one sucursal
-                product.producto_sucursal[0].cantidad_por_sucursal += ingresoData[product.id_producto] || 0
-                if (ingresoData[product.id_producto])
-                    newStock.push({
-                        productId: product.id_producto,
-                        sucursalId: 3,
-                        stock: ingresoData[product.id_producto]
-                    })
+        for (const product of productsList) {
+            const ingreso = ingresoData[product._id] || 0;
+            if (ingreso > 0) {
+                newStock.push({
+                    productId: product._id,
+                    sucursalId: 3,
+                    stock: ingreso
+                });
+            }else{
+                console.log(`No se actualiza el stock del producto ${product.nombre_producto} porque el ingreso es 0`);
             }
         }
 
-
-        await updateProductStockAPI(newStock)
-
-        handleUpdate()
-
+        console.log("Datos a enviar a API (mock):", newStock);
+        alert("Stock actualizado (simulado)");
         setIngresoData({});
     };
 
-
     const columns = [
         {
-            title: "",
-            dataIndex: "infoButton",
-            key: "infoButton",
-            width: "5%",
-            render: (_: any, product: IProduct) => (
-                <Button type="primary" onClick={() => showModal(product)}>
+            title: "Info",
+            key: "info",
+            render: (_: any, product: any) => (
+                <Button onClick={() => console.log("Mostrar info de:", product)}>
                     <InfoCircleOutlined />
                 </Button>
             )
         },
         !isSeller && {
-            title: "",
-            dataIndex: "addVariant",
+            title: "Agregar Variante",
             key: "addVariant",
-            width: "5%",
-            render: (_: any, product: IProduct) => (
-
-                <Button type='primary' onClick={() => showVariantModal(product)}>
+            render: (_: any, product: any) => (
+                <Button onClick={() => console.log("Agregar variante de:", product)}>
                     <PlusOutlined />
                 </Button>
             )
@@ -84,24 +81,26 @@ const ProductTable = ({ groupList, groupCriteria, showModal, showVariantModal, p
         {
             title: 'Stock actual',
             dataIndex: 'producto_sucursal',
-            key: 'producto_sucursal',
-            render: (producto_sucursal: any) =>
-                producto_sucursal.reduce((acc: number, cur: any) => acc + cur.cantidad_por_sucursal, 0)
+            key: 'stock',
+            render: (producto_sucursal: any[]) =>
+                Array.isArray(producto_sucursal)
+                    ? producto_sucursal.reduce((acc, suc) => acc + (suc.cantidad_por_sucursal || 0), 0)
+                    : 0
         },
         !isSeller && {
-            title: 'Ingreso/Entrada',
-            dataIndex: 'ingreso',
+            title: 'Ingreso',
             key: 'ingreso',
             render: (_: any, record: any) => (
-                !record.stock && <Input
+                <Input
                     type="number"
-                    value={ingresoData[record.id_producto] || ''}
-                    onChange={(e) =>
-                        handleIngresoChange(record.id_producto, parseInt(e.target.value, 10) || 0)
-                    }
+                    value={ingresoData[record._id] || ''}
+                    onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        handleIngresoChange(record._id, isNaN(val) ? '' : val);
+                    }}
+
                 />
-            ),
-            width: "10%"
+            )
         },
         {
             title: 'Precio',
@@ -112,76 +111,78 @@ const ProductTable = ({ groupList, groupCriteria, showModal, showVariantModal, p
             title: 'Categoría',
             dataIndex: 'categoria',
             key: 'categoria',
-            render: (categoria: any) => categoria?.categoria || "Sin categoria",
-        },
+            render: (cat: any) => cat?.categoria || "Sin categoría"
+        }
     ].filter(Boolean);
 
-    const changeSearcher = (criteria) => {
-        setSearcher(criteria)
-    }
+    const changeSearcher = (criteria: any) => {
+        console.log("Aplicando filtro de búsqueda:", criteria);
+        setSearcher(criteria);
+    };
 
     const getProductInGroup = () => {
-        const newGroupList = groupList
-        for (const group of newGroupList) {
-            const products = groupCriteria(group, productsList)
-            const productsSearch = products.filter(product => {
-                const { nombre_producto, id_categoria, sucursal, features } = searcher
+        console.log("Searcher actual:", searcher);
+        const newGroupList = groupList.map((group: any) => {
+            const groupId = group.id || group._id;
+            const groupName = group.name || group.nombre || "Sin nombre";
 
-                const lowerProductName = product.nombre_producto.toLowerCase()
-                const condition = ((!nombre_producto || lowerProductName.includes(nombre_producto.toLowerCase()))
-                    && (!id_categoria || product.id_categoria == id_categoria)
-                    && (!sucursal || product.producto_sucursal.some(suc => suc.id_sucursal == sucursal))
-                    && (!features || features.reduce((acc, feat) =>
-                        acc && product.features.some(productFeat => productFeat.feature == feat.key && productFeat.value.toLowerCase() == feat.value.toLowerCase())
-                        , true))
-                )
-                return condition
-            })
-            group.products = productsSearch
-        }
-        // TODO: Check if there will be empty tables, if not, use the code below that is not used
-        // const filteredGroupList = newGroupList.filter(group => group.products.length > 0);
-        // filteredGroupList.sort((groupA, groupB) => (groupA.products.length > groupB.products.length ? -1 : 1));
-        // setTableGroup(filteredGroupList);
-        newGroupList.sort((groupA, groupB) => (groupA.products.length > groupB.products.length) ? -1 : 1)
-        setTableGroup([...newGroupList])
-    }
+            const products = groupCriteria(group, productsList);
+            console.log("Grupito", groupId, "con productos:", products,"y grupasoz",group);
+            const filtered = products.filter(product => {
+                const { nombre_producto, id_categoria, sucursal, features } = searcher;
+
+                return (
+                    (!nombre_producto || product.nombre_producto.toLowerCase().includes(nombre_producto.toLowerCase())) &&
+                    (!id_categoria || product.id_categoria === id_categoria) &&
+                    (!sucursal || product.producto_sucursal?.some(suc => suc.id_sucursal === sucursal)) &&
+                    (!features || features.every(feat =>
+                        product.features?.some(pf =>
+                            pf.feature === feat.key && pf.value.toLowerCase() === feat.value.toLowerCase()
+                        )
+                    ))
+                );
+            });
+
+            console.log(`Productos en grupo "${groupName}" después de filtro:`, filtered);
+
+            return { ...group, name: groupName, products: filtered };
+        });
+
+        setTableGroup(newGroupList);
+        console.log("Tabla agrupada:", newGroupList);
+    };
+
 
     useEffect(() => {
-        getProductInGroup()
-    }, [searcher, groupList, productsList])
-
+        getProductInGroup();
+    }, [searcher, productsList, groupList]);
 
     return (
         <>
-            <ProductSearcher
-                applySearcher={changeSearcher}
-            />
-            {
-                tableGroup.map((group: any) => (
-                    <div>
-                        <h2 style={{ textAlign: "left", marginTop: 30 }}>{group.nombre || group.categoria || group.name}</h2>
-                        <div style={{ marginTop: 30 }}>
+            <ProductSearcher applySearcher={changeSearcher} />
+            <Button onClick={handleStockUpdate} style={{ marginBottom: 20 }}>Actualizar Stock</Button>
+
+            {tableGroup.length === 0 ? (
+                <p>No hay grupos de productos.</p>
+            ) : (
+                tableGroup.map((group, i) => (
+                    <div key={i}>
+                        <h2 style={{ textAlign: 'left', marginTop: 30 }}>{group.name}</h2>
+                        {group.products.length === 0 ? (
+                            <p style={{ color: 'gray' }}>Este grupo no tiene productos.</p>
+                        ) : (
                             <Table
                                 columns={columns}
                                 dataSource={group.products}
                                 pagination={{ pageSize: 5 }}
-                                scroll={{ x: "max-content" }}
-                                rowClassName={(record) => {
-                                    const ingreso = ingresoData[record.id_producto] || 0;
-                                    return ingreso !== 0 ? 'highlight-row' : '';
-                                }}
-
-
+                                rowKey="_id" // ✅ Asegura que el rowKey sea consistente
                             />
-                        </div>
+                        )}
                     </div>
                 ))
-            }
-
+            )}
         </>
-
-    )
+    );
 };
 
 export default ProductTable;
