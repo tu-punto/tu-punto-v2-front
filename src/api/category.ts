@@ -27,3 +27,15 @@ export const registerCategoryAPI = async (categoryData: any) => {
 
     }
 }
+export const getCategoryByIdAPI = async (id: string) => {
+    try {
+        const res = await apiClient.get(`/category/${id}`);
+        return res.data;
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false };
+    }
+}

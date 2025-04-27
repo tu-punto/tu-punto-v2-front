@@ -4,6 +4,7 @@ import { ISale } from "./saleModel";
 import { IWorker } from "./workerModel";
 
 export interface IProduct {
+  _id?:string;
   id_producto: number;
   nombre_producto: string;
   precio: number;

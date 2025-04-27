@@ -63,7 +63,9 @@ export const getProductsFromGroup = (productData, combinations, selectedFeatures
         const joinedFeatureValues = featureValues.map(f => f.value).join(' ')
 
         return {
-            "nombre_producto": `${productData.nombre_producto} ${joinedFeatureValues}`,
+            "nombre_producto": joinedFeatureValues //Nombre + variante
+                ? `${productData.nombre_producto} / ${joinedFeatureValues}`
+                : productData.nombre_producto,
             "precio": combination.price,
             "imagen": '',
             "cantidad_por_sucursal": combination.stock,
@@ -95,9 +97,12 @@ export const createProductsFromGroup = async (productData, combinations, selecte
             };
         });
 
-        const joinedFeatureValues = featureValues.map(f => f.value).join(' ');
+        const joinedFeatureValues = featureValues.map(f => f.value).join(' / ');
+        console.log("joinedFeatureValues", joinedFeatureValues);
         return {
-            nombre_producto: `${productData.nombre_producto} ${joinedFeatureValues}`,
+            "nombre_producto": joinedFeatureValues //Nombre + variante
+                ? `${productData.nombre_producto} / ${joinedFeatureValues}`
+                : productData.nombre_producto,
             precio: combination.price,
             imagen: '',
             cantidad_por_sucursal: combination.stock,

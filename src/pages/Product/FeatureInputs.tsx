@@ -94,7 +94,7 @@ const FeatureInputs = ({ features, selectedFeatures, featureValues, setFeatureVa
             className: "text-mobile-sm xl:text-desktop-sm",
         },
         {
-            title: 'Precio',
+            title: 'Precio Unitario',
             dataIndex: 'price',
             key: 'price',
             render: (text: any, record: any) => (

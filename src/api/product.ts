@@ -70,6 +70,20 @@ export const getAllProductsEntryAmountBySellerId = async (sellerId: any) => {
         return { succcess: false }
     }
 }
+export const getAllStockByProductIdAPI = async (idProduct: any) => {
+    try {
+        const res = await apiClient.get(`/product/stock/${idProduct}`)
+        console.log('Datos de producto_sucursal:', res.data);
+        return res.data
+    } catch (error) {
+        const err = error as AxiosError
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data }
+        }
+        return { success: false }
+    }
+}
+
 
 export const getProductFeaturesAPI = async (productId: any) => {
     try {
