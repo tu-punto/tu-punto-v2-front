@@ -5,6 +5,7 @@ import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
 import AddVariantModal from '../Product/AddVariantModal';
 import ProductInfoModal from '../Product/ProductInfoModal';
+import StockPerBranchModal from './StockPerBranchModal';
 import Product from "../Product/Product.tsx";
 import { IProduct } from "../../models/productModel.ts";
 import { getAllStockByProductIdAPI } from "../../api/product";
@@ -30,6 +31,9 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
 
     const [infoModalOpen, setInfoModalOpen] = useState(false);
     const [selectedProductInfo, setSelectedProductInfo] = useState<IProduct>(null);
+    const [stockModalOpen, setStockModalOpen] = useState(false);
+    const [selectedProductoSucursal, setSelectedProductoSucursal] = useState<any[]>([]);
+
 
     const openInfoModal = (product: any) => {
         setSelectedProductInfo(product);
@@ -50,6 +54,16 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         setSelectedProduct(null);
         setVariantModalOpen(false);
     };
+    const openStockModal = (productoSucursal: any[]) => {
+        setSelectedProductoSucursal(productoSucursal);
+        setStockModalOpen(true);
+    };
+
+    const closeStockModal = () => {
+        setSelectedProductoSucursal([]);
+        setStockModalOpen(false);
+    };
+
 
     const groupCriteria = (group: any, products: any[]) => {
         //.log("Tabla productos: ",products );
@@ -124,9 +138,13 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         {
             title: 'Stock actual',
             key: 'stock',
-            render: (_: any, record: any) => record.variant
-                ? record.stock // si es variante muestra stock individual
-                : record.totalStock // si es grupo principal muestra total
+            render: (_: any, record: any) => record.variant ? (
+                <Button type="link" onClick={() => openStockModal(record.producto_sucursal)}>
+                    {record.stock}
+                </Button>
+            ) : (
+                <span>{record.totalStock}</span>
+            )
         },
         {
             title: 'Precio Unitario',
@@ -139,7 +157,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
             key: 'nombre_categoria',
             render: (nombre_categoria: any) => nombre_categoria || "Sin categoría"
         },
-        {
+        {/*
             title: "Info",
             key: "info",
             render: (_: any, record: any) => (
@@ -149,7 +167,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     </Button>
                 )
             )
-        },
+        */},
         !isSeller && {
             title: "Agregar Variante",
             key: "addVariant",
@@ -234,6 +252,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
             fetchStockForProducts();
         }
     }, [productsList, groupList, searcher]);
+    //console.log("Product sucursal:", selectedProductoSucursal);
 
 
     return (
@@ -281,6 +300,12 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     product: selectedProduct
                 }}
             />
+            <StockPerBranchModal
+                visible={stockModalOpen}
+                onClose={closeStockModal}
+                productoSucursal={selectedProductoSucursal}
+            />
+
         </>
     );
 };

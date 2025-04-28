@@ -21,7 +21,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
     const [branches , setBranches] = useState<IBranch[]>([])
 
     const handleFinish = async (productData: any) => {
-        console.log('Producto a registrar:', productData); // Verás el _idCategoria aquí
+        //console.log('Producto a registrar:', productData); // Verás el _idCategoria aquí
         setLoading(true);
         onSuccess(productData, combinations, selectedFeatures, features)
         setLoading(false);
