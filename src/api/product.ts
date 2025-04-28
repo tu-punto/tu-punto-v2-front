@@ -73,7 +73,7 @@ export const getAllProductsEntryAmountBySellerId = async (sellerId: any) => {
 export const getAllStockByProductIdAPI = async (idProduct: any) => {
     try {
         const res = await apiClient.get(`/product/stock/${idProduct}`)
-        console.log('Datos de producto_sucursal:', res.data);
+        //console.log('Datos de producto_sucursal:', res.data);
         return res.data
     } catch (error) {
         const err = error as AxiosError
@@ -138,3 +138,16 @@ export const updateProductStockAPI = async (newStock: any) => {
         parseError(error as AxiosError)
     }
 }
+export const updateProductBranchStockAPI = async (productBranchId: string, nuevaCantidad: number) => {
+    try {
+        const res = await apiClient.put(`/product/producto-sucursal/${productBranchId}`, { nuevaCantidad });
+        return res.data;
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false };
+    }
+}
+
