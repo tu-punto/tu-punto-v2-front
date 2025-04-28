@@ -28,6 +28,7 @@ export const Sales = () => {
     const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
     const { data, fetchProducts } = useProducts();
+
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [branches, setBranches] = useState([] as any[]);
 
@@ -99,17 +100,22 @@ export const Sales = () => {
     useEffect(() => {
         fetchSellers();
         fetchSucursal();
+        fetchProducts();
     }, []);
+    console.log("Data en Sales", data);
 
     const filteredProducts = () => {
+        console.log("Data en filtered",data,);
         let filteredData = data.filter((product: any) => product.groupId !== 1)
+
+        console.log("Filtered data 1",filteredData);
         if (!isAdmin) {
             return filteredData
         }
         if (selectedSellerId) {
             filteredData = filteredData.filter(product => product.id_vendedor === selectedSellerId)
         }
-
+        console.log("Filtered data 2",filteredData);
         if (selectedBranchId) {
             filteredData = filteredData.filter(product => {
                 for (const prodBranch of product.producto_sucursal) {
@@ -119,7 +125,10 @@ export const Sales = () => {
                 }
             })
         }
+        console.log("Filtered data",filteredData);
         return filteredData
+
+
     }
 
     const handleProductSelect = (product: any) => {
@@ -226,7 +235,7 @@ export const Sales = () => {
     const handleAddProduct = (newProduct: any) => {
         setSelectedProducts((prevProducts: any) => [...prevProducts, newProduct]);
     };
-
+    console.log("Final",data);
     return (
         <>
             <h1 className="text-mobile-2xl xl:text-desktop-2xl font-bold mb-4">
@@ -295,7 +304,7 @@ export const Sales = () => {
                         bordered={false}
                     >
                         <ProductTable
-                            data={filteredProducts()}
+                            data={data}
                             onSelectProduct={handleProductSelect}
                             key={refreshKey}
                         />

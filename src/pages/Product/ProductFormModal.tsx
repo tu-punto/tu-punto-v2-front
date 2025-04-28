@@ -147,7 +147,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                         placeholder="Selecciona un vendedor"
                         options={sellers.map((seller: any) => ({
                             value: seller._id,
-                            label: seller.nombre, // usa `nombre` si tu modelo de seller lo tiene
+                            label: seller.nombre+" "+seller.apellido, // usa `nombre` si tu modelo de seller lo tiene
                         }))}
                         showSearch
                         filterOption={(input, option: any) =>

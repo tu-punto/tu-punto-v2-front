@@ -53,6 +53,7 @@ const AppLayout = () => {
         <Content className="flex flex-col bg-white p-6">
           <Outlet />
         </Content>
+
       </Layout>
     </Layout>
   );

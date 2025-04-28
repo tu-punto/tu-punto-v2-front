@@ -11,21 +11,21 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
     const [sellers, setSellers] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([])
     const [filterList, setFilterList] = useState<any[]>([])
-    const [idKey, setIdKey] = useState("id_vendedor")
+    const [idKey, setIdKey] = useState("_id")
 
     const fetchData = async () => {
         const sellersResponse = await getSellersAPI();
-        sellersResponse.unshift({id_vendedor: null, name: "Todos"})
+        sellersResponse.unshift({_id: null, name: "Todos"})
         setSellers(sellersResponse);
-
+        console.log(sellersResponse);
         const groupsResponse = await getGroupsAPI()
         setGroups(groupsResponse)
-
+        console.log(groupsResponse);
         const categoriesResponse = await getCategoriesAPI()
         for(const category of categoriesResponse)
             category.name = category.categoria
         setCategories(categoriesResponse)
-
+        console.log(categoriesResponse);
         setFilterList(sellersResponse)
     }
 
@@ -36,12 +36,12 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
 
     useEffect( () => {
         if(filterSelected == 0){
-            setIdKey("id_vendedor")
+            setIdKey("_id")
             setFilterList(sellers)
             setPlaceholder("Lista de vendedores")
         }
         else if(filterSelected == 1){
-            setIdKey("id_categoria")
+            setIdKey("_id")
             setFilterList(categories)
             setPlaceholder("Lista de categorías")
         }
@@ -53,7 +53,7 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
     }, [filterSelected])
 
     for(const seller of sellers){
-        if(seller.id_vendedor)
+        if(seller._id)
             seller.name = `${seller.marca} - ${seller.nombre} ${seller.apellido}`
     }
 
