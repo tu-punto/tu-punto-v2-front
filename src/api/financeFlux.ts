@@ -55,3 +55,7 @@ export const getStatsAPI = async () => {
         parseError(error as AxiosError)
     }
 }
+
+export const paySellerDebtAPI = (fluxId: string) => {
+    apiClient.patch(`/financeFlux/${fluxId}/pay`);
+}

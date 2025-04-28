@@ -2,169 +2,171 @@ import {
   Modal,
   Form,
   DatePicker,
-  Radio,
   InputNumber,
   Button,
   Col,
   Row,
   message,
-  Checkbox,
+  Radio,
+  Card,
 } from "antd";
-import { useState } from "react";
-import { updateSellerAPI } from "../../api/seller";
-import { registerFinanceFluxAPI } from "../../api/financeFlux";
+import { PlusOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 
-const DebtModal = ({ visible, onSuccess, onCancel, seller }: any) => {
+import { getSucursalsAPI } from "../../api/sucursal";
+import { updateSellerAPI } from "../../api/seller";
+
+import BranchFields from "./components/BranchFields";
+import { ISucursalPago } from "../../models/sellerModels";
+
+interface Props {
+  visible: boolean;
+  onCancel: () => void;
+  onSuccess: () => void;
+  seller: any; // SellerRow
+}
+
+export default function DebtModal({ visible, onCancel, onSuccess, seller }: Props) {
   const [loading, setLoading] = useState(false);
-  const [payDebts, setPayDebts] = useState(false);
+  const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
+  const [form] = Form.useForm();
 
-  const handleFinish = async (debtInfo: any) => {
+  useEffect(() => {
+    if (!visible) return;
+    (async () => {
+      setSucursalOptions(await getSucursalsAPI());
+
+      const initSucursales = (seller.pago_sucursales || []).map((p: ISucursalPago) => ({
+        id_sucursal: p.id_sucursal,
+        sucursalName: p.sucursalName,
+        alquiler: p.alquiler,
+        exhibicion: p.exhibicion,
+        delivery: p.delivery,
+        entrega_simple: p.entrega_simple,
+      }));
+
+      form.setFieldsValue({
+        fecha_vigencia: dayjs(seller.fecha_vigencia, "D/M/YYYY/"),
+        comision_porcentual: seller.comision_porcentual,
+        comision_fija: seller.comision_fija,
+        isDebt: true,
+        sucursales: initSucursales.length ? initSucursales : [{}],
+      });
+    })();
+  }, [visible]);
+
+  const addBranch = () => {
+    const list = form.getFieldValue("sucursales") || [];
+    if (list.length >= sucursalOptions.length) {
+      return message.warning("Ya agregaste todas las sucursales");
+    }
+    form.setFieldsValue({ sucursales: [...list, {}] });
+  };
+
+  const onFinish = async (values: any) => {
     setLoading(true);
-
-    const montoFinanceFlux =
-      parseInt(debtInfo.alquiler) +
-      parseInt(debtInfo.exhibicion) +
-      parseInt(debtInfo.delivery);
-    let newDebt = parseFloat(seller.deudaInt || 0);
-    if (debtInfo.isDebt) {
-      newDebt -= montoFinanceFlux;
-    }
-    const updatedSellerData = {
-      ...debtInfo,
-      deuda: newDebt,
-    };
-
-    const resSeller = await updateSellerAPI(parseInt(seller.key), updatedSellerData);
-    if (!resSeller?.success) {
-      message.error("Error al renovar el vendedor");
-      setLoading(false);
-      return;
-    }
-    message.success("Vendedor renovado con éxito");
-
-    const financeFluxData = {
-      id_vendedor: parseInt(seller.key),
-      categoria: "RENOVACION",
-      tipo: "INGRESO",
-      concepto: `Vendedor ${seller.nombre} - ${seller.marca} renovado`,
-      monto: montoFinanceFlux,
-      esDeuda: debtInfo.isDebt,
-    };
-
-    const resFinanceFlux = await registerFinanceFluxAPI(financeFluxData);
-    if (resFinanceFlux.status) {
-      message.success("Ingreso registrado con éxito");
-    } else {
-      message.error(
-        `Error al registrar el ingreso con monto Bs. ${montoFinanceFlux}`
+    try {
+      const montoFinanceFlux = (values.sucursales || []).reduce(
+        (tot: number, p: any) =>
+          tot +
+          Number(p.alquiler || 0) +
+          Number(p.exhibicion || 0) +
+          Number(p.delivery || 0),
+        0
       );
+
+      let nuevaDeuda = Number(seller.deudaInt || 0);
+      if (values.isDebt) nuevaDeuda -= montoFinanceFlux;
+
+      const payload = {
+        ...values,
+        fecha_vigencia: values.fecha_vigencia.toISOString(),
+        pago_sucursales: values.sucursales,
+        deuda: nuevaDeuda,
+        esDeuda: values.isDebt,
+      };
+
+      const res = await updateSellerAPI(seller._id, payload);
+      if (!res?.success) throw new Error("update fail");
+
+      message.success("Vendedor renovado con éxito");
+      onSuccess();
+    } catch (err) {
+      console.error(err);
+      message.error("Error al renovar vendedor");
+    } finally {
+      setLoading(false);
     }
-    
-    if (payDebts) {
-      // TODO: Logica de pago de deudas anteriores
-      message.success("Deuda(s) pagada(s) con éxito");
-    }
-    onSuccess();
-    setLoading(false);
   };
 
   return (
-    <Modal
-      title={"Renovar vendedor"}
-      open={visible}
-      footer={null}
-      onCancel={onCancel}
-    >
-      <Form onFinish={handleFinish} layout="vertical">
-        <Form.Item name="isDebt" label="Es deuda?">
+    <Modal title="Renovar vendedor" open={visible} footer={null} onCancel={onCancel} width={850}>
+      <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Form.Item name="isDebt" label="¿Es deuda?">
           <Radio.Group>
             <Radio.Button value={true}>SI</Radio.Button>
             <Radio.Button value={false}>NO</Radio.Button>
           </Radio.Group>
         </Form.Item>
 
-        <Form.Item
-          name="fecha_vigencia"
-          label="Fecha Final del Servicio*"
-          rules={[
-            {
-              required: true,
-              message: "Por favor seleccione una fecha final del servicio",
-            },
-          ]}
-        >
-          <DatePicker
-            className="w-full"
-            defaultValue={dayjs(seller.fecha_vigencia, "D/M/YYYY/")}
-            format="DD/MM/YYYY"
-          />
-        </Form.Item>
-
         <Row gutter={16}>
-          <Col span={6}>
+          <Col xs={24} md={12}>
             <Form.Item
-              name="alquiler"
-              label="Alquiler"
-              initialValue={seller.alquiler}
+              name="fecha_vigencia"
+              label="Fecha final del servicio"
+              rules={[{ required: true }]}
             >
-              <InputNumber className="w-full" prefix="Bs." min={0} />
+              <DatePicker className="w-full" format="DD/MM/YYYY" />
             </Form.Item>
           </Col>
-          <Col span={6}>
-            <Form.Item
-              name="exhibicion"
-              label="Exhibición"
-              initialValue={seller.exhibicion}
-            >
-              <InputNumber className="w-full" prefix="Bs." min={0} />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item
-              name="delivery"
-              label="Delivery"
-              initialValue={seller.delivery}
-            >
-              <InputNumber className="w-full" prefix="Bs." min={0} />
-            </Form.Item>
-          </Col>
-          <Col></Col>
         </Row>
 
-        <Form.Item
-          name="comision_porcentual"
-          label="Porcentaje de comisión"
-          initialValue={seller.comision_porcentual.replace("%", "").trim()}
-        >
-          <InputNumber min={0} max={100} suffix="%" />
-        </Form.Item>
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item name="comision_porcentual" label="Comisión %">
+              <InputNumber className="w-full" min={0} max={100} suffix="%" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="comision_fija" label="Comisión fija">
+              <InputNumber className="w-full" prefix="Bs." />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Form.Item
-          name="comision_fija"
-          label="Comisión Fija"
-          initialValue={seller.comision_fija.replace("Bs.", "").trim()}
-        >
-          <InputNumber prefix="Bs." className="w-full" />
-        </Form.Item>
-        <Form.Item>
-          <Checkbox
-            checked={payDebts}
-            onChange={(e) => setPayDebts(e.target.checked)}
-            className="text-mobile-sm xl:text-desktop-sm"
-          >
-            ¿Desea pagar las deudas existentes?
-          </Checkbox>
-        </Form.Item>
+        {/* Sucursales dinámicas */}
+        <Row justify="space-between" align="middle">
+          <Col><h3>Sucursales</h3></Col>
+          <Col>
+            <Button type="dashed" icon={<PlusOutlined />} onClick={addBranch}>
+              Añadir sucursal
+            </Button>
+          </Col>
+        </Row>
 
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading} className="text-mobile-sm xl:text-desktop-sm">
+        <Form.List name="sucursales">
+          {(fields, { remove }) => (
+            <>
+              {fields.map((field) => (
+                <Card key={field.key} style={{ marginTop: 16 }}>
+                  <BranchFields
+                    field={field}
+                    remove={remove}
+                    sucursalOptions={sucursalOptions}
+                  />
+                </Card>
+              ))}
+            </>
+          )}
+        </Form.List>
+
+        <Form.Item className="mt-6">
+          <Button type="primary" htmlType="submit" loading={loading}>
             Guardar
           </Button>
         </Form.Item>
       </Form>
     </Modal>
   );
-};
-
-export default DebtModal;
+}
