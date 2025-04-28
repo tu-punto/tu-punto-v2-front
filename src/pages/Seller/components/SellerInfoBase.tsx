@@ -1,6 +1,8 @@
-import { Button, Col, DatePicker, Form, InputNumber, message, Row } from "antd";
+import { Button, Card, Col, DatePicker, Form, InputNumber, message, Row } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import dayjs from 'dayjs';
+
 import { getProductsEntryAmount, updateEntry, deleteEntryProductsAPI } from "../../../api/entry";
 import { getPaymentProofsBySellerIdAPI } from "../../../api/paymentProof";
 import { getProductsBySellerIdAPI, updateSale, deleteSalesAPI } from "../../../api/sales";
@@ -13,6 +15,7 @@ import PaymentProofTable from "./PaymentProofTable";
 import CustomTable from "./SalesTable";
 import { getShipingByIdsAPI } from "../../../api/shipping";
 import PaymentProofPDF from "../../GeneratePDF/PaymentProofPDF";
+import BranchFields from "./BranchFields";
 
 const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     const [form] = Form.useForm();
@@ -151,7 +154,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         setLoading(true);
         try {
             console.log("Submitting form with sellerData", sellerData);
-            const resSeller = await updateSellerAPI(parseInt(seller.key), sellerData);
+            const resSeller = await updateSellerAPI(seller.key, sellerData);
             if (!resSeller?.success) {
                 message.error('Error al editar el vendedor');
                 return;
@@ -208,10 +211,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                 initialValues={{
                     telefono: seller.telefono,
                     fecha_vigencia: dayjs(seller.fecha_vigencia, "D/M/YYYY"),
-                    alquiler: seller.alquiler,
-                    exhibicion: seller.exhibicion,
-                    delivery: seller.delivery,
                     adelanto_servicio: seller.adelanto_servicio,
+                    sucursales: seller.pago_sucursales.length ? seller.pago_sucursales : [{}],
                     fecha: dayjs(seller.fecha, "D/M/YYYY"),
                 }}
             >
@@ -221,23 +222,37 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                 <Form.Item name="fecha_vigencia" label='Fecha final/máxima del servicio'>
                     <DatePicker format="DD/MM/YYYY" disabled={isSeller} />
                 </Form.Item>
-                <Row gutter={16}>
-                    <Col sm={24} xl={8}>
-                        <Form.Item name="alquiler" label="Alquiler">
-                            <InputNumber className="w-full" prefix="Bs." min={0} readOnly={isSeller} />
-                        </Form.Item>
-                    </Col>
-                    <Col sm={24} xl={8}>
-                        <Form.Item name="exhibicion" label="Exhibición">
-                            <InputNumber className="w-full" prefix="Bs." min={0} readOnly={isSeller} />
-                        </Form.Item>
-                    </Col>
-                    <Col sm={24} xl={8}>
-                        <Form.Item name="delivery" label="Delivery">
-                            <InputNumber className="w-full" prefix="Bs." min={0} readOnly={isSeller} />
-                        </Form.Item>
+                <Row justify="space-between" align="middle">
+                    <Col><h4 className="font-bold text-lg">Servicios por sucursal</h4></Col>
+                    <Col>
+                        <Button
+                            type="dashed"
+                            icon={<PlusOutlined />}
+                            onClick={() => {
+                                const current = form.getFieldValue("sucursales") || [];
+                                form.setFieldsValue({ sucursales: [...current, {}] });
+                            }}
+                        >
+                            Añadir sucursal
+                        </Button>
                     </Col>
                 </Row>
+
+                <Form.List name="sucursales">
+                    {(fields, { remove }) => (
+                        <>
+                            {fields.map((field) => (
+                                <Card key={field.key} style={{ marginTop: 16 }}>
+                                    <BranchFields
+                                        field={field}
+                                        remove={remove}
+                                        sucursalOptions={sucursales}
+                                    />
+                                </Card>
+                            ))}
+                        </>
+                    )}
+                </Form.List>
                 <Form.Item name="adelanto_servicio" label="Adelanto">
                     <InputNumber className="w-full" prefix="Bs." min={0} readOnly={isSeller} />
                 </Form.Item>

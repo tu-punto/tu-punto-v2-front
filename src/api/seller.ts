@@ -10,7 +10,12 @@ export const getSellersAPI = async () => {
         parseError(error as AxiosError)
     }
 }
-export const getSellerAPI = async (sellerId:number) => {
+
+export const renewSellerAPI = (id: string | number, data: any) => {
+    apiClient.put(`/seller/renew/${id}`, data);
+}
+
+export const getSellerAPI = async (sellerId: number) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}`)
         return res.data
@@ -21,7 +26,7 @@ export const getSellerAPI = async (sellerId:number) => {
 
 export const registerSellerAPI = async (sellerData: any) => {
     try {
-        console.log("Seller Data",sellerData);
+        console.log("Seller Data", sellerData);
         const res = await apiClient.post(`/seller/register`, sellerData)
         return res.data
     } catch (error) {
@@ -29,7 +34,7 @@ export const registerSellerAPI = async (sellerData: any) => {
     }
 }
 
-export const updateSellerAPI = async (sellerId: number, updateData: any) => {
+export const updateSellerAPI = async (sellerId: string, updateData: any) => {
     try {
         const res = await apiClient.put(`/seller/update/${sellerId}`, { newData: updateData })
         return { success: true, data: res.data }
