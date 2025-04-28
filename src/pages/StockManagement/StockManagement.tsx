@@ -50,10 +50,10 @@ const StockManagement = () => {
             const groupsResponse = await getGroupsAPI();
             const productsResponse = await getProductsAPI();
 
-            console.log("Sellers", sellersResponse);
-            console.log("Categories", categoriesResponse);
-            console.log("Groups", groupsResponse);
-            console.log("Products", productsResponse);
+            //console.log("Sellers", sellersResponse);
+            //console.log("Categories", categoriesResponse);
+            //console.log("Groups", groupsResponse);
+            //console.log("Products", productsResponse);
 
             setSellers(sellersResponse);
             setCategories(categoriesResponse);
@@ -175,7 +175,7 @@ const StockManagement = () => {
         const filter = options[criteriaFilter]?.filter;
         if (!filter) return;
         const newList = products.filter(product => filter(product, selectedSeller));
-        console.log("Lista que se muestra en ProductTable:", newList);
+        //console.log("Lista que se muestra en ProductTable:", newList);
         setFilteredProducts(newList);
     };
 
@@ -208,9 +208,9 @@ const StockManagement = () => {
         setIsMoveModalVisible(false);
     };
 
-    console.log("CRITERIA GROUP:", criteriaGroup);
-    console.log("GROUP ENVIADO A PRODUCTTABLE:", options[criteriaGroup]?.group);
-    console.log("FUNCIÓN DE AGRUPACIÓN:", options[criteriaGroup]?.groupFunction);
+    //console.log("CRITERIA GROUP:", criteriaGroup);
+    //console.log("GROUP ENVIADO A PRODUCTTABLE:", options[criteriaGroup]?.group);
+    //console.log("FUNCIÓN DE AGRUPACIÓN:", options[criteriaGroup]?.groupFunction);
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div className="block xl:flex justify-center">

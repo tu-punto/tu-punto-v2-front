@@ -21,6 +21,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
     const [branches , setBranches] = useState<IBranch[]>([])
 
     const handleFinish = async (productData: any) => {
+        //console.log('Producto a registrar:', productData); // Verás el _idCategoria aquí
         setLoading(true);
         onSuccess(productData, combinations, selectedFeatures, features)
         setLoading(false);
@@ -29,6 +30,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
     const createCategory = async () => {
         if (!newCategory) return
         setLoading(true)
+        console.log('Creando categoría:', newCategory);
         const response = await registerCategoryAPI({ categoria: newCategory })
         setLoading(false)
         if (response.status) {
@@ -72,6 +74,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
     const fetchCategories = async () => {
         try {
             const response = await getCategoriesAPI();
+            console.log('Categorías traídas del backend:', response);
             setCategories(response);
         } catch (error) {
             message.error('Error al obtener las categorías');
