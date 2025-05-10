@@ -17,7 +17,7 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     setIsModalVisible(false);
   };
 
-  const onFinish = (values: any) => {
+  const onFinish = () => {
     setIsModalVisible(false);
   };
 
