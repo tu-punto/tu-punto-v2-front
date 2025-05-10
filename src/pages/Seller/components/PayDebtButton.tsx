@@ -1,38 +1,73 @@
-import { Button, Checkbox, Popover, Tooltip, message } from "antd";
-import { DollarOutlined } from "@ant-design/icons";
-import { useState } from "react";
+import { useState } from 'react';
+import { Button, Checkbox, Popover, Tooltip, message } from 'antd';
+import { DollarOutlined } from '@ant-design/icons';
 
-const PayDebtButton = ({ seller }: any) => {
-  const [visible, setVisible] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+import { paySellerDebtAPI } from '../../../api/seller';
 
+interface Props {
+  seller: any;                       // SellerRow
+  onSuccess: () => void;             // para refrescar la tabla
+}
+
+const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
+  const [visible,   setVisible]   = useState(false);
+  const [checked,   setChecked]   = useState(false);
+  const [loading,   setLoading]   = useState(false);
+
+  /** click “Pagar” */
   const handleConfirm = async () => {
+    if (!checked) {
+      message.warning('Marca la casilla para confirmar el pago.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      message.success("Pago realizado con éxito");
-    } catch (error) {
-      message.error("Error al realizar el pago");
+      const res = await paySellerDebtAPI(seller._id, { payAll: true });
+      if (!res?.success) throw new Error('fail');
+
+      message.success('Pago realizado con éxito');
+      onSuccess();                   // 🔄 refresca los vendedores
+    } catch (err) {
+      console.error(err);
+      message.error('Error al realizar el pago');
     } finally {
+      setLoading(false);
       setVisible(false);
-      setConfirmed(false);
+      setChecked(false);
     }
   };
 
+  /** cancelar */
   const handleCancel = () => {
     setVisible(false);
-    setConfirmed(false);
-    message.info("Pago cancelado");
+    setChecked(false);
+    message.info('Pago cancelado');
   };
 
+  /* contenido del Popover */
   const content = (
     <div>
-      <Checkbox style={{ color: "#ff4d4f" }} className="text-mobile-sm xl:text-desktop-sm">
+      <Checkbox
+        checked={checked}
+        onChange={(e) => setChecked(e.target.checked)}
+        style={{ color: '#ff4d4f' }}
+        className="text-mobile-sm xl:text-desktop-sm"
+      >
         ¿Desea pagar las deudas existentes?
       </Checkbox>
-      <div style={{ marginTop: 8, textAlign: "right" }}>
-        <Button onClick={handleCancel} style={{ marginRight: 8 }} className="text-mobile-sm xl:text-desktop-sm">
+
+      <div className="mt-2 text-right">
+        <Button onClick={handleCancel} className="mr-2 text-mobile-sm xl:text-desktop-sm">
           Cancelar
         </Button>
-        <Button type="primary" danger onClick={handleConfirm} className="text-mobile-sm xl:text-desktop-sm">
+        <Button
+          type="primary"
+          danger
+          loading={loading}
+          onClick={handleConfirm}
+          className="text-mobile-sm xl:text-desktop-sm"
+        >
           Pagar
         </Button>
       </div>
@@ -40,14 +75,15 @@ const PayDebtButton = ({ seller }: any) => {
   );
 
   return (
-    <Tooltip title='Pagar deuda'>
+    <Tooltip title="Pagar deuda">
+      {/* detener propagación para que la fila no se seleccione */}
       <div onClick={(e) => e.stopPropagation()}>
         <Popover
           content={content}
           title="Pagar al vendedor"
           trigger="click"
           open={visible}
-          onOpenChange={(newVisible) => setVisible(newVisible)}
+          onOpenChange={(v) => setVisible(v)}
           placement="right"
         >
           <Button type="default" icon={<DollarOutlined />} />

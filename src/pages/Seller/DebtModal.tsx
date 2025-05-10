@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 
 import { getSucursalsAPI } from "../../api/sucursal";
-import { updateSellerAPI } from "../../api/seller";
+import { renewSellerAPI } from "../../api/seller";
 
 import BranchFields from "./components/BranchFields";
 import { ISucursalPago } from "../../models/sellerModels";
@@ -87,7 +87,7 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
         esDeuda: values.isDebt,
       };
 
-      const res = await updateSellerAPI(seller._id, payload);
+      const res = await renewSellerAPI(seller._id, payload);
       if (!res?.success) throw new Error("update fail");
 
       message.success("Vendedor renovado con éxito");
