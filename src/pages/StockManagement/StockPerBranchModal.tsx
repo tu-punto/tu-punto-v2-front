@@ -1,131 +1,75 @@
-import { Modal, Table, Button, InputNumber, Space, message } from 'antd';
-import { EditOutlined, SaveOutlined } from '@ant-design/icons';
+import { Modal, Table } from 'antd';
 import { useEffect, useState } from 'react';
 import { getSucursalsAPI } from '../../api/sucursal';
-import { updateProductBranchStockAPI, addProductStockAPI } from '../../api/product'; // Importamos tu nueva API
 
-const StockPerBranchModal = ({ visible, onClose, productoSucursal }: { visible: boolean, onClose: () => void, productoSucursal: any[] }) => {
-
-    const [branches, setBranches] = useState<any[]>([]);
-    const [loadingBranches, setLoadingBranches] = useState(false);
-    const [editing, setEditing] = useState(false);
+const StockPerBranchModal = ({
+                                 visible,
+                                 onClose,
+                                 variantName,
+                                 producto,
+                             }: {
+    visible: boolean;
+    onClose: () => void;
+    variantName: string;
+    producto: any;
+}) => {
     const [dataSource, setDataSource] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (visible) {
-            fetchBranches();
+        if (visible && variantName && producto) {
+            fetchData();
         }
-    }, [visible]);
+    }, [visible, variantName, producto]);
 
-    const fetchBranches = async () => {
-        setLoadingBranches(true);
+    const fetchData = async () => {
+        setLoading(true);
         try {
             const res = await getSucursalsAPI();
-            setBranches(res);
-            // Construimos la data cuando abrimos el modal
             const combinedData = res.map((branch: any) => {
-                const found = productoSucursal.find(ps => ps.id_sucursal === (branch._id.$oid || branch._id));
+                const sucursalId = branch._id.$oid || branch._id;
+
+                const foundSucursal = producto.sucursales?.find(
+                    (s: any) => (s.id_sucursal.$oid || s.id_sucursal) === sucursalId
+                );
+
+                const foundVariante = foundSucursal?.variantes?.find(
+                    (v: any) => v.nombre_variante === variantName
+                );
+
                 return {
-                    key: branch._id.$oid || branch._id,
+                    key: sucursalId,
                     nombre: branch.nombre,
-                    cantidad_por_sucursal: found ? found.cantidad_por_sucursal : 0,
-                    id_producto_sucursal: found ? (found._id.$oid || found._id) : null
+                    stock: foundVariante ? foundVariante.stock : 0
                 };
             });
+
             setDataSource(combinedData);
         } catch (error) {
-            console.error('Error al obtener sucursales:', error);
+            console.error('Error al obtener datos del stock por sucursal:', error);
         } finally {
-            setLoadingBranches(false);
+            setLoading(false);
         }
-    };
-
-    const handleSaveChanges = async () => {
-        try {
-            const updates = dataSource.filter(row => row.id_producto_sucursal !== null);
-            const creations = dataSource.filter(row => row.id_producto_sucursal === null && row.cantidad_por_sucursal > 0);
-
-            // Primero actualizamos los que ya existen
-            for (const item of updates) {
-                await updateProductBranchStockAPI(item.id_producto_sucursal, item.cantidad_por_sucursal);
-            }
-
-            // Luego creamos los nuevos registros de productos_sucursal
-            for (const item of creations) {
-                await addProductStockAPI({
-                    branch: item.key, // ID de sucursal
-                    products: [
-                        {
-                            id_producto: productoSucursal[0].id_producto, // sacado de productoSucursal
-                            cantidad_por_sucursal: item.cantidad_por_sucursal,
-                            numero_caja: 0 // Siempre iniciar en 0
-                        }
-                    ]
-                });
-            }
-
-            message.success('Stock actualizado exitosamente');
-            setEditing(false);
-            onClose();
-        } catch (error) {
-            console.error('Error al actualizar o registrar stock:', error);
-            message.error('Error actualizando o registrando stock');
-        }
-    };
-
-
-    const handleChangeCantidad = (value: number, key: string) => {
-        setDataSource(prev =>
-            prev.map(item =>
-                item.key === key ? { ...item, cantidad_por_sucursal: value } : item
-            )
-        );
     };
 
     const columns = [
         { title: 'Sucursal', dataIndex: 'nombre', key: 'nombre' },
-        {
-            title: 'Cantidad',
-            dataIndex: 'cantidad_por_sucursal',
-            key: 'cantidad_por_sucursal',
-            render: (text: any, record: any) =>
-                editing ? (
-                    <InputNumber
-                        min={0}
-                        value={record.cantidad_por_sucursal}
-                        onChange={(value) => handleChangeCantidad(value || 0, record.key)}
-                    />
-                ) : (
-                    record.cantidad_por_sucursal
-                )
-        }
+        { title: 'Stock', dataIndex: 'stock', key: 'stock' }
     ];
 
     return (
         <Modal
-            title="Stock por Sucursal"
+            title={`Stock por Sucursal - Variante: ${variantName}`}
             open={visible}
             onCancel={onClose}
             footer={null}
             width={600}
         >
-            <Space style={{ marginBottom: 16 }}>
-                {!editing ? (
-                    <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
-                        Editar
-                    </Button>
-                ) : (
-                    <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveChanges}>
-                        Guardar Cambios
-                    </Button>
-                )}
-            </Space>
-
             <Table
                 columns={columns}
                 dataSource={dataSource}
+                loading={loading}
                 pagination={false}
-                loading={loadingBranches}
                 size="small"
             />
         </Modal>

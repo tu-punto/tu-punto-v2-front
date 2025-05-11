@@ -11,7 +11,7 @@ const SellerFacturaButton = ({ isOpen }: { isOpen: boolean }) => {
             <img src={sellerIcon} alt="Vendedores de Factura" className="w-6 h-6 mx-3" />
             {isOpen && (
                 <span className="ml-2 text-mobile-sm xl:text-desktop-sm whitespace-normal break-words text-left">
-          Vendedores de Factura
+          Detalle Vendedores
         </span>
             )}
         </Link>

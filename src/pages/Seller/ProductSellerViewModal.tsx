@@ -13,7 +13,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
     const [form] = Form.useForm();
 
     const handleFinish = async (productData: any) => {
-        //console.log(productData);
+        console.log("ProductData",productData);
         Modal.confirm({
             title: 'Confirmación',
             content: '¿Está seguro de que desea registrar este producto?',
@@ -184,7 +184,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
                             </>
                         )}
                         options={categories.map((category: any) => ({
-                            value: category.id_categoria,
+                            value: category._id,
                             label: category.categoria,
                         }))}
                         showSearch

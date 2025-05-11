@@ -235,7 +235,8 @@ export const Sales = () => {
     const handleAddProduct = (newProduct: any) => {
         setSelectedProducts((prevProducts: any) => [...prevProducts, newProduct]);
     };
-    console.log("Final",data);
+    console.log("🚀 Productos pasados a ProductTable:", data);
+
     return (
         <>
             <h1 className="text-mobile-2xl xl:text-desktop-2xl font-bold mb-4">

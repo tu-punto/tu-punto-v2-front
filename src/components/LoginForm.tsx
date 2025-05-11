@@ -37,6 +37,8 @@ export default function LoginForm({
       if (!userRes.success) {
         return message.error("No se recuperó el usuario");
       }
+      localStorage.setItem("sucursalId", values.sucursalId);
+
       setUser(userRes.data);
       message.success("¡Bienvenido!");
       navigate(redirectTo);

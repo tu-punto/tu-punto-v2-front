@@ -4,6 +4,8 @@ import { useContext, useEffect, useState } from 'react';
 import useProducts from '../../hooks/useProducts';
 import { UserContext } from '../../context/userContext';
 const ProductTable = ({ data, onSelectProduct, refreshKey }: any) => {
+    console.log("📦 Data recibida como prop:", data);
+
     const { user }: any = useContext(UserContext);
 
     const columns = [
@@ -35,13 +37,16 @@ const ProductTable = ({ data, onSelectProduct, refreshKey }: any) => {
     useEffect(() => {
         const getNewData = async () => {
             const newData = await fetchProducts()
+            console.log("🔄 Nuevos productos desde hook:", newData);
             setLocalData(newData)
         }
         getNewData()
     }, [refreshKey])
+    console.log("📊 Datos que se están renderizando en la tabla:", data);
 
     return (
         <div className='flex'>
+
             <Table
                 className='flex-1'
                 columns={columns}
