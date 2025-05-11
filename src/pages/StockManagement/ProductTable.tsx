@@ -33,6 +33,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
     const [selectedProductInfo, setSelectedProductInfo] = useState<IProduct>(null);
     const [stockModalOpen, setStockModalOpen] = useState(false);
     const [selectedProductoSucursal, setSelectedProductoSucursal] = useState<any[]>([]);
+    const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
 
 
     const openInfoModal = (product: any) => {
@@ -54,15 +55,21 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         setSelectedProduct(null);
         setVariantModalOpen(false);
     };
-    const openStockModal = (productoSucursal: any[]) => {
-        setSelectedProductoSucursal(productoSucursal);
+    const [selectedVariantName, setSelectedVariantName] = useState("");
+    const [selectedProductForStock, setSelectedProductForStock] = useState<any>(null);
+
+    const openStockModal = (variantName: string, product: any) => {
+        setSelectedVariantName(variantName);
+        setSelectedProductForStock(product);
         setStockModalOpen(true);
     };
 
     const closeStockModal = () => {
-        setSelectedProductoSucursal([]);
+        setSelectedVariantName("");
+        setSelectedProductForStock(null);
         setStockModalOpen(false);
     };
+
 
 
     const groupCriteria = (group: any, products: any[]) => {
@@ -97,8 +104,8 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         const groups: { [key: string]: any } = {};
 
         products.forEach((product) => {
-            const [baseName, ...variantParts] = product.nombre_producto.split(' / ');
-            const variant = variantParts.join(' / ') || null;
+            const baseName = product.nombre_producto;
+            const sucursales = product.sucursales || [];
 
             if (!groups[baseName]) {
                 groups[baseName] = {
@@ -106,50 +113,75 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     nombre_producto: baseName,
                     children: [],
                     totalStock: 0,
-                    precio: product.precio,
+                    precio: '-', // puede variar entre variantes
                     nombre_categoria: product.nombre_categoria,
+                    productOriginal: product,
                 };
             }
 
-            const stock = Array.isArray(product.producto_sucursal)
-                ? product.producto_sucursal.reduce((acc, suc) => acc + (suc.cantidad_por_sucursal || 0), 0)
-                : 0;
+            sucursales.forEach((sucursal: any) => {
+                sucursal.variantes.forEach((variante: any) => {
+                    const variantName = `${variante.nombre_variante}`;
 
-            groups[baseName].children.push({
-                ...product,
-                variant,
-                stock,
-                key: product._id, // clave única para cada variante
+                    groups[baseName].children.push({
+                        ...product,
+                        nombre_producto: baseName, // para usarlo en render
+                        variant: variantName,
+                        stock: variante.stock,
+                        precio: variante.precio,
+                        key: `${product._id}-${sucursal.id_sucursal}-${variante.nombre_variante}`,
+                        sucursalData: sucursal,
+                    });
+
+
+                    groups[baseName].totalStock += variante.stock;
+                });
             });
-
-            groups[baseName].totalStock += stock;
         });
 
         return Object.values(groups);
     };
+
 
     const columns = [
         {
             title: "Producto",
             dataIndex: 'nombre_producto',
             key: 'nombre_producto',
-            render: (_: any, record: any) => record.variant ? `→ ${record.variant}` : record.nombre_producto
+            render: (_: any, record: any) =>
+                record.variant ? `→ ${record.nombre_producto} - ${record.variant}` : record.nombre_producto
         },
         {
             title: 'Stock actual',
             key: 'stock',
             render: (_: any, record: any) => record.variant ? (
-                <Button type="link" onClick={() => openStockModal(record.producto_sucursal)}>
+                <Button type="link" onClick={() => openStockModal(record.variant, record)}>
                     {record.stock}
                 </Button>
+
             ) : (
                 <span>{record.totalStock}</span>
             )
+
         },
         {
             title: 'Precio Unitario',
             dataIndex: 'precio',
             key: 'precio',
+        },
+        {
+            title: "Ingresos",
+            key: "ingresos",
+            render: (_: any, record: any) =>
+                record.variant ? (
+                    <Input
+                        value={ingresoData[record.key] ?? ''}
+                        onChange={(e) => handleIngresoChange(record.key, Number(e.target.value))}
+                        placeholder="Ingresar cantidad"
+                        type="number"
+                        min={0}
+                    />
+                ) : null
         },
         {
             title: 'Categoría',
@@ -172,13 +204,18 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
             title: "Agregar Variante",
             key: "addVariant",
             render: (_: any, record: any) => (
-                record.variant && (
-                    <Button onClick={() => openVariantModal(record)}>
+                !record.variant && (
+                    <Button onClick={(e) => {
+                        e.stopPropagation(); // evita que se expanda la fila
+                        openVariantModal(record.productOriginal);
+                    }}>
                         <PlusOutlined />
                     </Button>
+
                 )
             )
         },
+
     ].filter(Boolean);
 
 
@@ -218,15 +255,9 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
     useEffect(() => {
         const fetchStockForProducts = async () => {
             const updatedProducts = await Promise.all(productsList.map(async (product) => {
-                let producto_sucursal = [];
                 let nombre_categoria = "Sin categoría";
 
                 try {
-                    const stockRes = await getAllStockByProductIdAPI(product._id);
-                    if (stockRes.success !== false) {
-                        producto_sucursal = stockRes;
-                    }
-
                     if (product.id_categoria) {
                         const categoryRes = await getCategoryByIdAPI(product.id_categoria);
                         if (categoryRes.success !== false && categoryRes.categoria) {
@@ -234,12 +265,11 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                         }
                     }
                 } catch (err) {
-                    console.error("Error fetching product or category:", err);
+                    console.error("Error fetching category:", err);
                 }
 
                 return {
                     ...product,
-                    producto_sucursal,
                     nombre_categoria,
                 };
             }));
@@ -247,6 +277,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
             setUpdatedProductsList(updatedProducts);
             getProductInGroup(updatedProducts);
         };
+
 
         if (productsList.length > 0) {
             fetchStockForProducts();
@@ -273,12 +304,18 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                                 columns={columns}
                                 dataSource={groupProductsByBaseName(group.products)}
                                 expandable={{
-                                    defaultExpandAllRows: false,
+                                    expandedRowKeys,
+                                    onExpand: (expanded, record) => {
+                                        setExpandedRowKeys(expanded
+                                            ? [...expandedRowKeys, record.key]
+                                            : expandedRowKeys.filter(key => key !== record.key));
+                                    },
                                     expandRowByClick: true,
                                 }}
                                 pagination={{ pageSize: 5 }}
                                 rowKey="key"
                             />
+
 
                         )}
                     </div>
@@ -295,7 +332,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                 visible={variantModalOpen}
                 onCancel={closeVariantModal}
                 group={{
-                    id: selectedProduct?.groupId,
+                    id: selectedProduct?._id,
                     name: selectedProduct?.nombre_producto,
                     product: selectedProduct
                 }}
@@ -303,8 +340,11 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
             <StockPerBranchModal
                 visible={stockModalOpen}
                 onClose={closeStockModal}
-                productoSucursal={selectedProductoSucursal}
+                variantName={selectedVariantName}
+                producto={selectedProductForStock}
             />
+
+
 
         </>
     );

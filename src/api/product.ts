@@ -4,7 +4,9 @@ import { parseError } from "./util"
 
 export const getProductsAPI = async () => {
     try {
+        console.log("Tratando de obtener productos");
         const res = await apiClient.get(`/product`)
+        console.log("Get productos",res.data);
         return res.data
     } catch (error) {
         const err = error as AxiosError
@@ -30,9 +32,9 @@ export const registerProductAPI = async (productData: any) => {
 
 export const registerVariantAPI = async (productData: any) => {
     try {
+        console.log('Datos a enviar:', productData);
         const res = await apiClient.post('/product/registerVariant', {
-            product: productData.product,
-            stock: productData.stock
+            product: productData,
         })
         return res.data
     } catch (error) {
@@ -150,4 +152,40 @@ export const updateProductBranchStockAPI = async (productBranchId: string, nueva
         return { success: false };
     }
 }
+export const getProductStockAPI = async (idProduct: string, idSucursal: string) => {
+    try {
+        const res = await apiClient.get(`/product/${idProduct}/sucursal/${idSucursal}`)
+        return res.data
+    } catch (error) {
+        const err = error as AxiosError
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data }
+        }
+        return { success: false }
+    }
+}
+
+export const getProductByIdAPI = async (idProduct: string) => {
+    try {
+        const res = await apiClient.get(`/product/${idProduct}`)
+        return res.data
+    } catch (error) {
+        const err = error as AxiosError
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data }
+        }
+        return { success: false }
+    }
+}
+export const createVariantAPI = async ({ productId, sucursalId, variant }) => {
+    console.log("Creando variante", { productId, sucursalId, variant });
+    const res = await apiClient.post(`/product/add-variant`, {
+        productId,
+        sucursalId,
+        variant
+    });
+    return { success: true, data: res.data };
+};
+
+
 

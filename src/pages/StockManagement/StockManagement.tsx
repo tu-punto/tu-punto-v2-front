@@ -53,7 +53,7 @@ const StockManagement = () => {
             //console.log("Sellers", sellersResponse);
             //console.log("Categories", categoriesResponse);
             //console.log("Groups", groupsResponse);
-            //console.log("Products", productsResponse);
+            console.log("Products", productsResponse);
 
             setSellers(sellersResponse);
             setCategories(categoriesResponse);
@@ -172,12 +172,12 @@ const StockManagement = () => {
     };
 
     const filter = () => {
-        const filter = options[criteriaFilter]?.filter;
-        if (!filter) return;
-        const newList = products.filter(product => filter(product, selectedSeller));
-        //console.log("Lista que se muestra en ProductTable:", newList);
+        const selectedOption = options[criteriaFilter];
+        if (!selectedOption || !selectedOption.filter) return;
+        const newList = products.filter(product => selectedOption.filter(product, selectedSeller));
         setFilteredProducts(newList);
     };
+
 
     const handleChangeFilter = (index: number) => {
         setCriteriaFilter(index);
@@ -297,9 +297,14 @@ const StockManagement = () => {
 
             <ProductTable
                 groupList={options[criteriaFilter]?.group || []}
-                groupCriteria={(group) =>
-                    (options[criteriaFilter]?.groupFunction || (() => []))(group, filteredProducts)
-                }
+                groupCriteria={(group) => {
+                    const fn = options[criteriaFilter]?.groupFunction;
+                    console.log("groupFunction:", fn, "filteredProducts:", filteredProducts);
+                    if (typeof fn !== 'function' || !Array.isArray(filteredProducts)) return [];
+                    return fn(group, filteredProducts);
+                }}
+
+
                 showModal={showModal}
                 showVariantModal={showVariantModal}
                 productsList={
