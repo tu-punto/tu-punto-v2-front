@@ -6,10 +6,17 @@ import { Button } from "antd";
 const FinanceFlux = () => {
     const [isModalVisible, setIsModalVisible] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
+    const [editingFlux, setEditingFlux] = useState(null);
+
+    const handleEdit = (flux: any) => {
+        setEditingFlux(flux);
+        setIsModalVisible(true);
+    };
 
     const showModal = () => {
+        setEditingFlux(null);
         setIsModalVisible(true);
-    }
+    };
 
     const handleCancel = () => {
         setIsModalVisible(false);
@@ -29,12 +36,13 @@ const FinanceFlux = () => {
                 <h1 className="text-mobile-2xl xl:text-desktop-2xl font-bold">GASTOS E INGRESOS</h1>
                 <Button onClick={showModal} type="primary" className="text-mobile-sm xl:text-desktop-sm">Agregar Gasto o Ingreso</Button>
             </div>
-            <FinanceFluxTable key={refreshKey} />
+            <FinanceFluxTable refreshKey={refreshKey} onEdit={handleEdit} />
             <FinanceFluxFormModal
                 visible={isModalVisible}
                 onCancel={handleCancel}
                 onFinish={onFinish}
                 onSuccess={handleSuccess}
+                editingFlux={editingFlux}
             />
         </div>
     )
