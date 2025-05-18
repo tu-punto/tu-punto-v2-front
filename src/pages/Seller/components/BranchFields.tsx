@@ -5,10 +5,12 @@ export default function BranchFields({
   field,
   remove,
   sucursalOptions,
+  form,
 }: {
   field: any;
-  remove: any
+  remove: any;
   sucursalOptions: any[];
+  form: any;
 }) {
   return (
     <Row gutter={[8, 8]}>
@@ -38,7 +40,25 @@ export default function BranchFields({
               label: s.nombre,
             }))}
             showSearch
+            onChange={(value) => {
+              const selected = sucursalOptions.find((s) => s._id === value);
+              if (selected) {
+                form.setFieldValue(
+                  ['sucursales', field.name, 'sucursalName'],
+                  selected.nombre
+                );
+              }
+            }}
           />
+        </Form.Item>
+
+        {/* Campo oculto para mantener sucursalName sincronizado */}
+        <Form.Item
+          {...field}
+          name={[field.name, "sucursalName"]}
+          style={{ display: "none" }}
+        >
+          <input type="hidden" />
         </Form.Item>
       </Col>
 
