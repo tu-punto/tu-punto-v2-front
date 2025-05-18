@@ -1,8 +1,8 @@
-import { DatePicker, Select, Table } from "antd"
+import { Button, DatePicker, Select, Table } from "antd"
 import { getFinancesFluxAPI, getSellerByShippingAPI, getWorkerByShippingAPI } from "../../api/financeFlux";
 import { useEffect, useState } from "react";
 
-const FinanceFluxTable = (refreshKey: any) => {
+const FinanceFluxTable = ({ refreshKey, onEdit }: { refreshKey: any, onEdit: (flux: any) => void }) => {
     const [dataWithKey, setDataWithKey] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [selectedType, setSelectedType] = useState('');
@@ -29,7 +29,8 @@ const FinanceFluxTable = (refreshKey: any) => {
 
             const dataWithKeys = apiData.map((financeFlux: any, index: number) => ({
                 ...financeFlux,
-                key: financeFlux.id_flujo_financiero, // Usa un campo único como key
+                key: financeFlux._id, // Usa un campo único como key
+                id_flujo_financiero: financeFlux._id,
                 vendedor: sellers[index]?.nombre && sellers[index]?.apellido ? `${sellers[index]?.nombre} ${sellers[index]?.apellido}` : '',
                 encargado: workers[index]?.nombre || '',
                 esDeuda: financeFlux.esDeuda ? 'SI' : 'NO'
@@ -127,8 +128,16 @@ const FinanceFluxTable = (refreshKey: any) => {
                 <span className="text-mobile-sm xl:text-desktop-sm">{text}</span>
             ),
         },
+        {
+            title: "Acciones",
+            key: "actions",
+            render: (_: any, record: any) => (
+                <Button onClick={() => onEdit(record)} type="primary" className="text-mobile-sm xl:text-desktop-sm">Editar</Button>
+
+            ),
+        }
     ];
-    
+
 
     return (
         <div>

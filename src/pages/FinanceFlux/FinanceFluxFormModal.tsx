@@ -1,11 +1,12 @@
 import { Button, Col, DatePicker, Form, Input, InputNumber, message, Modal, Radio, Row, Select } from "antd";
 import { CommentOutlined, NotificationOutlined } from '@ant-design/icons';
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
-import { registerFinanceFluxAPI } from "../../api/financeFlux";
+import { registerFinanceFluxAPI, updateFinanceFluxAPI } from "../../api/financeFlux";
 import { getWorkersAPI } from "../../api/worker";
 import { getSellersAPI, registerSellerAPI } from "../../api/seller";
 
-function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
+function FinanceFluxFormModal({ visible, onCancel, onSuccess, editingFlux }: any) {
     const [loading, setLoading] = useState(false);
     const [workers, setWorkers] = useState([])
     const [sellers, setSellers] = useState([])
@@ -14,15 +15,31 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
 
     const handleFinish = async (financeFluxData: any) => {
         setLoading(true);
-        const response = await registerFinanceFluxAPI(financeFluxData);
-        setLoading(false);
-        if (response.status) {
-            message.success('Gasto o ingreso registrado con éxito');
-            onSuccess()
-        } else {
-            message.error('Error al registrar el gasto o ingreso');
+
+        console.log(financeFluxData);
+        const payload = {
+            ...financeFluxData,
+            fecha: financeFluxData.fecha?.toDate()?.toISOString(),
+        };
+
+        try {
+            const response = editingFlux
+                ? await updateFinanceFluxAPI(editingFlux.id_flujo_financiero, payload)
+                : await registerFinanceFluxAPI(payload);
+
+            if (response.status || response.ok) {
+                message.success(editingFlux ? 'Flujo actualizado con éxito' : 'Gasto o ingreso registrado con éxito');
+                onSuccess();
+            } else {
+                throw new Error();
+            }
+        } catch (error) {
+            message.error('Error al guardar el flujo financiero');
+        } finally {
+            setLoading(false);
         }
     };
+
     const createSeller = async () => {
         if (!newSeller) return
         setLoading(true)
@@ -60,6 +77,21 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
         fetchWorkers();
         fetchSellers();
     }, []);
+
+    useEffect(() => {
+        if (editingFlux) {
+            form.setFieldsValue({
+                ...editingFlux,
+                fecha: editingFlux.fecha ? dayjs(editingFlux.fecha) : null,
+                id_vendedor: editingFlux.id_vendedor,
+                id_trabajador: editingFlux.id_trabajador,
+                esDeuda: editingFlux.esDeuda 
+            });
+        } else {
+            form.resetFields();
+        }
+    }, [editingFlux, form]);
+
     return (
         <Modal
             title="Agregar Gasto o Ingreso"
@@ -102,10 +134,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
                 </Row>
                 <Row gutter={16}>
                     <Col span={12}>
-                        <Form.Item
-                            name='_id'
-                            label='Vendedor'
-                        >
+                        <Form.Item name='id_vendedor' label='Vendedor'>
                             <Select
                                 placeholder="Selecciona un vendedor"
                                 dropdownRender={menu => (
@@ -145,8 +174,22 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess }: any) {
                             name='fecha'
                             label='Fecha'
                             rules={[{ required: true, message: 'Este campo es obligatorio' }]}
-                            >
+                        >
                             <DatePicker format="DD/MM/YYYY" />
+                        </Form.Item>
+                    </Col>
+                </Row>
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item
+                            name='esDeuda'
+                            label='¿Es deuda?'
+                            rules={[{ required: true, message: 'Este campo es obligatorio' }]}
+                        >
+                            <Radio.Group>
+                                <Radio value={true}>Sí</Radio>
+                                <Radio value={false}>No</Radio>
+                            </Radio.Group>
                         </Form.Item>
                     </Col>
                 </Row>

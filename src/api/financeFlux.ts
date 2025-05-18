@@ -20,6 +20,15 @@ export const registerFinanceFluxAPI = async (financeFluxData: any) => {
     }
 }
 
+export const updateFinanceFluxAPI = async (id: string, data: any) => {
+    try {
+        const res = await apiClient.put(`/financeFlux/${id}`, data);
+        return res.data
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
 export const getSellerByShippingAPI = async (sellerId: any) => {
     try {
         const res = await apiClient.get(`/financeFlux/seller/${sellerId}`)
