@@ -23,34 +23,37 @@ import {
   updateSale,
   deleteSalesAPI,
 } from '../../../api/sales';
-import { updateSellerAPI } from '../../../api/seller';
+import { getSellerDebtsAPI, updateSellerAPI } from '../../../api/seller';
 import { getSucursalsAPI } from '../../../api/sucursal';
 import { getShipingByIdsAPI } from '../../../api/shipping';
 
 import { UserContext } from '../../../context/userContext';
 
-import BranchFields           from './BranchFields';
-import SellerHeader           from './SellerHeader';
-import StatsCards             from './StatsCards';
-import SalesSection           from './SalesSection';
-import EntryHistorySection    from './EntryHistorySection';
-import PaymentProofSection    from './PaymentProofSection';
-import ActionButtons          from './ActionButtons';
+import BranchFields from './BranchFields';
+import SellerHeader from './SellerHeader';
+import StatsCards from './StatsCards';
+import SalesSection from './SalesSection';
+import EntryHistorySection from './EntryHistorySection';
+import PaymentProofSection from './PaymentProofSection';
+import ActionButtons from './ActionButtons';
+import SellerDebtTable from './SellerDebtTable';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [form] = Form.useForm();
 
   /* ───── estado global para submit ───── */
-  const [loading, setLoading]       = useState(false);
+  const [loading, setLoading] = useState(false);
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [sucursalesLoaded, setSucursalesLoaded] = useState(false);
 
   /* datos agregados de sub-componentes */
-  const [salesData,        setSalesData]        = useState<any[]>([]);
-  const [deletedSales,     setDeletedSales]     = useState<any[]>([]);
-  const [entryData,        setEntryData]        = useState<any[]>([]);
+  const [salesData, setSalesData] = useState<any[]>([]);
+  const [deletedSales, setDeletedSales] = useState<any[]>([]);
+  const [entryData, setEntryData] = useState<any[]>([]);
   const [deletedEntryData, setDeletedEntryData] = useState<any[]>([]);
-  const [paymentProofs,    setPaymentProofs]    = useState<any[]>([]);
+  const [paymentProofs, setPaymentProofs] = useState<any[]>([]);
+  const [sellerDebts, setSellerDebts] = useState<any[]>([]);
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === 'seller';
@@ -63,6 +66,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       fetchSales();
       fetchEntryProducts();
       fetchPaymentProofs(seller.key);
+      fetchSellerDebts(seller.key);
     }
   }, [sucursalesLoaded]);
 
@@ -74,12 +78,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     } catch (e) { console.error('Error sucursales', e); }
   };
 
+  const fetchSellerDebts = async (sellerId: string) => {
+    try {
+      const res = await getSellerDebtsAPI(sellerId);
+      if (res?.success) setSellerDebts(res.data);
+    } catch (e) {
+      console.error('Error al cargar deudas del vendedor', e);
+    }
+  };
+
   const fetchSales = async () => {
     try {
       const res = await getProductsBySellerIdAPI(seller.key);
       const productos: any[] = Array.isArray(res) ? res : [];
       const pedidosIds = productos.map(p => p.id_pedido);
-      const uniqueIds  = Array.from(new Set(pedidosIds));
+      const uniqueIds = Array.from(new Set(pedidosIds));
 
       const shipRes = await getShipingByIdsAPI(uniqueIds);
 
@@ -96,7 +109,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         return {
           ...prod,
           tipo: esVenta ? 'Venta' : 'Pedido',
-          key : `${prod.id_producto}-${prod.fecha_pedido}`,
+          key: `${prod.id_producto}-${prod.fecha_pedido}`,
         };
       });
 
@@ -111,7 +124,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     } catch (e) { console.error('Error entry', e); }
   };
 
-  const fetchPaymentProofs = async (sellerId: number) => {
+  const fetchPaymentProofs = async (sellerId: string) => {
     try {
       const res = await getPaymentProofsBySellerIdAPI(sellerId);
       setPaymentProofs(Array.isArray(res) ? res : []);
@@ -152,8 +165,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   /* ─────────── valores para Stats ─────────── */
   const saldoPendiente = Number(seller.saldo_pendiente) || 0;
-  const deuda          = Number(seller.deuda)           || 0;
-  const pagoPendiente  = saldoPendiente - deuda;
+  const deuda = Number(seller.deuda) || 0;
+  const pagoPendiente = saldoPendiente - deuda;
 
   /* ─────────── render ─────────── */
   return (
@@ -171,11 +184,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         onFinish={handleFinish}
         layout="vertical"
         initialValues={{
-          telefono       : seller.telefono,
-          fecha_vigencia : dayjs(seller.fecha_vigencia, 'D-M-YYYY'),
-          sucursales     : seller.pago_sucursales.length
-                             ? seller.pago_sucursales
-                             : [{}],
+          telefono: seller.telefono,
+          fecha_vigencia: dayjs(seller.fecha_vigencia, 'D-M-YYYY'),
+          sucursales: seller.pago_sucursales.length
+            ? seller.pago_sucursales
+            : [{}],
         }}
       >
         {/* Teléfono */}
@@ -217,6 +230,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                     field={field}
                     remove={remove}
                     sucursalOptions={sucursales}
+                    form={form}
                   />
                 </Card>
               ))}
@@ -229,8 +243,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           initialSales={salesData}
           onSalesChange={setSalesData}
           onDeletedSalesChange={setDeletedSales}
-          onUpdateNoPagadasTotal={() => {}}
-          onUpdateHistorialTotal={() => {}}
+          onUpdateNoPagadasTotal={() => { }}
+          onUpdateHistorialTotal={() => { }}
           isSeller={isSeller}
         />
 
@@ -241,6 +255,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           isSeller={isSeller}
         />
 
+        <SellerDebtTable data={sellerDebts} />
+        
         <PaymentProofSection
           proofs={paymentProofs}
           sellerId={seller.key}

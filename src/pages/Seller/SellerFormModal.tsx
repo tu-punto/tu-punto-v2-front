@@ -249,6 +249,7 @@ export default function SellerFormModal({
                     field={field}
                     remove={remove}
                     sucursalOptions={sucursalOptions}
+                    form={form}
                   />
                 </Card>
               ))}

@@ -58,3 +58,12 @@ export const paySellerDebtAPI = async (sellerId: string,
         parseError(error as AxiosError)
     }
 }
+
+export const getSellerDebtsAPI  = async (sellerId: string) => {
+    try {
+        const res = await apiClient.get(`/seller/${sellerId}/debts`)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
