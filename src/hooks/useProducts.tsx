@@ -1,27 +1,49 @@
 import { useState, useEffect } from "react";
 import { getProductsAPI } from "../api/product";
+import { getCategoryByIdAPI } from "../api/category";
 
 const useProducts = () => {
     const [data, setData] = useState<any[]>([]);
+    const sucursalId = localStorage.getItem("sucursalId");
+
+    const categoryCache = new Map<string, string>();
+
+    const getCategoryName = async (id: string) => {
+        if (categoryCache.has(id)) return categoryCache.get(id);
+
+        const result = await getCategoryByIdAPI(id);
+        const nombre = result?.categoria || "Sin categoría";
+        categoryCache.set(id, nombre);
+        return nombre;
+    };
 
     const mapApiDataToProductoData = async (apiData: any) => {
-        const productDataPromises = apiData.map(async (item: any) => {
-            console.log("Llegué aqui",item);
-            //const categoria = item.categoria.categoria
+        const productData: any[] = [];
 
-            return {
-                key: item._id,
-                producto: item.nombre_producto,
-                precio: item.precio,
-                stockActual: item.producto_sucursal.reduce((acc: number, prodSuc: any) => acc + prodSuc.cantidad_por_sucursal, 0),
-                categoria: item.id_categoria,
-                id_vendedor: item.id_vendedor,
-                groupId: item.group._id, //Added not to show "Sin Grupo" group products
-                producto_sucursal: item.producto_sucursal
-            };
-        });
-        console.log("Devuelvo esto aqui",productDataPromises);
-        return Promise.all(productDataPromises);
+        for (const item of apiData) {
+            const sucursal = item.sucursales?.find(
+                (s: any) => s.id_sucursal === sucursalId
+            );
+            if (!sucursal) continue;
+
+            const categoriaNombre = await getCategoryName(item.id_categoria);
+
+            for (const v of sucursal.variantes || []) {
+                productData.push({
+                    key: `${item._id}-${v.nombre_variante}`,
+                    producto: `${item.nombre_producto} ${v.nombre_variante}`,
+                    precio: v.precio,
+                    stockActual: v.stock,
+                    categoria: categoriaNombre,
+                    id_vendedor: item.id_vendedor,
+                    id_producto: item._id,
+                    sucursalId: sucursal.id_sucursal,
+                    variante: v.nombre_variante,
+                });
+            }
+        }
+
+        return productData;
     };
 
     const fetchProducts = async () => {

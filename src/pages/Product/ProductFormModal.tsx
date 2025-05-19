@@ -2,39 +2,32 @@ import { Select, Button, Form, Input, Modal, message } from "antd";
 import { useEffect, useState } from "react";
 import { getSellersAPI } from "../../api/seller";
 import { getCategoriesAPI, registerCategoryAPI } from "../../api/category";
-import { IBranch } from "../../models/branchModel";
 import { getSucursalsAPI } from "../../api/sucursal";
-import SucursalVariantsForm from "./SucursalVariantsForm"; // Nuevo subcomponente
 import VariantInputs from "./VariantInputs";
-import {registerVariantAPI} from "../../api/product.ts";
+import { registerVariantAPI } from "../../api/product.ts";
 
 const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
     const [loading, setLoading] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [newCategory, setNewCategory] = useState('');
-    const [combinations, setCombinations] = useState([]); // Variantes generadas por sucursal
-    const [branches, setBranches] = useState<IBranch[]>([]);
-    const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
-    const [variantValues, setVariantValues] = useState<any>({});
+    const [newCategory, setNewCategory] = useState("");
+    const [combinations, setCombinations] = useState([]); // matriz final: nombre_variante, nombre_subvariante, precio, stock
+    const [branches, setBranches] = useState([]);
 
     const [form] = Form.useForm();
-
     const handleFinish = async (productData: any) => {
         setLoading(true);
         try {
-            const sucursalesMap: any = {};
+            const sucursalId = localStorage.getItem("sucursalId");
 
-            combinations.forEach(({ branchId, variant, stock, price }) => {
-                if (!sucursalesMap[branchId]) {
-                    sucursalesMap[branchId] = [];
-                }
-                sucursalesMap[branchId].push({ nombre_variante: variant, stock, precio: price });
-            });
-
-            const sucursales = Object.entries(sucursalesMap).map(([id_sucursal, variantes]: any) => ({
-                id_sucursal,
-                variantes
+            const sucursales = branches.map((b) => ({
+                id_sucursal: b._id,
+                variantes: combinations.map((combo) => ({
+                    nombre_variante: combo.varName0 ?? 'Variante',
+                    nombre_subvariante: combo.var0 ?? combo.variantName,
+                    precio: combo.price,
+                    stock: b._id === sucursalId ? combo.stock : 0
+                }))
             }));
 
             const finalData = {
@@ -42,15 +35,12 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                 sucursales
             };
 
-            console.log("Datos enviados a API:", finalData);
-
-            const response = await registerVariantAPI({ product: finalData });
+            const response = await registerVariantAPI(finalData);
 
             if (response.success) {
                 message.success("Producto registrado correctamente");
                 form.resetFields();
                 setCombinations([]);
-                setSelectedBranches([]);
                 onSuccess();
                 onCancel();
             } else {
@@ -58,14 +48,12 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
             }
 
         } catch (err) {
+            console.error(err);
             message.error("Error inesperado");
         } finally {
             setLoading(false);
         }
     };
-
-
-
 
     const createCategory = async () => {
         if (!newCategory) return;
@@ -73,11 +61,11 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
         const response = await registerCategoryAPI({ categoria: newCategory });
         setLoading(false);
         if (response.status) {
-            message.success('Categoría creada con éxito');
+            message.success("Categoría creada con éxito");
             fetchCategories();
-            setNewCategory('');
+            setNewCategory("");
         } else {
-            message.error('Error al crear categoría');
+            message.error("Error al crear categoría");
         }
     };
 
@@ -86,7 +74,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
             const res = await getSucursalsAPI();
             setBranches(res);
         } catch (error) {
-            message.error('Error al obtener las sucursales');
+            message.error("Error al obtener las sucursales");
         }
     };
 
@@ -95,7 +83,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
             const response = await getSellersAPI();
             setSellers(response);
         } catch (error) {
-            message.error('Error al obtener los vendedores');
+            message.error("Error al obtener los vendedores");
         }
     };
 
@@ -104,7 +92,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
             const response = await getCategoriesAPI();
             setCategories(response);
         } catch (error) {
-            message.error('Error al obtener las categorías');
+            message.error("Error al obtener las categorías");
         }
     };
 
@@ -120,7 +108,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
             open={visible}
             onCancel={onCancel}
             footer={null}
-            width={900}
+            width={1000}
         >
             <Form
                 form={form}
@@ -131,7 +119,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                 <Form.Item
                     name="nombre_producto"
                     label="Nombre del Producto"
-                    rules={[{ required: true, message: 'Por favor ingrese el nombre del producto' }]}
+                    rules={[{ required: true, message: "Por favor ingrese el nombre del producto" }]}
                 >
                     <Input placeholder="Nombre del Producto" />
                 </Form.Item>
@@ -139,7 +127,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                 <Form.Item
                     name="id_vendedor"
                     label="Vendedor"
-                    rules={[{ required: true, message: 'Por favor seleccione un vendedor' }]}
+                    rules={[{ required: true, message: "Por favor seleccione un vendedor" }]}
                 >
                     <Select
                         placeholder="Selecciona un vendedor"
@@ -157,18 +145,18 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                 <Form.Item
                     name="id_categoria"
                     label="Categoría"
-                    rules={[{ required: true, message: 'Por favor seleccione una categoría' }]}
+                    rules={[{ required: true, message: "Por favor seleccione una categoría" }]}
                 >
                     <Select
                         placeholder="Selecciona una categoría"
-                        dropdownRender={menu => (
+                        dropdownRender={(menu) => (
                             <>
                                 {menu}
-                                <div style={{ display: 'flex', padding: 8 }}>
+                                <div style={{ display: "flex", padding: 8 }}>
                                     <Input
-                                        style={{ flex: 'auto' }}
+                                        style={{ flex: "auto" }}
                                         value={newCategory}
-                                        onChange={e => setNewCategory(e.target.value)}
+                                        onChange={(e) => setNewCategory(e.target.value)}
                                     />
                                     <Button type="link" onClick={createCategory} loading={loading}>
                                         Añadir categoría
@@ -187,16 +175,11 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                     />
                 </Form.Item>
 
+                {/* NUEVO COMPONENTE que maneja variante + subvariantes */}
                 <VariantInputs
-                    branches={branches}
-                    selectedBranches={selectedBranches}
-                    setSelectedBranches={setSelectedBranches}
-                    variantValues={variantValues}
-                    setVariantValues={setVariantValues}
                     combinations={combinations}
                     setCombinations={setCombinations}
                 />
-
 
                 <Form.Item>
                     <Button type="primary" htmlType="submit" loading={loading}>

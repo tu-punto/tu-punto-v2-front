@@ -1,11 +1,8 @@
 import { Table } from 'antd';
-
-import { useContext, useEffect, useState } from 'react';
-import useProducts from '../../hooks/useProducts';
+import { useContext } from 'react';
 import { UserContext } from '../../context/userContext';
-const ProductTable = ({ data, onSelectProduct, refreshKey }: any) => {
-    console.log("📦 Data recibida como prop:", data);
 
+const ProductTable = ({ data, onSelectProduct }: any) => {
     const { user }: any = useContext(UserContext);
 
     const columns = [
@@ -31,28 +28,14 @@ const ProductTable = ({ data, onSelectProduct, refreshKey }: any) => {
         },
     ];
 
-    const { fetchProducts } = useProducts()
-    const [localData, setLocalData] = useState<any>([])
-
-    useEffect(() => {
-        const getNewData = async () => {
-            const newData = await fetchProducts()
-            console.log("🔄 Nuevos productos desde hook:", newData);
-            setLocalData(newData)
-        }
-        getNewData()
-    }, [refreshKey])
-    console.log("📊 Datos que se están renderizando en la tabla:", data);
-
     return (
-        <div className='flex'>
-
+        <div className="flex">
             <Table
-                className='flex-1'
+                className="flex-1"
                 columns={columns}
                 dataSource={data}
-                pagination={{pageSize: 10, pageSizeOptions: []}}
-                scroll={{x: "max-content" }}
+                pagination={{ pageSize: 10, pageSizeOptions: [] }}
+                scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
                     className: 'text-mobile-sm xl:text-desktop-sm',
                     onClick: () => onSelectProduct(record),
@@ -61,4 +44,5 @@ const ProductTable = ({ data, onSelectProduct, refreshKey }: any) => {
         </div>
     );
 };
+
 export default ProductTable;

@@ -9,7 +9,8 @@ import StockPerBranchModal from './StockPerBranchModal';
 import Product from "../Product/Product.tsx";
 import { IProduct } from "../../models/productModel.ts";
 import { getAllStockByProductIdAPI } from "../../api/product";
-import { getCategoryByIdAPI } from '../../api/category'; // corrige el path si es diferente
+import { getCategoryByIdAPI } from '../../api/category';
+import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
 
 
 interface ProductTableProps {
@@ -69,8 +70,20 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         setSelectedProductForStock(null);
         setStockModalOpen(false);
     };
+    const [priceModalOpen, setPriceModalOpen] = useState(false);
+    const [selectedProductForPrice, setSelectedProductForPrice] = useState<any>(null);
 
+    const openPriceModal = (variantName: string, product: any) => {
+        setSelectedVariantName(variantName);
+        setSelectedProductForPrice(product);
+        setPriceModalOpen(true);
+    };
 
+    const closePriceModal = () => {
+        setSelectedVariantName("");
+        setSelectedProductForPrice(null);
+        setPriceModalOpen(false);
+    };
 
     const groupCriteria = (group: any, products: any[]) => {
         //.log("Tabla productos: ",products );
@@ -101,11 +114,19 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         setIngresoData({});
     };
     const groupProductsByBaseName = (products: any[]) => {
+        const sucursalId = localStorage.getItem('sucursalId'); // Obtener sucursal activa
         const groups: { [key: string]: any } = {};
 
         products.forEach((product) => {
             const baseName = product.nombre_producto;
             const sucursales = product.sucursales || [];
+
+            // Filtrar solo sucursales que coincidan con la activa
+            const sucursalesFiltradas = sucursales.filter(
+                (sucursal: any) => sucursal.id_sucursal === sucursalId
+            );
+
+            if (sucursalesFiltradas.length === 0) return; // Saltar si no tiene sucursales válidas
 
             if (!groups[baseName]) {
                 groups[baseName] = {
@@ -119,20 +140,19 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                 };
             }
 
-            sucursales.forEach((sucursal: any) => {
+            sucursalesFiltradas.forEach((sucursal: any) => {
                 sucursal.variantes.forEach((variante: any) => {
                     const variantName = `${variante.nombre_variante}`;
 
                     groups[baseName].children.push({
                         ...product,
-                        nombre_producto: baseName, // para usarlo en render
+                        nombre_producto: baseName,
                         variant: variantName,
                         stock: variante.stock,
                         precio: variante.precio,
-                        key: `${product._id}-${sucursal.id_sucursal}-${variante.nombre_variante}`,
+                        key: `${product._id}-${sucursal.id_sucursal?.$oid}-${variante.nombre_variante}`,
                         sucursalData: sucursal,
                     });
-
 
                     groups[baseName].totalStock += variante.stock;
                 });
@@ -141,6 +161,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
 
         return Object.values(groups);
     };
+
 
 
     const columns = [
@@ -166,8 +187,14 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         },
         {
             title: 'Precio Unitario',
-            dataIndex: 'precio',
             key: 'precio',
+            render: (_: any, record: any) => record.variant ? (
+                <Button type="link" onClick={() => openPriceModal(record.variant, record)}>
+                    {record.precio}
+                </Button>
+            ) : (
+                <span>-</span>
+            )
         },
         {
             title: "Ingresos",
@@ -230,13 +257,20 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
 
             const productsInGroup = groupCriteria(group, products);
 
+            const sucursalId = (localStorage.getItem('sucursalId') || "0");
+
             const filtered = productsInGroup.filter(product => {
                 const { nombre_producto, id_categoria, sucursal, features } = searcher;
 
+                // Solo productos que contengan variantes de esta sucursal
+                const perteneceASucursal = product.sucursales?.some(suc => suc.id_sucursal === sucursalId);
+                //console.log("Sucursal ID:", sucursalId);
+                //console.log("Sucursal:", product.sucursales);
+                //console.log("Pertenece a sucursal:", perteneceASucursal);
                 return (
+                    perteneceASucursal &&
                     (!nombre_producto || product.nombre_producto.toLowerCase().includes(nombre_producto.toLowerCase())) &&
                     (!id_categoria || product.id_categoria === id_categoria) &&
-                    (!sucursal || product.producto_sucursal?.some(suc => suc.id_sucursal === sucursal)) &&
                     (!features || features.every(feat =>
                         product.features?.some(pf =>
                             pf.feature === feat.key && pf.value.toLowerCase() === feat.value.toLowerCase()
@@ -244,6 +278,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     ))
                 );
             });
+
 
             return { ...group, name: groupName, products: filtered };
         });
@@ -343,8 +378,12 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                 variantName={selectedVariantName}
                 producto={selectedProductForStock}
             />
-
-
+            <PricePerBranchModal
+                visible={priceModalOpen}
+                onClose={closePriceModal}
+                variantName={selectedVariantName}
+                producto={selectedProductForPrice}
+            />
 
         </>
     );
