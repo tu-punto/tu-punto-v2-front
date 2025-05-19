@@ -1,152 +1,151 @@
-import { useState, useEffect } from "react";
-import { Form, Input, InputNumber, Table, Button, Tag, Select } from "antd";
-import { IBranch } from "../../models/branchModel";
+import { useState, useEffect } from 'react';
+import { Form, Input, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 
-const VariantInputs = ({
-                           branches,
-                           selectedBranches,
-                           setSelectedBranches,
-                           variantValues,
-                           setVariantValues,
-                           combinations,
-                           setCombinations
-                       }: {
-    branches: IBranch[],
-    selectedBranches: string[],
-    setSelectedBranches: (v: string[]) => void,
-    variantValues: any,
-    setVariantValues: (v: any) => void,
-    combinations: any[],
-    setCombinations: (c: any[]) => void
-}) => {
-    const [currentInput, setCurrentInput] = useState<any>({});
+const VariantInputs = ({ combinations, setCombinations }: any) => {
+    const [variants, setVariants] = useState<any[]>([]);
+
+    const addVariant = () => {
+        setVariants([...variants, { name: '', subvariants: [] }]);
+    };
+
+    const removeVariant = (index: number) => {
+        const updated = [...variants];
+        updated.splice(index, 1);
+        setVariants(updated);
+    };
+
+    const updateVariantName = (index: number, name: string) => {
+        const updated = [...variants];
+        updated[index].name = name;
+        setVariants(updated);
+    };
+
+    const addSubvariant = (variantIndex: number, value: string) => {
+        const updated = [...variants];
+        if (!updated[variantIndex].subvariants.includes(value)) {
+            updated[variantIndex].subvariants.push(value);
+        }
+        setVariants(updated);
+    };
+
+    const removeSubvariant = (variantIndex: number, value: string) => {
+        const updated = [...variants];
+        updated[variantIndex].subvariants = updated[variantIndex].subvariants.filter((sv: string) => sv !== value);
+        setVariants(updated);
+    };
 
     useEffect(() => {
-        generateCombinations();
-    }, [variantValues, selectedBranches]);
-
-    const handleBranchChange = (value: string[]) => {
-        setSelectedBranches(value);
-    };
-
-    const handleVariantChange = (branchId: string, value: string) => {
-        setCurrentInput((prev: any) => ({
-            ...prev,
-            [branchId]: value,
-        }));
-    };
-
-    const confirmVariant = (branchId: string) => {
-        const inputValue = currentInput[branchId];
-        if (inputValue && (!variantValues[branchId] || !variantValues[branchId].includes(inputValue))) {
-            setVariantValues((prev: any) => ({
-                ...prev,
-                [branchId]: [...(prev[branchId] || []), inputValue],
-            }));
-            setCurrentInput((prev: any) => ({
-                ...prev,
-                [branchId]: '',
-            }));
-        }
-    };
-
-    const handleRemoveVariant = (branchId: string, value: string) => {
-        setVariantValues((prev: any) => ({
-            ...prev,
-            [branchId]: prev[branchId].filter((v: string) => v !== value),
-        }));
-    };
-
-    const generateCombinations = () => {
-        const combinationsGenerated: any[] = [];
-        selectedBranches.forEach((branchId) => {
-            const variants = variantValues[branchId] || [];
-            variants.forEach((variant: string, idx: number) => {
-                const key = `${branchId}-${idx}`;
-                const existing = combinations.find(c => c.key === key) || {};
-                combinationsGenerated.push({
-                    key,
-                    branchId,
-                    variant,
-                    stock: existing.stock || 0,
-                    price: existing.price || 0,
+        const generateCombinations = (index = 0, path = [], result = []) => {
+            if (index === variants.length) {
+                const combination: any = {
+                    key: path.map(p => p.value).join('-'),
+                    variantName: path.map(p => p.value).join(' / '),
+                    stock: 0,
+                    price: 0
+                };
+                path.forEach((p, i) => {
+                    combination[`var${i}`] = p.value;
+                    combination[`varName${i}`] = p.name;
                 });
-            });
-        });
-        setCombinations(combinationsGenerated);
-    };
+                result.push(combination);
+                return;
+            }
+            for (const value of variants[index].subvariants) {
+                generateCombinations(index + 1, [...path, { name: variants[index].name, value }], result);
+            }
+        };
 
-    const handleCombinationChange = (key: string, field: string, value: any) => {
-        setCombinations(combinations.map(c => c.key === key ? { ...c, [field]: value } : c));
-    };
-
-    const columns = [
-        {
-            title: "Sucursal",
-            dataIndex: "branchId",
-            render: (val: string) => branches.find(b => b._id === val)?.nombre || val
-        },
-        {
-            title: "Variante",
-            dataIndex: "variant",
-        },
-        {
-            title: "Stock",
-            dataIndex: "stock",
-            render: (text: any, record: any) => (
-                <InputNumber min={0} value={text} onChange={(value) => handleCombinationChange(record.key, 'stock', value)} />
-            )
-        },
-        {
-            title: "Precio",
-            dataIndex: "price",
-            render: (text: any, record: any) => (
-                <InputNumber min={0} value={text} onChange={(value) => handleCombinationChange(record.key, 'price', value)} />
-            )
-        },
-        {
-            title: "Acción",
-            render: (_: any, record: any) => (
-                <Button danger onClick={() => {
-                    setVariantValues((prev: any) => ({
-                        ...prev,
-                        [record.branchId]: prev[record.branchId].filter((v: string) => v !== record.variant)
-                    }));
-                }}>Eliminar</Button>
-            )
+        const result: any[] = [];
+        if (variants.every(v => v.subvariants.length && v.name)) {
+            generateCombinations(0, [], result);
         }
-    ];
+        setCombinations(result);
+    }, [variants]);
+
+    const handleChange = (key: string, field: 'stock' | 'price', value: number) => {
+        const updated = combinations.map((combo: any) =>
+            combo.key === key ? { ...combo, [field]: value } : combo
+        );
+        setCombinations(updated);
+    };
 
     return (
-        <>
-            <Form.Item label="Sucursales">
-                <Select
-                    mode="multiple"
-                    options={branches.map(b => ({ value: b._id, label: b.nombre }))}
-                    value={selectedBranches}
-                    onChange={handleBranchChange}
-                />
-            </Form.Item>
-
-            {selectedBranches.map(branchId => (
-                <Form.Item key={branchId} label={`Variantes para ${branches.find(b => b._id === branchId)?.nombre}`}>
-                    {variantValues[branchId]?.map((v: string) => (
-                        <Tag key={v} closable onClose={() => handleRemoveVariant(branchId, v)}>
-                            {v}
-                        </Tag>
-                    ))}
-                    <Input
-                        value={currentInput[branchId] || ''}
-                        onChange={e => handleVariantChange(branchId, e.target.value)}
-                        onPressEnter={() => confirmVariant(branchId)}
-                        placeholder="Añadir variante"
-                    />
-                    <Button onClick={() => confirmVariant(branchId)}>Agregar</Button>
-                </Form.Item>
+        <div style={{ padding: '1rem 0' }}>
+            <Typography.Title level={5}>Variantes</Typography.Title>
+            {variants.map((variant, index) => (
+                <div key={index} style={{ marginBottom: 16 }}>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                        <Space wrap>
+                            <Input
+                                placeholder="Nombre de la variante (ej: Color)"
+                                value={variant.name}
+                                onChange={(e) => updateVariantName(index, e.target.value)}
+                            />
+                            <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
+                        </Space>
+                        <Space wrap>
+                            {variant.subvariants.map((sv: string) => (
+                                <Tag
+                                    closable
+                                    onClose={() => removeSubvariant(index, sv)}
+                                    key={sv}
+                                >
+                                    {sv}
+                                </Tag>
+                            ))}
+                        </Space>
+                        <Input.Search
+                            placeholder={`Agregar subvariante a ${variant.name}`}
+                            enterButton={<PlusOutlined />}
+                            onSearch={(val) => val && addSubvariant(index, val)}
+                        />
+                    </Space>
+                </div>
             ))}
+            <Button icon={<PlusOutlined />} onClick={addVariant}>
+                Agregar Variante
+            </Button>
 
-            <Table columns={columns} dataSource={combinations} pagination={false} />
-        </>
+            {combinations.length > 0 && (
+                <div style={{ marginTop: 24 }}>
+                    <Typography.Title level={5}>Combinaciones</Typography.Title>
+                    <Table
+                        dataSource={combinations}
+                        rowKey="key"
+                        pagination={false}
+                        columns={[
+                            {
+                                title: 'Combinación',
+                                dataIndex: 'variantName'
+                            },
+                            {
+                                title: 'Stock',
+                                dataIndex: 'stock',
+                                render: (text, record) => (
+                                    <InputNumber
+                                        min={0}
+                                        value={record.stock}
+                                        onChange={(value) => handleChange(record.key, 'stock', value || 0)}
+                                    />
+                                )
+                            },
+                            {
+                                title: 'Precio',
+                                dataIndex: 'price',
+                                render: (text, record) => (
+                                    <InputNumber
+                                        min={0}
+                                        value={record.price}
+                                        onChange={(value) => handleChange(record.key, 'price', value || 0)}
+                                    />
+                                )
+                            }
+                        ]}
+                    />
+                </div>
+            )}
+        </div>
     );
 };
 

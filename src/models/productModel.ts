@@ -3,11 +3,19 @@ import { IWorker } from "./workerModel";
 import { ISale } from "./saleModel";
 import { IEntry } from "./entryModel";
 
-export interface IVariante {
-  nombre_variante: string;
+export interface ISubvariante {
+  nombre_subvariante: string;
   precio: number;
   stock: number;
 }
+
+export interface IVariante {
+  nombre_variante: string;
+  precio?: number;     // opcional porque puede usar subvariantes
+  stock?: number;      // idem
+  subvariantes?: ISubvariante[];
+}
+
 
 export interface ISucursalProducto {
   id_sucursal: string; // ObjectId como string

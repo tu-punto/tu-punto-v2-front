@@ -186,6 +186,48 @@ export const createVariantAPI = async ({ productId, sucursalId, variant }) => {
     });
     return { success: true, data: res.data };
 };
+export const updateProductPriceAPI = async (priceUpdates: Array<{
+    productId: string,
+    sucursalId: string,
+    varianteNombre: string,
+    precio: number
+}>) => {
+    try {
+        const res = await apiClient.put('/product/update-price', { priceUpdates });
+        return res.data;
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false };
+    }
+};
+export const updateSubvariantStockAPI = async ({
+                                                   productId,
+                                                   sucursalId,
+                                                   varianteNombre,
+                                                   subvarianteNombre,
+                                                   stock
+                                               }) => {
+    try {
+        const res = await apiClient.put('/product/update-subvariant-stock', {
+            productId,
+            sucursalId,
+            varianteNombre,
+            subvarianteNombre,
+            stock
+        });
+        return res.data;
+    } catch (error) {
+        const err = error;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false };
+    }
+};
+
 
 
 

@@ -1,4 +1,4 @@
-import { Button, Card, Col, message, Row, Select, Space, Typography } from "antd";
+import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -25,12 +25,13 @@ export const Sales = () => {
     const [refreshKey, setRefreshKey] = useState(0)
     const [sellers, setSellers] = useState([])
     const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined);
-    const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
+    //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
     const { data, fetchProducts } = useProducts();
 
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [branches, setBranches] = useState([] as any[]);
+    const [searchText, setSearchText] = useState("");
 
     const updateTotalAmount = (amount: number) => {
         setTotalAmount(amount);
@@ -105,31 +106,27 @@ export const Sales = () => {
     console.log("Data en Sales", data);
 
     const filteredProducts = () => {
-        console.log("Data en filtered",data,);
-        let filteredData = data.filter((product: any) => product.groupId !== 1)
+        let filteredData = data;
 
-        console.log("Filtered data 1",filteredData);
         if (!isAdmin) {
-            return filteredData
+            filteredData = data;
+        } else {
+            if (selectedSellerId) {
+                filteredData = filteredData.filter(product => product.id_vendedor === selectedSellerId);
+            }
         }
-        if (selectedSellerId) {
-            filteredData = filteredData.filter(product => product.id_vendedor === selectedSellerId)
+
+        if (searchText.trim()) {
+            const lowerSearch = searchText.toLowerCase();
+            filteredData = filteredData.filter(product =>
+                product.producto.toLowerCase().includes(lowerSearch)
+            );
         }
-        console.log("Filtered data 2",filteredData);
-        if (selectedBranchId) {
-            filteredData = filteredData.filter(product => {
-                for (const prodBranch of product.producto_sucursal) {
-                    if (prodBranch.id_sucursal === selectedBranchId) {
-                        return product
-                    }
-                }
-            })
-        }
-        console.log("Filtered data",filteredData);
-        return filteredData
+
+        return filteredData;
+    };
 
 
-    }
 
     const handleProductSelect = (product: any) => {
         // setEditableProducts((prevProducts: any) => {
@@ -255,6 +252,12 @@ export const Sales = () => {
                                 </Col>
                                 <Col>
                                     <Space wrap>
+                                        <Input.Search
+                                            placeholder="Buscar producto..."
+                                            onChange={(e) => setSearchText(e.target.value)}
+                                            style={{ width: 200 }}
+                                            allowClear
+                                        />
                                         <Button
                                             type="primary"
                                             onClick={() => setProductAddModal(true)}
@@ -263,51 +266,32 @@ export const Sales = () => {
                                             Añadir nuevo producto
                                         </Button>
                                         {isAdmin && (
-                                            <Space wrap>
-                                                <Select
-                                                    placeholder="Selecciona un vendedor"
-                                                    options={sellers.map((vendedor: any) => ({
-                                                        value: vendedor._id,
-                                                        label: vendedor.nombre,
-                                                    }))}
-                                                    filterOption={(input, option: any) =>
-                                                        option.label
-                                                            .toLowerCase()
-                                                            .includes(input.toLowerCase())
-                                                    }
-                                                    style={{ minWidth: 200 }}
-                                                    onChange={(value) => setSelectedSellerId(value)}
-                                                    showSearch
-                                                    allowClear
-                                                />
-                                                <Select
-                                                    placeholder="Selecciona una sucursal"
-                                                    options={branches.map((branch: IBranch) => ({
-                                                        value: branch._id,
-                                                        label: branch.nombre,
-                                                    }))}
-                                                    filterOption={(input, option: any) =>
-                                                        option.label
-                                                            .toLowerCase()
-                                                            .includes(input.toLowerCase())
-                                                    }
-                                                    style={{ minWidth: 200 }}
-                                                    onChange={(value) => setSelectedBranchId(value)}
-                                                    showSearch
-                                                    allowClear
-                                                />
-                                            </Space>
+                                            <Select
+                                                placeholder="Selecciona un vendedor"
+                                                options={sellers.map((vendedor: any) => ({
+                                                    value: vendedor._id,
+                                                    label: vendedor.nombre,
+                                                }))}
+                                                filterOption={(input, option: any) =>
+                                                    option.label.toLowerCase().includes(input.toLowerCase())
+                                                }
+                                                style={{ minWidth: 200 }}
+                                                onChange={(value) => setSelectedSellerId(value)}
+                                                showSearch
+                                                allowClear
+                                            />
                                         )}
                                     </Space>
                                 </Col>
                             </Row>
+
                         }
                         bordered={false}
                     >
                         <ProductTable
-                            data={data}
                             onSelectProduct={handleProductSelect}
-                            key={refreshKey}
+                            refreshKey={refreshKey}
+                            data={filteredProducts()}
                         />
                     </Card>
                 </Col>
