@@ -1,3 +1,4 @@
+/*
 import { Modal, Button, Descriptions, message } from 'antd';
 import RestockTable from './RestockTable';
 import EntryProductTable from './EntryProductTable';
@@ -225,3 +226,5 @@ const ProductInfoModal = ({ visible, onClose, product }: ProductInfoModalProps) 
 };
 
 export default ProductInfoModal;
+
+ */

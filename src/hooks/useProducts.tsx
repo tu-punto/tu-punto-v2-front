@@ -28,19 +28,20 @@ const useProducts = () => {
 
             const categoriaNombre = await getCategoryName(item.id_categoria);
 
-            for (const v of sucursal.variantes || []) {
+            sucursal.combinaciones.forEach((combo: any, index: number) => {
+                const nombreVariante = Object.values(combo.variantes).join(" / ");
                 productData.push({
-                    key: `${item._id}-${v.nombre_variante}`,
-                    producto: `${item.nombre_producto} ${v.nombre_variante}`,
-                    precio: v.precio,
-                    stockActual: v.stock,
+                    key: `${item._id}-${index}`,
+                    producto: `${item.nombre_producto} - ${nombreVariante}`,
+                    precio: combo.precio,
+                    stockActual: combo.stock,
                     categoria: categoriaNombre,
                     id_vendedor: item.id_vendedor,
                     id_producto: item._id,
                     sucursalId: sucursal.id_sucursal,
-                    variante: v.nombre_variante,
+                    variantes: combo.variantes
                 });
-            }
+            });
         }
 
         return productData;

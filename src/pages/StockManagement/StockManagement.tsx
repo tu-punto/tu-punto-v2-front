@@ -3,10 +3,10 @@ import { Row, Col } from 'antd';
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
-import { addProductFeaturesAPI, getProductsAPI, registerVariantAPI, updateProductStockAPI } from '../../api/product';
+import { addProductFeaturesAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
 import { Button, Input, Select } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import ProductInfoModal from '../Product/ProductInfoModal';
+//import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
 import { getGroupByIdAPI, getGroupsAPI } from '../../api/group';
@@ -318,13 +318,13 @@ const StockManagement = () => {
             />
 
 
-            {infoModalVisible && (
+            {/*infoModalVisible && (
                 <ProductInfoModal
                     visible={infoModalVisible}
                     onClose={closeModal}
                     product={selectedProduct}
                 />
-            )}
+            )*/}
 
             {isProductFormVisible && (
                 <ProductFormModal

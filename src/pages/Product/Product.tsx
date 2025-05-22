@@ -2,7 +2,7 @@ import { useState } from "react";
 import Button from "antd/es/button";
 import ProductFormModal from "./ProductFormModal";
 import useGroup from "../../hooks/useGroup";
-import GroupProductTable from "./GroupProductTable";
+//import GroupProductTable from "./GroupProductTable";
 import AddVariantModal from "./AddVariantModal";
 import { addProductFeaturesAPI, registerVariantAPI } from "../../api/product";
 

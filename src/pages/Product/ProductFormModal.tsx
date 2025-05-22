@@ -22,14 +22,20 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
 
             const sucursales = branches.map((b) => ({
                 id_sucursal: b._id,
-                variantes: combinations.map((combo) => ({
-                    nombre_variante: combo.varName0 ?? 'Variante',
-                    nombre_subvariante: combo.var0 ?? combo.variantName,
-                    precio: combo.price,
-                    stock: b._id === sucursalId ? combo.stock : 0
-                }))
+                combinaciones: combinations.map(combo => {
+                    const variantes: Record<string, string> = {};
+                    let i = 0;
+                    while (combo[`varName${i}`] && combo[`var${i}`]) {
+                        variantes[combo[`varName${i}`]] = combo[`var${i}`];
+                        i++;
+                    }
+                    return {
+                        variantes,
+                        precio: combo.price,
+                        stock: b._id === sucursalId ? combo.stock : 0
+                    };
+                })
             }));
-
             const finalData = {
                 ...productData,
                 sucursales
