@@ -14,6 +14,16 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             dataIndex: 'producto',
             key: 'producto',
             className: "text-mobile-sm xl:text-desktop-sm",
+            render: (text: string, record: any) => (
+                <span>
+            {text}
+                    {record.esTemporal && (
+                        <span style={{ marginLeft: 8, color: '#faad14', fontWeight: 500 }}>
+                    (Temporal)
+                </span>
+                    )}
+        </span>
+            )
         },
         {
             title: 'Cantidad',
@@ -22,10 +32,12 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             render: (_: any, record: any) => (
                 <InputNumber
                     min={1}
+                    max={record.stockActual ?? Infinity}
                     value={record.cantidad}
                     onChange={value => handleValueChange(record.key, 'cantidad', value)}
                     className="text-mobile-sm xl:text-desktop-sm"
                 />
+
             ),
             className: "text-mobile-sm xl:text-desktop-sm",
         },

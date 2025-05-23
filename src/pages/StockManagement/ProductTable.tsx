@@ -4,9 +4,9 @@ import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
 import AddVariantModal from '../Product/AddVariantModal';
-import ProductInfoModal from '../Product/ProductInfoModal';
+//import ProductInfoModal from '../Product/ProductInfoModal';
 import StockPerBranchModal from './StockPerBranchModal';
-import Product from "../Product/Product.tsx";
+//import Product from "../Product/Product.tsx";
 import { IProduct } from "../../models/productModel.ts";
 import { getAllStockByProductIdAPI } from "../../api/product";
 import { getCategoryByIdAPI } from '../../api/category';
@@ -114,19 +114,14 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         setIngresoData({});
     };
     const groupProductsByBaseName = (products: any[]) => {
-        const sucursalId = localStorage.getItem('sucursalId'); // Obtener sucursal activa
+        const sucursalId = localStorage.getItem('sucursalId');
         const groups: { [key: string]: any } = {};
 
         products.forEach((product) => {
             const baseName = product.nombre_producto;
             const sucursales = product.sucursales || [];
-
-            // Filtrar solo sucursales que coincidan con la activa
-            const sucursalesFiltradas = sucursales.filter(
-                (sucursal: any) => sucursal.id_sucursal === sucursalId
-            );
-
-            if (sucursalesFiltradas.length === 0) return; // Saltar si no tiene sucursales válidas
+            const sucursal = sucursales.find((s: any) => s.id_sucursal === sucursalId);
+            if (!sucursal || !sucursal.combinaciones) return;
 
             if (!groups[baseName]) {
                 groups[baseName] = {
@@ -134,36 +129,31 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     nombre_producto: baseName,
                     children: [],
                     totalStock: 0,
-                    precio: '-', // puede variar entre variantes
                     nombre_categoria: product.nombre_categoria,
                     productOriginal: product,
                 };
             }
 
-            sucursalesFiltradas.forEach((sucursal: any) => {
-                sucursal.variantes.forEach((variante: any) => {
-                    const variantName = `${variante.nombre_variante}`;
+            sucursal.combinaciones.forEach((comb: any, index: number) => {
+                const variant = Object.entries(comb.variantes)
+                    .map(([k, v]) => `${v}`)
+                    .join(' / '); // ejemplo: s / rojo
 
-                    groups[baseName].children.push({
-                        ...product,
-                        nombre_producto: baseName,
-                        variant: variantName,
-                        stock: variante.stock,
-                        precio: variante.precio,
-                        key: `${product._id}-${sucursal.id_sucursal?.$oid}-${variante.nombre_variante}`,
-                        sucursalData: sucursal,
-                    });
-
-                    groups[baseName].totalStock += variante.stock;
+                groups[baseName].children.push({
+                    ...product,
+                    variant,
+                    stock: comb.stock,
+                    precio: comb.precio,
+                    key: `${product._id}-${sucursalId}-${index}`,
+                    sucursalData: sucursal,
                 });
+
+                groups[baseName].totalStock += comb.stock;
             });
         });
 
         return Object.values(groups);
     };
-
-
-
     const columns = [
         {
             title: "Producto",
@@ -356,12 +346,15 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     </div>
                 ))
             )}
-
+            {/*
             <ProductInfoModal
                 visible={infoModalOpen}
                 onClose={closeInfoModal}
                 product={selectedProductInfo}
             />
+            */
+            }
+
 
             <AddVariantModal
                 visible={variantModalOpen}

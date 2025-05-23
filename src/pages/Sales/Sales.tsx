@@ -33,6 +33,8 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [searchText, setSearchText] = useState("");
 
+    const sucursalId = localStorage.getItem('sucursalId');
+
     const updateTotalAmount = (amount: number) => {
         setTotalAmount(amount);
     };
@@ -230,9 +232,19 @@ export const Sales = () => {
         }
     }
     const handleAddProduct = (newProduct: any) => {
-        setSelectedProducts((prevProducts: any) => [...prevProducts, newProduct]);
+        setSelectedProducts((prevProducts: any) => [
+            ...prevProducts,
+            {
+                ...newProduct,
+                cantidad: newProduct.cantidad || 1,
+                precio_unitario: newProduct.precio || 0,
+                utilidad: 1,
+                stockActual: newProduct.cantidad || 1, // para controlar el límite de cantidad vendida
+                esTemporal: true, // ⚠️ marca como producto de ocasión
+            }
+        ]);
     };
-    console.log("🚀 Productos pasados a ProductTable:", data);
+    //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
 
     return (
         <>

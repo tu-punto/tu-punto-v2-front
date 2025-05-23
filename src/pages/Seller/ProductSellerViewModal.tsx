@@ -23,54 +23,27 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
     };
 
     const submitProductData = async (productData: any) => {
-        setLoading(true);
         const { nombre_producto, precio, id_categoria, cantidad_por_sucursal } = productData;
-        const product = {
-            nombre_producto,
+
+        const newProduct = {
+            key: Date.now().toString(), // ID temporal único
+            producto: nombre_producto,
+            stockActual: cantidad_por_sucursal,
             precio,
-            id_categoria,
+            categoria: categories.find(c => c._id === id_categoria)?.categoria || "Sin categoría",
+            cantidad: cantidad_por_sucursal,
+            precio_unitario: precio,
+            utilidad: 1,
             id_vendedor: user.id,
-            groupId: 1, // TODO: Put the "Sin Grupo" id according to the database.
+            esTemporal: true // opcional, útil si luego quieres distinguirlos
         };
-        const stock = {
-            id_sucursal: 3, // TODO: Change with the default sucursal
-            cantidad_por_sucursal,
-        };
-        const payload = { product, stock };
-        try {
-            const response = await registerVariantAPI(payload);
-            if (!response.status) {
-                message.error('Error al registrar el producto');
-                setLoading(false);
-                return;
-            }
-            const entry = {
-                id_producto: response.newProduct.id_producto,
-                cantidad_ingreso: cantidad_por_sucursal,
-                id_vendedor: user.id,
-                id_sucursal: 3, // TODO: Change with the default sucursal to store products 
-                estado: 'Sin Grupo',
-            }
-            // TODO: Put this createEntryAPI into the registerVariantAPI to avoid this extra request, be careful with the other requests that use this function.
-            const entryResponse = await createEntryAPI(entry);
-            if (!entryResponse.status) {
-                message.error('Error al registrar el stock del producto');
-                setLoading(false);
-                return;
-            }
-            message.success('Producto registrado con éxito');
-            form.resetFields();
-            onAddProduct({ ...product, key: response.newProduct.id_producto, producto:nombre_producto, 
-                cantidad: cantidad_por_sucursal, 
-                precio_unitario: precio, 
-                utilidad: 1 }); //TODO: Make that the user can't modify the "cantidad" in empty sales table 
-            onSuccess(); 
-        } catch (error) {
-            message.error('Error al registrar el producto');
-        } finally {
-            setLoading(false);
-        }   
-    }
+
+        message.success("Producto temporal agregado al carrito");
+        form.resetFields();
+        onAddProduct(newProduct);
+        onSuccess();
+    };
+
 
     const fetchCategories = async () => {
         try {

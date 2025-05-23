@@ -14,6 +14,7 @@ interface AddVariantModalProps {
 }
 
 const AddVariantModal = ({ visible, onCancel, group }: AddVariantModalProps) => {
+
     const [form] = Form.useForm();
 
     const sucursalId = localStorage.getItem('sucursalId');
@@ -23,11 +24,13 @@ const AddVariantModal = ({ visible, onCancel, group }: AddVariantModalProps) => 
     }, [visible]);
 
     const onFinish = async (values: any) => {
+        /*
         if (!sucursalId) {
             return message.error("No se encontró la sucursal en localStorage");
         }
         console.log("Group",group);
         try {
+
             const res = await createVariantAPI({
 
                 productId: group.product._id,
@@ -39,6 +42,8 @@ const AddVariantModal = ({ visible, onCancel, group }: AddVariantModalProps) => 
                 }
             });
 
+
+
             if (res?.success) {
                 message.success("Variante agregada con éxito");
                 onCancel();
@@ -49,6 +54,7 @@ const AddVariantModal = ({ visible, onCancel, group }: AddVariantModalProps) => 
             message.error("Error al agregar la variante");
             console.error(err);
         }
+    */
     };
 
     return (
