@@ -225,7 +225,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess, editingFlux }: any
                     <Col span={12}>
                         <Form.Item
                             name='id_trabajador'
-                            label='Trabajador'
+                            label='Founder'
                             rules={[
                                 ({ getFieldValue }) => ({
                                     validator(_, value) {
@@ -238,7 +238,7 @@ function FinanceFluxFormModal({ visible, onCancel, onSuccess, editingFlux }: any
                             ]}
                         >
                             <Select
-                                placeholder="Selecciona un Trabajador"
+                                placeholder="Selecciona un Founder"
                                 options={workers.map((worker: any) => ({
                                     value: worker._id,
                                     label: worker.nombre,
