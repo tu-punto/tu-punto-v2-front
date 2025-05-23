@@ -3,7 +3,7 @@ import { ISale } from "./saleModel";
 import { IWorker } from "./workerModel";
 
 export interface Shipping {
-  id_pedido: number;
+  id_pedido: string;
   cliente: string;
   telefono_cliente: number;
   tipo_de_pago: string;

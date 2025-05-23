@@ -146,36 +146,37 @@ export const updateProductBranchStockAPI = async (productBranchId, nuevaCantidad
         return handleError(error)
     }
 }
-
 export const updateProductPriceAPI = async (priceUpdates) => {
     try {
-        const res = await apiClient.put('/product/update-price', { priceUpdates })
-        return res.data
+        const res = await apiClient.put('/product/update-price', { priceUpdates });
+        return res.data;
     } catch (error) {
-        return handleError(error)
+        return handleError(error);
     }
-}
-
+};
 export const updateSubvariantStockAPI = async ({
                                                    productId,
                                                    sucursalId,
-                                                   varianteNombre,
-                                                   subvarianteNombre,
+                                                   variantes,
                                                    stock
-                                               }) => {
+                                               }: {
+    productId: string;
+    sucursalId: string;
+    variantes: Record<string, string>;
+    stock: number;
+}) => {
     try {
-        const res = await apiClient.put('/product/update-subvariant-stock', {
+        const res = await apiClient.put(`/product/update-subvariant-stock`, {
             productId,
             sucursalId,
-            varianteNombre,
-            subvarianteNombre,
+            variantes,
             stock
-        })
-        return res.data
+        });
+        return res.data;
     } catch (error) {
-        return handleError(error)
+        return handleError(error);
     }
-}
+};
 export const registerVariantAPI = async (productData: any) => {
     try {
         //const sucursalId = localStorage.getItem("sucursalId");

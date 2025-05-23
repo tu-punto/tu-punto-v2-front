@@ -28,29 +28,36 @@ const PricePerBranchModal = ({
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await getSucursalsAPI();
-            const combinedData = res.map((branch: any) => {
-                const sucursalId = branch._id.$oid || branch._id;
+            const sucursales = await getSucursalsAPI();
+            const allVariantKeys = Object.keys(
+                producto?.sucursales?.[0]?.combinaciones?.[0]?.variantes || {}
+            );
 
-                const foundSucursal = producto.sucursales?.find(
-                    (s: any) => (s.id_sucursal.$oid || s.id_sucursal) === sucursalId
+            const combinedData = sucursales.map((branch: any) => {
+                const sucursalId = branch._id?.$oid || branch._id;
+                const sucursal = producto.sucursales?.find(
+                    (s: any) => (s.id_sucursal?.$oid || s.id_sucursal) === sucursalId
                 );
 
-                const foundVariante = foundSucursal?.variantes?.find(
-                    (v: any) => v.nombre_variante === variantName
-                );
+                const combinacion = sucursal?.combinaciones?.find((c: any) => {
+                    const entry = Object.entries(c.variantes || {})
+                        .map(([_, v]) => v)
+                        .join(" / ");
+                    return entry === variantName;
+                });
 
                 return {
                     key: sucursalId,
                     nombre: branch.nombre,
-                    precio: foundVariante?.precio ?? 0,
-                    disponible: !!foundVariante
+                    precio: combinacion?.precio ?? 0,
+                    disponible: !!combinacion,
+                    variantes: combinacion?.variantes || {}, // ✅ envía el objeto real
                 };
             });
 
             setDataSource(combinedData);
         } catch (error) {
-            console.error('Error al obtener datos de precios por sucursal:', error);
+            console.error("Error al obtener datos de precios por sucursal:", error);
         } finally {
             setLoading(false);
         }
@@ -61,9 +68,7 @@ const PricePerBranchModal = ({
             prev.map((item) => (item.key === key ? { ...item, precio: value } : item))
         );
     };
-
     const handleSave = async () => {
-        // Solo validamos precios donde el producto está disponible
         const hasInvalidPrice = dataSource.some(
             item => item.disponible && (item.precio === null || item.precio === undefined || item.precio < 0)
         );
@@ -82,13 +87,28 @@ const PricePerBranchModal = ({
                 setSaving(true);
                 try {
                     const priceUpdates = dataSource
-                        .filter(item => item.disponible) // ✅ Solo se envían los válidos
-                        .map((item) => ({
-                            productId: producto._id?.$oid || producto._id,
-                            sucursalId: item.key,
-                            varianteNombre: variantName,
-                            precio: item.precio,
-                        }));
+                        .filter(item => item.disponible)
+                        .map((item) => {
+                            const sucursal = producto.sucursales.find(
+                                (s) => (s.id_sucursal?.$oid || s.id_sucursal) === item.key
+                            );
+
+                            const combinacion = sucursal?.combinaciones.find((c: any) => {
+                                const nombre = Object.entries(c.variantes || {})
+                                    .map(([_, v]) => v)
+                                    .join(' / ');
+                                return nombre === variantName;
+                            });
+
+                            return {
+                                productId: producto._id?.$oid || producto._id,
+                                sucursalId: item.key,
+                                variantes: combinacion?.variantes || {}, // ✅ aseguramos enviar TODAS las claves
+                                precio: item.precio,
+                            };
+                        });
+
+                    console.log("📤 Enviando priceUpdates:", priceUpdates);
 
                     const res = await updateProductPriceAPI(priceUpdates);
 
@@ -107,7 +127,6 @@ const PricePerBranchModal = ({
             }
         });
     };
-
     const columns = [
         { title: 'Sucursal', dataIndex: 'nombre', key: 'nombre' },
         {

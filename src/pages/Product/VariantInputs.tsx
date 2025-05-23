@@ -2,11 +2,41 @@ import { useState, useEffect } from 'react';
 import { Input, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 
-const VariantInputs = ({ combinations, setCombinations }: any) => {
+const VariantInputs = ({
+                           combinations,
+                           setCombinations,
+                           readOnlyCombinations = [],
+                       }: any) => {
     const [variants, setVariants] = useState<any[]>([]);
+    const [initialized, setInitialized] = useState(false);
+
+    useEffect(() => {
+        if (!initialized && readOnlyCombinations.length) {
+            const variantMap: Record<string, Set<string>> = {};
+            readOnlyCombinations.forEach(combo => {
+                let i = 0;
+                while (combo[`varName${i}`] && combo[`var${i}`]) {
+                    const name = combo[`varName${i}`];
+                    const value = combo[`var${i}`];
+                    if (!variantMap[name]) variantMap[name] = new Set();
+                    variantMap[name].add(value);
+                    i++;
+                }
+            });
+
+            const formatted = Object.entries(variantMap).map(([name, set]) => ({
+                name,
+                subvariants: Array.from(set),
+                readOnly: true,
+            }));
+
+            setVariants(formatted);
+            setInitialized(true);
+        }
+    }, [readOnlyCombinations, initialized]);
 
     const addVariant = () => {
-        setVariants([...variants, { name: '', subvariants: [] }]);
+        setVariants([...variants, { name: '', subvariants: [], readOnly: false }]);
     };
 
     const removeVariant = (index: number) => {
@@ -41,7 +71,7 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
                 const combination: any = {
                     key: path.map(p => `${p.name}-${p.value}`).join('-'),
                     stock: 0,
-                    price: 0
+                    price: 0,
                 };
                 path.forEach((p, i) => {
                     combination[`var${i}`] = p.value;
@@ -50,6 +80,7 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
                 result.push(combination);
                 return;
             }
+
             for (const value of variants[index].subvariants) {
                 generateCombinations(index + 1, [...path, { name: variants[index].name, value }], result);
             }
@@ -59,7 +90,26 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
         if (variants.every(v => v.subvariants.length && v.name)) {
             generateCombinations(0, [], result);
         }
-        setCombinations(result);
+
+        const normalizedReadOnly = readOnlyCombinations.map(combo => {
+            const key = Object.entries(combo)
+                .filter(([k]) => k.startsWith('varName'))
+                .map((_, i) => `${combo[`varName${i}`]}-${combo[`var${i}`]}`)
+                .join('-');
+            return {
+                ...combo,
+                key,
+                disabled: true
+            };
+        });
+
+        const lockedKeys = new Set(normalizedReadOnly.map(c => c.key));
+        const finalCombinations = [
+            ...normalizedReadOnly,
+            ...result.filter(c => !lockedKeys.has(c.key))
+        ];
+
+        setCombinations(finalCombinations);
     }, [variants]);
 
     const handleChange = (key: string, field: 'stock' | 'price', value: number) => {
@@ -69,7 +119,6 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
         setCombinations(updated);
     };
 
-    // columnas dinámicas según cantidad de variantes
     const dynamicColumns = variants.map((variant, i) => ({
         title: variant.name || `Var${i + 1}`,
         dataIndex: `var${i}`,
@@ -81,22 +130,24 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
         {
             title: 'Stock',
             dataIndex: 'stock',
-            render: (text, record) => (
+            render: (_: any, record: any) => (
                 <InputNumber
                     min={0}
                     value={record.stock}
                     onChange={(value) => handleChange(record.key, 'stock', value || 0)}
+                    disabled={record.disabled}
                 />
             )
         },
         {
             title: 'Precio',
             dataIndex: 'price',
-            render: (text, record) => (
+            render: (_: any, record: any) => (
                 <InputNumber
                     min={0}
                     value={record.price}
                     onChange={(value) => handleChange(record.key, 'price', value || 0)}
+                    disabled={record.disabled}
                 />
             )
         }
@@ -113,13 +164,16 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
                                 placeholder="Nombre de la variante (ej: Color)"
                                 value={variant.name}
                                 onChange={(e) => updateVariantName(index, e.target.value)}
+                                disabled={variant.readOnly}
                             />
-                            <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
+                            {!variant.readOnly && (
+                                <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
+                            )}
                         </Space>
                         <Space wrap>
                             {variant.subvariants.map((sv: string) => (
                                 <Tag
-                                    closable
+                                    closable={!variant.readOnly}
                                     onClose={() => removeSubvariant(index, sv)}
                                     key={sv}
                                 >
@@ -131,6 +185,7 @@ const VariantInputs = ({ combinations, setCombinations }: any) => {
                             placeholder={`Agregar subvariante a ${variant.name || 'Variante'}`}
                             enterButton={<PlusOutlined />}
                             onSearch={(val) => val && addSubvariant(index, val)}
+                            disabled={!variant.name}
                         />
                     </Space>
                 </div>

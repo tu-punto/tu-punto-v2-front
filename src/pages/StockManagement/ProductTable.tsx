@@ -52,13 +52,17 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
         setVariantModalOpen(true);
     };
 
+
     const closeVariantModal = () => {
         setSelectedProduct(null);
         setVariantModalOpen(false);
     };
     const [selectedVariantName, setSelectedVariantName] = useState("");
     const [selectedProductForStock, setSelectedProductForStock] = useState<any>(null);
+    const handleVariantAdded = (res: any) => {
 
+        setUpdatedProductsList(prev => [...prev, res.newProduct]);
+    };
     const openStockModal = (variantName: string, product: any) => {
         setSelectedVariantName(variantName);
         setSelectedProductForStock(product);
@@ -364,6 +368,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                     name: selectedProduct?.nombre_producto,
                     product: selectedProduct
                 }}
+                onAdd={handleVariantAdded}
             />
             <StockPerBranchModal
                 visible={stockModalOpen}

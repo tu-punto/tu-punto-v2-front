@@ -81,22 +81,15 @@ function SalesFormModal({
 
     const actualizarStock = async (productos: any[]) => {
         const sucursalId = localStorage.getItem('sucursalId');
-        console.log("Aqui llegué", productos);
         for (const prod of productos) {
-            if (prod.temporary) continue;
+            if (prod.temporary || !prod.variantes) continue;
 
             const {
                 id_producto,
-                variante,
-                subvariante,
                 cantidad,
-                stockActual
+                stockActual,
+                variantes
             } = prod;
-
-            if (!variante || !subvariante) {
-                console.warn("Producto sin variante/subvariante:", prod);
-                continue;
-            }
 
             const nuevoStock = stockActual - cantidad;
 
@@ -104,18 +97,22 @@ function SalesFormModal({
                 console.warn(`Stock negativo para ${id_producto}: ${nuevoStock}`);
                 continue;
             }
-            console.log("Aqui estoy");
-            await updateSubvariantStockAPI({
-                productId: id_producto,
-                sucursalId,
-                varianteNombre: variante,
-                subvarianteNombre: subvariante,
-                stock: nuevoStock
-            });
+
+            try {
+                const res = await updateSubvariantStockAPI({
+                    productId: id_producto,
+                    sucursalId,
+                    variantes,
+                    stock: nuevoStock
+                });
+                if (!res.success) {
+                    message.error("Error actualizando stock de una combinación");
+                }
+            } catch (err) {
+                console.error("Error al actualizar stock:", err);
+            }
         }
     };
-
-
     return (
         <Modal
             title="Registrar Venta"
