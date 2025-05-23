@@ -39,13 +39,20 @@ export const Sales = () => {
         setTotalAmount(amount);
     };
     const showSalesModal = () => {
+        if (selectedProducts.length === 0) {
+            message.warning("Debes seleccionar al menos un producto para realizar una venta.");
+            return;
+        }
         setModalType('sales');
     };
 
     const showShippingModal = () => {
+        if (selectedProducts.length === 0) {
+            message.warning("Debes seleccionar al menos un producto para realizar una entrega.");
+            return;
+        }
         setModalType('shipping');
     };
-
     const handleCancel = () => {
         setModalType(null);
     };
@@ -66,10 +73,12 @@ export const Sales = () => {
         setTotalAmount(0);
     };
 
-    const handleSuccess = () => {
+    const handleSuccess = async () => {
         setModalType(null);
-        setRefreshKey(prevKey => prevKey + 1);
+        await fetchProducts(); // <- fuerza recarga del inventario con stock actualizado
+        setRefreshKey(prevKey => prevKey + 1); // para que también se actualicen las tablas dependientes
     };
+
 
     const fetchSellers = async () => {
         try {
@@ -153,10 +162,11 @@ export const Sales = () => {
             item.vendedor = item.id_vendedor
         })
         try {
+            console.log("📤 Enviando ventas:", productsToAdd);
             await registerSalesToShippingAPI({
-                shippingId: shipping.id_pedido,
+                shippingId: shipping._id,
                 sales: productsToAdd
-            })
+            });
         } catch (error) {
             message.error('Error registrando ventas del pedido')
         }

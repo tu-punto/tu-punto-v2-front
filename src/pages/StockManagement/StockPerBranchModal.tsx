@@ -7,46 +7,33 @@ const StockPerBranchModal = ({
                                  onClose,
                                  variantName,
                                  producto,
-                             }: {
-    visible: boolean;
-    onClose: () => void;
-    variantName: string;
-    producto: any;
-}) => {
-    const [dataSource, setDataSource] = useState<any[]>([]);
+                             }) => {
+    const [dataSource, setDataSource] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (visible && variantName && producto) {
-            fetchData();
-        }
+        if (visible && variantName && producto) fetchData();
     }, [visible, variantName, producto]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await getSucursalsAPI();
-            const combinedData = res.map((branch: any) => {
-                const sucursalId = branch._id.$oid || branch._id;
-
-                const foundSucursal = producto.sucursales?.find(
-                    (s: any) => (s.id_sucursal.$oid || s.id_sucursal) === sucursalId
+            const branches = await getSucursalsAPI();
+            const data = branches.map(branch => {
+                const id = branch._id.$oid || branch._id;
+                const sucursal = producto.sucursales?.find(s => (s.id_sucursal.$oid || s.id_sucursal) === id);
+                const match = sucursal?.combinaciones?.find(c =>
+                    Object.values(c.variantes || {}).join(" / ").toLowerCase() === variantName.toLowerCase()
                 );
-
-                const foundVariante = foundSucursal?.variantes?.find(
-                    (v: any) => v.nombre_variante === variantName
-                );
-
                 return {
-                    key: sucursalId,
+                    key: id,
                     nombre: branch.nombre,
-                    stock: foundVariante ? foundVariante.stock : 0
+                    stock: match?.stock ?? 0,
                 };
             });
-
-            setDataSource(combinedData);
-        } catch (error) {
-            console.error('Error al obtener datos del stock por sucursal:', error);
+            setDataSource(data);
+        } catch (err) {
+            console.error("Error obteniendo stock por sucursal:", err);
         } finally {
             setLoading(false);
         }
@@ -54,7 +41,7 @@ const StockPerBranchModal = ({
 
     const columns = [
         { title: 'Sucursal', dataIndex: 'nombre', key: 'nombre' },
-        { title: 'Stock', dataIndex: 'stock', key: 'stock' }
+        { title: 'Stock', dataIndex: 'stock', key: 'stock' },
     ];
 
     return (
@@ -65,13 +52,7 @@ const StockPerBranchModal = ({
             footer={null}
             width={600}
         >
-            <Table
-                columns={columns}
-                dataSource={dataSource}
-                loading={loading}
-                pagination={false}
-                size="small"
-            />
+            <Table columns={columns} dataSource={dataSource} loading={loading} pagination={false} />
         </Modal>
     );
 };

@@ -1,4 +1,4 @@
-import { Table } from 'antd';
+import { Table , message} from 'antd';
 import { useContext } from 'react';
 import { UserContext } from '../../context/userContext';
 
@@ -37,8 +37,14 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                 pagination={{ pageSize: 10, pageSizeOptions: [] }}
                 scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
-                    className: 'text-mobile-sm xl:text-desktop-sm',
-                    onClick: () => onSelectProduct(record),
+                    className: `text-mobile-sm xl:text-desktop-sm ${record.stockActual === 0 ? 'bg-red-100 text-red-700' : ''}`,
+                    onClick: () => {
+                        if (record.stockActual === 0) {
+                            message.error(`El producto "${record.producto}" no tiene stock disponible.`);
+                            return;
+                        }
+                        onSelectProduct(record);
+                    },
                 })}
             />
         </div>
