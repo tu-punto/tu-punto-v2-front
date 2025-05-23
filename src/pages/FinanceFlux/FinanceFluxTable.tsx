@@ -1,5 +1,5 @@
 import { Button, DatePicker, Select, Table } from "antd"
-import { getFinancesFluxAPI, getSellerByShippingAPI, getWorkerByShippingAPI } from "../../api/financeFlux";
+import { getFinancesFluxAPI } from "../../api/financeFlux";
 import { useEffect, useState } from "react";
 
 const FinanceFluxTable = ({ refreshKey, onEdit }: { refreshKey: any, onEdit: (flux: any) => void }) => {
@@ -18,29 +18,24 @@ const FinanceFluxTable = ({ refreshKey, onEdit }: { refreshKey: any, onEdit: (fl
     const fetchFinances = async () => {
         try {
             const apiData = await getFinancesFluxAPI();
-            const sellerPromises = apiData.map((financeFlux: any) =>
-                financeFlux.id_vendedor ? getSellerByShippingAPI(financeFlux.id_vendedor) : Promise.resolve(null)
-            );
-            const workerPromises = apiData.map((financeFlux: any) =>
-                financeFlux.id_trabajador ? getWorkerByShippingAPI(financeFlux.id_trabajador) : Promise.resolve(null)
-            );
-            const sellers = await Promise.all(sellerPromises);
-            const workers = await Promise.all(workerPromises);
 
-            const dataWithKeys = apiData.map((financeFlux: any, index: number) => ({
+            const dataWithKeys = apiData.map((financeFlux: any) => ({
                 ...financeFlux,
-                key: financeFlux._id, // Usa un campo único como key
+                key: financeFlux._id,
                 id_flujo_financiero: financeFlux._id,
-                vendedor: sellers[index]?.nombre && sellers[index]?.apellido ? `${sellers[index]?.nombre} ${sellers[index]?.apellido}` : '',
-                encargado: workers[index]?.nombre || '',
+                vendedor: financeFlux.id_vendedor
+                    ? `${financeFlux.id_vendedor.nombre} ${financeFlux.id_vendedor.apellido}`
+                    : 'N/A',
+                encargado: financeFlux.id_trabajador?.nombre || 'N/A',
                 esDeuda: financeFlux.esDeuda ? 'SI' : 'NO'
             }));
+
             setDataWithKey(dataWithKeys);
             setFilteredData(dataWithKeys);
         } catch (error) {
             console.error("Error fetching financeFlux data:", error);
         }
-    }
+    };
 
     useEffect(() => {
         fetchFinances();
@@ -121,7 +116,7 @@ const FinanceFluxTable = ({ refreshKey, onEdit }: { refreshKey: any, onEdit: (fl
             ),
         },
         {
-            title: "Encargado",
+            title: "Founder",
             dataIndex: "encargado",
             key: "finance_flux_worker",
             render: (text: string) => (

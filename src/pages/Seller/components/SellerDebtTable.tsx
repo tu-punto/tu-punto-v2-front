@@ -1,6 +1,13 @@
 import { Table } from 'antd';
+import dayjs from 'dayjs';
 
 const columns = [
+  {
+    title: 'Fecha',
+    dataIndex: 'fecha',
+    key: 'fecha',
+    render: (val: string) => dayjs(val).format('DD/MM/YYYY'),
+  },
   {
     title: 'Monto',
     dataIndex: 'monto',
