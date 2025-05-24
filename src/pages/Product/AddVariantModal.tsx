@@ -62,7 +62,7 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
                     };
                 })
             };
-
+            console.log("Payload enviado:", payload);
             const res = await createVariantAPI(payload);
 
             if (res?.success) {

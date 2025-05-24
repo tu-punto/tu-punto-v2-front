@@ -4,7 +4,7 @@ import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
 import { addProductFeaturesAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
-import { Button, Input, Select } from 'antd';
+import { Button, Input, Select, Spin } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 //import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
@@ -212,6 +212,7 @@ const StockManagement = () => {
     //console.log("GROUP ENVIADO A PRODUCTTABLE:", options[criteriaGroup]?.group);
     //console.log("FUNCIÓN DE AGRUPACIÓN:", options[criteriaGroup]?.groupFunction);
     return (
+
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div className="block xl:flex justify-center">
                 <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de</h2>
@@ -299,14 +300,9 @@ const StockManagement = () => {
                 groupList={options[criteriaFilter]?.group || []}
                 groupCriteria={(group) => {
                     const fn = options[criteriaFilter]?.groupFunction;
-                    console.log("groupFunction:", fn, "filteredProducts:", filteredProducts);
                     if (typeof fn !== 'function' || !Array.isArray(filteredProducts)) return [];
                     return fn(group, filteredProducts);
                 }}
-
-
-                showModal={showModal}
-                showVariantModal={showVariantModal}
                 productsList={
                     isSeller
                         ? products.filter((product) => product._id === user._id)
@@ -315,9 +311,8 @@ const StockManagement = () => {
                 handleUpdate={(ingresoData: { [key: number]: number }) => {
                     setProductsToUpdate(ingresoData);
                 }}
+                onUpdateProducts={fetchData} // ✅ PASA ESTA FUNCIÓN AL HIJO
             />
-
-
             {/*infoModalVisible && (
                 <ProductInfoModal
                     visible={infoModalVisible}
@@ -330,7 +325,10 @@ const StockManagement = () => {
                 <ProductFormModal
                     visible={isProductFormVisible}
                     onCancel={() => setProductFormVisible(false)}
-                    onSuccess={saveNewProducts}
+                    onSuccess={async () => {
+                        await fetchData(); // Recarga productos desde backend
+                        setProductFormVisible(false); // Cierra modal
+                    }}
                 />
             )}
 
@@ -363,6 +361,7 @@ const StockManagement = () => {
                 />
             )}
         </div>
+
     );
 };
 

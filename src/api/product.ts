@@ -10,26 +10,21 @@ const handleError = (error) => {
 export const createVariantAPI = async ({
                                            productId,
                                            sucursalId,
-                                           variant
+                                           combinaciones
                                        }: {
     productId: string;
     sucursalId: string;
-    variant: {
-        nombre_variante: string;
-        precio?: number;
-        stock?: number;
-        subvariantes?: {
-            nombre_subvariante: string;
-            precio: number;
-            stock: number;
-        }[];
-    };
+    combinaciones: {
+        variantes: Record<string, string>;
+        precio: number;
+        stock: number;
+    }[];
 }) => {
     try {
         const res = await apiClient.post(`/product/add-variant`, {
             productId,
             sucursalId,
-            variant
+            combinaciones
         });
         return res.data;
     } catch (error) {

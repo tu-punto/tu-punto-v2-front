@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { Button, Input, Table } from 'antd';
+import { Button, Input, Table, Spin } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
@@ -16,9 +16,11 @@ import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path 
 interface ProductTableProps {
     productsList: any[];
     groupList: any[];
+    onUpdateProducts?: () => Promise<void>;
 }
 
-const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
+
+const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -59,9 +61,11 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
     };
     const [selectedVariantName, setSelectedVariantName] = useState("");
     const [selectedProductForStock, setSelectedProductForStock] = useState<any>(null);
-    const handleVariantAdded = (res: any) => {
-
-        setUpdatedProductsList(prev => [...prev, res.newProduct]);
+    const handleVariantAdded = async () => {
+        if (typeof onUpdateProducts === "function") {
+            await onUpdateProducts();
+        }
+        closeVariantModal();
     };
     const openStockModal = (variantName: string, product: any) => {
         setSelectedVariantName(variantName);
@@ -284,25 +288,15 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
     useEffect(() => {
         const fetchStockForProducts = async () => {
             const updatedProducts = await Promise.all(productsList.map(async (product) => {
-                let nombre_categoria = "Sin categoría";
+                if (!product.id_categoria) return { ...product, nombre_categoria: "Sin categoría" };
 
                 try {
-                    if (product.id_categoria) {
-                        const categoryRes = await getCategoryByIdAPI(product.id_categoria);
-                        if (categoryRes.success !== false && categoryRes.categoria) {
-                            nombre_categoria = categoryRes.categoria;
-                        }
-                    }
-                } catch (err) {
-                    console.error("Error fetching category:", err);
+                    const categoryRes = getCategoryByIdAPI(product.id_categoria);
+                    return { ...product, nombre_categoria: (await categoryRes)?.categoria || "Sin categoría" };
+                } catch {
+                    return { ...product, nombre_categoria: "Sin categoría" };
                 }
-
-                return {
-                    ...product,
-                    nombre_categoria,
-                };
             }));
-
             setUpdatedProductsList(updatedProducts);
             getProductInGroup(updatedProducts);
         };
@@ -314,11 +308,10 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
     }, [productsList, groupList, searcher]);
     //console.log("Product sucursal:", selectedProductoSucursal);
 
-
+    const loading = updatedProductsList.length === 0;
     return (
-        <>
+        <Spin spinning={loading} tip="Cargando productos...">
             <ProductSearcher applySearcher={changeSearcher} />
-
 
             {tableGroup.length === 0 ? (
                 <p>No hay grupos de productos.</p>
@@ -344,22 +337,12 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                                 pagination={{ pageSize: 5 }}
                                 rowKey="key"
                             />
-
-
                         )}
                     </div>
                 ))
             )}
-            {/*
-            <ProductInfoModal
-                visible={infoModalOpen}
-                onClose={closeInfoModal}
-                product={selectedProductInfo}
-            />
-            */
-            }
 
-
+            {/* Modales */}
             <AddVariantModal
                 visible={variantModalOpen}
                 onCancel={closeVariantModal}
@@ -382,8 +365,7 @@ const ProductTable = ({ productsList, groupList }: ProductTableProps) => {
                 variantName={selectedVariantName}
                 producto={selectedProductForPrice}
             />
-
-        </>
+        </Spin>
     );
 };
 
