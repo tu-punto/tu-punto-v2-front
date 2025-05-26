@@ -68,8 +68,8 @@ function SalesFormModal({
                 ...product
             };
         });
-        console.log("xd");
-        console.log("Parsed Selected Products", parsedSelectedProducts);
+        //console.log("xd");
+        //console.log("Parsed Selected Products", parsedSelectedProducts);
         await handleDebt(parsedSelectedProducts, response.newShipping.adelanto_cliente);
         await handleSales(response.newShipping, parsedSelectedProducts);
         await actualizarStock(parsedSelectedProducts);

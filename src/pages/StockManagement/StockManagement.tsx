@@ -53,7 +53,7 @@ const StockManagement = () => {
             //console.log("Sellers", sellersResponse);
             //console.log("Categories", categoriesResponse);
             //console.log("Groups", groupsResponse);
-            console.log("Products", productsResponse);
+            //console.log("Products", productsResponse);
 
             setSellers(sellersResponse);
             setCategories(categoriesResponse);

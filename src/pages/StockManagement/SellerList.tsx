@@ -17,15 +17,15 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
         const sellersResponse = await getSellersAPI();
         sellersResponse.unshift({_id: null, name: "Todos"})
         setSellers(sellersResponse);
-        console.log(sellersResponse);
+        //console.log(sellersResponse);
         const groupsResponse = await getGroupsAPI()
         setGroups(groupsResponse)
-        console.log(groupsResponse);
+        //console.log(groupsResponse);
         const categoriesResponse = await getCategoriesAPI()
         for(const category of categoriesResponse)
             category.name = category.categoria
         setCategories(categoriesResponse)
-        console.log(categoriesResponse);
+        //console.log(categoriesResponse);
         setFilterList(sellersResponse)
     }
 

@@ -102,7 +102,7 @@ export const getProductFeaturesAPI = async (productId) => {
 // POST
 export const registerProductAPI = async (productData) => {
     try {
-        console.log("Product data:", productData)
+        //console.log("Product data:", productData)
         const res = await apiClient.post(`/product/register`, productData)
         console.log("Response data:", res.data)
         return res.data

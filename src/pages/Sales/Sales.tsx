@@ -114,7 +114,7 @@ export const Sales = () => {
         fetchSucursal();
         fetchProducts();
     }, []);
-    console.log("Data en Sales", data);
+    //console.log("Data en Sales", data);
 
     const filteredProducts = () => {
         let filteredData = data;
@@ -162,7 +162,7 @@ export const Sales = () => {
             item.vendedor = item.id_vendedor
         })
         try {
-            console.log("📤 Enviando ventas:", productsToAdd);
+            //console.log("📤 Enviando ventas:", productsToAdd);
             await registerSalesToShippingAPI({
                 shippingId: shipping._id,
                 sales: productsToAdd

@@ -117,7 +117,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTabl
             }
         }
 
-        console.log("Datos a enviar a API (mock):", newStock);
+        //console.log("Datos a enviar a API (mock):", newStock);
         alert("Stock actualizado (simulado)");
         setIngresoData({});
     };
