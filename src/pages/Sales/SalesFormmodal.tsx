@@ -56,16 +56,21 @@ function SalesFormModal({
             setLoading(false);
             return;
         }
-
+        console.log("✅ Nuevo pedido registrado:", response.newShipping);
         message.success("Pedido registrado con éxito");
 
         const parsedSelectedProducts = selectedProducts.map((product: any) => {
-            const [productId] = product.key.split("-"); // si tiene variante: ID-Variante
+            const [productId] = product.key.split("-");
             return {
                 id_producto: productId,
+                producto: productId,  // <- Añadir esto
                 id_vendedor: product.id_vendedor,
+                vendedor: product.id_vendedor, // <- Añadir esto
                 id_pedido: response.newShipping._id,
-                ...product
+                cantidad: product.cantidad,
+                precio_unitario: product.precio_unitario,
+                utilidad: product.utilidad,
+                deposito_realizado: false
             };
         });
         //console.log("xd");

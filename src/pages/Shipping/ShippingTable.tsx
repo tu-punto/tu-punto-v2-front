@@ -30,7 +30,7 @@ const ShippingTable = (refreshKey: any) => {
             const apiData = await getShippingsAPI();
             const dataWithKey = apiData.map((pedido: any) => ({
                 ...pedido,
-                key: pedido.id_pedido
+                key: pedido._id
             }));
             setShippingData(dataWithKey);
         } catch (error) {
