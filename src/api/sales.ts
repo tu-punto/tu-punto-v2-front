@@ -117,6 +117,8 @@ export const updateProductSalesAPI = async (salesData: any[]) => {
         parseError(error as AxiosError)
     }
 }
+
+
 // export const deleteProductsByShippingAPI = async (shippingId: any, products:any) => {
 //     try {
 //         const res = await apiClient.get(`/sale/products/delete/${shippingId}`, products)
@@ -143,3 +145,23 @@ export const updateProductSalesAPI = async (salesData: any[]) => {
 
 //     }
 // }
+
+export const deleteSaleByIdAPI = async (id: string) => {
+  try {
+    const res = await apiClient.delete(`/sale/${id}`);
+    return { success: true, ...res.data };
+  } catch (error) {
+    parseError(error as AxiosError);
+    return { success: false };
+  }
+};
+
+export const updateSaleByIdAPI = async (id: string, data: any) => {
+  try {
+    const res = await apiClient.put(`/sale/${id}`, data);
+    return { success: true, ...res.data };
+  } catch (error) {
+    parseError(error as AxiosError);
+    return { success: false };
+  }
+};

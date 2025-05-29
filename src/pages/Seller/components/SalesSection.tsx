@@ -8,6 +8,8 @@ interface Props {
   onDeletedSalesChange: (deleted: any[]) => void;
   onUpdateNoPagadasTotal: (total: number) => void;
   onUpdateHistorialTotal: (total: number) => void;
+  onUpdateOneSale: (id: string, fields: any) => void;
+  onDeleteOneSale: (id: string) => void;
   isSeller: boolean;
 }
 
@@ -17,6 +19,8 @@ const SalesSection: React.FC<Props> = ({
   onDeletedSalesChange,
   onUpdateNoPagadasTotal,
   onUpdateHistorialTotal,
+  onUpdateOneSale,
+  onDeleteOneSale,
   isSeller,
 }) => {
   const [
@@ -56,7 +60,13 @@ const SalesSection: React.FC<Props> = ({
         <SalesTable
           data={ventasNoPagadas}
           onUpdateTotalAmount={onUpdateNoPagadasTotal}
-          onDeleteProduct={handleDelete}
+          onDeleteProduct={(key, id) => {
+            onDeleteOneSale(id);
+            handleDelete(key); // elimina del estado local
+          }}
+          onUpdateProduct={(id, fields) => {
+            onUpdateOneSale(id, fields);
+          }}
           handleValueChange={handleValueChange}
           showClient
           isAdmin={!isSeller}
@@ -70,10 +80,16 @@ const SalesSection: React.FC<Props> = ({
         </h4>
         <SalesTable
           data={salesData}
-          onUpdateTotalAmount={onUpdateHistorialTotal}
-          onDeleteProduct={handleDelete}
+          onUpdateTotalAmount={onUpdateNoPagadasTotal}
+          onDeleteProduct={(key, id) => {
+            onDeleteOneSale(id);
+            handleDelete(key); // elimina del estado local
+          }}
+          onUpdateProduct={(id, fields) => {
+            onUpdateOneSale(id, fields);
+          }}
           handleValueChange={handleValueChange}
-          showClient={false}
+          showClient
           isAdmin={!isSeller}
         />
       </section>

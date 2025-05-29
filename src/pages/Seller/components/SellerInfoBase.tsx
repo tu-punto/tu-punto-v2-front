@@ -22,6 +22,8 @@ import {
   getProductsBySellerIdAPI,
   updateSale,
   deleteSalesAPI,
+  deleteSaleByIdAPI,
+  updateSaleByIdAPI,
 } from '../../../api/sales';
 import { getSellerDebtsAPI, updateSellerAPI } from '../../../api/seller';
 import { getSucursalsAPI } from '../../../api/sucursal';
@@ -115,6 +117,26 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
       setSalesData(final);
     } catch (e) { console.error('Error ventas', e); }
+  };
+
+  const handleUpdateSale = async (id: string, fields: any) => {
+    const res = await updateSaleByIdAPI(id, fields);
+    if (res?.success) {
+      message.success("Venta actualizada correctamente");
+      await fetchSales(); // Refresca ventas
+    } else {
+      message.error("Error al actualizar la venta");
+    }
+  };
+
+  const handleDeleteSale = async (id: string) => {
+    const res = await deleteSaleByIdAPI(id);
+    if (res?.success) {
+      message.success("Venta eliminada correctamente");
+      await fetchSales(); // Refresca ventas
+    } else {
+      message.error("Error al eliminar la venta");
+    }
   };
 
   const fetchEntryProducts = async () => {
@@ -242,10 +264,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         <SalesSection
           initialSales={salesData}
           onSalesChange={setSalesData}
-          onDeletedSalesChange={setDeletedSales}
+          onDeletedSalesChange={() => { }}
           onUpdateNoPagadasTotal={() => { }}
           onUpdateHistorialTotal={() => { }}
           isSeller={isSeller}
+          onUpdateOneSale={handleUpdateSale}
+          onDeleteOneSale={handleDeleteSale}
         />
 
         <EntryHistorySection
@@ -256,7 +280,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         />
 
         <SellerDebtTable data={sellerDebts} />
-        
+
         <PaymentProofSection
           proofs={paymentProofs}
           sellerId={seller.key}
