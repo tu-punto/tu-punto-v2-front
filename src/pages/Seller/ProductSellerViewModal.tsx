@@ -5,7 +5,7 @@ import { UserContext } from "../../context/userContext";
 import { registerVariantAPI } from "../../api/product";
 import { createEntryAPI } from "../../api/entry";
 
-const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: any) => {
+const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller  }: any) => {
     const { user }: any = useContext(UserContext);
     const [loading, setLoading] = useState(false)
     const [categories, setCategories] = useState([])
@@ -13,7 +13,11 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
     const [form] = Form.useForm();
 
     const handleFinish = async (productData: any) => {
-        console.log("ProductData",productData);
+        if (!selectedSeller) {
+            message.warning("Debe seleccionar un vendedor antes de registrar el producto.");
+            return;
+        }
+
         Modal.confirm({
             title: 'Confirmación',
             content: '¿Está seguro de que desea registrar este producto?',
@@ -21,12 +25,11 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
             onOk: () => submitProductData(productData),
         });
     };
-
     const submitProductData = async (productData: any) => {
         const { nombre_producto, precio, id_categoria, cantidad_por_sucursal } = productData;
 
         const newProduct = {
-            key: Date.now().toString(), // ID temporal único
+            key: Date.now().toString(),
             producto: nombre_producto,
             stockActual: cantidad_por_sucursal,
             precio,
@@ -34,10 +37,9 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
             cantidad: cantidad_por_sucursal,
             precio_unitario: precio,
             utilidad: 1,
-            id_vendedor: user.id,
-            esTemporal: true // opcional, útil si luego quieres distinguirlos
+            id_vendedor: selectedSeller._id,
+            esTemporal: true
         };
-
         message.success("Producto temporal agregado al carrito");
         form.resetFields();
         onAddProduct(newProduct);
@@ -71,6 +73,30 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct }: 
             footer={null}
             width={800}
         >
+            {selectedSeller ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                    <span style={{
+                        backgroundColor: '#f0f2f5',
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        fontWeight: 'bold'
+                    }}>
+                      Vendedor: {selectedSeller.nombre} {selectedSeller.apellido}
+                    </span>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                    <span style={{
+                        backgroundColor: '#fff1f0',
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        color: '#cf1322',
+                        fontWeight: 'bold'
+                    }}>
+                      Seleccione un vendedor
+                    </span>
+                </div>
+            )}
             <Form
                 form={form}
                 name="productForm"

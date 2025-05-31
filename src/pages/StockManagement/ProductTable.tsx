@@ -11,16 +11,17 @@ import { IProduct } from "../../models/productModel.ts";
 import { getAllStockByProductIdAPI } from "../../api/product";
 import { getCategoryByIdAPI } from '../../api/category';
 import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
+import { saveTempStock } from "../../utils/storageHelpers";
 
 
 interface ProductTableProps {
     productsList: any[];
     groupList: any[];
     onUpdateProducts?: () => Promise<void>;
+    setStockListForConfirmModal?: (stockList: any[]) => void; // ← NUEVO
 }
 
-
-const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTableProps) => {
+const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal }: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -37,7 +38,50 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTabl
     const [stockModalOpen, setStockModalOpen] = useState(false);
     const [selectedProductoSucursal, setSelectedProductoSucursal] = useState<any[]>([]);
     const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
+    useEffect(() => {
+        const ingresos = JSON.parse(localStorage.getItem("newStock") || "[]");
 
+        const ingresoObj: { [key: string]: number } = {};
+        ingresos.forEach((entry: any) => {
+            const key = `${entry.productId}-${entry.sucursalId}-${entry.index}`;
+            ingresoObj[key] = entry.stock;
+        });
+
+        setIngresoData(ingresoObj);
+    }, []);
+
+    const handleIngresoChange = (key: string, value: number) => {
+
+        setIngresoData((prev) => {
+            const updated = { ...prev, [key]: value };
+
+            const newStockArray = Object.entries(updated).map(([k, stock]) => {
+                const [productId, sucursalId, index] = k.split("-");
+                const producto = productsList.find((p) => p._id === productId);
+                const sucursal = producto?.sucursales?.find((s) => s.id_sucursal === sucursalId);
+                const combinacion = sucursal?.combinaciones?.[index];
+
+                return {
+                    product: {
+                        _id: producto._id,
+                        variantes: combinacion?.variantes || {},
+                    },
+                    newStock: {
+                        productId,
+                        sucursalId,
+                        index: Number(index),
+                        stock: Number(stock),
+                    }
+                };
+            });
+            if (setStockListForConfirmModal) {
+                setStockListForConfirmModal(newStockArray);
+            }
+
+            return updated;
+        });
+
+    };
 
     const openInfoModal = (product: any) => {
         setSelectedProductInfo(product);
@@ -99,9 +143,6 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTabl
         return products.filter(p => p.id_vendedor === group._id);
     };
 
-    const handleIngresoChange = (productId: number, value: number) => {
-        setIngresoData((prev) => ({ ...prev, [productId]: value }));
-    };
 
     const handleStockUpdate = () => {
         const newStock = [];
@@ -167,8 +208,15 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTabl
             title: "Producto",
             dataIndex: 'nombre_producto',
             key: 'nombre_producto',
-            render: (_: any, record: any) =>
-                record.variant ? `→ ${record.nombre_producto} - ${record.variant}` : record.nombre_producto
+            render: (_: any, record: any) => {
+                const isNew = record.isNew || record.productOriginal?.isNew;
+                return (
+                    <>
+                        {record.variant ? `→ ${record.nombre_producto} - ${record.variant}` : record.nombre_producto}
+                        {isNew && <span style={{ color: '#d4380d', fontWeight: 600, marginLeft: 8 }}>(Nuevo)</span>}
+                    </>
+                );
+            }
         },
         {
             title: 'Stock actual',
@@ -297,17 +345,44 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTabl
                     return { ...product, nombre_categoria: "Sin categoría" };
                 }
             }));
+
+            const sucursalId = localStorage.getItem("sucursalId");
+
+            const newProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
+            const newVariants = JSON.parse(localStorage.getItem("newVariants") || "[]");
+
+            // Agregar productos nuevos locales
+            newProducts.forEach((prod: any) => {
+                prod.isNew = true;
+                updatedProducts.push(prod);
+            });
+
+            // Agregar variantes nuevas a productos existentes (solo sucursal actual)
+            newVariants.forEach((variant: any) => {
+                const base = updatedProducts.find(p => p._id === variant.product?._id || p.product?._id === variant.product?._id);
+                if (base) {
+                    if (!base.sucursales) base.sucursales = [];
+                    const sucursalIndex = base.sucursales.findIndex((s: any) => s.id_sucursal === variant.sucursalId);
+                    const combinacionesFiltradas = variant.combinaciones.filter((c: any) => c.stock > 0);
+                    if (sucursalIndex !== -1) {
+                        base.sucursales[sucursalIndex].combinaciones.push(...combinacionesFiltradas);
+                    } else {
+                        base.sucursales.push({
+                            id_sucursal: variant.sucursalId,
+                            combinaciones: combinacionesFiltradas
+                        });
+                    }
+                }
+            });
+
             setUpdatedProductsList(updatedProducts);
             getProductInGroup(updatedProducts);
         };
-
 
         if (productsList.length > 0) {
             fetchStockForProducts();
         }
     }, [productsList, groupList, searcher]);
-    //console.log("Product sucursal:", selectedProductoSucursal);
-
     const loading = updatedProductsList.length === 0;
     return (
         <Spin spinning={loading} tip="Cargando productos...">
@@ -325,12 +400,19 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts }: ProductTabl
                             <Table
                                 columns={columns}
                                 dataSource={groupProductsByBaseName(group.products)}
+                                rowClassName={(record) =>
+                                    record.variant && ingresoData[record.key] && ingresoData[record.key] > 0
+                                        ? "bg-green-50 border-l-4 border-green-500"
+                                        : ""
+                                }
                                 expandable={{
                                     expandedRowKeys,
                                     onExpand: (expanded, record) => {
-                                        setExpandedRowKeys(expanded
-                                            ? [...expandedRowKeys, record.key]
-                                            : expandedRowKeys.filter(key => key !== record.key));
+                                        setExpandedRowKeys(
+                                            expanded
+                                                ? [...expandedRowKeys, record.key]
+                                                : expandedRowKeys.filter((key) => key !== record.key)
+                                        );
                                     },
                                     expandRowByClick: true,
                                 }}

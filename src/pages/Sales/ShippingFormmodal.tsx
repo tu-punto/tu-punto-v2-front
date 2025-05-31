@@ -1,8 +1,9 @@
 import { Modal, Form, Input, InputNumber, Button, Radio, Col, Row, DatePicker, TimePicker, Card, message, Select } from 'antd';
 import { UserOutlined, PhoneOutlined, CommentOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
-import { registerShippingAPI } from '../../api/shipping';
+import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
 import { sendMessageAPI } from '../../api/whatsapp';
+import { updateSubvariantStockAPI } from '../../api/product';
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
@@ -21,10 +22,13 @@ function ShippingFormModal({
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [form] = Form.useForm();
     const [showWarning, setShowWarning] = useState(false);
-
     const handleFinish = async (shippingData: any) => {
         setLoading(true);
-
+        if (showWarning) {
+            message.error("La suma QR + Efectivo no es válida. Verifica los montos.");
+            setLoading(false);
+            return;
+        }
         const tipoPagoMap: any = {
             1: 'Transferencia o QR',
             2: 'Efectivo',
@@ -37,25 +41,59 @@ function ShippingFormModal({
             3: 'Entregado'
         };
 
+        const estadoFinal = estadoPedidoMap[shippingData.estado_pedido];
+
         const apiShippingData = {
             ...shippingData,
             tipo_de_pago: tipoPagoMap[shippingData.tipo_de_pago],
-            estado_pedido: estadoPedidoMap[shippingData.estado_pedido],
+            estado_pedido: estadoFinal,
             id_sucursal: parseInt(localStorage.getItem("sucursalId") || "3"),
         };
 
         const response = await registerShippingAPI(apiShippingData);
-        if (!response.status) {
+        if (!response?.status || !response?.newShipping) {
             message.error('Error al registrar el pedido');
+            setLoading(false);
+            return;
         }
 
-        const parsedProducts = selectedProducts.map((product: any) => ({
-            id_producto: product.key,
-            ...product,
-        }));
+        const productosTemporales = selectedProducts.filter((p: any) => p.esTemporal);
+        const productosNormales = selectedProducts.filter((p: any) => !p.esTemporal);
 
-        await handleDebt(parsedProducts, response.newShipping.adelanto_cliente);
-        await handleSales(response.newShipping, parsedProducts);
+        const ventas = productosNormales.map((p: any) => {
+            const [productId] = p.key.split("-");
+            return {
+                id_producto: productId,
+                producto: productId,
+                id_vendedor: p.id_vendedor,
+                vendedor: p.id_vendedor,
+                id_pedido: response.newShipping._id,
+                cantidad: p.cantidad,
+                precio_unitario: p.precio_unitario,
+                utilidad: p.utilidad,
+                deposito_realizado: false
+            };
+        });
+        if (estadoFinal === 'Entregado' && ventas.length > 0) {
+            await handleDebt(ventas, response.newShipping.adelanto_cliente);
+            await handleSales(response.newShipping, ventas);
+            await actualizarStock(ventas);
+        }
+        if (productosTemporales.length > 0) {
+            const productosTemporalesData = productosTemporales.map((p: any) => ({
+                producto: p.producto,
+                cantidad: p.cantidad,
+                precio_unitario: p.precio_unitario,
+                utilidad: p.utilidad,
+                id_vendedor: p.id_vendedor
+            }));
+
+            await updateShippingAPI(
+                { productos_temporales: productosTemporalesData },
+                response.newShipping._id
+            );
+        }
+
         clearSelectedProducts();
         form.resetFields();
         setEstadoPedido(null);
@@ -71,6 +109,28 @@ function ShippingFormModal({
 
     const handleDecrement = (setter: React.Dispatch<React.SetStateAction<number>>, value: number) => {
         setter(prev => parseFloat((prev - value).toFixed(2)));
+    };
+    const actualizarStock = async (productos: any[]) => {
+        const sucursalId = localStorage.getItem('sucursalId');
+        for (const prod of productos) {
+            if (!prod.variantes || prod.temporary) continue;
+            const { id_producto, cantidad, stockActual, variantes } = prod;
+            const nuevoStock = stockActual - cantidad;
+            if (nuevoStock < 0) continue;
+            try {
+                const res = await updateSubvariantStockAPI({
+                    productId: id_producto,
+                    sucursalId,
+                    variantes,
+                    stock: nuevoStock
+                });
+                if (!res.success) {
+                    message.error("Error actualizando stock de una combinación");
+                }
+            } catch (err) {
+                console.error("Error al actualizar stock:", err);
+            }
+        }
     };
 
     useEffect(() => {
@@ -317,12 +377,28 @@ function ShippingFormModal({
                                     {tipoPago === '4' && (
                                         <Row gutter={16}>
                                             <Col span={12}>
-                                                <Form.Item label="Subtotal QR" name="subtotal_qr">
+                                                <Form.Item label="Subtotal QR" name="subtotal_qr" rules={[
+                                                    { required: true, message: 'Debe ingresar un valor en QR' },
+                                                    {
+                                                        validator: (_, value) => {
+                                                            if (value <= 0) return Promise.reject("El monto QR debe ser mayor a 0");
+                                                            if (value >= totalAmount) return Promise.reject("El monto QR debe ser menor al total");
+                                                            return Promise.resolve();
+                                                        }
+                                                    }
+                                                ]}>
                                                     <InputNumber
                                                         prefix="Bs."
-                                                        min={0}
+                                                        min={0.01}
+                                                        max={totalAmount - 0.01}
                                                         value={qrInput}
-                                                        onChange={setQrInput}
+                                                        onChange={(val) => {
+                                                            const qr = val ?? 0;
+                                                            setQrInput(qr);
+                                                            const efectivo = parseFloat((totalAmount - qr).toFixed(2));
+                                                            setEfectivoInput(efectivo);
+                                                            form.setFieldsValue({ subtotal_efectivo: efectivo });
+                                                        }}
                                                         style={{ width: '100%' }}
                                                     />
                                                 </Form.Item>
@@ -331,10 +407,9 @@ function ShippingFormModal({
                                                 <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
                                                     <InputNumber
                                                         prefix="Bs."
-                                                        min={0}
                                                         value={efectivoInput}
-                                                        onChange={setEfectivoInput}
-                                                        style={{ width: '100%' }}
+                                                        readOnly
+                                                        style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
                                                     />
                                                 </Form.Item>
                                             </Col>

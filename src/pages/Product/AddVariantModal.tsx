@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Button, message } from 'antd';
 import VariantInputs from './VariantInputs';
 import { createVariantAPI } from '../../api/product';
-
+import { saveTempVariant } from '../../utils/storageHelpers';
 const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
     const [combinations, setCombinations] = useState([]);
     const [existingCombinations, setExistingCombinations] = useState([]);
@@ -39,45 +39,33 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
         if (!sucursalId) return message.error("No se encontró la sucursal en localStorage");
 
         const newCombinations = combinations.filter(c => !c.disabled);
-
         if (newCombinations.length === 0) {
             return message.warning("No se han agregado nuevas combinaciones");
         }
 
-        try {
-            const payload = {
-                productId: group.product._id,
-                sucursalId,
-                combinaciones: newCombinations.map(combo => {
-                    const variantes: Record<string, string> = {};
-                    let i = 0;
-                    while (combo[`varName${i}`] && combo[`var${i}`]) {
-                        variantes[combo[`varName${i}`]] = combo[`var${i}`];
-                        i++;
-                    }
-                    return {
-                        variantes,
-                        precio: combo.price,
-                        stock: combo.stock
-                    };
-                })
-            };
-            console.log("Payload enviado:", payload);
-            const res = await createVariantAPI(payload);
+        const payload = {
+            product: group.product,
+            sucursalId,
+            combinaciones: newCombinations.map(combo => {
+                const variantes: Record<string, string> = {};
+                let i = 0;
+                while (combo[`varName${i}`] && combo[`var${i}`]) {
+                    variantes[combo[`varName${i}`]] = combo[`var${i}`];
+                    i++;
+                }
+                return {
+                    variantes,
+                    precio: combo.price,
+                    stock: combo.stock,
+                    isNew: true // 🔴 Marca visual de nuevo
+                };
+            })
+        };
 
-            if (res?.success) {
-                message.success("Variantes agregadas con éxito");
-                onCancel();
-                onAdd && onAdd(res); // actualiza la tabla desde StockManagement
-            } else {
-                message.error("No se pudieron agregar las variantes");
-            }
-        } catch (err) {
-            console.error(err);
-            message.error("Error inesperado al agregar variantes");
-        }
+        saveTempVariant(payload);
+        message.success("Variantes guardadas localmente");
+        onCancel();
     };
-
     return (
         <Modal
             title={`Agregar variantes a "${group.name}"`}

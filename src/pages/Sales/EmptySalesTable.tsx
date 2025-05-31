@@ -1,12 +1,24 @@
 import { Button, InputNumber, Table } from "antd";
 import { useEffect } from "react";
 
-const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange }: any) => {
-
-    const totalAmount = products.reduce((acc: any, product: any) => {
+const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers }: any) => {
+    const updatedProducts = products.map((product: any) => {
+        const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
+        const comision = vendedor?.comision_porcentual || 0;
         const cantidad = product.cantidad || 0;
         const precio = product.precio_unitario || 0;
-        return acc + (precio * cantidad);
+        const utilidad = (precio * cantidad * comision) / 100;
+
+        return {
+            ...product,
+            utilidad: utilidad
+        };
+    });
+    const totalAmount = updatedProducts.reduce((acc: number, product: any) => {
+        const cantidad = product.cantidad || 0;
+        const precio = product.precio_unitario || 0;
+        const utilidad = product.utilidad || 0;
+        return acc + ((precio - utilidad) * cantidad);
     }, 0);
     const columns = [
         {
@@ -92,7 +104,7 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             </div>
             <Table
                 columns={columns}
-                dataSource={products}
+                dataSource={updatedProducts}
                 pagination={{pageSize: 10, pageSizeOptions: []}}
                 scroll={{x: "max-content"}}
             // footer={() => (

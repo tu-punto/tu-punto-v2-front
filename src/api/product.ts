@@ -160,6 +160,13 @@ export const updateSubvariantStockAPI = async ({
     variantes: Record<string, string>;
     stock: number;
 }) => {
+    console.log("📦 Enviando actualización de stock:", {
+        productId,
+        sucursalId,
+        variantes,
+        stock
+    });
+
     try {
         const res = await apiClient.put(`/product/update-subvariant-stock`, {
             productId,
@@ -169,9 +176,11 @@ export const updateSubvariantStockAPI = async ({
         });
         return res.data;
     } catch (error) {
+        console.error("❌ Error al actualizar stock:", error);
         return handleError(error);
     }
 };
+
 export const registerVariantAPI = async (productData: any) => {
     try {
         //const sucursalId = localStorage.getItem("sucursalId");
