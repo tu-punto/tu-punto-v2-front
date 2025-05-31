@@ -1,355 +1,329 @@
-import { Modal, Button, Table, InputNumber, Popconfirm } from 'antd';
-// 🔧 Estas importaciones son de las APIs reales, puedes comentar si no las usarás
-// import { createProductsFromGroup, createVariant } from '../../services/createProducts';
-// import { updateProductStockAPI } from '../../api/product';
-// import { generateDeliveredProductsAPI } from '../../api/googleDrive';
+import { Modal, Button, Table, InputNumber, Popconfirm, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
+import { createVariantAPI, registerProductAPI, updateSubvariantStockAPI } from "../../api/product";
+import { getTempStock, getTempProducts, getTempVariants, clearTempStock, clearTempProducts, clearTempVariants } from "../../utils/storageHelpers";
 
 const ConfirmProductsModal = ({ visible, onClose, onSuccess }) => {
-  // 🧪 Datos quemados para pruebas:
-  const [stockData, setStockData] = useState([
-    {
-      product: {
-        id_producto: 1,
-        nombre_producto: 'Azúcar Blanca',
-        precio: 5,
-      },
-      newStock: {
-        stock: 100,
-      },
-    },
-  ]);
+    const [stockData, setStockData] = useState([]);
+    const [variantData, setVariantData] = useState([]);
+    const [productData, setProductData] = useState([]);
+    const sucursalId = localStorage.getItem("sucursalId");
 
-  const [variantData, setVariantData] = useState([
-    {
-      product: {
-        id_producto: 2,
-        nombre_producto: 'Harina Integral',
-        precio: 4.5,
-        stock: 50,
-        categoria: { categoria: 'Alimentos' },
-        groupId: 'grupo-1',
-      },
-    },
-  ]);
+    useEffect(() => {
+        //const newStock = JSON.parse(localStorage.getItem("newStock") || "[]");
+        //const newVariants = JSON.parse(localStorage.getItem("newVariants") || "[]");
+        const newProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
 
-  const [productData, setProductData] = useState([
-    {
-      productData: {
-        nombre_producto: 'Leche Entera',
-      },
-      combinations: [
-        {
-          key: 'leche1',
-          tamaño: '1L',
-          stock: 20,
-          price: 6,
-        },
-        {
-          key: 'leche2',
-          tamaño: '2L',
-          stock: 10,
-          price: 10,
-        },
-      ],
-      selectedFeatures: ['tamaño'],
-      features: ['tamaño'],
-    },
-  ]);
+        // Solo tomar combinaciones de la sucursal actual
+        const filteredProducts = newProducts.map((p) => {
+            const prod = p.productData || p;
+            const filteredSucursales = prod.sucursales.map((s) => ({
+                ...s,
+                combinaciones: s.id_sucursal === sucursalId
+                    ? s.combinaciones.filter((c) => c.stock > 0)
+                    : []
+            })).filter(s => s.combinaciones.length > 0);
+            return { ...p, productData: { ...prod, sucursales: filteredSucursales } };
+        });
 
-  const saveProducts = async () => {
-    console.log("🔄 Iniciando proceso de guardado...");
+        setStockData(getTempStock());
+        setVariantData(getTempVariants());
+        setProductData(filteredProducts);
+    }, [visible]);
 
-    try {
-      // 🔧 Aquí se llamarían las APIs para crear variantes
-      for (const variant of variantData) {
-        console.log("➡️ Crear variant:", variant);
-        // await createVariant(variant);
-      }
-
-      // 🔧 Crear productos con combinaciones
-      for (const product of productData) {
-        console.log("➡️ Crear producto con combinaciones:", product);
-        // await createProductsFromGroup(product.productData, product.combinations, product.selectedFeatures, product.features);
-      }
-
-      // 🔧 Actualizar stock
-      const newStockList = stockData.map(stock => stock.newStock);
-      console.log("📈 Actualizar stock:", newStockList);
-      // await updateProductStockAPI(newStockList);
-
-      // 🔧 Preparar PDF (simulado)
-      const productsArray = productData.flatMap(product =>
-          product.combinations.map(comb => ({
-            producto: `${product.productData.nombre_producto} - ${comb.tamaño}`,
-            unitario: comb.price,
-            cantidad: comb.stock,
-            total: comb.price * comb.stock,
-          }))
-      );
-
-      const stockArray = stockData.map(stockEntry => ({
-        producto: stockEntry.product.nombre_producto,
-        unitario: stockEntry.product.precio,
-        cantidad: stockEntry.newStock.stock,
-        total: stockEntry.product.precio * stockEntry.newStock.stock,
-      }));
-
-      const variantsArray = variantData.map(variant => ({
-        producto: variant.product.nombre_producto,
-        unitario: variant.product.precio,
-        cantidad: variant.product.stock,
-        total: variant.product.precio * variant.product.stock,
-      }));
-
-      const productsPDF = [...productsArray, ...stockArray, ...variantsArray];
-
-      console.log("🧾 Generar PDF con los siguientes productos:");
-      console.table(productsPDF);
-
-      // await generateDeliveredProductsAPI(productsPDF);
-
-      console.log("✅ Proceso simulado exitosamente");
-      onSuccess?.();
-    } catch (error) {
-      console.error("❌ Error al guardar productos:", error);
-    }
-  };
-
-  const handleEdit = (record, key, value) => {
-    const updatedData = stockData.map(item =>
-        item === record ? { ...item, [key]: value } : item
-    );
-    setStockData(updatedData);
-  };
-
-  const handleDelete = (data, setData, record) => {
-    const updatedData = data.filter(item => item !== record);
-    setData(updatedData);
-  };
-
-  const handleEditVariant = (record, keyPath, value) => {
-    const updatedData = variantData.map(item => {
-      if (item === record) {
-        const updatedItem = { ...item };
-        let nestedField = updatedItem;
-        for (let i = 0; i < keyPath.length - 1; i++) {
-          nestedField = nestedField[keyPath[i]];
-        }
-        nestedField[keyPath[keyPath.length - 1]] = value;
-        return updatedItem;
-      }
-      return item;
-    });
-    setVariantData(updatedData);
-  };
-
-  const handleEditProducts = (record, key, value) => {
-    const updatedProducts = productData.map(product => {
-      if (product === record.originalProduct) {
-        const updatedCombinations = product.combinations.map(comb =>
-            comb.key === record.combinationKey ? { ...comb, [key]: value } : comb
+    const handleEditStock = (record, value) => {
+        const updated = stockData.map(item =>
+            item === record ? { ...item, newStock: { ...item.newStock, stock: value } } : item
         );
-        return { ...product, combinations: updatedCombinations };
-      }
-      return product;
-    });
-    setProductData(updatedProducts);
-  };
+        setStockData(updated);
+    };
 
-  const flattenedCombinations = useMemo(
-      () =>
-          productData.flatMap(product =>
-              product.combinations.map(combination => ({
-                key: combination.key,
-                productName: product.productData.nombre_producto,
-                variant: Object.entries(combination)
-                    .filter(([key]) => !["key", "stock", "price"].includes(key))
-                    .map(([_, value]) => value)
-                    .join(", "),
-                stock: combination.stock,
-                price: combination.price,
-                originalProduct: product,
-                combinationKey: combination.key,
-              }))
-          ),
-      [productData]
-  );
+    const handleDelete = (data, setData, record) => {
+        setData(data.filter(item => item !== record));
+    };
 
-  return (
-      <Modal
-          title="Confirm Changes"
-          visible={visible}
-          onCancel={onClose}
-          footer={[
-            <Button key="cancel" onClick={onClose}>
-              Cancel
-            </Button>,
-            <Button
-                key="submit"
-                type="primary"
-                onClick={() => {
-                  console.log("📋 Datos antes de guardar:", { stockData, variantData, productData });
-                  saveProducts();
-                }}
-            >
-              Confirm
-            </Button>,
-          ]}
-          width={800}
-      >
-        <h3>New Stock</h3>
-        <Table
-            dataSource={stockData}
-            columns={[
-              {
-                title: "Product Name",
-                dataIndex: ["product", "nombre_producto"],
-                key: "nombre_producto",
-              },
-              {
-                title: "Stock",
-                dataIndex: "stock",
-                key: "stock",
-                render: (text, record) => (
-                    <InputNumber
-                        min={0}
-                        value={record.newStock.stock}
-                        onChange={value => handleEdit(record, "newStock", { ...record.newStock, stock: value })}
-                    />
-                ),
-              },
-              {
-                title: "Price",
-                dataIndex: ["product", "precio"],
-                key: "precio",
-              },
-              {
-                title: "Actions",
-                key: "actions",
-                render: (_, record) => (
-                    <Popconfirm title="Delete?" onConfirm={() => handleDelete(stockData, setStockData, record)}>
-                      <Button danger>Delete</Button>
-                    </Popconfirm>
-                ),
-              },
+    const handleEditVariant = (record, key, value) => {
+        const updated = variantData.map(item =>
+            item === record ? { ...item, [key]: value } : item
+        );
+        setVariantData(updated);
+    };
+
+    const handleEditProduct = (productId, sucursalId, combIndex, field, value) => {
+        const updated = productData.map(raw => {
+            const prod = raw.productData || raw;
+            if (prod._id === productId) {
+                const updatedSucursales = prod.sucursales.map(suc => {
+                    if (suc.id_sucursal === sucursalId) {
+                        const combinaciones = [...suc.combinaciones];
+                        combinaciones[combIndex][field] = value;
+                        return { ...suc, combinaciones };
+                    }
+                    return suc;
+                });
+                return { ...raw, productData: { ...prod, sucursales: updatedSucursales } };
+            }
+            return raw;
+        });
+        setProductData(updated);
+    };
+
+    const flattenedCombinations = useMemo(() => {
+        return productData.flatMap(raw => {
+            const prod = raw.productData || raw;
+            const sucursal = prod.sucursales?.find(s => s.id_sucursal === sucursalId);
+            if (!sucursal) return [];
+
+            return sucursal.combinaciones.map((comb, idx) => ({
+                key: `${prod._id}-${sucursal.id_sucursal}-${idx}`,
+                nombre_producto: prod.nombre_producto,
+                sucursalId: sucursal.id_sucursal,
+                index: idx,
+                variantes: Object.entries(comb.variantes).map(([k, v]) => `${k[0]}: ${v}`).join(" / "),
+                precio: comb.precio,
+                stock: comb.stock,
+                productId: prod._id
+            }));
+        });
+    }, [productData, sucursalId]);
+
+    const clearAll = () => {
+        clearTempStock();
+        clearTempProducts();
+        clearTempVariants();
+        setStockData([]);
+        setVariantData([]);
+        setProductData([]);
+        onClose?.();
+    };
+    const saveProducts = async () => {
+        try {
+            for (const variant of variantData) {
+                const payload = {
+                    productId: variant.product._id,
+                    sucursalId,
+                    combinaciones: variant.combinaciones
+                };
+                await createVariantAPI(payload);
+            }
+
+            for (const prodRaw of productData) {
+                const product = prodRaw.productData || prodRaw;
+                await registerProductAPI(product);
+            }
+
+            for (const entry of stockData) {
+                const { product } = entry;
+                const variantes = product.variantes;
+                const stock = entry.newStock.stock;
+                const productId = product._id || product.id_producto;
+                await updateSubvariantStockAPI({
+                    productId,
+                    sucursalId,
+                    variantes,
+                    stock
+                });
+            }
+
+            clearAll();
+            message.success("Todos los cambios fueron aplicados correctamente.");
+            onSuccess?.();
+        } catch (error) {
+            console.error("Error al guardar productos:", error);
+            message.error("Ocurrió un error al guardar los cambios.");
+        }
+    };
+    return (
+        <Modal
+            title="Confirmar Productos"
+            visible={visible}
+            onCancel={clearAll}
+            footer={[
+                <Button key="clear" danger onClick={clearAll}>Limpiar Cambios</Button>,
+                <Button key="cancel" onClick={onClose}>Cancelar</Button>,
+                <Button key="save" type="primary" onClick={saveProducts}>Confirmar</Button>
             ]}
-            rowKey={record => record.product.id_producto}
-            pagination={false}
-        />
+            width={900}
+        >
+            <h3>Ingresos a Productos Existentes</h3>
+            {stockData.length > 0 ? (
+                <Table
+                    dataSource={stockData}
+                    rowKey={(_, i) => i}
+                    pagination={false}
+                    columns={[
+                        { title: "ID Producto", dataIndex: ["product", "_id"] },
+                        {
+                            title: "Stock",
+                            render: (_, record) => (
+                                <InputNumber
+                                    min={0}
+                                    value={record.newStock.stock}
+                                    onChange={(val) => handleEditStock(record, val)}
+                                />
+                            )
+                        },
+                        {
+                            title: "Acciones",
+                            render: (_, record) => (
+                                <Popconfirm title="¿Eliminar?" onConfirm={() => handleDelete(stockData, setStockData, record)}>
+                                    <Button danger>Eliminar</Button>
+                                </Popconfirm>
+                            )
+                        }
+                    ]}
+                />
+            ) : <p style={{ color: 'gray' }}>No hay ingresos nuevos.</p>}
 
-        <h3>New Variants</h3>
-        <Table
-            dataSource={variantData}
-            columns={[
-              {
-                title: "Product Name",
-                dataIndex: ["product", "nombre_producto"],
-                key: "nombre_producto",
-              },
-              {
-                title: "Category",
-                dataIndex: ["product", "categoria", "categoria"],
-                key: "categoria",
-              },
-              {
-                title: "Stock",
-                dataIndex: ["product", "stock"],
-                key: "stock",
-                render: (text, record) => (
-                    <InputNumber
-                        min={0}
-                        value={record.product.stock}
-                        onChange={value => handleEditVariant(record, ["product", "stock"], value)}
-                    />
-                ),
-              },
-              {
-                title: "Price",
-                dataIndex: ["product", "precio"],
-                key: "precio",
-                render: (text, record) => (
-                    <InputNumber
-                        min={0}
-                        step={0.01}
-                        value={record.product.precio}
-                        onChange={value => handleEditVariant(record, ["product", "precio"], value)}
-                    />
-                ),
-              },
-              {
-                title: "Actions",
-                key: "actions",
-                render: (_, record) => (
-                    <Popconfirm title="Delete?" onConfirm={() => handleDelete(variantData, setVariantData, record)}>
-                      <Button danger>Delete</Button>
-                    </Popconfirm>
-                ),
-              },
-            ]}
-            rowKey={record => `${record.product.nombre_producto}_${record.product.groupId}`}
-            pagination={false}
-        />
-
-        <h3>New Products</h3>
-        <Table
-            dataSource={flattenedCombinations}
-            columns={[
-              {
-                title: "Product Name",
-                dataIndex: "productName",
-                key: "productName",
-              },
-              {
-                title: "Variant",
-                dataIndex: "variant",
-                key: "variant",
-              },
-              {
-                title: "Stock",
-                dataIndex: "stock",
-                key: "stock",
-                render: (stock, record) => (
-                    <InputNumber min={0} value={stock} onChange={value => handleEditProducts(record, "stock", value)} />
-                ),
-              },
-              {
-                title: "Price",
-                dataIndex: "price",
-                key: "price",
-                render: (price, record) => (
-                    <InputNumber min={0} step={0.01} value={price} onChange={value => handleEditProducts(record, "price", value)} />
-                ),
-              },
-              {
-                title: "Actions",
-                key: "actions",
-                render: (_, record) => (
-                    <Popconfirm
-                        title="Delete combination?"
-                        onConfirm={() => {
-                          const updatedProducts = productData.map(product => {
-                            if (product === record.originalProduct) {
-                              const updatedCombinations = product.combinations.filter(
-                                  comb => comb.key !== record.combinationKey
-                              );
-                              return { ...product, combinations: updatedCombinations };
-                            }
-                            return product;
-                          });
-                          setProductData(updatedProducts);
-                        }}
-                    >
-                      <Button danger>Delete</Button>
-                    </Popconfirm>
-                ),
-              },
-            ]}
-            rowKey="key"
-            pagination={false}
-        />
-      </Modal>
-  );
+            <h3>Variantes Nuevas</h3>
+            {variantData.length > 0 ? (
+                <Table
+                    dataSource={variantData.flatMap((record, i) => (
+                        record.combinaciones.map((comb, index) => ({
+                            key: `${i}-${index}`,
+                            nombre_producto: record.product.nombre_producto,
+                            variantes: Object.entries(comb.variantes).map(([k, v]) => `${k}: ${v}`).join(" / "),
+                            precio: comb.precio,
+                            stock: comb.stock,
+                            variantRecord: record,
+                            combIndex: index,
+                        }))
+                    ))}
+                    rowKey="key"
+                    pagination={false}
+                    columns={[
+                        { title: "Producto", dataIndex: "nombre_producto" },
+                        { title: "Variantes", dataIndex: "variantes" },
+                        {
+                            title: "Stock",
+                            render: (_, record) => (
+                                <InputNumber
+                                    min={0}
+                                    value={record.stock}
+                                    onChange={(val) => {
+                                        const updated = variantData.map(v => {
+                                            if (v === record.variantRecord) {
+                                                const combinaciones = [...v.combinaciones];
+                                                combinaciones[record.combIndex].stock = val;
+                                                return { ...v, combinaciones };
+                                            }
+                                            return v;
+                                        });
+                                        setVariantData(updated);
+                                    }}
+                                />
+                            )
+                        },
+                        {
+                            title: "Precio",
+                            render: (_, record) => (
+                                <InputNumber
+                                    min={0}
+                                    value={record.precio}
+                                    onChange={(val) => {
+                                        const updated = variantData.map(v => {
+                                            if (v === record.variantRecord) {
+                                                const combinaciones = [...v.combinaciones];
+                                                combinaciones[record.combIndex].precio = val;
+                                                return { ...v, combinaciones };
+                                            }
+                                            return v;
+                                        });
+                                        setVariantData(updated);
+                                    }}
+                                />
+                            )
+                        },
+                        {
+                            title: "Acciones",
+                            render: (_, record) => (
+                                <Popconfirm
+                                    title="¿Eliminar?"
+                                    onConfirm={() => {
+                                        const updated = variantData.map(v => {
+                                            if (v === record.variantRecord) {
+                                                const combinaciones = v.combinaciones.filter((_, i) => i !== record.combIndex);
+                                                return { ...v, combinaciones };
+                                            }
+                                            return v;
+                                        });
+                                        setVariantData(updated);
+                                    }}
+                                >
+                                    <Button danger>Eliminar</Button>
+                                </Popconfirm>
+                            )
+                        }
+                    ]}
+                />
+            ) : <p style={{ color: 'gray' }}>No hay variantes nuevas.</p>}
+            <h3>Productos Nuevos</h3>
+            {flattenedCombinations.length > 0 ? (
+                <Table
+                    dataSource={flattenedCombinations}
+                    rowKey="key"
+                    pagination={false}
+                    columns={[
+                        { title: "Producto", dataIndex: "nombre_producto" },
+                        { title: "Variantes", dataIndex: "variantes" },
+                        {
+                            title: "Stock",
+                            render: (_, record) => (
+                                <InputNumber
+                                    min={0}
+                                    value={record.stock}
+                                    onChange={(val) =>
+                                        handleEditProduct(record.productId, record.sucursalId, record.index, "stock", val)
+                                    }
+                                />
+                            )
+                        },
+                        {
+                            title: "Precio",
+                            render: (_, record) => (
+                                <InputNumber
+                                    min={0}
+                                    value={record.precio}
+                                    onChange={(val) =>
+                                        handleEditProduct(record.productId, record.sucursalId, record.index, "precio", val)
+                                    }
+                                />
+                            )
+                        },
+                        {
+                            title: "Acciones",
+                            render: (_, record) => (
+                                <Popconfirm
+                                    title="¿Eliminar combinación?"
+                                    onConfirm={() => {
+                                        const updated = productData.map(raw => {
+                                            const prod = raw.productData || raw;
+                                            if (prod._id === record.productId) {
+                                                const updatedSucursales = prod.sucursales.map(suc => {
+                                                    if (suc.id_sucursal === record.sucursalId) {
+                                                        return {
+                                                            ...suc,
+                                                            combinaciones: suc.combinaciones.filter((_, i) => i !== record.index)
+                                                        };
+                                                    }
+                                                    return suc;
+                                                });
+                                                return { ...raw, productData: { ...prod, sucursales: updatedSucursales } };
+                                            }
+                                            return raw;
+                                        });
+                                        setProductData(updated);
+                                    }}
+                                >
+                                    <Button danger>Eliminar</Button>
+                                </Popconfirm>
+                            )
+                        }
+                    ]}
+                />
+            ) : <p style={{ color: 'gray' }}>No hay productos nuevos.</p>}
+        </Modal>
+    );
 };
 
 export default ConfirmProductsModal;

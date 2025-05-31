@@ -43,6 +43,7 @@ const registerShippingAPI = async (shippingData: any) => {
 };
 
 const registerSalesToShippingAPI = async (salesData: any) => {
+  console.log("Registering sales data:", salesData);
   try {
     const res = await apiClient.post("/shipping/register/sales", salesData);
     return { success: true, ...res.data };
@@ -55,17 +56,12 @@ const registerSalesToShippingAPI = async (salesData: any) => {
   }
 };
 
-const updateShippingAPI = async (
-  updateShippingData: any,
-  shippingId: number
-) => {
+const updateShippingAPI = async (updateShippingData: any, shippingId: string) => {
   try {
-    const res = await apiClient.put(`/shipping/${shippingId}`, {
-      newData: updateShippingData,
-    });
+    const res = await apiClient.put(`/shipping/${shippingId}`, updateShippingData);
     return { success: true, ...res.data };
   } catch (error) {
-    parseError(error as AxiosError);
+    return { success: false };
   }
 };
 

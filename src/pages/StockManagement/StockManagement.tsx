@@ -15,10 +15,12 @@ import { getCategoriesAPI } from '../../api/category';
 import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
+import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempVariants} from "../../utils/storageHelpers.ts";
 
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
+    const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
 
     const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -122,13 +124,10 @@ const StockManagement = () => {
     };
 
     const closeConfirmProduct = async () => {
-        const productsResponse = await getProductsAPI();
-        setProducts(productsResponse);
-        setFilteredProducts(productsResponse);
-        setNewVariants([]);
-        setProductsToUpdate({});
-        setNewProducts([]);
-        setStock([]);
+        await fetchData();
+        setFilteredProducts(products);
+        clearTempProducts();
+        clearTempVariants();
         setIsConfirmModalVisible(false);
     };
 
@@ -188,17 +187,22 @@ const StockManagement = () => {
     };
 
     const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
-        await createProductsFromGroup(productData, combinations, selectedFeatures, features);
-        setProductFormVisible(false);
-        setNewProducts([...newProducts, {
+        const newProduct = {
             productData,
             combinations,
             selectedFeatures,
-            features
-        }]);
-        setPrevKey(key => key + 1);
-    };
+            features,
+            isNew: true // Marcar como nuevo
+        };
 
+        // Guardar en localStorage
+        const stored = JSON.parse(localStorage.getItem("newProducts") || "[]");
+        localStorage.setItem("newProducts", JSON.stringify([...stored, newProduct]));
+
+        // Actualizar estado para UI
+        setNewProducts(prev => [...prev, newProduct]);
+        setProductFormVisible(false);
+    };
     const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
 
     const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
@@ -267,25 +271,21 @@ const StockManagement = () => {
                 <Col {...controlSpan}>
                     <Button
                         onClick={() => {
-                            const newStock = [];
-                            for (const productId in productsToUpdate) {
-                                const product = products.find(
-                                    (product) => product.id_producto == productId
-                                );
-
-                                if (product.producto_sucursal[0]) {
-                                    product.entrance = productsToUpdate[productId];
-                                }
-
-                                newStock.push({
-                                    product,
+                            const sucursalId = localStorage.getItem("sucursalId");
+                            const newStock = Object.entries(productsToUpdate).map(([key, value]) => {
+                                const [productId, _, index] = key.split("-");
+                                return {
+                                    product: products.find((p) => p._id === productId),
                                     newStock: {
                                         productId,
-                                        sucursalId: 3,
-                                        stock: productsToUpdate[productId],
+                                        sucursalId,
+                                        index: Number(index),
+                                        stock: value,
                                     },
-                                });
-                            }
+                                };
+                            });
+
+                            saveTempStock(newStock);
                             setStock(newStock);
                             setIsConfirmModalVisible(true);
                         }}
@@ -311,7 +311,8 @@ const StockManagement = () => {
                 handleUpdate={(ingresoData: { [key: number]: number }) => {
                     setProductsToUpdate(ingresoData);
                 }}
-                onUpdateProducts={fetchData} // ✅ PASA ESTA FUNCIÓN AL HIJO
+                onUpdateProducts={fetchData}
+                setStockListForConfirmModal={setStockListForConfirmModal}
             />
             {/*infoModalVisible && (
                 <ProductInfoModal
@@ -346,12 +347,12 @@ const StockManagement = () => {
                     visible={isConfirmModalVisible}
                     onClose={cancelConfirmProduct}
                     onSuccess={closeConfirmProduct}
-                    newVariants={newVariants}
-                    newProducts={newProducts}
-                    newStock={stock}
+                    newVariants={getTempVariants()}
+                    newProducts={getTempProducts()}
+                    newStock={stockListForConfirmModal}
                 />
-            )}
 
+            )}
             {isMoveModalVisible && (
                 <MoveProductsModal
                     visible={isMoveModalVisible}

@@ -292,7 +292,7 @@ export const Sales = () => {
                                                 placeholder="Selecciona un vendedor"
                                                 options={sellers.map((vendedor: any) => ({
                                                     value: vendedor._id,
-                                                    label: vendedor.nombre,
+                                                    label: vendedor.nombre+" "+vendedor.apellido,
                                                 }))}
                                                 filterOption={(input, option: any) =>
                                                     option.label.toLowerCase().includes(input.toLowerCase())
@@ -355,16 +355,17 @@ export const Sales = () => {
                             handleValueChange={handleValueChange}
                             onUpdateTotalAmount={updateTotalAmount}
                             key={refreshKey}
+                            sellers={sellers}
                         />
                     </Card>
                 </Col>
             </Row>
-
             <ProductSellerViewModal
                 visible={productAddModal}
                 onCancel={handleProductModalCancel}
                 onSuccess={handleSuccessProductModal}
                 onAddProduct={handleAddProduct}
+                selectedSeller={sellers.find((s: any) => s._id === selectedSellerId) || null}
             />
             <SalesFormModal
                 visible={modalType === "sales"}
