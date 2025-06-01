@@ -5,7 +5,7 @@ import { getCategoriesAPI, registerCategoryAPI } from "../../api/category";
 import { getSucursalsAPI } from "../../api/sucursal";
 import VariantInputs from "./VariantInputs";
 import { registerVariantAPI } from "../../api/product.ts";
-
+import { saveTempProduct } from '../../utils/storageHelpers';
 const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
     const [loading, setLoading] = useState(false);
     const [sellers, setSellers] = useState([]);
@@ -16,49 +16,38 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
 
     const [form] = Form.useForm();
     const handleFinish = async (productData: any) => {
-        setLoading(true);
-        try {
-            const sucursalId = localStorage.getItem("sucursalId");
+        const sucursalId = localStorage.getItem("sucursalId");
 
-            const sucursales = branches.map((b) => ({
-                id_sucursal: b._id,
-                combinaciones: combinations.map(combo => {
-                    const variantes: Record<string, string> = {};
-                    let i = 0;
-                    while (combo[`varName${i}`] && combo[`var${i}`]) {
-                        variantes[combo[`varName${i}`]] = combo[`var${i}`];
-                        i++;
-                    }
-                    return {
-                        variantes,
-                        precio: combo.price,
-                        stock: b._id === sucursalId ? combo.stock : 0
-                    };
-                })
-            }));
-            const finalData = {
-                ...productData,
-                sucursales
-            };
+        const sucursales = branches.map((b) => ({
+            id_sucursal: b._id,
+            combinaciones: combinations.map(combo => {
+                const variantes: Record<string, string> = {};
+                let i = 0;
+                while (combo[`varName${i}`] && combo[`var${i}`]) {
+                    variantes[combo[`varName${i}`]] = combo[`var${i}`];
+                    i++;
+                }
+                return {
+                    variantes,
+                    precio: combo.price,
+                    stock: b._id === sucursalId ? combo.stock : 0
+                };
+            })
+        }));
 
-            const response = await registerVariantAPI(finalData);
+        const tempProduct = {
+            productData,
+            combinations,
+            selectedFeatures: [],
+            features: [],
+            sucursales
+        };
 
-            if (response.success) {
-                message.success("Producto registrado correctamente");
-                form.resetFields();
-                setCombinations([]);
-                onSuccess();
-                onCancel();
-            } else {
-                message.error(response.message || "Error al registrar el producto");
-            }
-
-        } catch (err) {
-            console.error(err);
-            message.error("Error inesperado");
-        } finally {
-            setLoading(false);
-        }
+        saveTempProduct(tempProduct);
+        message.success("Producto guardado localmente");
+        form.resetFields();
+        setCombinations([]);
+        onCancel();
     };
 
     const createCategory = async () => {

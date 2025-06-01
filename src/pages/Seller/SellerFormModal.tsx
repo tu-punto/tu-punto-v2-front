@@ -78,6 +78,7 @@ export default function SellerFormModal({
       // 2· mapear payload para backend
       const payload = {
         ...values,
+        saldo_pendiente: 0,
         fecha_vigencia: dayjs(values.fecha_vigencia).toISOString(),
         pago_sucursales: values.sucursales.map((s: any) => ({
           id_sucursal: s.id_sucursal,
