@@ -21,7 +21,7 @@ const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
     const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
-
+    const [resetSignal, setResetSignal] = useState(false);
     const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [selectedGroup, setSelectedGroup] = useState(null);
@@ -128,6 +128,8 @@ const StockManagement = () => {
         setFilteredProducts(products);
         clearTempProducts();
         clearTempVariants();
+        setProductsToUpdate({});
+        setStockListForConfirmModal([]);
         setIsConfirmModalVisible(false);
     };
 
@@ -174,7 +176,11 @@ const StockManagement = () => {
         const selectedOption = options[criteriaFilter];
         if (!selectedOption || !selectedOption.filter) return;
         const newList = products.filter(product => selectedOption.filter(product, selectedSeller));
+
         setFilteredProducts(newList);
+        setProductsToUpdate({});
+        setStockListForConfirmModal([]);
+
     };
 
 
@@ -256,6 +262,7 @@ const StockManagement = () => {
                                 Agregar Producto
                             </Button>
                         </Col>
+                        {/*
                         <Col xs={24} sm={12} lg={6}>
                             <Button
                                 onClick={() => setIsMoveModalVisible(true)}
@@ -265,28 +272,15 @@ const StockManagement = () => {
                                 Mover Productos
                             </Button>
                         </Col>
+                        */}
                     </>
                 )}
 
                 <Col {...controlSpan}>
                     <Button
                         onClick={() => {
-                            const sucursalId = localStorage.getItem("sucursalId");
-                            const newStock = Object.entries(productsToUpdate).map(([key, value]) => {
-                                const [productId, _, index] = key.split("-");
-                                return {
-                                    product: products.find((p) => p._id === productId),
-                                    newStock: {
-                                        productId,
-                                        sucursalId,
-                                        index: Number(index),
-                                        stock: value,
-                                    },
-                                };
-                            });
-
-                            saveTempStock(newStock);
-                            setStock(newStock);
+                            saveTempStock(stockListForConfirmModal); // ✅ ya actualizado desde ProductTable
+                            setStock(stockListForConfirmModal);       // ✅ se pasa al modal también por props
                             setIsConfirmModalVisible(true);
                         }}
                         className='text-mobile-base xl:text-mobile-base'
@@ -313,6 +307,7 @@ const StockManagement = () => {
                 }}
                 onUpdateProducts={fetchData}
                 setStockListForConfirmModal={setStockListForConfirmModal}
+                resetSignal={resetSignal}
             />
             {/*infoModalVisible && (
                 <ProductInfoModal
@@ -346,12 +341,17 @@ const StockManagement = () => {
                 <ConfirmProductsModal
                     visible={isConfirmModalVisible}
                     onClose={cancelConfirmProduct}
-                    onSuccess={closeConfirmProduct}
+                    onSuccess={() => {
+                        closeConfirmProduct();
+                        setProductsToUpdate({});
+                        setStockListForConfirmModal([]);
+                        setResetSignal(true);
+                        setTimeout(() => setResetSignal(false), 100);
+                    }}
                     newVariants={getTempVariants()}
                     newProducts={getTempProducts()}
                     newStock={stockListForConfirmModal}
                 />
-
             )}
             {isMoveModalVisible && (
                 <MoveProductsModal

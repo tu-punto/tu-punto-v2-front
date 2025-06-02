@@ -19,9 +19,10 @@ interface ProductTableProps {
     groupList: any[];
     onUpdateProducts?: () => Promise<void>;
     setStockListForConfirmModal?: (stockList: any[]) => void; // ← NUEVO
+    resetSignal?: boolean;
 }
 
-const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal }: ProductTableProps) => {
+const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal }: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -49,13 +50,20 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
         setIngresoData(ingresoObj);
     }, []);
+    useEffect(() => {
+        if (resetSignal) {
+            setIngresoData({});
+        }
+    }, [resetSignal]);
 
     const handleIngresoChange = (key: string, value: number) => {
 
         setIngresoData((prev) => {
             const updated = { ...prev, [key]: value };
 
-            const newStockArray = Object.entries(updated).map(([k, stock]) => {
+            const newStockArray = Object.entries(updated)
+                .filter(([_, stock]) => Number(stock) > 0) // <- ❗solo mayores a 0
+                .map(([k, stock]) => {
                 const [productId, sucursalId, index] = k.split("-");
                 const producto = productsList.find((p) => p._id === productId);
                 const sucursal = producto?.sucursales?.find((s) => s.id_sucursal === sucursalId);
@@ -64,7 +72,11 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 return {
                     product: {
                         _id: producto._id,
+                        nombre_producto: producto.nombre_producto,
+                        nombre_categoria: producto.nombre_categoria || "Sin categoría",
                         variantes: combinacion?.variantes || {},
+                        precio: combinacion?.precio ?? "-",
+                        stock: combinacion?.stock ?? "-"
                     },
                     newStock: {
                         productId,

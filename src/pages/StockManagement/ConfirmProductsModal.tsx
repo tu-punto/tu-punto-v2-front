@@ -152,9 +152,29 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess }) => {
                     rowKey={(_, i) => i}
                     pagination={false}
                     columns={[
-                        { title: "ID Producto", dataIndex: ["product", "_id"] },
                         {
-                            title: "Stock",
+                            title: "Producto",
+                            render: (_, record) => {
+                                const variantes = Object.entries(record.product.variantes || {})
+                                    .map(([k, v]) => `${v}`)
+                                    .join(" / ");
+                                return `→ ${record.product.nombre_producto || ''} - ${variantes}`;
+                            }
+                        },
+                        {
+                            title: "Stock actual",
+                            render: (_, record) => (
+                                <span>{record.product.stock || "-"}</span>
+                            )
+                        },
+                        {
+                            title: "Precio Unitario",
+                            render: (_, record) => (
+                                <span>{record.product.precio || "-"}</span>
+                            )
+                        },
+                        {
+                            title: "Ingresos",
                             render: (_, record) => (
                                 <InputNumber
                                     min={0}
@@ -164,9 +184,18 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess }) => {
                             )
                         },
                         {
+                            title: "Categoría",
+                            render: (_, record) => (
+                                <span>{record.product.categoria || "Ropa"}</span> // si no tienes, hardcodea momentáneamente
+                            )
+                        },
+                        {
                             title: "Acciones",
                             render: (_, record) => (
-                                <Popconfirm title="¿Eliminar?" onConfirm={() => handleDelete(stockData, setStockData, record)}>
+                                <Popconfirm
+                                    title="¿Eliminar?"
+                                    onConfirm={() => handleDelete(stockData, setStockData, record)}
+                                >
                                     <Button danger>Eliminar</Button>
                                 </Popconfirm>
                             )
