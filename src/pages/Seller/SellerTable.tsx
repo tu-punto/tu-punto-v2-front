@@ -33,7 +33,7 @@ export default function SellerTable({
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const refresh = () => setRefreshKey((k:any) => k + 1);
+  const refresh = () => setRefreshKey((k: any) => k + 1);
 
   /* ---- columnas ---- */
   const columns = [
@@ -56,7 +56,7 @@ export default function SellerTable({
       key: "acciones",
       render: (_: any, row: SellerRow) => (
         <div className="flex gap-2 justify-end">
-          <PayDebtButton seller={row}  onSuccess={refresh} />
+          <PayDebtButton seller={row} onSuccess={refresh} />
           <Tooltip title="Renovar vendedor">
             <Button icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); setSelected(row); setDebtModal(true); }} />
           </Tooltip>
@@ -91,7 +91,7 @@ export default function SellerTable({
             key: seller._id,
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
-            deudaInt: Number(seller.deuda) || 0,
+            deuda: seller.saldo_pendiente - seller.deuda,
             pagoTotalInt: (Number(seller.deuda) || 0) - Number(advances || 0),
             pago_mensual: `Bs. ${mensual}`,
           };
@@ -157,7 +157,7 @@ export default function SellerTable({
             visible={infoModal && !debtModal}
             seller={selected}
             onCancel={closeAll}
-            onSuccess={() => {closeAll(); refresh();} }
+            onSuccess={() => { closeAll(); refresh(); }}
           />
           <SucursalDrawer
             open={drawerOpen}
