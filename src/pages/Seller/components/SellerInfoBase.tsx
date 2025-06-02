@@ -198,8 +198,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       <SellerHeader name={seller.nombre} />
 
       <StatsCards
-        pagoPendiente={pagoPendiente}
-        deuda={deuda}
+        pagoPendiente={deuda}
+        deuda={pagoPendiente}
         saldoPendiente={saldoPendiente}
       />
 
