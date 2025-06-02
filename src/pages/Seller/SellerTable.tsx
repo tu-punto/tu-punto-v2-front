@@ -92,13 +92,13 @@ export default function SellerTable({
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
             deuda: seller.saldo_pendiente - seller.deuda,
-            pagoTotalInt: (Number(seller.deuda) || 0) - Number(advances || 0),
+            pagoTotalInt: (Number(seller.saldo_pendiente ) || 0)  - (Number(seller.deuda) || 0),
             pago_mensual: `Bs. ${mensual}`,
           };
         })
       );
 
-      setPending(rows.filter((r) => r.pagoTotalInt > 0));
+      setPending(rows.filter((r) => r.pagoTotalInt !== 0));
       setOnTime(rows.filter((r) => r.pagoTotalInt === 0));
     })();
   }, [refreshKey]);

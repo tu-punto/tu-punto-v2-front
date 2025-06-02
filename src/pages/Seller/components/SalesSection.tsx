@@ -23,13 +23,19 @@ const SalesSection: React.FC<Props> = ({
   onDeleteOneSale,
   isSeller,
 }) => {
+  // 1) Asignamos key = id_venta a cada objeto
+  const salesConKey = initialSales.map(sale => ({
+    ...sale,
+    key: sale.id_venta, // aquí defines el valor de "key"
+  }));
+
+  // 2) Pasamos ese array al hook
   const [
     salesData,
     setSalesData,
     handleValueChange,
-  ] = useEditableTable(initialSales);
+  ] = useEditableTable(salesConKey);
 
-  /* ─────────── deletions locales ─────────── */
   const handleDelete = (key: any) => {
     setSalesData(prev => {
       const updated = prev.filter(p => p.key !== key);
@@ -44,15 +50,12 @@ const SalesSection: React.FC<Props> = ({
     });
   };
 
-  /* ──────── sincronizar con el padre ──────── */
   useEffect(() => { onSalesChange(salesData); }, [salesData]);
 
-  /* ─────────── filtrados ─────────── */
   const ventasNoPagadas = salesData.filter(p => !p.deposito_realizado);
 
   return (
     <>
-      {/* Ventas no pagadas */}
       <section className="mb-4 overflow-x-auto">
         <h4 className="font-bold text-mobile-sm xl:text-desktop-sm">
           Ventas no pagadas
@@ -62,7 +65,7 @@ const SalesSection: React.FC<Props> = ({
           onUpdateTotalAmount={onUpdateNoPagadasTotal}
           onDeleteProduct={(key, id) => {
             onDeleteOneSale(id);
-            handleDelete(key); // elimina del estado local
+            handleDelete(key);
           }}
           onUpdateProduct={(id, fields) => {
             onUpdateOneSale(id, fields);
@@ -73,17 +76,16 @@ const SalesSection: React.FC<Props> = ({
         />
       </section>
 
-      {/* Historial de ventas */}
       <section className="mb-4 overflow-x-auto">
         <h4 className="font-bold text-mobile-sm xl:text-desktop-sm">
           Historial de ventas
         </h4>
         <SalesTable
           data={salesData}
-          onUpdateTotalAmount={onUpdateNoPagadasTotal}
+          onUpdateTotalAmount={onUpdateHistorialTotal}
           onDeleteProduct={(key, id) => {
             onDeleteOneSale(id);
-            handleDelete(key); // elimina del estado local
+            handleDelete(key);
           }}
           onUpdateProduct={(id, fields) => {
             onUpdateOneSale(id, fields);
