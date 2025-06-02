@@ -351,6 +351,7 @@ const StockManagement = () => {
                     newVariants={getTempVariants()}
                     newProducts={getTempProducts()}
                     newStock={stockListForConfirmModal}
+                    productosConSucursales={products}
                 />
             )}
             {isMoveModalVisible && (

@@ -43,7 +43,14 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
             sucursales
         };
 
-        saveTempProduct(tempProduct);
+        saveTempProduct({
+            productData,
+            combinations,
+            selectedFeatures: [],
+            features: [],
+            sucursales
+        });
+
         message.success("Producto guardado localmente");
         form.resetFields();
         setCombinations([]);

@@ -160,13 +160,14 @@ export const updateSubvariantStockAPI = async ({
     variantes: Record<string, string>;
     stock: number;
 }) => {
+    /*
     console.log("📦 Enviando actualización de stock:", {
         productId,
         sucursalId,
         variantes,
         stock
     });
-
+    */
     try {
         const res = await apiClient.put(`/product/update-subvariant-stock`, {
             productId,
@@ -183,13 +184,8 @@ export const updateSubvariantStockAPI = async ({
 
 export const registerVariantAPI = async (productData: any) => {
     try {
-        //const sucursalId = localStorage.getItem("sucursalId");
-        //const { combinations, ...rest } = productData;
         console.log("Product data:", productData);
-        //console.log("Combinations:", combinations);
-        const res = await apiClient.post('/product/register', {
-            product: productData
-        });
+        const res = await apiClient.post('/product/register', productData); // ✅ aquí está el fix
         return res.data;
     } catch (error) {
         const err = error as AxiosError;
@@ -199,4 +195,5 @@ export const registerVariantAPI = async (productData: any) => {
         return { success: false };
     }
 };
+
 

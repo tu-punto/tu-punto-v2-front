@@ -7,14 +7,16 @@ export const saveTempProduct = (tempProduct) => {
 
     const productFinal = {
         _id: productData._id || crypto.randomUUID(),
-        nombre_producto: productData.nombre_producto,
-        id_vendedor: productData.id_vendedor,
-        id_categoria: productData.id_categoria,
+        nombre_producto: productData?.nombre_producto ?? '',       // ← validar que venga
+        id_vendedor: productData?.id_vendedor ?? '',               // ← validar que venga
+        id_categoria: productData?.id_categoria ?? '',             // ← validar que venga
         sucursales,
         isNew: true,
     };
+
     localStorage.setItem("newProducts", JSON.stringify([...stored, productFinal]));
 };
+
 
 export const getTempProducts = () => {
     return JSON.parse(localStorage.getItem("newProducts") || "[]");
