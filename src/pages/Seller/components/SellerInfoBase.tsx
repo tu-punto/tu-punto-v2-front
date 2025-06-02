@@ -48,6 +48,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [loading, setLoading] = useState(false);
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [sucursalesLoaded, setSucursalesLoaded] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   /* datos agregados de sub-componentes */
   const [salesData, setSalesData] = useState<any[]>([]);
@@ -63,6 +64,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   /* ───── cargar sucursales y luego todo ───── */
   useEffect(() => { if (seller.key) fetchSucursales(); }, [seller]);
 
+
   useEffect(() => {
     if (sucursalesLoaded) {
       fetchSales();
@@ -70,7 +72,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       fetchPaymentProofs(seller.key);
       fetchSellerDebts(seller.key);
     }
-  }, [sucursalesLoaded]);
+  }, [sucursalesLoaded, refreshKey]);
 
   /* ─────────── solicitudes ─────────── */
   const fetchSucursales = async () => {
@@ -279,7 +281,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           isSeller={isSeller}
         />
 
-        <SellerDebtTable data={sellerDebts} />
+        <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} />
 
         <PaymentProofSection
           proofs={paymentProofs}
