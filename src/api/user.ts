@@ -14,7 +14,7 @@ export const checkLoginAPI = async (userData: any) => {
 export const getUserByCookieAPI = async () => {
   try {
     const res = await apiClient.get("/user/info"); // o como se llame tu endpoint
-    return { success: true, data: res.data };
+    return res.data ;
   } catch (error) {
     console.log(error);
     return { success: false };

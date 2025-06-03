@@ -15,11 +15,9 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
         };
     });
     const totalAmount = updatedProducts.reduce((acc: number, product: any) => {
-        const cantidad = product.cantidad || 0;
-        const precio = product.precio_unitario || 0;
-        const utilidad = product.utilidad || 0;
-        return acc + ((precio - utilidad) * cantidad);
+        return acc + (product.precio_unitario * product.cantidad);
     }, 0);
+
     const columns = [
         {
             title: 'Producto',
@@ -74,13 +72,12 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             render: (_: any, record: any) => (
                 <InputNumber
                     min={0}
+                    max={record.precio_unitario * record.cantidad}
                     value={record.utilidad}
                     onChange={value => handleValueChange(record.key, 'utilidad', value)}
-                    defaultValue={0}
                     className="text-mobile-sm xl:text-desktop-sm"
                 />
             ),
-            className: "text-mobile-sm xl:text-desktop-sm",
         },
         {
             title: 'Acción',

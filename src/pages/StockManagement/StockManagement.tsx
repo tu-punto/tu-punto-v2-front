@@ -51,7 +51,8 @@ const StockManagement = () => {
             const categoriesResponse = await getCategoriesAPI();
             const groupsResponse = await getGroupsAPI();
             const productsResponse = await getProductsAPI();
-
+            console.log("🧪 Productos recibidos:", productsResponse);
+            console.log("🧪 Usuario actual:", user);
             //console.log("Sellers", sellersResponse);
             //console.log("Categories", categoriesResponse);
             //console.log("Groups", groupsResponse);
@@ -114,7 +115,12 @@ const StockManagement = () => {
         // NUEVO: aplicar filtro por defecto cuando se cargan
         setTimeout(() => filter(), 100);
     }, [sellers, categories, groups]);
-
+    const finalProductList = isSeller
+        ? products.filter(
+            (product) =>
+                products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
+        )
+        : filteredProducts;
 
     const showVariantModal = async (product: any) => {
         const group = await getGroupByIdAPI(product.groupId);
@@ -224,30 +230,38 @@ const StockManagement = () => {
     return (
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="block xl:flex justify-center">
-                <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de</h2>
-                <Select
-                    style={{ width: 200 }}
-                    placeholder="Select an option"
-                    onChange={handleChangeFilter}
-                    defaultValue={0}
-                >
-                    {options.map((option, index) => (
-                        <Select.Option key={option.option} value={index}>
-                            {option.option}
-                        </Select.Option>
-                    ))}
-                </Select>
-            </div>
-            <Row gutter={[16, 16]} justify="center" align="middle">
-                <Col xs={24} md={8} style={{ marginBottom: "16px" }}>
-                    <SellerList
-                        filterSelected={criteriaFilter}
-                        onSelectSeller={handleSelectSeller}
-                    />
-                </Col>
-            </Row>
+            {isSeller ? (
+                <h2 className='text-mobile-3xl xl:text-mobile-3xl text-center'>
+                    Productos de {user?.nombre || 'Vendedor'}
+                </h2>
+            ) : (
+                <div className="block xl:flex justify-center">
+                    <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de</h2>
+                    <Select
+                        style={{ width: 200 }}
+                        placeholder="Select an option"
+                        onChange={handleChangeFilter}
+                        defaultValue={0}
+                    >
+                        {options.map((option, index) => (
+                            <Select.Option key={option.option} value={index}>
+                                {option.option}
+                            </Select.Option>
+                        ))}
+                    </Select>
+                </div>
+            )}
 
+            {!isSeller && (
+                <Row gutter={[16, 16]} justify="center" align="middle">
+                    <Col xs={24} md={8} style={{ marginBottom: "16px" }}>
+                        <SellerList
+                            filterSelected={criteriaFilter}
+                            onSelectSeller={handleSelectSeller}
+                        />
+                    </Col>
+                </Row>
+            )}
             <Row gutter={[16, 16]} justify="center" align="middle" style={{ marginBottom: "16px" }}>
 
 
@@ -275,19 +289,20 @@ const StockManagement = () => {
                         */}
                     </>
                 )}
-
-                <Col {...controlSpan}>
-                    <Button
-                        onClick={() => {
-                            saveTempStock(stockListForConfirmModal); // ✅ ya actualizado desde ProductTable
-                            setStock(stockListForConfirmModal);       // ✅ se pasa al modal también por props
-                            setIsConfirmModalVisible(true);
-                        }}
-                        className='text-mobile-base xl:text-mobile-base'
-                    >
-                        Actualizar Stock
-                    </Button>
-                </Col>
+                {!isSeller && (
+                    <Col {...controlSpan}>
+                        <Button
+                            onClick={() => {
+                                saveTempStock(stockListForConfirmModal);
+                                setStock(stockListForConfirmModal);
+                                setIsConfirmModalVisible(true);
+                            }}
+                            className='text-mobile-base xl:text-mobile-base'
+                        >
+                            Actualizar Stock
+                        </Button>
+                    </Col>
+                )}
             </Row>
 
             <ProductTable
@@ -298,9 +313,7 @@ const StockManagement = () => {
                     return fn(group, filteredProducts);
                 }}
                 productsList={
-                    isSeller
-                        ? products.filter((product) => product._id === user._id)
-                        : filteredProducts
+                    finalProductList
                 }
                 handleUpdate={(ingresoData: { [key: number]: number }) => {
                     setProductsToUpdate(ingresoData);

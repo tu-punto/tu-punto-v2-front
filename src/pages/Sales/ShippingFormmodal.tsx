@@ -1,6 +1,6 @@
 import { Modal, Form, Input, InputNumber, Button, Radio, Col, Row, DatePicker, TimePicker, Card, message, Select } from 'antd';
 import { UserOutlined, PhoneOutlined, CommentOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
 import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
@@ -22,8 +22,22 @@ function ShippingFormModal({
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [form] = Form.useForm();
     const [showWarning, setShowWarning] = useState(false);
+    const [quienPaga, setQuienPaga] = useState<string | null>(null);
+
+    const saldoACobrar = useMemo(() => {
+        return totalAmount +
+            (form.getFieldValue("quien_paga_delivery") === "comprador" ? montoCobradoDelivery : 0) -
+            adelantoClienteInput;
+    }, [totalAmount, montoCobradoDelivery, adelantoClienteInput, form]);
+
     const handleFinish = async (shippingData: any) => {
         setLoading(true);
+
+        if (saldoACobrar <= 0) {
+            message.error("El saldo a cobrar debe ser mayor a 0");
+            setLoading(false);
+            return;
+        }
         if (showWarning) {
             message.error("La suma QR + Efectivo no es válida. Verifica los montos.");
             setLoading(false);
@@ -263,18 +277,48 @@ function ShippingFormModal({
                             {estadoPedido === '3' && (
                                 <>
                                     <Row gutter={16}>
-                                        <Col span={12}>
-                                            <Form.Item name="cargo_delivery" label="Monto cobrado por el Delivery">
-                                                <InputNumber
-                                                    prefix="Bs."
-                                                    value={montoCobradoDelivery}
-                                                    onChange={value => setMontoCobradoDelivery(value ?? 0)}
-                                                    style={{ width: '100%' }}
-                                                />
+                                        <Col span={24}>
+                                            <Form.Item
+                                                name="quien_paga_delivery"
+                                                label="¿Quién paga el delivery?"
+                                                rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}>
+                                                <Radio.Group
+                                                    onChange={(e) => {
+                                                        setQuienPaga(e.target.value); // actualiza el estado que forza re-render
+                                                        form.setFieldValue("quien_paga_delivery", e.target.value); // opcional, si necesitas setear manualmente
+                                                    }}>
+                                                    <Radio.Button value="comprador">COMPRADOR</Radio.Button>
+                                                    <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
+                                                    <Radio.Button value="tupunto">Tu Punto</Radio.Button>
+                                                </Radio.Group>
                                             </Form.Item>
+
+                                        </Col>
+                                    </Row>
+
+                                    <Row gutter={16}>
+                                        <Col span={12}>
+                                            {["comprador", "vendedor"].includes(quienPaga || "") && (
+                                                <Form.Item
+                                                    name="cargo_delivery"
+                                                    label="Monto cobrado por el Delivery"
+                                                    rules={[{ required: true, message: "Campo obligatorio" }]}>
+                                                    <InputNumber
+                                                        prefix="Bs."
+                                                        value={montoCobradoDelivery}
+                                                        onChange={value => setMontoCobradoDelivery(value ?? 0)}
+                                                        style={{ width: '100%' }}
+                                                    />
+                                                </Form.Item>
+                                            )}
+
                                         </Col>
                                         <Col span={12}>
-                                            <Form.Item name="costo_delivery" label="Costo de realizar el Delivery">
+                                            <Form.Item
+                                                name="costo_delivery"
+                                                label="Costo de realizar el Delivery"
+                                                rules={[{ required: true, message: "Campo obligatorio" }]}
+                                            >
                                                 <InputNumber
                                                     prefix="Bs."
                                                     value={costoRealizarDelivery}
@@ -284,6 +328,7 @@ function ShippingFormModal({
                                             </Form.Item>
                                         </Col>
                                     </Row>
+
                                 </>
                             )}
 
@@ -432,7 +477,7 @@ function ShippingFormModal({
                                         <Input
                                             prefix="Bs."
                                             readOnly
-                                            value={(totalAmount + montoCobradoDelivery - adelantoClienteInput).toFixed(2)}
+                                            value={saldoACobrar.toFixed(2)}
                                             style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
                                         />
                                     </Form.Item>

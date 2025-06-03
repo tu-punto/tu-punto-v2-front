@@ -11,7 +11,10 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
     (async () => {
       try {
         const res = await getUserByCookieAPI();
-        if (res?.success) setUser(res.data);
+        if (res?.success) {
+          console.log("✅ Usuario desde /info:", res.data);
+          setUser(res.data);
+        }
       } catch (e) {
         console.error("Error fetching user:", e);
         setUser(null);
