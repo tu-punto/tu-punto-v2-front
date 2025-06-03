@@ -1,7 +1,6 @@
 import { Table, Input, Button } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { updateSellerAPI } from '../../../api/seller';
 import { updateFinanceFluxAPI } from '../../../api/financeFlux';
 
 export default function SellerDebtTable({ data, setRefreshKey }: { data: any[], setRefreshKey: (key: number) => void }) {
@@ -13,7 +12,7 @@ export default function SellerDebtTable({ data, setRefreshKey }: { data: any[], 
 
   const handleEdit = (record: any) => {
     setEditingKey(record._id);
-    setEditingRow({ ...record }); // Store the current row data for editing
+    setEditingRow({ ...record });
   };
 
   const handleSave = async () => {
