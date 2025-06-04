@@ -28,6 +28,7 @@ export const Sales = () => {
     //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
     const { data, fetchProducts } = useProducts();
+    const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [branches, setBranches] = useState([] as any[]);
@@ -120,10 +121,13 @@ export const Sales = () => {
         let filteredData = data;
 
         if (!isAdmin) {
-            filteredData = data;
+            filteredData = filteredData.filter(p => p.id_vendedor === user.id_vendedor);
+            if (selectedBranchId) {
+                filteredData = filteredData.filter(p => p.sucursalId === selectedBranchId);
+            }
         } else {
             if (selectedSellerId) {
-                filteredData = filteredData.filter(product => product.id_vendedor === selectedSellerId);
+                filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
             }
         }
 
@@ -280,7 +284,20 @@ export const Sales = () => {
                                             style={{ width: 200 }}
                                             allowClear
                                         />
-                                        <Button
+                                        { !isAdmin && (
+                                            <Select
+                                                placeholder="Sucursal"
+                                                value={selectedBranchId}
+                                                onChange={(value) => setSelectedBranchId(value)}
+                                                options={branches.map((sucursal: any) => ({
+                                                    value: sucursal._id,
+                                                    label: sucursal.nombre,
+                                                }))}
+                                                style={{ minWidth: 180 }}
+                                                allowClear
+                                            />
+                                        )}
+                                            <Button
                                             type="primary"
                                             onClick={() => setProductAddModal(true)}
                                             className="text-mobile-base xl:text-desktop-sm "

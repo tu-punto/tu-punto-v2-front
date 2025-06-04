@@ -30,93 +30,82 @@ function ShippingFormModal({
             adelantoClienteInput;
     }, [totalAmount, montoCobradoDelivery, adelantoClienteInput, form]);
 
-    const handleFinish = async (shippingData: any) => {
+    const handleFinish = async (values: any) => {
+        //console.log(" selectedProducts:", selectedProducts);
+
+        const sucursalId = sucursals?.[0]?._id || null;
         setLoading(true);
 
-        if (saldoACobrar <= 0) {
-            message.error("El saldo a cobrar debe ser mayor a 0");
-            setLoading(false);
-            return;
-        }
-        if (showWarning) {
-            message.error("La suma QR + Efectivo no es válida. Verifica los montos.");
-            setLoading(false);
-            return;
-        }
-        const tipoPagoMap: any = {
-            1: 'Transferencia o QR',
-            2: 'Efectivo',
-            3: 'Pagado al dueño',
-            4: 'Efectivo + QR'
-        };
+        try {
+            const response = await registerShippingAPI({
+                ...values,
+                id_sucursal: sucursalId,
+            });
 
-        const estadoPedidoMap: any = {
-            1: 'En espera',
-            3: 'Entregado'
-        };
+            if (!response.success) {
+                message.error("Error al registrar el pedido");
+                setLoading(false);
+                return;
+            }
 
-        const estadoFinal = estadoPedidoMap[shippingData.estado_pedido];
+            const productosTemporales = selectedProducts.filter((p: any) => p.esTemporal);
+            const productosNormales = selectedProducts.filter((p: any) => !p.esTemporal);
 
-        const apiShippingData = {
-            ...shippingData,
-            tipo_de_pago: tipoPagoMap[shippingData.tipo_de_pago],
-            estado_pedido: estadoFinal,
-            id_sucursal: parseInt(localStorage.getItem("sucursalId") || "3"),
-        };
+            const ventas = productosNormales.map((p: any) => {
+                const [productId] = p.key.split("-");
+                return {
+                    id_producto: productId,
+                    producto: productId,
+                    id_vendedor: p.id_vendedor,
+                    vendedor: p.id_vendedor,
+                    id_pedido: response.newShipping._id,
+                    cantidad: p.cantidad,
+                    precio_unitario: p.precio_unitario,
+                    utilidad: p.utilidad,
+                    deposito_realizado: false,
+                    variantes: p.variantes,
+                    stockActual: p.stockActual
+                };
+            });
 
-        const response = await registerShippingAPI(apiShippingData);
-        if (!response?.status || !response?.newShipping) {
-            message.error('Error al registrar el pedido');
-            setLoading(false);
-            return;
-        }
+            if (ventas.length > 0) {
+                await handleDebt(ventas, response.newShipping.adelanto_cliente);
+                await handleSales(response.newShipping, ventas);
 
-        const productosTemporales = selectedProducts.filter((p: any) => p.esTemporal);
-        const productosNormales = selectedProducts.filter((p: any) => !p.esTemporal);
+                // RESTAR STOCK si el estado es "Entregado"
+                if (values.estado_pedido === "Entregado") {
 
-        const ventas = productosNormales.map((p: any) => {
-            const [productId] = p.key.split("-");
-            return {
-                id_producto: productId,
-                producto: productId,
-                id_vendedor: p.id_vendedor,
-                vendedor: p.id_vendedor,
-                id_pedido: response.newShipping._id,
-                cantidad: p.cantidad,
-                precio_unitario: p.precio_unitario,
-                utilidad: p.utilidad,
-                deposito_realizado: false,
-                quien_paga_delivery: shippingData.quien_paga_delivery
+                    await actualizarStock(ventas);
+                }
+            }
 
-            };
-        });
-        if (estadoFinal === 'Entregado' && ventas.length > 0) {
-            await handleDebt(ventas, response.newShipping.adelanto_cliente);
-            await handleSales(response.newShipping, ventas);
-            await actualizarStock(ventas);
-        }
-        if (productosTemporales.length > 0) {
-            const productosTemporalesData = productosTemporales.map((p: any) => ({
-                producto: p.producto,
-                cantidad: p.cantidad,
-                precio_unitario: p.precio_unitario,
-                utilidad: p.utilidad,
-                id_vendedor: p.id_vendedor
-            }));
+            if (productosTemporales.length > 0) {
+                const productosTemporalesData = productosTemporales.map((p: any) => ({
+                    producto: p.producto,
+                    cantidad: p.cantidad,
+                    precio_unitario: p.precio_unitario,
+                    utilidad: p.utilidad,
+                    id_vendedor: p.id_vendedor
+                }));
 
-            await updateShippingAPI(
-                { productos_temporales: productosTemporalesData },
-                response.newShipping._id
-            );
+                await updateShippingAPI(
+                    { productos_temporales: productosTemporalesData },
+                    response.newShipping._id
+                );
+            }
+
+            clearSelectedProducts();
+            form.resetFields();
+            setTipoPago(null);
+            setQrInput(0);
+            setEfectivoInput(0);
+            onSuccess();
+        } catch (error) {
+            console.error("Error en handleFinish:", error);
+            message.error("Error al procesar la entrega");
         }
 
-        clearSelectedProducts();
-        form.resetFields();
-        setEstadoPedido(null);
-        setTipoPago(null);
-        setAdelantoVisible(false);
         setLoading(false);
-        onSuccess();
     };
 
     const handleIncrement = (setter: React.Dispatch<React.SetStateAction<number>>, value: number) => {
@@ -127,30 +116,39 @@ function ShippingFormModal({
         setter(prev => parseFloat((prev - value).toFixed(2)));
     };
     const actualizarStock = async (productos: any[]) => {
-        const sucursalId = localStorage.getItem('sucursalId');
+        const sucursalId = sucursals?.[0]?._id || null;
         for (const prod of productos) {
-            if (!prod.variantes || prod.temporary) continue;
+            if (prod.esTemporal) continue;
+
             const { id_producto, cantidad, stockActual, variantes } = prod;
+
+            if (!variantes || typeof variantes !== 'object') {
+                console.warn("Sin variantes válidas para:", prod);
+                continue;
+            }
+
             const nuevoStock = stockActual - cantidad;
             if (nuevoStock < 0) continue;
+
             try {
+
                 const res = await updateSubvariantStockAPI({
                     productId: id_producto,
                     sucursalId,
                     variantes,
                     stock: nuevoStock
                 });
+
                 if (!res.success) {
-                    message.error("Error actualizando stock de una combinación");
+                    message.error(`Error actualizando stock de ${id_producto}`);
                 }
             } catch (err) {
                 console.error("Error al actualizar stock:", err);
             }
         }
     };
-
     useEffect(() => {
-        const monto = parseFloat(totalAmount || 0);
+        const monto = saldoACobrar || 0;
         const suma = (qrInput || 0) + (efectivoInput || 0);
         if (tipoPago === '4') {
             setShowWarning(suma !== monto);
@@ -166,11 +164,23 @@ function ShippingFormModal({
     }, [form]);
     useEffect(() => {
         if (tipoPago === '1') {
-            form.setFieldsValue({ subtotal_qr: totalAmount });
+            form.setFieldsValue({ subtotal_qr: saldoACobrar });
+            setQrInput(saldoACobrar);
+            setEfectivoInput(0);
         } else if (tipoPago === '2' || tipoPago === '3') {
-            form.setFieldsValue({ subtotal_efectivo: totalAmount });
+            form.setFieldsValue({ subtotal_efectivo: saldoACobrar });
+            setQrInput(0);
+            setEfectivoInput(saldoACobrar);
+        } else if (tipoPago === '4') {
+            const mitad = parseFloat((saldoACobrar / 2).toFixed(2));
+            form.setFieldsValue({
+                subtotal_qr: mitad,
+                subtotal_efectivo: saldoACobrar - mitad
+            });
+            setQrInput(mitad);
+            setEfectivoInput(saldoACobrar - mitad);
         }
-    }, [tipoPago, totalAmount, form]);
+    }, [tipoPago, saldoACobrar, form]);
 
     return (
         <Modal title="Realizar Entrega" open={visible} onCancel={onCancel} footer={null} width={800}>
@@ -267,16 +277,23 @@ function ShippingFormModal({
                             <Row gutter={16}>
                                 <Col span={24}>
                                     <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                                        <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())}>
-                                            <Radio.Button value="1">En espera</Radio.Button>
-                                            <Radio.Button value="3">Entregado</Radio.Button>
-                                        </Radio.Group>
+                                        {isAdmin ? (
+                                            <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())}>
+                                                <Radio.Button value="En Espera">En espera</Radio.Button>
+                                                <Radio.Button value="Entregado">Entregado</Radio.Button>
+                                            </Radio.Group>
+                                        ) : (
+                                            <Radio.Group disabled defaultValue="En Espera">
+                                                <Radio.Button value="En Espera">En espera</Radio.Button>
+                                            </Radio.Group>
+                                        )}
+
                                     </Form.Item>
                                 </Col>
                             </Row>
 
                             {/* Condicional Entregado */}
-                            {estadoPedido === '3' && (
+                            {estadoPedido === 'Entregado' && (
                                 <>
                                     <Row gutter={16}>
                                         <Col span={24}>
@@ -335,7 +352,7 @@ function ShippingFormModal({
                             )}
 
                             {/* ¿Está ya pagado? */}
-                            {(estadoPedido === '1' || estadoPedido === '3') && (
+                            {(estadoPedido === 'En Espera' || estadoPedido === 'Entregado') && (
                                 <>
                                     <Row gutter={16}>
                                         <Col span={24}>
@@ -373,9 +390,21 @@ function ShippingFormModal({
                                     )}
                                 </>
                             )}
-
+                            {/* Saldo a Cobrar */}
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item label="Saldo a Cobrar">
+                                        <Input
+                                            prefix="Bs."
+                                            readOnly
+                                            value={saldoACobrar.toFixed(2)}
+                                            style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
                             {/* Tipo de pago */}
-                            {estadoPedido === '3' && (
+                            {estadoPedido === 'Entregado' && (
                                 <>
                                     <Row gutter={16}>
                                         <Col span={24}>
@@ -397,7 +426,7 @@ function ShippingFormModal({
                                                 <Form.Item label="Subtotal QR" name="subtotal_qr">
                                                     <InputNumber
                                                         prefix="Bs."
-                                                        value={totalAmount}
+                                                        value={saldoACobrar}
                                                         readOnly
                                                         style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
                                                     />
@@ -412,7 +441,7 @@ function ShippingFormModal({
                                                 <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
                                                     <InputNumber
                                                         prefix="Bs."
-                                                        value={totalAmount}
+                                                        value={saldoACobrar}
                                                         readOnly
                                                         style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
                                                     />
@@ -429,20 +458,20 @@ function ShippingFormModal({
                                                     {
                                                         validator: (_, value) => {
                                                             if (value <= 0) return Promise.reject("El monto QR debe ser mayor a 0");
-                                                            if (value >= totalAmount) return Promise.reject("El monto QR debe ser menor al total");
+                                                            if (value >= saldoACobrar) return Promise.reject("El monto QR debe ser menor al total");
                                                             return Promise.resolve();
                                                         }
                                                     }
                                                 ]}>
                                                     <InputNumber
                                                         prefix="Bs."
-                                                        min={0.01}
-                                                        max={totalAmount - 0.01}
+                                                        min={0.10}
+                                                        max={saldoACobrar - 0.01}
                                                         value={qrInput}
                                                         onChange={(val) => {
                                                             const qr = val ?? 0;
                                                             setQrInput(qr);
-                                                            const efectivo = parseFloat((totalAmount - qr).toFixed(2));
+                                                            const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
                                                             setEfectivoInput(efectivo);
                                                             form.setFieldsValue({ subtotal_efectivo: efectivo });
                                                         }}
@@ -463,7 +492,7 @@ function ShippingFormModal({
                                             {showWarning && (
                                                 <Col span={24}>
                                                     <div style={{ color: 'red', fontWeight: 'bold' }}>
-                                                        La suma de QR + Efectivo debe ser igual al monto total.
+                                                        La suma de QR + Efectivo debe ser igual al saldo a cobrar.
                                                     </div>
                                                 </Col>
                                             )}
@@ -472,19 +501,6 @@ function ShippingFormModal({
                                 </>
                             )}
 
-                            {/* Saldo a Cobrar */}
-                            <Row gutter={16}>
-                                <Col span={24}>
-                                    <Form.Item label="Saldo a Cobrar">
-                                        <Input
-                                            prefix="Bs."
-                                            readOnly
-                                            value={saldoACobrar.toFixed(2)}
-                                            style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
-                                        />
-                                    </Form.Item>
-                                </Col>
-                            </Row>
                         </>
                     )}
                 </Card>
