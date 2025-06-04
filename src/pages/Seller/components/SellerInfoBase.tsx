@@ -96,9 +96,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       const res = await getProductsBySellerIdAPI(seller.key);
       const productos: any[] = Array.isArray(res) ? res : [];
       const pedidosIds = productos.map(p => p.id_pedido);
-      const uniqueIds = Array.from(new Set(pedidosIds));
+      const uniquePedidos= Array.from(new Set(pedidosIds));
 
-      const shipRes = await getShipingByIdsAPI(uniqueIds);
+      const shipRes = await getShipingByIdsAPI(uniquePedidos)
 
       const final = productos.map(prod => {
         const lugarEntrega =
@@ -113,6 +113,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         return {
           ...prod,
           tipo: esVenta ? 'Venta' : 'Pedido',
+          subtotal: prod.precio_unitario * prod.cantidad,
           key: `${prod.id_producto}-${prod.fecha_pedido}`,
         };
       });

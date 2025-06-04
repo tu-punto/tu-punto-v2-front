@@ -46,6 +46,24 @@ const CustomTable = ({
       className: "text-mobile-sm xl:text-desktop-sm",
     },
     {
+      title: "Subtotal deudas",
+      key: "utilidad",
+      render: (_: any, record: any) => {
+        const subtotalDeuda = record.id_pedido.pagado_al_vendedor
+          ? -record.utilidad
+          : record.subtotal - record.utilidad;
+
+        return `${subtotalDeuda.toFixed(2)}`;
+      },
+      className: "text-mobile-sm xl:text-desktop-sm",
+    },
+    {
+      title: "Utilidad",
+      dataIndex: "utilidad",
+      key: "utilidad",
+      className: "text-mobile-sm xl:text-desktop-sm",
+    },
+    {
       title: "Precio Unitario",
       dataIndex: "precio_unitario",
       key: "precio_unitario",
@@ -96,51 +114,51 @@ const CustomTable = ({
     },
     ...(isAdmin
       ? [
-          {
-            title: "Acción",
-            key: "action",
-            render: (_: any, record: any) => (
-              <div className="flex gap-2">
-                {/* Confirmación de guardar */}
-                <Popconfirm
-                  title="¿Guardar cambios?"
-                  okText="Guardar"
-                  cancelText="Cancelar"
-                  onConfirm={() => {
-                    onUpdateProduct(record.id_venta, {
-                      precio_unitario: record.precio_unitario,
-                      cantidad: record.cantidad,
-                    });
-                  }}
-                >
-                  <Button
-                    icon={<SaveOutlined />}
-                    size="small"
-                    type="text"
-                  />
-                </Popconfirm>
+        {
+          title: "Acción",
+          key: "action",
+          render: (_: any, record: any) => (
+            <div className="flex gap-2">
+              {/* Confirmación de guardar */}
+              <Popconfirm
+                title="¿Guardar cambios?"
+                okText="Guardar"
+                cancelText="Cancelar"
+                onConfirm={() => {
+                  onUpdateProduct(record.id_venta, {
+                    precio_unitario: record.precio_unitario,
+                    cantidad: record.cantidad,
+                  });
+                }}
+              >
+                <Button
+                  icon={<SaveOutlined />}
+                  size="small"
+                  type="text"
+                />
+              </Popconfirm>
 
-                {/* Confirmación de eliminación */}
-                <Popconfirm
-                  title="¿Estás seguro de eliminar este producto?"
-                  okText="Sí"
-                  cancelText="No"
-                  onConfirm={() => {
-                    onDeleteProduct(record.key, record.id_venta);
-                  }}
-                >
-                  <Button
-                    icon={<DeleteOutlined />}
-                    size="small"
-                    type="text"
-                    danger
-                  />
-                </Popconfirm>
-              </div>
-            ),
-            className: "text-mobile-sm xl:text-desktop-sm",
-          },
-        ]
+              {/* Confirmación de eliminación */}
+              <Popconfirm
+                title="¿Estás seguro de eliminar este producto?"
+                okText="Sí"
+                cancelText="No"
+                onConfirm={() => {
+                  onDeleteProduct(record.key, record.id_venta);
+                }}
+              >
+                <Button
+                  icon={<DeleteOutlined />}
+                  size="small"
+                  type="text"
+                  danger
+                />
+              </Popconfirm>
+            </div>
+          ),
+          className: "text-mobile-sm xl:text-desktop-sm",
+        },
+      ]
       : []),
   ];
 
