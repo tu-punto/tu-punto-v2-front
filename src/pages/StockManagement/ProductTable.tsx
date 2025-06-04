@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { Button, Input, Table, Spin } from 'antd';
+import { Button, Input, Table, Spin, Select } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
@@ -39,6 +39,21 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     const [stockModalOpen, setStockModalOpen] = useState(false);
     const [selectedProductoSucursal, setSelectedProductoSucursal] = useState<any[]>([]);
     const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
+
+    const [categories, setCategories] = useState<any[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [searchText, setSearchText] = useState("");
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await import('../../api/category').then(m => m.getCategoriesAPI());
+                setCategories(res);
+            } catch (err) {
+                console.error("Error al cargar categorías", err);
+            }
+        };
+        fetchCategories();
+    }, []);
     useEffect(() => {
         const ingresos = JSON.parse(localStorage.getItem("newStock") || "[]");
 
@@ -179,6 +194,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         const groups: { [key: string]: any } = {};
 
         products.forEach((product) => {
+            if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
+
             const baseName = product.nombre_producto;
             const sucursales = product.sucursales || [];
             const sucursal = sucursales.find((s: any) => s.id_sucursal === sucursalId);
@@ -197,8 +214,14 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
             sucursal.combinaciones.forEach((comb: any, index: number) => {
                 const variant = Object.entries(comb.variantes)
-                    .map(([k, v]) => `${v}`)
-                    .join(' / '); // ejemplo: s / rojo
+                    .map(([_, v]) => `${v}`)
+                    .join(' / ');
+
+                if (
+                    searchText &&
+                    !baseName.toLowerCase().includes(searchText.toLowerCase()) &&
+                    !variant.toLowerCase().includes(searchText.toLowerCase())
+                ) return;
 
                 groups[baseName].children.push({
                     ...product,
@@ -213,7 +236,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             });
         });
 
-        return Object.values(groups);
+        return Object.values(groups).filter(group => group.children.length > 0);
     };
     const columns = [
         {
@@ -398,7 +421,28 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     const loading = updatedProductsList.length === 0;
     return (
         <Spin spinning={loading} tip="Cargando productos...">
-            <ProductSearcher applySearcher={changeSearcher} />
+            {/*<ProductSearcher applySearcher={changeSearcher} />*/}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+                <Input
+                    placeholder="Buscar producto o variante..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    style={{ width: 300 }}
+                    allowClear
+                />
+                <Select
+                    value={selectedCategory}
+                    onChange={setSelectedCategory}
+                    style={{ width: 240 }}
+                >
+                    <Select.Option value="all">Todas las categorías</Select.Option>
+                    {categories.map(cat => (
+                        <Select.Option key={cat._id} value={cat._id}>
+                            {cat.categoria}
+                        </Select.Option>
+                    ))}
+                </Select>
+            </div>
 
             {tableGroup.length === 0 ? (
                 <p>No hay grupos de productos.</p>

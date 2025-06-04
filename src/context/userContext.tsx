@@ -12,7 +12,7 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
       try {
         const res = await getUserByCookieAPI();
         if (res?.success) {
-          console.log("✅ Usuario desde /info:", res.data);
+          //console.log("✅ Usuario desde /info:", res.data);
           setUser(res.data);
         }
       } catch (e) {

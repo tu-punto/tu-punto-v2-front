@@ -22,7 +22,7 @@ export const App = () => {
                         },
                     }}
                 >
-                    <RouterGuard /> {/* ✅ listo para usar context y proteger rutas */}
+                    <RouterGuard />
                 </ConfigProvider>
             </UserContextProvider>
         </AntdApp>

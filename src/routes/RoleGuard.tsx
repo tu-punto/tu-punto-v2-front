@@ -14,10 +14,6 @@ const RoleGuard: React.FC<RoleGuardProps> = ({
                                              }) => {
   const { user, loading } = useContext(UserContext);
 
-  console.log("🧪 user en RoleGuard:", user);
-  console.log("🧪 role:", user?.role);
-  console.log("🧪 allowedRoles:", allowedRoles);
-  console.log("🧪 match:", allowedRoles.includes(user?.role));
 
   if (loading) {
     return (
@@ -28,12 +24,12 @@ const RoleGuard: React.FC<RoleGuardProps> = ({
   }
 
   if (!user) {
-    console.warn("⚠️ Usuario no logueado");
+    //console.warn("⚠️ Usuario no logueado");
     return <Navigate to="/login-admin" replace />;
   }
 
   if (!allowedRoles.includes(user.role)) {
-    console.warn("🚫 Rol no permitido:", user.role);
+    //console.warn("🚫 Rol no permitido:", user.role);
     return <Navigate to="/unauthorized" replace />;
   }
 
