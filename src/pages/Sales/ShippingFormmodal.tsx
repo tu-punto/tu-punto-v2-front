@@ -85,7 +85,9 @@ function ShippingFormModal({
                 cantidad: p.cantidad,
                 precio_unitario: p.precio_unitario,
                 utilidad: p.utilidad,
-                deposito_realizado: false
+                deposito_realizado: false,
+                quien_paga_delivery: shippingData.quien_paga_delivery
+
             };
         });
         if (estadoFinal === 'Entregado' && ventas.length > 0) {

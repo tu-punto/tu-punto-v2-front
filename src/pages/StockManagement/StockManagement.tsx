@@ -16,6 +16,7 @@ import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
 import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempVariants} from "../../utils/storageHelpers.ts";
+import ProductTableSeller from "./ProductTableSeller.tsx";
 
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
@@ -51,12 +52,8 @@ const StockManagement = () => {
             const categoriesResponse = await getCategoriesAPI();
             const groupsResponse = await getGroupsAPI();
             const productsResponse = await getProductsAPI();
-            console.log("🧪 Productos recibidos:", productsResponse);
-            console.log("🧪 Usuario actual:", user);
-            //console.log("Sellers", sellersResponse);
-            //console.log("Categories", categoriesResponse);
-            //console.log("Groups", groupsResponse);
-            //console.log("Products", productsResponse);
+            //console.log("🧪 Productos recibidos:", productsResponse);
+            //console.log("🧪 Usuario actual:", user);
 
             setSellers(sellersResponse);
             setCategories(categoriesResponse);
@@ -116,12 +113,11 @@ const StockManagement = () => {
         setTimeout(() => filter(), 100);
     }, [sellers, categories, groups]);
     const finalProductList = isSeller
-        ? products.filter(
-            (product) =>
-                products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
-        )
+        ? products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
         : filteredProducts;
 
+    //console.log("Productos originales:", products);
+    //console.log("🧪 Productos filtrados:", finalProductList);
     const showVariantModal = async (product: any) => {
         const group = await getGroupByIdAPI(product.groupId);
         group.product = product;
@@ -224,19 +220,17 @@ const StockManagement = () => {
         setIsMoveModalVisible(false);
     };
 
-    //console.log("CRITERIA GROUP:", criteriaGroup);
-    //console.log("GROUP ENVIADO A PRODUCTTABLE:", options[criteriaGroup]?.group);
-    //console.log("FUNCIÓN DE AGRUPACIÓN:", options[criteriaGroup]?.groupFunction);
     return (
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {isSeller ? (
-                <h2 className='text-mobile-3xl xl:text-mobile-3xl text-center'>
-                    Productos de {user?.nombre || 'Vendedor'}
+                <h2 style={{ fontSize: "1.5rem", textAlign: "center", marginBottom: 24, fontWeight: 600 }}>
+                    Productos de {user?.nombre_vendedor || 'Vendedor'}
                 </h2>
             ) : (
                 <div className="block xl:flex justify-center">
-                    <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de</h2>
+                    <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de Productos</h2>
+                    {/*
                     <Select
                         style={{ width: 200 }}
                         placeholder="Select an option"
@@ -249,6 +243,7 @@ const StockManagement = () => {
                             </Select.Option>
                         ))}
                     </Select>
+                    */}
                 </div>
             )}
 
@@ -305,23 +300,21 @@ const StockManagement = () => {
                 )}
             </Row>
 
-            <ProductTable
-                groupList={options[criteriaFilter]?.group || []}
-                groupCriteria={(group) => {
-                    const fn = options[criteriaFilter]?.groupFunction;
-                    if (typeof fn !== 'function' || !Array.isArray(filteredProducts)) return [];
-                    return fn(group, filteredProducts);
-                }}
-                productsList={
-                    finalProductList
-                }
-                handleUpdate={(ingresoData: { [key: number]: number }) => {
-                    setProductsToUpdate(ingresoData);
-                }}
-                onUpdateProducts={fetchData}
-                setStockListForConfirmModal={setStockListForConfirmModal}
-                resetSignal={resetSignal}
-            />
+            {isSeller ? (
+                <ProductTableSeller
+                    productsList={finalProductList}
+                    onUpdateProducts={fetchData}
+                />
+            ) : (
+                <ProductTable
+                    productsList={finalProductList}
+                    groupList={options[criteriaFilter]?.group || []}
+                    onUpdateProducts={fetchData}
+                    setStockListForConfirmModal={setStockListForConfirmModal}
+                    resetSignal={resetSignal}
+                />
+            )}
+
             {/*infoModalVisible && (
                 <ProductInfoModal
                     visible={infoModalVisible}
