@@ -191,6 +191,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   /* ─────────── valores para Stats ─────────── */
   const saldoPendiente = salesData.reduce((acc, sale) => {
+     if (sale.deposito_realizado) return acc;
     let subtotalDeuda = 0
     if (sale.id_pedido.pagado_al_vendedor) {
       subtotalDeuda = -sale.utilidad
@@ -202,7 +203,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   }, 0)
 
   const deuda = Number(seller.deuda) || 0;
-  console.log('seller',seller.deuda)
   const pagoPendiente = deuda - saldoPendiente;
 
   /* ─────────── render ─────────── */
