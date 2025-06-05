@@ -195,7 +195,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (sale.id_pedido.pagado_al_vendedor) {
       subtotalDeuda = -sale.utilidad
     } else {
-      sale.subtotal - sale.utilidad;
+      subtotalDeuda = sale.subtotal - sale.utilidad;
     }
 
     return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.costo_delivery;
