@@ -17,15 +17,16 @@ const SellerInfoPageWrapper = () => {
                 const date = new Date(sellerData.fecha);
 
                 // Sumar alquiler, exhibición y delivery desde todas las sucursales
-                const totalAlquiler = sellerData.pago_sucursales.reduce((sum:any, s:any) => sum + (s.alquiler || 0), 0);
-                const totalExhibicion = sellerData.pago_sucursales.reduce((sum:any, s:any) => sum + (s.exhibicion || 0), 0);
-                const totalDelivery = sellerData.pago_sucursales.reduce((sum:any, s:any) => sum + (s.delivery || 0), 0);
+                console.log("seller Info: ",sellerData)
+                const totalAlquiler = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.alquiler || 0), 0);
+                const totalExhibicion = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.exhibicion || 0), 0);
+                const totalDelivery = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.delivery || 0), 0);
                 const pagoMensualTotal = totalAlquiler + totalExhibicion + totalDelivery;
 
                 const sellerWithKey = {
                     key: sellerData._id,
                     nombre: `${sellerData.nombre} ${sellerData.apellido}`,
-                    deuda: `Bs. ${sellerData.deuda}`,
+                    deuda: sellerData.deuda,
                     deudaInt: sellerData.deuda,
                     pagoTotalInt: sellerData.deuda - (sellerData.adelanto_servicio || 0),
                     fecha_vigencia: finish_date.toLocaleDateString("es-ES"),

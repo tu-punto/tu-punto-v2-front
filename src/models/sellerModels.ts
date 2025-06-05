@@ -20,6 +20,7 @@ export interface ISeller {
   nombre: string;
   apellido: string;
   telefono: number;
+  saldo_pendiente: number;
   carnet: number;
   direccion: string;
   mail: string;

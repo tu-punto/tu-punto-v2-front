@@ -91,8 +91,8 @@ export default function SellerTable({
             key: seller._id,
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
-            deuda: seller.saldo_pendiente - seller.deuda,
-            pagoTotalInt: (Number(seller.saldo_pendiente ) || 0)  - (Number(seller.deuda) || 0),
+            deuda: seller.deuda,
+            pagoTotalInt: Number(seller.deuda),
             pago_mensual: `Bs. ${mensual}`,
           };
         })

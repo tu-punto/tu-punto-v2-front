@@ -202,6 +202,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   }, 0)
 
   const deuda = Number(seller.deuda) || 0;
+  console.log('seller',seller.deuda)
   const pagoPendiente = deuda - saldoPendiente;
 
   /* ─────────── render ─────────── */
@@ -210,8 +211,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       <SellerHeader name={seller.nombre} />
 
       <StatsCards
-        pagoPendiente={deuda}
-        deuda={pagoPendiente}
+        pagoPendiente={pagoPendiente}
+        deuda={deuda}
         saldoPendiente={saldoPendiente}
       />
 
@@ -251,6 +252,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                 const curr = form.getFieldValue('sucursales') || [];
                 form.setFieldsValue({ sucursales: [...curr, {}] });
               }}
+              disabled={isSeller}
             >
               Añadir sucursal
             </Button>
@@ -267,6 +269,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                     remove={remove}
                     sucursalOptions={sucursales}
                     form={form}
+                    isSeller={isSeller}
                   />
                 </Card>
               ))}
@@ -293,7 +296,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           isSeller={isSeller}
         />
 
-        <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} />
+        <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} isSeller={isSeller}/>
 
         <PaymentProofSection
           proofs={paymentProofs}

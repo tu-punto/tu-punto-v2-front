@@ -6,11 +6,13 @@ export default function BranchFields({
   remove,
   sucursalOptions,
   form,
+  isSeller = false,
 }: {
   field: any;
   remove: any;
   sucursalOptions: any[];
   form: any;
+  isSeller?: boolean;
 }) {
   return (
     <Row gutter={[8, 8]}>
@@ -49,6 +51,7 @@ export default function BranchFields({
                 );
               }
             }}
+            disabled={isSeller}
           />
         </Form.Item>
 
@@ -70,17 +73,19 @@ export default function BranchFields({
             label={k.replace("_", " ")}
             rules={[{ required: true, message: "Obligatorio" }]}
           >
-            <InputNumber min={0} className="w-full" />
+            <InputNumber min={0} className="w-full" disabled={isSeller} />
           </Form.Item>
         </Col>
       ))}
 
-      <Col>
-        <DeleteOutlined
-          className="cursor-pointer text-red-500"
-          onClick={() => remove(field.name)}
-        />
-      </Col>
+      {!isSeller && (
+        <Col>
+          <DeleteOutlined
+            className="cursor-pointer text-red-500"
+            onClick={() => remove(field.name)}
+          />
+        </Col>
+      )}
     </Row>
   );
 }

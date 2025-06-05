@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { updateFinanceFluxAPI } from '../../../api/financeFlux';
 
-export default function SellerDebtTable({ data, setRefreshKey }: { data: any[], setRefreshKey: (key: number) => void }) {
+export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data: any[], setRefreshKey: (key: number) => void, isSeller: boolean }) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<any>({});
 
@@ -88,6 +88,7 @@ export default function SellerDebtTable({ data, setRefreshKey }: { data: any[], 
       title: 'Acciones',
       key: 'acciones',
       render: (_: any, record: any) => {
+        if (isSeller) return null;
         const editable = isEditing(record);
         return editable ? (
           <div className="flex gap-2">
