@@ -20,7 +20,7 @@ export const renewSellerAPI = async (id: string | number, data: any) => {
     }
 }
 
-export const getSellerAPI = async (sellerId: number) => {
+export const getSellerAPI = async (sellerId: string) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}`)
         return res.data

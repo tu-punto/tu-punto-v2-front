@@ -68,14 +68,7 @@ export default function SellerFormModal({
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
-      // 1· alta de usuario
-      await registerUserAPI({
-        email: values.mail,
-        password: `${values.carnet}`,
-        role: SELLER,
-      });
-
-      // 2· mapear payload para backend
+            // 2· mapear payload para backend
       const payload = {
         ...values,
         saldo_pendiente: 0,
@@ -91,7 +84,15 @@ export default function SellerFormModal({
         esDeuda: true, // alta siempre entra como deuda
       };
 
-      await registerSellerAPI(payload);
+      const newSeller = await registerSellerAPI(payload);
+
+      // 1· alta de usuario
+      await registerUserAPI({
+        email: values.mail,
+        password: `${values.carnet}`,
+        role: SELLER,
+        seller: newSeller._id,
+      });
       message.success("Vendedor registrado");
       onSuccess();
     } catch {
