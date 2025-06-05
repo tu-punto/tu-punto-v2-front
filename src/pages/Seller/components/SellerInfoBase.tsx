@@ -199,7 +199,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       subtotalDeuda = sale.subtotal - sale.utilidad;
     }
 
-    return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.costo_delivery;
+    return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
   }, 0)
 
   const deuda = Number(seller.deuda) || 0;
