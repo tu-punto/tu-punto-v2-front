@@ -96,9 +96,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       const res = await getProductsBySellerIdAPI(seller.key);
       const productos: any[] = Array.isArray(res) ? res : [];
       const pedidosIds = productos.map(p => p.id_pedido);
-      const uniquePedidos= Array.from(new Set(pedidosIds));
+      const uniquePedidos = Array.from(new Set(pedidosIds));
 
-      const shipRes = await getShipingByIdsAPI(uniquePedidos)
+      const shipRes = await getShipingByIdsAPI(uniquePedidos.map(pedido => pedido._id));
 
       const final = productos.map(prod => {
         const lugarEntrega =
@@ -123,7 +123,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   const handleUpdateSale = async (id: string, fields: any) => {
-    const res = await updateSaleByIdAPI(id, fields);
+    const sucursalId = localStorage.getItem('sucursalId');
+    const res = await updateSaleByIdAPI(id, { ...fields, id_sucursal: sucursalId });
     if (res?.success) {
       message.success("Venta actualizada correctamente");
       await fetchSales(); // Refresca ventas
@@ -191,7 +192,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   /* ─────────── valores para Stats ─────────── */
   const saldoPendiente = Number(seller.saldo_pendiente) || 0;
   const deuda = Number(seller.deuda) || 0;
-  const pagoPendiente = saldoPendiente - deuda;
+  const pagoPendiente = deuda - saldoPendiente
 
   /* ─────────── render ─────────── */
   return (
