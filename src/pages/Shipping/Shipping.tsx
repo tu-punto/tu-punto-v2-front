@@ -21,9 +21,15 @@ const Shipping = () => {
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-4">
-                <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold">Pedidos</h1>
+                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+                    <img src="/box-icon.png" alt="Pedidos" className="w-8 h-8" />
+                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+                        Pedidos
+                    </h1>
+                </div>
             </div>
-            <ShippingTable key={refreshKey} />
+
+            <ShippingTable refreshKey={refreshKey} />
         </div>
     );
 };

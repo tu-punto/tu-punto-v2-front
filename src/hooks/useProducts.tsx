@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { getProductsAPI } from "../api/product";
 import { getCategoryByIdAPI } from "../api/category";
 
-const useProducts = () => {
+const useProducts = (externalSucursalId?: string) => {
     const [data, setData] = useState<any[]>([]);
-    const sucursalId = localStorage.getItem("sucursalId");
+    const sucursalId = externalSucursalId || localStorage.getItem("sucursalId");
 
     const categoryCache = new Map<string, string>();
 

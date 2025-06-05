@@ -27,9 +27,8 @@ export const Sales = () => {
     const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined);
     //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
-    const { data, fetchProducts } = useProducts();
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-
+    const { data, fetchProducts } = useProducts(!isAdmin ? selectedBranchId || undefined : undefined);
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [branches, setBranches] = useState([] as any[]);
     const [searchText, setSearchText] = useState("");
@@ -113,10 +112,21 @@ export const Sales = () => {
     useEffect(() => {
         fetchSellers();
         fetchSucursal();
-        fetchProducts();
     }, []);
-    //console.log("Data en Sales", data);
+    useEffect(() => {
+        if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+            setSelectedBranchId(branches[0]._id);
+        }
+    }, [branches, isAdmin]);
 
+    useEffect(() => {
+        if (!isAdmin && selectedBranchId) {
+            fetchProducts();
+        }
+        if (isAdmin) {
+            fetchProducts();
+        }
+    }, [selectedBranchId, isAdmin]);
     const filteredProducts = () => {
         let filteredData = data;
 
@@ -138,10 +148,10 @@ export const Sales = () => {
             );
         }
 
+        filteredData = filteredData.filter(product => product.stockActual > 0);
+
         return filteredData;
     };
-
-
 
     const handleProductSelect = (product: any) => {
         // setEditableProducts((prevProducts: any) => {
@@ -262,9 +272,15 @@ export const Sales = () => {
 
     return (
         <>
-            <h1 className="text-mobile-2xl xl:text-desktop-2xl font-bold mb-4">
-                Carrito
-            </h1>
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+                    <img src="/shopping-cart-icon.png" alt="Carrito" className="w-8 h-8" />
+                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+                        Carrito
+                    </h1>
+                </div>
+            </div>
+
             <Row gutter={[16, 16]}>
                 {/* Columna de Inventario */}
                 <Col xs={24} md={12}>

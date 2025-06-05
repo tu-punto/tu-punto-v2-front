@@ -271,8 +271,14 @@ const BoxClosePage = () => {
 
   return (
     <>
-      <h1 className="text-2xl font-bold mb-3">Cierre de Caja</h1>
-      <Card>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+          <img src="/cierre-caja-icon.png" alt="Cierre de Caja" className="w-8 h-8" />
+          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+            Cierre de Caja
+          </h1>
+        </div>
+      </div>      <Card>
         <Row justify="center" align="middle" gutter={[16, 16]} className="mb-4">
           <Col xs={24} sm={12} md={8} lg={6}>
             <Select

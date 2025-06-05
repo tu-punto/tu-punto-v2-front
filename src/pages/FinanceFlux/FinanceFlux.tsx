@@ -31,11 +31,23 @@ const FinanceFlux = () => {
     }
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-4">
-                <h1 className="text-mobile-2xl xl:text-desktop-2xl font-bold">GASTOS E INGRESOS</h1>
-                <Button onClick={showModal} type="primary" className="text-mobile-sm xl:text-desktop-sm">Agregar Gasto o Ingreso</Button>
+        <div className="p-4">
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+                    <img src="/finance-icon1.png" alt="Gastos e Ingresos" className="w-8 h-8" />
+                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+                        Gastos e Ingresos
+                    </h1>
+                </div>
+                <Button
+                    onClick={showModal}
+                    type="primary"
+                    className="text-mobile-sm xl:text-desktop-sm"
+                >
+                    Agregar Gasto o Ingreso
+                </Button>
             </div>
+
             <FinanceFluxTable refreshKey={refreshKey} onEdit={handleEdit} />
             <FinanceFluxFormModal
                 visible={isModalVisible}
@@ -46,6 +58,7 @@ const FinanceFlux = () => {
             />
         </div>
     )
+
 }
 
 export default FinanceFlux

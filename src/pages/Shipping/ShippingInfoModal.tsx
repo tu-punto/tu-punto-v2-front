@@ -296,6 +296,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
                         onDeleteProduct={handleDeleteProduct}
                         onUpdateTotalAmount={updateTotalAmount}
                         handleValueChange={handleValueChange}
+                        sellers={[]}
                     />
                 </Form.Item>
                 <Form.Item

@@ -35,11 +35,12 @@ function ShippingFormModal({
 
         const sucursalId = sucursals?.[0]?._id || null;
         setLoading(true);
-
+        const lugarOrigen = sucursals?.[0]?._id || null;
         try {
             const response = await registerShippingAPI({
                 ...values,
                 id_sucursal: sucursalId,
+                lugar_origen: lugarOrigen,
             });
 
             if (!response.success) {
@@ -273,23 +274,18 @@ function ShippingFormModal({
                     bordered={false}
                     style={{ marginTop: 16 }}
                 >
-                    {isAdmin && (
-                        <>
+
                             {/* Estado del Pedido */}
                             <Row gutter={16}>
                                 <Col span={24}>
                                     <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                                        {isAdmin ? (
-                                            <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())}>
-                                                <Radio.Button value="En Espera">En espera</Radio.Button>
-                                                <Radio.Button value="Entregado">Entregado</Radio.Button>
-                                            </Radio.Group>
-                                        ) : (
-                                            <Radio.Group disabled defaultValue="En Espera">
-                                                <Radio.Button value="En Espera">En espera</Radio.Button>
-                                            </Radio.Group>
-                                        )}
-
+                                        <Radio.Group
+                                            onChange={(e) => setEstadoPedido(e.target.value.toString())}
+                                            value={estadoPedido || "En Espera"}
+                                        >
+                                            <Radio.Button value="En Espera">En espera</Radio.Button>
+                                            {isAdmin && <Radio.Button value="Entregado">Entregado</Radio.Button>}
+                                        </Radio.Group>
                                     </Form.Item>
                                 </Col>
                             </Row>
@@ -503,8 +499,6 @@ function ShippingFormModal({
                                 </>
                             )}
 
-                        </>
-                    )}
                 </Card>
 
                 <Form.Item style={{ marginTop: 16 }}>

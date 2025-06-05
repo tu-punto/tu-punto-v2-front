@@ -223,6 +223,15 @@ const StockManagement = () => {
     return (
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+                    <img src="/inventory-icon.png" alt="Inventario" className="w-8 h-8" />
+                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+                        Gestión de Inventario
+                    </h1>
+                </div>
+            </div>
+
             {isSeller ? (
                 <h2 style={{ fontSize: "1.5rem", textAlign: "center", marginBottom: 24, fontWeight: 600 }}>
                     Productos de {user?.nombre_vendedor || 'Vendedor'}

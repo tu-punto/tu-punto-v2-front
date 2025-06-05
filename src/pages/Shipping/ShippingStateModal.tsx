@@ -21,7 +21,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     };
 
     const estadoPedidoMap: any = {
-        1: 'En espera',
+        1: 'En Espera',
         2: 'Entregado'
     };
 
@@ -100,8 +100,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
 
     const renderEstadoOptions = () => {
         const opciones = [
-            { value: '1', label: 'En espera' },
-            { value: '2', label: 'Por entregar' },
+            { value: '1', label: 'En Espera' },
             { value: '3', label: 'Entregado' }
         ];
         // Si ya está en estado 3, ocultar "Por entregar"

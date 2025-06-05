@@ -5,17 +5,19 @@ import ShippingInfoModal from './ShippingInfoModal';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import ShippingStateModal from './ShippingStateModal';
 import { getSucursalsAPI } from '../../api/sucursal';
+import { getSellersAPI } from "../../api/seller";
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-const ShippingTable = (refreshKey: any) => {
+const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
+
     const [shippingData, setShippingData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
     const [entregadoData, setEntregadoData] = useState([]);
     const [filteredEsperaData, setFilteredEsperaData] = useState([]);
     const [filteredEntregadoData, setFilteredEntregadoData] = useState([]);
-    const [selectedStatus, setSelectedStatus] = useState<'espera' | 'entregado'>('espera');
+    const [selectedStatus, setSelectedStatus] = useState<'En Espera' | 'entregado'>('En Espera');
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isModaStatelVisible, setIsModalStateVisible] = useState(false);
@@ -24,7 +26,8 @@ const ShippingTable = (refreshKey: any) => {
     const [selectedOrigin, setSelectedOrigin] = useState('');
     const [otherLocation, setOtherLocation] = useState('');
     const [sucursal, setSucursal] = useState([] as any[]);
-
+    const [vendedores, setVendedores] = useState<any[]>([]);
+    const [selectedVendedor, setSelectedVendedor] = useState("Todos");
     const fetchShippings = async () => {
         try {
             const apiData = await getShippingsAPI();
@@ -37,34 +40,49 @@ const ShippingTable = (refreshKey: any) => {
             console.error("Error fetching shipping data:", error);
         }
     };
+    const toSimpleDate = (d: Date | null) =>
+        d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
 
     const filterByLocationAndDate = (data: any) => {
+        const nombreSucursalToIdMap = new Map(
+            sucursal.map((suc) => [suc.nombre, suc._id?.toString()])
+        );
         return data.filter((pedido: any) => {
             const isOtherLocation = selectedLocation === 'other';
-            const matchesOrigin = !selectedOrigin || pedido.id_sucursal === sucursal.find((suc) => suc.nombre.toLowerCase() === selectedOrigin.toLowerCase())?.id_sucursal;
+            const matchesOrigin =
+                !selectedOrigin ||
+                pedido.lugar_origen?._id?.toString() === nombreSucursalToIdMap.get(selectedOrigin);
+
             const matchesLocation = isOtherLocation
                 ? !sucursal.some((suc) => suc.nombre.toLowerCase() === pedido.lugar_entrega.toLowerCase()) &&
                 (!otherLocation || pedido.lugar_entrega.toLowerCase().includes(otherLocation.toLowerCase()))
                 : !selectedLocation || pedido.lugar_entrega.toLowerCase().includes(selectedLocation.toLowerCase());
-            const matchesDateRange = dateRange[0] && dateRange[1]
-                ? new Date(pedido.fecha_pedido) >= dateRange[0] && new Date(pedido.fecha_pedido) <= dateRange[1]
-                : true;
-            return matchesOrigin && matchesLocation && matchesDateRange;
+            const matchesDateRange =
+                dateRange[0] && dateRange[1]
+                    ? toSimpleDate(new Date(pedido.fecha_pedido)) >= toSimpleDate(dateRange[0]) &&
+                    toSimpleDate(new Date(pedido.fecha_pedido)) <= toSimpleDate(dateRange[1])
+                    : true;
+            const matchesVendedor =
+                selectedVendedor === "Todos" ||
+                pedido.venta?.some((v: any) => v.vendedor?._id === selectedVendedor);
+
+
+            return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor;
         });
     };
-
     const columns = [
         {
             title: '',
             dataIndex: 'infoButton',
             key: 'infoButton',
             width: '5%',
-            render: (_: any, record: any) => (
-                <InfoCircleOutlined
-                    style={{ fontSize: '20px', color: '#1890ff', cursor: 'pointer' }}
-                    onClick={() => handleIconClick(record)}
-                />
-            )
+            render: (_: any, record: any) =>
+                record.estado_pedido !== "Entregado" && (
+                    <InfoCircleOutlined
+                        style={{ fontSize: '20px', color: '#1890ff', cursor: 'pointer' }}
+                        onClick={() => handleIconClick(record)}
+                    />
+                )
         },
         {
             title: 'Fecha Pedido',
@@ -74,9 +92,16 @@ const ShippingTable = (refreshKey: any) => {
         },
         {
             title: 'Lugar de Origen',
-            dataIndex: 'id_sucursal',
+            dataIndex: 'lugar_origen',
             key: 'lugar_origen',
-            render: (text: string) => sucursal.find((suc) => suc.id_sucursal === text)?.nombre
+            render: (_: any, record: any) => {
+                const lugar = record.lugar_origen;
+                if (typeof lugar === 'object' && lugar !== null) {
+                    return lugar.nombre || '—';
+                }
+                const suc = sucursal.find((s) => s._id === lugar || s._id === record.id_sucursal);
+                return suc?.nombre || '—';
+            }
         },
         {
             title: 'Lugar de entrega',
@@ -87,6 +112,30 @@ const ShippingTable = (refreshKey: any) => {
             title: 'Vendedor',
             dataIndex: 'vendedor',
             key: 'vendedor',
+            render: (_: any, record: any) => {
+                const vendedoresUnicos = Array.from(
+                    new Map(
+                        record.venta
+                            ?.filter((v: any) => v.vendedor)
+                            .map((v: any) => [v.vendedor._id, `${v.vendedor.nombre} ${v.vendedor.apellido}`])
+                    ).values()
+                );
+
+                if (!vendedoresUnicos.length) return 'Sin vendedor';
+
+                if (vendedoresUnicos.length <= 3) {
+                    return vendedoresUnicos.join(', ');
+                }
+
+                return (
+                    <>
+                        {vendedoresUnicos.slice(0, 2).join(', ')}{' '}
+                        <span style={{ color: '#1890ff', cursor: 'pointer' }} title={vendedoresUnicos.join(', ')}>
+                          +{vendedoresUnicos.length - 2} más
+                        </span>
+                    </>
+                );
+            }
         },
         {
             title: 'Cliente',
@@ -96,6 +145,7 @@ const ShippingTable = (refreshKey: any) => {
     ];
 
     const handleIconClick = (order: any) => {
+        if (order.estado_pedido === "Entregado") return;
         setSelectedShipping(order);
         setIsModalStateVisible(true);
     };
@@ -110,7 +160,7 @@ const ShippingTable = (refreshKey: any) => {
             const response = await getSucursalsAPI();
             setSucursal(response);
         } catch (error) {
-            message.error('Error al obtener los vendedores');
+            message.error('Error al obtener las sucursales');
         }
     };
 
@@ -120,7 +170,7 @@ const ShippingTable = (refreshKey: any) => {
     }, [refreshKey]);
 
     useEffect(() => {
-        setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En espera'));
+        setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En Espera'));
         setEntregadoData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'Entregado'));
     }, [shippingData]);
 
@@ -128,17 +178,40 @@ const ShippingTable = (refreshKey: any) => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
     }, [esperaData, entregadoData, selectedLocation, selectedOrigin, dateRange]);
-
+    useEffect(() => {
+        const fetchVendedores = async () => {
+            try {
+                const response = await getSellersAPI();
+                setVendedores(response);
+            } catch (error) {
+                message.error("Error al obtener vendedores");
+            }
+        };
+        fetchVendedores();
+    }, []);
     return (
         <div>
             <div style={{ marginBottom: 16 }}>
+                <Select
+                    placeholder="Filtrar por vendedor"
+                    style={{ width: 200, marginBottom: 16 }}
+                    value={selectedVendedor}
+                    onChange={(value) => setSelectedVendedor(value)}
+                >
+                    <Select.Option value="Todos">Todos</Select.Option>
+                    {vendedores.map((v: any) => (
+                        <Select.Option key={v._id} value={v._id}>
+                            {v.nombre} {v.apellido}
+                        </Select.Option>
+                    ))}
+                </Select>
                 <Select
                     className="mt-2 w-full xl:w-1/5"
                     placeholder="Estado del pedido"
                     value={selectedStatus}
                     onChange={(value) => setSelectedStatus(value)}
                 >
-                    <Option value="espera">En espera</Option>
+                    <Option value="En Espera">En Espera</Option>
                     <Option value="entregado">Entregado</Option>
                 </Select>
                 <Select
@@ -191,9 +264,9 @@ const ShippingTable = (refreshKey: any) => {
                 />
             </div>
 
-            {selectedStatus === 'espera' && (
+            {selectedStatus === 'En Espera' && (
                 <>
-                    <h2 className="text-mobile-sm xl:text-desktop-3xl">En espera</h2>
+                    <h2 className="text-mobile-sm xl:text-desktop-3xl">En Espera</h2>
                     <Table
                         columns={columns}
                         dataSource={filteredEsperaData}

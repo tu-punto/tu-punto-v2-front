@@ -58,7 +58,12 @@ const CierreCajaPage = () => {
     <div className="p-4">
       <Card>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold">Cierre de Caja Diario</h1>
+          <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+            <img src="/cierre-caja-icon.png" alt="Cierre de Caja" className="w-8 h-8" />
+            <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+              Cierre de Caja Diario
+            </h1>
+          </div>
         </div>
 
         <Row gutter={16}>
