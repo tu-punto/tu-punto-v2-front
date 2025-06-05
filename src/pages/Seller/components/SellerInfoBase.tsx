@@ -190,9 +190,19 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   /* ─────────── valores para Stats ─────────── */
-  const saldoPendiente = Number(seller.saldo_pendiente) || 0;
+  const saldoPendiente = salesData.reduce((acc, sale) => {
+    let subtotalDeuda = 0
+    if (sale.id_pedido.pagado_al_vendedor) {
+      subtotalDeuda = -sale.utilidad
+    } else {
+      sale.subtotal - sale.utilidad;
+    }
+
+    return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.costo_delivery;
+  }, 0)
+
   const deuda = Number(seller.deuda) || 0;
-  const pagoPendiente = deuda - saldoPendiente
+  const pagoPendiente = deuda - saldoPendiente;
 
   /* ─────────── render ─────────── */
   return (
