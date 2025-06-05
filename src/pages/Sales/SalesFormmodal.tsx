@@ -114,6 +114,7 @@ function SalesFormModal({
                 utilidad: p.utilidad,
                 deposito_realizado: false,
                 variantes: p.variantes,
+                nombre_variante: `${p.producto}`,
                 stockActual: p.stockActual
             };
         });

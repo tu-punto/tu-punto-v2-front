@@ -64,7 +64,9 @@ function ShippingFormModal({
                     utilidad: p.utilidad,
                     deposito_realizado: false,
                     variantes: p.variantes,
-                    stockActual: p.stockActual
+                    nombre_variante: `${p.producto}`,
+                    stockActual: p.stockActual,
+
                 };
             });
 
