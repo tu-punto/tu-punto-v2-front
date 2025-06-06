@@ -20,9 +20,13 @@ interface ProductTableProps {
     onUpdateProducts?: () => Promise<void>;
     setStockListForConfirmModal?: (stockList: any[]) => void; // ← NUEVO
     resetSignal?: boolean;
+    searchText: string;
+    setSearchText: (value: string) => void;
+    selectedCategory: string;
+    setSelectedCategory: (value: string) => void;
 }
 
-const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal }: ProductTableProps) => {
+const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory}: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -41,8 +45,6 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
 
     const [categories, setCategories] = useState<any[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
-    const [searchText, setSearchText] = useState("");
     useEffect(() => {
         const fetchCategories = async () => {
             try {
@@ -421,7 +423,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     const loading = updatedProductsList.length === 0;
     return (
         <Spin spinning={loading} tip="Cargando productos...">
-            {/*<ProductSearcher applySearcher={changeSearcher} />*/}
+            {/*<ProductSearcher applySearcher={changeSearcher} />
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <Input
                     placeholder="Buscar producto o variante..."
@@ -443,7 +445,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                     ))}
                 </Select>
             </div>
-
+            */}
             {tableGroup.length === 0 ? (
                 <p>No hay grupos de productos.</p>
             ) : (

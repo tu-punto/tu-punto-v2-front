@@ -45,6 +45,8 @@ const StockManagement = () => {
     const [sellers, setSellers] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
+    const [searchText, setSearchText] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
     const fetchData = async () => {
         try {
@@ -257,19 +259,67 @@ const StockManagement = () => {
             )}
 
             {!isSeller && (
-                <Row gutter={[16, 16]} justify="center" align="middle">
-                    <Col xs={24} md={8} style={{ marginBottom: "16px" }}>
-                        <SellerList
-                            filterSelected={criteriaFilter}
-                            onSelectSeller={handleSelectSeller}
-                        />
-                    </Col>
-                </Row>
+                <div className="bg-white rounded-xl px-5 py-4 shadow-md mb-4">
+                    <Row gutter={[16, 16]} align="middle" justify="center">
+                        <Col xs={24} sm={12} lg={6}>
+                            <SellerList
+                                filterSelected={criteriaFilter}
+                                onSelectSeller={handleSelectSeller}
+                            />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Button
+                                onClick={() => setProductFormVisible(true)}
+                                type="primary"
+                                block
+                                className="text-mobile-base xl:text-mobile-base"
+                            >
+                                Agregar Producto
+                            </Button>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Button
+                                onClick={() => {
+                                    saveTempStock(stockListForConfirmModal);
+                                    setStock(stockListForConfirmModal);
+                                    setIsConfirmModalVisible(true);
+                                }}
+                                block
+                                className="text-mobile-base xl:text-mobile-base"
+                            >
+                                Actualizar Stock
+                            </Button>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Input.Search
+                                placeholder="Buscar producto o variante..."
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                allowClear
+                                className="w-full"
+                            />
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Select
+                                value={selectedCategory}
+                                onChange={setSelectedCategory}
+                                className="w-full"
+                            >
+                                <Select.Option value="all">Todas las categorías</Select.Option>
+                                {categories.map((cat) => (
+                                    <Select.Option key={cat._id} value={cat._id}>
+                                        {cat.categoria}
+                                    </Select.Option>
+                                ))}
+                            </Select>
+                        </Col>
+                    </Row>
+                </div>
             )}
             <Row gutter={[16, 16]} justify="center" align="middle" style={{ marginBottom: "16px" }}>
 
 
-                {!isSeller && (
+                {/*!isSeller && (
                     <>
                         <Col xs={24} sm={12} lg={6}>
                             <Button
@@ -280,7 +330,7 @@ const StockManagement = () => {
                                 Agregar Producto
                             </Button>
                         </Col>
-                        {/*
+                        {
                         <Col xs={24} sm={12} lg={6}>
                             <Button
                                 onClick={() => setIsMoveModalVisible(true)}
@@ -290,10 +340,10 @@ const StockManagement = () => {
                                 Mover Productos
                             </Button>
                         </Col>
-                        */}
+                        }
                     </>
-                )}
-                {!isSeller && (
+                )*/}
+                {/*!isSeller && (
                     <Col {...controlSpan}>
                         <Button
                             onClick={() => {
@@ -306,7 +356,7 @@ const StockManagement = () => {
                             Actualizar Stock
                         </Button>
                     </Col>
-                )}
+                )*/}
             </Row>
 
             {isSeller ? (
@@ -321,7 +371,12 @@ const StockManagement = () => {
                     onUpdateProducts={fetchData}
                     setStockListForConfirmModal={setStockListForConfirmModal}
                     resetSignal={resetSignal}
+                    searchText={searchText}
+                    setSearchText={setSearchText}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
                 />
+
             )}
 
             {/*infoModalVisible && (

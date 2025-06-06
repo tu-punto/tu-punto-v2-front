@@ -409,7 +409,7 @@ export const Sales = () => {
                 handleSales={createSales}
                 totalAmount={totalAmount}
                 sucursals={branches}
-                handleDebt={updateSellerDebt}
+                //handleDebt={updateSellerDebt}
                 clearSelectedProducts={() => setSelectedProducts([])}
             />
             <ShippingFormModal
@@ -421,7 +421,7 @@ export const Sales = () => {
                 handleSales={createSales}
                 totalAmount={totalAmount}
                 sucursals={branches}
-                handleDebt={updateSellerDebt}
+                //handleDebt={updateSellerDebt}
                 clearSelectedProducts={() => setSelectedProducts([])}
                 isAdmin={isAdmin}
             />

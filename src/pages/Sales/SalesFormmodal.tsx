@@ -17,7 +17,7 @@ function SalesFormModal({
                             selectedProducts,
                             totalAmount,
                             handleSales,
-                            handleDebt,
+                            //handleDebt,
                             clearSelectedProducts
                         }: any) {
     const [form] = Form.useForm();
@@ -120,7 +120,7 @@ function SalesFormModal({
         });
 
         if (ventas.length > 0) {
-            await handleDebt(ventas, response.newShipping.adelanto_cliente);
+            //await handleDebt(ventas, response.newShipping.adelanto_cliente);
             await handleSales(response.newShipping, ventas);
             await actualizarStock(ventas);
         }
