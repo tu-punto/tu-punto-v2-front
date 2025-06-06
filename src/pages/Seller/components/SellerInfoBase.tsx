@@ -19,7 +19,7 @@ import {
 } from '../../../api/entry';
 import { getPaymentProofsBySellerIdAPI } from '../../../api/paymentProof';
 import {
-  getProductsBySellerIdAPI,
+  getSalesBySellerIdAPI,
   updateSale,
   deleteSalesAPI,
   deleteSaleByIdAPI,
@@ -93,8 +93,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   const fetchSales = async () => {
     try {
-      const res = await getProductsBySellerIdAPI(seller.key);
-      console.log('Ventas obtenidas:', res);
+      const res = await getSalesBySellerIdAPI(seller.key);
       const productos: any[] = Array.isArray(res) ? res : [];
       const pedidosIds = productos.map(p => p.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
@@ -135,8 +134,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   const handleDeleteSale = async (id: string) => {
-    const sucursalId = localStorage.getItem('sucursalId')
-    const res = await deleteSaleByIdAPI(id, sucursalId);
+    const res = await deleteSaleByIdAPI(id);
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
@@ -193,7 +191,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   /* ─────────── valores para Stats ─────────── */
   const saldoPendiente = salesData.reduce((acc, sale) => {
-     if (sale.deposito_realizado) return acc;
+    if (sale.deposito_realizado) return acc;
     let subtotalDeuda = 0
     if (sale.id_pedido.pagado_al_vendedor) {
       subtotalDeuda = -sale.utilidad
@@ -205,7 +203,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   }, 0)
 
   const deuda = Number(seller.deuda) || 0;
-  const pagoPendiente = deuda - saldoPendiente;
+  const pagoPendiente = saldoPendiente - deuda
 
   /* ─────────── render ─────────── */
   return (
@@ -298,7 +296,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           isSeller={isSeller}
         />
 
-        <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} isSeller={isSeller}/>
+        <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} isSeller={isSeller} />
 
         <PaymentProofSection
           proofs={paymentProofs}

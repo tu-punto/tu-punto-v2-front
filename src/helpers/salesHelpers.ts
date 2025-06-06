@@ -1,7 +1,7 @@
-import { getProductsBySellerIdAPI } from "../api/sales";
+import { getSalesBySellerIdAPI } from "../api/sales";
 
 export const getSellerProductsById = async (sellerId: number) => {
-    const res = await getProductsBySellerIdAPI(sellerId);
+    const res = await getSalesBySellerIdAPI(sellerId);
     // if (res?.status !== 200) {
     //     message.error(`Fail to get products by seller with id ${sellerId}`);
     //     return 0;

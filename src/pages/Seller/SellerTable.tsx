@@ -11,6 +11,7 @@ import { getSellersAPI } from "../../api/seller";
 import { getSellerAdvancesById } from "../../helpers/sellerHelpers";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
+import { getSalesBySellerIdAPI } from "../../api/sales";
 
 /* ---------- tipos de fila ---------- */
 type SellerRow = ISeller & {
@@ -38,7 +39,7 @@ export default function SellerTable({
   /* ---- columnas ---- */
   const columns = [
     { title: "Nombre", dataIndex: "nombre", key: "nombre", fixed: "left" as const },
-    { title: "Pago total", dataIndex: "deuda", key: "deuda" },
+    { title: "Pago total", dataIndex: "pagoTotal", key: "pagoTotal" },
     { title: "Fecha Vigencia", dataIndex: "fecha_vigencia", key: "fecha_vigencia" },
     {
       title: "Pago Mensual",
@@ -65,6 +66,31 @@ export default function SellerTable({
     },
   ];
 
+  const fetchSaldoPendiente = async (sellerId: string) => {
+    let saldoPendiente = 0;
+    const sales = await getSalesBySellerIdAPI(sellerId);
+    console.log("Sales for seller:", sellerId, sales);
+    console.log("Sales length:", sales.length);
+    if (!sales.length) {
+      console.error("Error fetching sales for seller:", sellerId);
+      return saldoPendiente;
+    }
+
+    saldoPendiente = sales && sales.reduce((acc: number, sale: any) => {
+      if (sale.deposito_realizado) return acc;
+
+      let subtotalDeuda = 0
+      if (sale.id_pedido.pagado_al_vendedor) {
+        subtotalDeuda = -sale.utilidad
+      } else {
+        subtotalDeuda = sale.subtotal - sale.utilidad;
+      }
+
+      return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
+    }, 0)
+    return saldoPendiente;
+  }
+
   /* ---- carga ---- */
   useEffect(() => {
     (async () => {
@@ -73,7 +99,8 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-          const advances = await getSellerAdvancesById(seller._id);
+
+          const saldoPendiente = await fetchSaldoPendiente(seller._id);
           const date = new Date(seller.fecha);
           const finish_date = new Date(seller.fecha_vigencia);
           const mensual = seller.pago_sucursales.reduce(
@@ -92,7 +119,8 @@ export default function SellerTable({
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
             deuda: seller.deuda,
-            pagoTotalInt: Number(seller.deuda),
+            pagoTotal: `Bs. ${saldoPendiente - seller.deuda}`,
+            pagoTotalInt: saldoPendiente - seller.deuda,
             pago_mensual: `Bs. ${mensual}`,
           };
         })

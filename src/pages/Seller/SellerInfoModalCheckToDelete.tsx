@@ -2,7 +2,7 @@ import { Button, Col, DatePicker, Form, Input, InputNumber, message, Modal, Row 
 import { useContext, useEffect, useState } from "react";
 import dayjs from 'dayjs';
 import CustomTable from "./components/SalesTable";
-import { deleteSalesAPI, getProductsBySellerIdAPI, updateSale } from "../../api/sales";
+import { deleteSalesAPI, getSalesBySellerIdAPI, updateSale } from "../../api/sales";
 import { getShipingByIdsAPI } from "../../api/shipping";
 import { updateSellerAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
@@ -58,7 +58,7 @@ const SellerInfoModal = ({ visible, onSuccess, onCancel, seller }: any) => {
     };
     const fetchProducts = async () => {
         try {
-            const response = await getProductsBySellerIdAPI(seller.key);
+            const response = await getSalesBySellerIdAPI(seller.key);
             const productos = Array.isArray(response) ? response : [];
 
             const pedidos = response.map((product: any) => product.id_pedido);

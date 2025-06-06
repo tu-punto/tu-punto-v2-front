@@ -27,6 +27,7 @@ export const registerSalesAPI = async (salesData: any) => {
         return { success: false }
     }
 }
+
 export const getProductByShippingAPI = async (shippingId: any) => {
     try {
         const res = await apiClient.get(`/sale/products/${shippingId}`)
@@ -40,7 +41,7 @@ export const getProductByShippingAPI = async (shippingId: any) => {
 
     }
 }
-export const getProductsBySellerIdAPI = async (sellerId: any) => {
+export const getSalesBySellerIdAPI = async (sellerId: any) => {
     try {
         const res = await apiClient.get(`/sale/products/seller/${sellerId}`)
         return res.data
