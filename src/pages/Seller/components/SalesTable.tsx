@@ -41,7 +41,7 @@ const CustomTable = ({
     },
     {
       title: "Producto",
-      dataIndex: "producto",
+      dataIndex: "nombre_variante",
       key: "producto",
       className: "text-mobile-sm xl:text-desktop-sm",
     },

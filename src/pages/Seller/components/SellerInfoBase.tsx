@@ -94,6 +94,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const fetchSales = async () => {
     try {
       const res = await getProductsBySellerIdAPI(seller.key);
+      console.log('Ventas obtenidas:', res);
       const productos: any[] = Array.isArray(res) ? res : [];
       const pedidosIds = productos.map(p => p.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
@@ -134,7 +135,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   const handleDeleteSale = async (id: string) => {
-    const res = await deleteSaleByIdAPI(id);
+    const sucursalId = localStorage.getItem('sucursalId')
+    const res = await deleteSaleByIdAPI(id, sucursalId);
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
