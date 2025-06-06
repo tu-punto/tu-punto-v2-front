@@ -8,7 +8,8 @@ import { updateSubvariantStockAPI } from '../../api/product';
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
                                totalAmount, handleSales, sucursals,
-                               handleDebt, clearSelectedProducts, isAdmin
+                               //handleDebt,
+                               clearSelectedProducts, isAdmin
                            }: any) {
     const [loading, setLoading] = useState(false);
     const [qrInput, setQrInput] = useState<number>(0);
@@ -72,7 +73,7 @@ function ShippingFormModal({
             });
 
             if (ventas.length > 0) {
-                await handleDebt(ventas, response.newShipping.adelanto_cliente);
+                //await handleDebt(ventas, response.newShipping.adelanto_cliente);
                 await handleSales(response.newShipping, ventas);
 
                 // RESTAR STOCK si el estado es "Entregado"

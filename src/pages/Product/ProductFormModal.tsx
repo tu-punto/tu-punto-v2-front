@@ -117,6 +117,11 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                 name="productForm"
                 onFinish={handleFinish}
                 layout="vertical"
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                        e.preventDefault();
+                    }
+                }}
             >
                 <Form.Item
                     name="nombre_producto"

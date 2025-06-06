@@ -1,11 +1,13 @@
+import TempProductModal from './TempProductModal';
 import { useEffect, useState } from 'react';
-import { Modal, Button, Form, Input, DatePicker, Row, Col, TimePicker, Radio, Select, InputNumber } from 'antd';
+import { Modal, Card, Button, Form, Input, DatePicker, Row, Col, TimePicker, Radio, Select, InputNumber } from 'antd';
 import dayjs from 'dayjs';
 import { deleteProductsByShippingAPI, getProductByShippingAPI, registerSalesAPI, updateProductsByShippingAPI } from '../../api/sales';
 import EmptySalesTable from '../Sales/EmptySalesTable';
 import useProducts from '../../hooks/useProducts';
 import useEditableTable from '../../hooks/useEditableTable';
 import { updateShippingAPI } from '../../api/shipping';
+import {UserOutlined, PhoneOutlined, CommentOutlined} from "@ant-design/icons";
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
     const [adelantoVisible, setAdelantoVisible] = useState(false);
@@ -18,39 +20,43 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
 
     const { data } = useProducts();
     const [form] = Form.useForm();
+    const [tempModalVisible, setTempModalVisible] = useState(false);
 
     useEffect(() => {
-        if (shipping) {
-            form.setFieldsValue({
-                ...shipping,
-                fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
-                hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
-                hora_entrega_real: shipping.hora_entrega_real ? dayjs(shipping.hora_entrega_real, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
-                hora_final: shipping.hora_final || '',
-                observaciones: shipping.observaciones || '',
-                telefono_cliente: shipping.telefono_cliente || '',
-                monto_total: shipping.monto_total || '',
-                // cargo_delivery : shipping.cargo_delivery || '',
-                // pagado_al_vendedor: shipping.pagado_al_vendedor || '',
-                // adelanto_cliente: shipping.adelanto_cliente || '',
-            });
-            setCargoDeliveryInput(shipping.cargo_delivery)
-            setAdelantoClienteInput(shipping.adelanto_cliente)
-            setAdelantoVisible(false)
-            if (shipping.adelanto_cliente > 0 || shipping.adelanto_cliente < 0) { setAdelantoVisible(true) }
-        }
-        if (shipping && shipping.id_pedido) {
-            getProductByShippingAPI(shipping.id_pedido).then((data: any[]) => {
-                // Asegúrate de que `data` sea un array
-                if (Array.isArray(data)) {
-                    setProducts(data);
-                } else {
+        if (!shipping) return;
+
+        form.setFieldsValue({
+            ...shipping,
+            cliente: shipping.cliente || '',
+            fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
+            hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
+            hora_entrega_real: shipping.hora_entrega_real ? dayjs(shipping.hora_entrega_real, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
+            hora_final: shipping.hora_final || '',
+            observaciones: shipping.observaciones || '',
+            telefono_cliente: shipping.telefono_cliente || '',
+            monto_total: shipping.monto_total || '',
+        });
+
+        setCargoDeliveryInput(shipping.cargo_delivery || 0);
+        setAdelantoClienteInput(shipping.adelanto_cliente || 0);
+        setAdelantoVisible(!!shipping.adelanto_cliente);
+        console.log("📦 ID del pedido:", shipping._id);
+        if (shipping._id) {
+
+            getProductByShippingAPI(shipping._id).then((ventas: any[]) => {
+                console.log("🧾 Productos devueltos por la API:", ventas);
+                if (!Array.isArray(ventas)) {
+                    console.error('Expected ventas to be an array', ventas);
                     setProducts([]);
-                    console.error('Expected data to be an array', data);
+                    return;
                 }
+                setProducts(ventas);
+                console.log("📋 Productos cargados en el estado:", ventas);
+
             });
         }
     }, [shipping, form]);
+
     useEffect(() => {
         const total = totalAmount || 0;
         const adelanto = adelantoClienteInput || 0;
@@ -77,52 +83,67 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
                     precio_unitario: product.precio_unitario,
                     utilidad: product.utilidad
                 }));
-                const formattedNewProducts = newProducts.map((product: any) => ({
-                    cantidad: product.cantidad,
-                    precio_unitario: product.precio_unitario,
-                    utilidad: product.utilidad,
-                    id_producto: product.key,
-                    id_pedido: shipping.id_pedido,
-                    id_vendedor: product.id_vendedor,
-                    deposito_realizado: false
-                }));
+                // Asegura que se use un ObjectId válido (string de 24 caracteres)
+                const pedidoId = typeof shipping._id === 'string' ? shipping._id : shipping._id.toString();
+
+                const formattedNewProducts = newProducts
+                    .filter((product: any) =>
+                        product.cantidad > 0 &&
+                        product.precio_unitario > 0 &&
+                        product.key &&
+                        pedidoId?.length === 24
+                    )
+                    .map((product: any) => ({
+                        cantidad: product.cantidad,
+                        precio_unitario: product.precio_unitario,
+                        utilidad: product.utilidad || 0,
+                        id_producto: product.key,
+                        id_pedido: pedidoId,
+                        id_vendedor: product.id_vendedor,
+                        deposito_realizado: false,
+                    }));
+
+                if (formattedNewProducts.length > 0) {
+                    console.log("✅ Productos nuevos válidos a registrar:", formattedNewProducts);
+                    registerSalesAPI(formattedNewProducts).catch((error: any) => {
+                        console.error("❌ Error registrando productos nuevos:", error);
+                    });
+                } else {
+                    console.warn("⚠️ No se encontraron productos nuevos válidos para registrar.");
+                }
+
 
                 // Actualizar productos existentes
                 if (existingProducts.length > 0) {
-                    updateProductsByShippingAPI(shipping.id_pedido, formattedExistingProducts).catch((error: any) => {
+                    updateProductsByShippingAPI(shipping._id, formattedExistingProducts).catch((error: any) => {
                         console.error("Error updating products:", error);
-                    });
-                }
-                // Insertar nuevos productos
-                if (newProducts.length > 0) {
-
-                    registerSalesAPI(formattedNewProducts).catch((error: any) => {
-                        console.error("Error adding new products:", error);
                     });
                 }
 
                 // Eliminar productos eliminados
                 if (deletedProducts.length > 0) {
-                    deleteProductsByShippingAPI(shipping.id_pedido, deletedProducts).catch((error: any) => {
+                    deleteProductsByShippingAPI(shipping._id, deletedProducts).catch((error: any) => {
                         console.error("Error deleting products:", error);
                     });
                 }
                 let updateShippingInfo = {
-                    fecha_pedido: (shippingInfoData.fecha_pedido).format('YYYY-MM-DD HH:mm:ss.SSS'),
-                    hora_entrega_acordada: (shippingInfoData.hora_entrega_acordada).format('YYYY-MM-DD HH:mm:ss'),
+                    cliente: shippingInfoData.cliente,
+                    fecha_pedido: shippingInfoData.fecha_pedido.format('YYYY-MM-DD HH:mm:ss.SSS'),
+                    hora_entrega_acordada: shippingInfoData.hora_entrega_acordada.format('YYYY-MM-DD HH:mm:ss'),
                     observaciones: shippingInfoData.observaciones,
                     telefono_cliente: shippingInfoData.telefono_cliente,
                     lugar_entrega: shippingInfoData.lugar_entrega,
-                    pagado_al_vendedor: shipping.pagado_al_vendedor,
-                    adelanto_cliente: shipping.adelanto_cliente,
                     cargo_delivery: shippingInfoData.cargo_delivery,
                 };
+
                 if (adelantoVisible) {
                     updateShippingInfo.adelanto_cliente = shippingInfoData.adelanto_cliente;
-                } if (shippingInfoData.pagado_al_vendedor === '1') {
-                    updateShippingInfo.pagado_al_vendedor = true;
-                } else { updateShippingInfo.pagado_al_vendedor = false }
-                updateShippingAPI(updateShippingInfo, shipping.id_pedido)
+                } else {
+                    updateShippingInfo.adelanto_cliente = 0;
+                }
+                updateShippingInfo.pagado_al_vendedor = shippingInfoData.pagado_al_vendedor === '1';
+
+                updateShippingAPI(updateShippingInfo, shipping._id)
                 onSave({ ...shipping, ...values });
                 onClose();
                 setLoading(false)
@@ -173,7 +194,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
 
     return (
         <Modal
-            title={`Detalles del Pedido ${shipping ? shipping.id_pedido : ''}`}
+            title={`Detalles del Pedido ${shipping ? shipping._id : ''}`}
             open={visible}
             onCancel={onClose}
             footer={[
@@ -199,49 +220,59 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
                 name="shipping_info_form"
                 onFinish={handleSave}
             >
-                <Row gutter={16}>
-                    <Col span={6}>
-                        <Form.Item
-                            name="fecha_pedido"
-                            label="Fecha de la entrega"
-                        >
-                            <DatePicker format="DD/MM/YYYY" />
-                        </Form.Item>
-                    </Col>
-                    <Col span={6}>
-                        <Form.Item
-                            name="hora_entrega_acordada"
-                            label="Hora de entrega"
-                        >
-                            <TimePicker format="HH:mm" />
+                <Card title="Información del Cliente" bordered={false}>
+                    <Row gutter={16}>
+                        <Col span={18}>
+                            <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true }]}>
+                                <Input prefix={<UserOutlined />} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={18}>
+                            <Form.Item name="telefono_cliente" label="Celular" rules={[{ required: true }]}>
+                                <Input
+                                    prefix={<PhoneOutlined />}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            !/[0-9.]/.test(e.key) &&
+                                            !['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'].includes(e.key)
+                                        ) {
+                                            e.preventDefault();
+                                        }
+                                    }}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                </Card>
 
-                        </Form.Item>
-                    </Col>
-                </Row>
-                <Form.Item
-                    name="observaciones"
-                    label="Comentarios"
-                >
-                    <Input />
-                </Form.Item>
-                <Row gutter={16}>
-                    <Col span={12}>
-                        <Form.Item
-                            name="telefono_cliente"
-                            label="Celular"
-                        >
-                            <Input />
-                        </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                        <Form.Item
-                            name="lugar_entrega"
-                            label="Lugar de entrega"
-                        >
-                            <Input />
-                        </Form.Item>
-                    </Col>
-                </Row>
+                <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
+                                <DatePicker style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="hora_entrega_acordada" label="Hora Entrega">
+                                <TimePicker format='HH:mm' style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item name="lugar_entrega" label="Lugar De Entrega" rules={[{ required: true }]}>
+                                <Input />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item name="observaciones" label="Observaciones">
+                                <Input prefix={<CommentOutlined />} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                </Card>
                 <Row gutter={16}>
                     <Col span={18}>
                         <Form.Item
@@ -299,25 +330,37 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
                         sellers={[]}
                     />
                 </Form.Item>
-                <Form.Item
-                    name="productos_lista"
-                    label="Producto"
-                >
-                    <Select
-                        onChange={(value) => { handleProductSelect(value) }}
-                        placeholder="Selecciona un producto"
-                        showSearch
-                        filterOption={(input, option: any) =>
-                            option?.label?.toLowerCase().includes(input.toLowerCase())
-                        }
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <Form.Item
+                        name="productos_lista"
+                        label="Producto"
+                        style={{ flex: 1, marginRight: 8 }}
                     >
-                        {data.map((product: any) => (
-                            <Select.Option key={product.id_producto} value={product.key} label={product.producto}>
-                                {product.producto}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                </Form.Item>
+                        <Select
+                            onChange={(value) => handleProductSelect(value)}
+                            placeholder="Selecciona un producto"
+                            showSearch
+                            filterOption={(input, option: any) =>
+                                option?.label?.toLowerCase().includes(input.toLowerCase())
+                            }
+                        >
+                            {data.map((product: any) => (
+                                <Select.Option key={product.id_producto} value={product.key} label={product.producto}>
+                                    {product.producto}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+
+                    <Button
+                        type="dashed"
+                        onClick={() => setTempModalVisible(true)}
+                        style={{ height: '100%' }}
+                    >
+                        Agregar Temporal
+                    </Button>
+                </div>
+
                 <Form.Item
                     name="saldo_cobrar"
                     label="Saldo a cobrar"
@@ -328,6 +371,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave }: any) => {
                         style={{ width: '100%' }}
                     />
                 </Form.Item>
+                <TempProductModal
+                    visible={tempModalVisible}
+                    onCancel={() => setTempModalVisible(false)}
+                    onAddProduct={(tempProduct: any) => {
+                        setProducts((prev: any) => [...prev, tempProduct]);
+                    }}
+                />
             </Form>
         </Modal >
     );

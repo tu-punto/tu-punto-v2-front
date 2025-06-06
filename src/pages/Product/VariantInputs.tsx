@@ -9,6 +9,9 @@ const VariantInputs = ({
                        }: any) => {
     const [variants, setVariants] = useState<any[]>([]);
     const [initialized, setInitialized] = useState(false);
+    const [inputValues, setInputValues] = useState<string[]>([]);
+    const [showBulkApply, setShowBulkApply] = useState(false);
+    const [bulkPrice, setBulkPrice] = useState<number | null>(null);
 
     useEffect(() => {
         if (!initialized && readOnlyCombinations.length) {
@@ -37,8 +40,8 @@ const VariantInputs = ({
 
     const addVariant = () => {
         setVariants([...variants, { name: '', subvariants: [], readOnly: false }]);
+        setInputValues([...inputValues, ""]);
     };
-
     const removeVariant = (index: number) => {
         const updated = [...variants];
         updated.splice(index, 1);
@@ -117,7 +120,13 @@ const VariantInputs = ({
             combo.key === key ? { ...combo, [field]: value } : combo
         );
         setCombinations(updated);
+
+        if (field === "price" && value > 0 && bulkPrice === null) {
+            setBulkPrice(value);
+            setShowBulkApply(true);
+        }
     };
+
 
     const dynamicColumns = variants.map((variant, i) => ({
         title: variant.name || `Var${i + 1}`,
@@ -182,10 +191,24 @@ const VariantInputs = ({
                             ))}
                         </Space>
                         <Input.Search
+                            style={{ maxWidth: 300 }}
+                            value={inputValues[index] || ""}
+                            onChange={(e) => {
+                                const updated = [...inputValues];
+                                updated[index] = e.target.value;
+                                setInputValues(updated);
+                            }}
+                            onSearch={(val) => {
+                                if (val) {
+                                    addSubvariant(index, val);
+                                    const updated = [...inputValues];
+                                    updated[index] = ""; // limpiar campo
+                                    setInputValues(updated);
+                                }
+                            }}
                             placeholder={`Agregar subvariante a ${variant.name || 'Variante'}`}
                             enterButton={<PlusOutlined />}
-                            onSearch={(val) => val && addSubvariant(index, val)}
-                            disabled={!variant.name}
+                                                        disabled={!variant.name}
                         />
                     </Space>
                 </div>
@@ -196,6 +219,35 @@ const VariantInputs = ({
 
             <div style={{ marginTop: 24 }}>
                 <Typography.Title level={5}>Combinaciones</Typography.Title>
+                {showBulkApply && (
+                    <div style={{ marginBottom: 16, background: '#f6ffed', border: '1px solid #b7eb8f', padding: 12, borderRadius: 6 }}>
+                        <Typography.Text strong>¿Usar este precio para todas las combinaciones?</Typography.Text>
+                        <Button
+                            type="link"
+                            onClick={() => {
+                                const updated = combinations.map((combo: any) =>
+                                    combo.disabled ? combo : { ...combo, price: bulkPrice }
+                                );
+                                setCombinations(updated);
+                                setShowBulkApply(false);
+                                setBulkPrice(null);
+                            }}
+                        >
+                            Aplicar a todas
+                        </Button>
+                        <Button
+                            type="link"
+                            danger
+                            onClick={() => {
+                                setShowBulkApply(false);
+                                setBulkPrice(null);
+                            }}
+                        >
+                            Cancelar
+                        </Button>
+                    </div>
+                )}
+
                 <Table
                     dataSource={combinations}
                     rowKey="key"
