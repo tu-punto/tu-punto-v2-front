@@ -7,7 +7,7 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<any>({});
 
-  useEffect(() => { console.log(data), [] })
+
   const isEditing = (record: any) => record._id === editingKey;
 
   const handleEdit = (record: any) => {
