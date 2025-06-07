@@ -69,8 +69,6 @@ export default function SellerTable({
   const fetchSaldoPendiente = async (sellerId: string) => {
     let saldoPendiente = 0;
     const sales = await getSalesBySellerIdAPI(sellerId);
-    console.log("Sales for seller:", sellerId, sales);
-    console.log("Sales length:", sales.length);
     if (!sales.length) {
       console.error("Error fetching sales for seller:", sellerId);
       return saldoPendiente;
@@ -78,12 +76,11 @@ export default function SellerTable({
 
     saldoPendiente = sales && sales.reduce((acc: number, sale: any) => {
       if (sale.deposito_realizado) return acc;
-
       let subtotalDeuda = 0
       if (sale.id_pedido.pagado_al_vendedor) {
         subtotalDeuda = -sale.utilidad
       } else {
-        subtotalDeuda = sale.subtotal - sale.utilidad;
+        subtotalDeuda = (sale.cantidad * sale.precio_unitario) - sale.utilidad;
       }
 
       return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
