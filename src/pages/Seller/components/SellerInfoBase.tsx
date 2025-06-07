@@ -134,7 +134,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   const handleDeleteSale = async (id: string) => {
-    const res = await deleteSaleByIdAPI(id);
+
+    const id_sucursal = localStorage.getItem('sucursalId');
+    const res = await deleteSaleByIdAPI(id, id_sucursal);
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
