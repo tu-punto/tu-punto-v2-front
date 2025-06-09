@@ -3,6 +3,7 @@ import { Button, Popconfirm, message, Table } from "antd";
 import dayjs from "dayjs";
 import { useEffect } from "react";
 import { EditableCellInputNumber } from "../../components/editableCell";
+import { render } from "@react-pdf/renderer";
 
 interface CustomTableProps {
   data: any[];
@@ -49,15 +50,16 @@ const CustomTable = ({
     },
     {
       title: "Subtotal deudas",
-      key: "utilidad",
-      render: (_: any, record: any) => {
-        const subtotalDeuda = record.id_pedido.pagado_al_vendedor
-          ? -record.utilidad
-          : record.subtotal - record.utilidad;
-
-        return `${subtotalDeuda.toFixed(2)}`;
-      },
+      key: "subtotal_deudas",
+      dataIndex: "subtotal_deudas",
       className: "text-mobile-sm xl:text-desktop-sm",
+      render: (_: any, record: any) => {
+        const subtotalVenta = record.cantidad * record.precio_unitario
+        const subtotalDeudas = record.id_pedido.pagado_al_vendedor
+          ? - record.utilidad
+          : subtotalVenta - record.utilidad
+        return `Bs. ${subtotalDeudas.toFixed(2)}`;
+      }
     },
     {
       title: "Utilidad",
@@ -85,7 +87,7 @@ const CustomTable = ({
       title: "Cantidad",
       dataIndex: "cantidad",
       key: "cantidad",
-      render: (_: any, record: any) => ( allowActions ? (
+      render: (_: any, record: any) => (allowActions ? (
         <EditableCellInputNumber
           isAdmin={isAdmin}
           value={record.cantidad}
@@ -93,7 +95,7 @@ const CustomTable = ({
           onChange={(value) =>
             handleValueChange(record.key, "cantidad", value)
           }
-        /> ) : `Bs. ${record.cantidad}`
+        />) : `Bs. ${record.cantidad}`
       ),
       className: "text-mobile-sm xl:text-desktop-sm",
     },
