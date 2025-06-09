@@ -1,15 +1,11 @@
-import { Button, InputNumber, Table } from "antd";
+import {  Table } from "antd";
 import dayjs from "dayjs";
-import { useEffect } from "react";
-import { EditableCellInputNumber } from "../../components/editableCell";
 
 interface EntryProductSellerTableProps {
   data: any[];
-  isAdmin: boolean;
 }
 const EntryProductSellerTable = ({
   data,
-  isAdmin
 }: EntryProductSellerTableProps) => {
   const columns = [
     {
