@@ -1,17 +1,18 @@
 import { DatePicker, Input, message, Select, Table } from 'antd';
-import { useEffect, useState } from 'react';
-import { getShippingsAPI } from '../../api/shipping';
+import {useContext, useEffect, useState} from 'react';
+import { getShippingsAPI, getShippingByIdAPI  } from '../../api/shipping';
 import ShippingInfoModal from './ShippingInfoModal';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import ShippingStateModal from './ShippingStateModal';
 import { getSucursalsAPI } from '../../api/sucursal';
 import { getSellersAPI } from "../../api/seller";
+import {UserContext} from "../../context/userContext.tsx";
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
-
+    const { user }: any = useContext(UserContext);
     const [shippingData, setShippingData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
     const [entregadoData, setEntregadoData] = useState([]);
@@ -150,11 +151,17 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         setIsModalStateVisible(true);
     };
 
-    const handleRowClick = (order: any) => {
-        setSelectedShipping(order);
-        setIsModalVisible(true);
+    const handleRowClick = async (record: any) => {
+        try {
+            const shipping = await getShippingByIdAPI(record._id); // ✅ este endpoint debe devolver solo UN pedido
+            console.log("📦 Pedido individual para el modal:", shipping);
+            setSelectedShipping(shipping);
+            setIsModalVisible(true);
+        } catch (error) {
+            console.error("Error al obtener pedido por ID:", error);
+            message.error("Error al cargar el pedido");
+        }
     };
-
     const fetchSucursal = async () => {
         try {
             const response = await getSucursalsAPI();
@@ -273,7 +280,12 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         pagination={false}
                         scroll={{ x: "max-content" }}
                         onRow={(record) => ({
-                            onClick: () => handleRowClick(record)
+                            onClick: async () => {
+                                const fullShipping = await getShippingByIdAPI(record._id);
+                                console.log("📦 Pedido completo con ventas:", fullShipping);
+                                setSelectedShipping(fullShipping);
+                                setIsModalVisible(true);
+                            },
                         })}
                     />
                 </>
@@ -288,21 +300,31 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         pagination={false}
                         scroll={{ x: "max-content" }}
                         onRow={(record) => ({
-                            onClick: () => handleRowClick(record)
+                            onClick: async () => {
+                                const fullShipping = await getShippingByIdAPI(record._id);
+                                console.log("📦 Pedido completo con ventas:", fullShipping);
+                                setSelectedShipping(fullShipping);
+                                setIsModalVisible(true);
+                            },
                         })}
+
                     />
                 </>
             )}
 
             <ShippingInfoModal
                 visible={isModalVisible && !isModaStatelVisible}
-                shipping={selectedShipping}
+                shipping={selectedShipping }
+                sucursals={sucursal} // <-- esta línea es clave
                 onClose={() => setIsModalVisible(false)}
                 onSave={() => {
                     setIsModalVisible(false);
                     fetchShippings();
                 }}
+                isAdmin={user?.rol?.toLowerCase?.() !== 'seller'}
+
             />
+
             <ShippingStateModal
                 visible={isModaStatelVisible}
                 order={selectedShipping}

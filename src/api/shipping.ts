@@ -55,12 +55,39 @@ const registerSalesToShippingAPI = async (salesData: any) => {
     return { success: false };
   }
 };
+const getShippingByIdAPI = async (id: string) => {
+  try {
+    const res = await apiClient.get(`/shipping/by/${id}`);
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
 
 const updateShippingAPI = async (updateShippingData: any, shippingId: string) => {
   try {
     const res = await apiClient.put(`/shipping/${shippingId}`, updateShippingData);
     return { success: true, ...res.data };
   } catch (error) {
+    return { success: false };
+  }
+};
+const addTemporaryProductsToShippingAPI = async (shippingId: string, productosTemporales: any[]) => {
+  try {
+    const res = await apiClient.put(`/shipping/${shippingId}/temporales`, {
+      productos_temporales: productosTemporales,
+    });
+    return { success: true, ...res.data };
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
     return { success: false };
   }
 };
@@ -80,5 +107,7 @@ export {
   registerSalesToShippingAPI,
   updateShippingAPI,
   getShipingByIdsAPI,
+  getShippingByIdAPI,
   getShippingsBySellerIdAPI,
+  addTemporaryProductsToShippingAPI,
 };
