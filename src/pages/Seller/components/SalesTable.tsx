@@ -1,5 +1,5 @@
 import { SaveOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Button, Popconfirm, message, Table } from "antd";
+import { Button, Popconfirm, message, Table, Empty } from "antd";
 import dayjs from "dayjs";
 import { useEffect } from "react";
 import { EditableCellInputNumber } from "../../components/editableCell";
@@ -171,8 +171,8 @@ const CustomTable = ({
     onUpdateTotalAmount(totalAmount);
   }, [data]);
 
-  return (
-    <div>
+  return data.length > 0 ? (
+    <>
       <div style={{ textAlign: "right" }}>
         <strong className="text-mobile-sm xl:text-desktop-sm">
           Monto Total:
@@ -180,8 +180,10 @@ const CustomTable = ({
         Bs.{totalAmount.toFixed(2)}
       </div>
       <Table columns={columns} dataSource={data} pagination={{ pageSize: 5 }} />
-    </div>
-  );
+    </>
+  ) : (
+    <Empty description="No se encontraron ventas" className="text-mobile-sm xl:text-desktop-sm" />
+  )
 };
 
 export default CustomTable;
