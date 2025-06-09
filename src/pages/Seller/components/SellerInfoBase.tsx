@@ -293,9 +293,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
         <EntryHistorySection
           initialEntries={entryData}
-          onEntriesChange={setEntryData}
-          onDeletedEntriesChange={setDeletedEntryData}
-          isSeller={isSeller}
         />
 
         <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} isSeller={isSeller} />

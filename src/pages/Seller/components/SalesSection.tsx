@@ -71,8 +71,9 @@ const SalesSection: React.FC<Props> = ({
             onUpdateOneSale(id, fields);
           }}
           handleValueChange={handleValueChange}
-          showClient
           isAdmin={!isSeller}
+          showClient
+          allowActions
         />
       </section>
 
@@ -83,16 +84,11 @@ const SalesSection: React.FC<Props> = ({
         <SalesTable
           data={salesData}
           onUpdateTotalAmount={onUpdateHistorialTotal}
-          onDeleteProduct={(key, id) => {
-            onDeleteOneSale(id);
-            handleDelete(key);
-          }}
-          onUpdateProduct={(id, fields) => {
-            onUpdateOneSale(id, fields);
-          }}
-          handleValueChange={handleValueChange}
-          showClient
+          onDeleteProduct={() => { }}
+          onUpdateProduct={() => { }}
+          handleValueChange={() => { }}
           isAdmin={!isSeller}
+          showClient
         />
       </section>
     </>
