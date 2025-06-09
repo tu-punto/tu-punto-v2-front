@@ -18,7 +18,8 @@ function SalesFormModal({
                             totalAmount,
                             handleSales,
                             //handleDebt,
-                            clearSelectedProducts
+                            clearSelectedProducts,
+                            sellers,
                         }: any) {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
@@ -80,8 +81,8 @@ function SalesFormModal({
             estado_pedido: "interno", // 🟡 invisible
             adelanto_cliente: 0,
             pagado_al_vendedor: tipoPagoSeleccionado === 3,
-            subtotal_qr: (tipoPagoSeleccionado === 1 || tipoPagoSeleccionado === 4) ? (qrInput || totalAmount / 2) : 0,
-            subtotal_efectivo: (tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4) ? (efectivoInput || totalAmount / 2) : 0,
+            subtotal_qr: tipoPagoSeleccionado === 1 || tipoPagoSeleccionado === 4 ? (qrInput || totalAmount / 2) : 0,
+            subtotal_efectivo: tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4 ? (efectivoInput || totalAmount / 2) : 0,
             id_sucursal: sucursalId,
             cliente: "Sin nombre",
             telefono_cliente: "00000000",
@@ -101,21 +102,25 @@ function SalesFormModal({
         const productosTemporales = selectedProducts.filter((p: any) => p.esTemporal);
         const productosNormales = selectedProducts.filter((p: any) => !p.esTemporal);
         const ventas = productosNormales.map((p: any) => {
-            console.log("Producto normal:", p);
-            const [productId] = p.key.split("-");
+            const vendedor = p.id_vendedor || p.vendedor;
+            const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
+            const utilidad = parseFloat(p.utilidad);
+            const utilidadCalculada = parseFloat(((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2));
+
             return {
-                id_producto: productId,
-                producto: productId,
-                id_vendedor: p.id_vendedor,
-                vendedor: p.id_vendedor,
+                id_producto: p.key.split("-")[0],
+                producto: p.key.split("-")[0],
+                id_vendedor: vendedor,
+                vendedor,
                 id_pedido: response.newShipping._id,
+                sucursal: sucursalId,
                 cantidad: p.cantidad,
                 precio_unitario: p.precio_unitario,
-                utilidad: p.utilidad,
+                utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
                 deposito_realizado: false,
                 variantes: p.variantes,
                 nombre_variante: `${p.producto}`,
-                stockActual: p.stockActual
+                stockActual: p.stockActual,
             };
         });
 
@@ -210,7 +215,7 @@ function SalesFormModal({
                     </Form.Item>
                 )}
 
-                {(tipoPago === '2' || tipoPago === '3') && (
+                {(tipoPago === '2') && (
                     <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
                         <InputNumber
                             prefix="Bs."

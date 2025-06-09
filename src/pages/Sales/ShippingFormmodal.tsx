@@ -4,12 +4,14 @@ import {useEffect, useMemo, useState} from 'react';
 import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
 import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
+import { useWatch } from 'antd/es/form/Form';
+
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
                                totalAmount, handleSales, sucursals,
                                //handleDebt,
-                               clearSelectedProducts, isAdmin
+                               clearSelectedProducts, isAdmin,sellers
                            }: any) {
     const [loading, setLoading] = useState(false);
     const [qrInput, setQrInput] = useState<number>(0);
@@ -30,6 +32,19 @@ function ShippingFormModal({
             (form.getFieldValue("quien_paga_delivery") === "comprador" ? montoCobradoDelivery : 0) -
             adelantoClienteInput;
     }, [totalAmount, montoCobradoDelivery, adelantoClienteInput, form]);
+    const hayMultiplesVendedores = useMemo(() => {
+        const vendedores = selectedProducts.map((p: any) => p.id_vendedor);
+        const unicos = [...new Set(vendedores)];
+        return unicos.length > 1;
+    }, [selectedProducts]);
+    const lugarEntrega = useWatch('lugar_entrega', form);
+
+    const origenEsIgualADestino = useMemo(() => {
+        const origen = sucursals?.[0]?.nombre?.trim().toLowerCase();
+        const destino = lugarEntrega?.trim()?.toLowerCase();
+        return origen && destino ? origen === destino : true;
+    }, [lugarEntrega, sucursals]);
+
 
     const handleFinish = async (values: any) => {
         //console.log(" selectedProducts:", selectedProducts);
@@ -54,21 +69,25 @@ function ShippingFormModal({
             const productosNormales = selectedProducts.filter((p: any) => !p.esTemporal);
 
             const ventas = productosNormales.map((p: any) => {
-                const [productId] = p.key.split("-");
+                const vendedor = p.id_vendedor || p.vendedor;
+                const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
+                const utilidad = parseFloat(p.utilidad);
+                const utilidadCalculada = parseFloat(((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2));
+
                 return {
-                    id_producto: productId,
-                    producto: productId,
-                    id_vendedor: p.id_vendedor,
-                    vendedor: p.id_vendedor,
+                    id_producto: p.key.split("-")[0],
+                    producto: p.key.split("-")[0],
+                    id_vendedor: vendedor,
+                    vendedor,
                     id_pedido: response.newShipping._id,
+                    sucursal: sucursalId,
                     cantidad: p.cantidad,
                     precio_unitario: p.precio_unitario,
-                    utilidad: p.utilidad,
+                    utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
                     deposito_realizado: false,
                     variantes: p.variantes,
                     nombre_variante: `${p.producto}`,
                     stockActual: p.stockActual,
-
                 };
             });
 
@@ -211,7 +230,7 @@ function ShippingFormModal({
                         </Col>
                     </Row>
                 </Card>
-                {/* DATOS DEL PEDIDO */}
+
                 {/* DATOS DEL PEDIDO */}
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
                     <Row gutter={16}>
@@ -264,6 +283,7 @@ function ShippingFormModal({
                         </Col>
                     </Row>
                 </Card>
+
                 {/* DETALLES DEL PAGO */}
                 <Card
                     title={
@@ -275,231 +295,231 @@ function ShippingFormModal({
                     bordered={false}
                     style={{ marginTop: 16 }}
                 >
+                    {/* ¿Está ya pagado? */}
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
+                                <Radio.Group
+                                    onChange={(e) => {
+                                        setAdelantoVisible(e.target.value === 'adelanto');
+                                        if (e.target.value !== 'adelanto') {
+                                            setAdelantoClienteInput(0);
+                                        }
+                                    }}
+                                >
+                                    <Radio.Button value="si">Sí</Radio.Button>
+                                    <Radio.Button value="no">No</Radio.Button>
+                                    <Radio.Button value="adelanto" disabled={hayMultiplesVendedores}>
+                                        Pago Adelanto
+                                    </Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
-                            {/* Estado del Pedido */}
+                    {adelantoVisible && (
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item name="adelanto_cliente" label="Monto del adelanto" rules={[{ required: true }]}>
+                                    <InputNumber
+                                        prefix="Bs."
+                                        min={0}
+                                        value={adelantoClienteInput}
+                                        onChange={value => setAdelantoClienteInput(value ?? 0)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    )}
+
+                    {/* Estado del Pedido */}
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
+                                <Radio.Group
+                                    onChange={(e) => setEstadoPedido(e.target.value.toString())}
+                                    value={estadoPedido || "En Espera"}
+                                >
+                                    <Radio.Button value="En Espera">En espera</Radio.Button>
+                                    {isAdmin && <Radio.Button value="Entregado">Entregado</Radio.Button>}
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    {/* ¿Quién paga delivery? */}
+                    {estadoPedido === 'Entregado' && !origenEsIgualADestino && (
+                        <>
                             <Row gutter={16}>
                                 <Col span={24}>
-                                    <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
+                                    <Form.Item
+                                        name="quien_paga_delivery"
+                                        label="¿Quién paga el delivery?"
+                                        rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}
+                                    >
                                         <Radio.Group
-                                            onChange={(e) => setEstadoPedido(e.target.value.toString())}
-                                            value={estadoPedido || "En Espera"}
+                                            onChange={(e) => {
+                                                setQuienPaga(e.target.value);
+                                                form.setFieldValue("quien_paga_delivery", e.target.value);
+                                            }}
                                         >
-                                            <Radio.Button value="En Espera">En espera</Radio.Button>
-                                            {isAdmin && <Radio.Button value="Entregado">Entregado</Radio.Button>}
+                                            <Radio.Button value="comprador" disabled={hayMultiplesVendedores}>
+                                                COMPRADOR
+                                            </Radio.Button>
+                                            <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
+                                            <Radio.Button value="tupunto">Tu Punto</Radio.Button>
                                         </Radio.Group>
                                     </Form.Item>
                                 </Col>
                             </Row>
 
-                            {/* Condicional Entregado */}
-                            {estadoPedido === 'Entregado' && (
-                                <>
-                                    <Row gutter={16}>
-                                        <Col span={24}>
-                                            <Form.Item
-                                                name="quien_paga_delivery"
-                                                label="¿Quién paga el delivery?"
-                                                rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}>
-                                                <Radio.Group
-                                                    onChange={(e) => {
-                                                        setQuienPaga(e.target.value); // actualiza el estado que forza re-render
-                                                        form.setFieldValue("quien_paga_delivery", e.target.value); // opcional, si necesitas setear manualmente
-                                                    }}>
-                                                    <Radio.Button value="comprador">COMPRADOR</Radio.Button>
-                                                    <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
-                                                    <Radio.Button value="tupunto">Tu Punto</Radio.Button>
-                                                </Radio.Group>
-                                            </Form.Item>
-
-                                        </Col>
-                                    </Row>
-
-                                    <Row gutter={16}>
-                                        <Col span={12}>
-                                            {["comprador", "vendedor"].includes(quienPaga || "") && (
-                                                <Form.Item
-                                                    name="cargo_delivery"
-                                                    label="Monto cobrado por el Delivery"
-                                                    rules={[{ required: true, message: "Campo obligatorio" }]}>
-                                                    <InputNumber
-                                                        prefix="Bs."
-                                                        value={montoCobradoDelivery}
-                                                        onChange={value => setMontoCobradoDelivery(value ?? 0)}
-                                                        style={{ width: '100%' }}
-                                                    />
-                                                </Form.Item>
-                                            )}
-
-                                        </Col>
-                                        <Col span={12}>
-                                            <Form.Item
-                                                name="costo_delivery"
-                                                label="Costo de realizar el Delivery"
-                                                rules={[{ required: true, message: "Campo obligatorio" }]}
-                                            >
-                                                <InputNumber
-                                                    prefix="Bs."
-                                                    value={costoRealizarDelivery}
-                                                    onChange={value => setCostoRealizarDelivery(value ?? 0)}
-                                                    style={{ width: '100%' }}
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-
-                                </>
-                            )}
-
-                            {/* ¿Está ya pagado? */}
-                            {(estadoPedido === 'En Espera' || estadoPedido === 'Entregado') && (
-                                <>
-                                    <Row gutter={16}>
-                                        <Col span={24}>
-                                            <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
-                                                <Radio.Group
-                                                    onChange={(e) => {
-                                                        setAdelantoVisible(e.target.value === 'adelanto');
-                                                        if (e.target.value !== 'adelanto') {
-                                                            setAdelantoClienteInput(0);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Radio.Button value="si">Sí</Radio.Button>
-                                                    <Radio.Button value="no">No</Radio.Button>
-                                                    <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
-                                                </Radio.Group>
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-
-                                    {adelantoVisible && (
-                                        <Row gutter={16}>
-                                            <Col span={24}>
-                                                <Form.Item name="adelanto_cliente" label="Monto del adelanto" rules={[{ required: true }]}>
-                                                    <InputNumber
-                                                        prefix="Bs."
-                                                        min={0}
-                                                        value={adelantoClienteInput}
-                                                        onChange={value => setAdelantoClienteInput(value ?? 0)}
-                                                        style={{ width: '100%' }}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                        </Row>
-                                    )}
-                                </>
-                            )}
-                            {/* Saldo a Cobrar */}
                             <Row gutter={16}>
-                                <Col span={24}>
-                                    <Form.Item label="Saldo a Cobrar">
-                                        <Input
+                                <Col span={12}>
+                                    {["comprador", "vendedor"].includes(quienPaga || "") && (
+                                        <Form.Item
+                                            name="cargo_delivery"
+                                            label="Monto cobrado por el Delivery"
+                                            rules={[{ required: true, message: "Campo obligatorio" }]}
+                                        >
+                                            <InputNumber
+                                                prefix="Bs."
+                                                value={montoCobradoDelivery}
+                                                onChange={value => setMontoCobradoDelivery(value ?? 0)}
+                                                style={{ width: '100%' }}
+                                            />
+                                        </Form.Item>
+                                    )}
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="costo_delivery"
+                                        label="Costo de realizar el Delivery"
+                                        rules={[{ required: true, message: "Campo obligatorio" }]}
+                                    >
+                                        <InputNumber
                                             prefix="Bs."
-                                            readOnly
-                                            value={saldoACobrar.toFixed(2)}
-                                            style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                                            value={costoRealizarDelivery}
+                                            onChange={value => setCostoRealizarDelivery(value ?? 0)}
+                                            style={{ width: '100%' }}
                                         />
                                     </Form.Item>
                                 </Col>
                             </Row>
-                            {/* Tipo de pago */}
-                            {estadoPedido === 'Entregado' && (
-                                <>
-                                    <Row gutter={16}>
-                                        <Col span={24}>
-                                            <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
-                                                <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
-                                                    <Radio.Button value="1">Transferencia o QR</Radio.Button>
-                                                    <Radio.Button value="2">Efectivo</Radio.Button>
-                                                    <Radio.Button value="3">Pagado al dueño</Radio.Button>
-                                                    <Radio.Button value="4">Efectivo + QR</Radio.Button>
-                                                </Radio.Group>
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
+                        </>
+                    )}
 
-                                    {/* Campos según tipo de pago */}
-                                    {["1"].includes(tipoPago || "") && (
-                                        <Row gutter={16}>
-                                            <Col span={24}>
-                                                <Form.Item label="Subtotal QR" name="subtotal_qr">
-                                                    <InputNumber
-                                                        prefix="Bs."
-                                                        value={saldoACobrar}
-                                                        readOnly
-                                                        style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                        </Row>
-                                    )}
+                    {/* Saldo a Cobrar */}
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item label="Saldo a Cobrar">
+                                <Input
+                                    prefix="Bs."
+                                    readOnly
+                                    value={saldoACobrar.toFixed(2)}
+                                    style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
 
-                                    {["2", "3"].includes(tipoPago || "") && (
-                                        <Row gutter={16}>
-                                            <Col span={24}>
-                                                <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                                                    <InputNumber
-                                                        prefix="Bs."
-                                                        value={saldoACobrar}
-                                                        readOnly
-                                                        style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                        </Row>
-                                    )}
+                    {/* Tipo de pago */}
+                    {estadoPedido === 'Entregado' && (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
+                                        <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
+                                            <Radio.Button value="1">Transferencia o QR</Radio.Button>
+                                            <Radio.Button value="2">Efectivo</Radio.Button>
+                                            <Radio.Button value="3">Pagado al dueño</Radio.Button>
+                                            <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                                        </Radio.Group>
+                                    </Form.Item>
+                                </Col>
+                            </Row>
 
-                                    {tipoPago === '4' && (
-                                        <Row gutter={16}>
-                                            <Col span={12}>
-                                                <Form.Item label="Subtotal QR" name="subtotal_qr" rules={[
-                                                    { required: true, message: 'Debe ingresar un valor en QR' },
-                                                    {
-                                                        validator: (_, value) => {
-                                                            if (value <= 0) return Promise.reject("El monto QR debe ser mayor a 0");
-                                                            if (value >= saldoACobrar) return Promise.reject("El monto QR debe ser menor al total");
-                                                            return Promise.resolve();
-                                                        }
-                                                    }
-                                                ]}>
-                                                    <InputNumber
-                                                        prefix="Bs."
-                                                        min={0.10}
-                                                        max={saldoACobrar - 0.01}
-                                                        value={qrInput}
-                                                        onChange={(val) => {
-                                                            const qr = val ?? 0;
-                                                            setQrInput(qr);
-                                                            const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
-                                                            setEfectivoInput(efectivo);
-                                                            form.setFieldsValue({ subtotal_efectivo: efectivo });
-                                                        }}
-                                                        style={{ width: '100%' }}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={12}>
-                                                <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                                                    <InputNumber
-                                                        prefix="Bs."
-                                                        value={efectivoInput}
-                                                        readOnly
-                                                        style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
-                                                    />
-                                                </Form.Item>
-                                            </Col>
-                                            {showWarning && (
-                                                <Col span={24}>
-                                                    <div style={{ color: 'red', fontWeight: 'bold' }}>
-                                                        La suma de QR + Efectivo debe ser igual al saldo a cobrar.
-                                                    </div>
-                                                </Col>
-                                            )}
-                                        </Row>
-                                    )}
-                                </>
+                            {/* Campos según tipo de pago */}
+                            {["1"].includes(tipoPago || "") && (
+                                <Row gutter={16}>
+                                    <Col span={24}>
+                                        <Form.Item label="Subtotal QR" name="subtotal_qr">
+                                            <InputNumber
+                                                prefix="Bs."
+                                                value={saldoACobrar}
+                                                readOnly
+                                                style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
                             )}
 
+                            {["2"].includes(tipoPago || "") && (
+                                <Row gutter={16}>
+                                    <Col span={24}>
+                                        <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
+                                            <InputNumber
+                                                prefix="Bs."
+                                                value={saldoACobrar}
+                                                readOnly
+                                                style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            )}
+
+                            {tipoPago === '4' && (
+                                <Row gutter={16}>
+                                    <Col span={12}>
+                                        <Form.Item label="Subtotal QR" name="subtotal_qr" rules={[
+                                            { required: true, message: 'Debe ingresar un valor en QR' },
+                                            {
+                                                validator: (_, value) => {
+                                                    if (value <= 0) return Promise.reject("El monto QR debe ser mayor a 0");
+                                                    if (value >= saldoACobrar) return Promise.reject("El monto QR debe ser menor al total");
+                                                    return Promise.resolve();
+                                                }
+                                            }
+                                        ]}>
+                                            <InputNumber
+                                                prefix="Bs."
+                                                min={0.10}
+                                                max={saldoACobrar - 0.01}
+                                                value={qrInput}
+                                                onChange={(val) => {
+                                                    const qr = val ?? 0;
+                                                    setQrInput(qr);
+                                                    const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
+                                                    setEfectivoInput(efectivo);
+                                                    form.setFieldsValue({ subtotal_efectivo: efectivo });
+                                                }}
+                                                style={{ width: '100%' }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col span={12}>
+                                        <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
+                                            <InputNumber
+                                                prefix="Bs."
+                                                value={efectivoInput}
+                                                readOnly
+                                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                    {showWarning && (
+                                        <Col span={24}>
+                                            <div style={{ color: 'red', fontWeight: 'bold' }}>
+                                                La suma de QR + Efectivo debe ser igual al saldo a cobrar.
+                                            </div>
+                                        </Col>
+                                    )}
+                                </Row>
+                            )}
+                        </>
+                    )}
                 </Card>
 
                 <Form.Item style={{ marginTop: 16 }}>

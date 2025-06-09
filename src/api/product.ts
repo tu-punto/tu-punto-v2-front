@@ -195,5 +195,32 @@ export const registerVariantAPI = async (productData: any) => {
         return { success: false };
     }
 };
+export const generateIngressPDFAPI = async (payload: any): Promise<{ success: boolean }> => {
+    try {
+        const res = await apiClient.post("/product/generate-ingress-pdf", payload, {
+            responseType: 'blob' // importante para que axios trate la respuesta como archivo
+        });
+
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `Comprobante_Ingresos_${Date.now()}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        URL.revokeObjectURL(url); // libera la memoria
+
+        return { success: true };
+    } catch (error) {
+        console.error("❌ Error generando PDF:", error);
+        return { success: false };
+
+    }
+};
+
+
 
 

@@ -411,6 +411,7 @@ export const Sales = () => {
                 sucursals={branches}
                 //handleDebt={updateSellerDebt}
                 clearSelectedProducts={() => setSelectedProducts([])}
+                sellers={sellers}
             />
             <ShippingFormModal
                 visible={modalType === "shipping"}
@@ -424,6 +425,7 @@ export const Sales = () => {
                 //handleDebt={updateSellerDebt}
                 clearSelectedProducts={() => setSelectedProducts([])}
                 isAdmin={isAdmin}
+                sellers={sellers}
             />
         </>
     );

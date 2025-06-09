@@ -1,19 +1,34 @@
 import { Button, InputNumber, Table } from "antd";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers }: any) => {
-    const updatedProducts = products.map((product: any) => {
-        const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
-        const comision = vendedor?.comision_porcentual || 0;
-        const cantidad = product.cantidad || 0;
-        const precio = product.precio_unitario || 0;
-        const utilidad = (precio * cantidad * comision) / 100;
+    const [updatedProducts, setUpdatedProducts] = useState(products);
 
-        return {
-            ...product,
-            utilidad: utilidad
-        };
-    });
+    useEffect(() => {
+        const withUtilidades = products.map((product: any, i: number) => {
+            const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
+            const comision = Number(vendedor?.comision_porcentual) || 0;
+            const cantidad = product.cantidad || 0;
+            const precio = product.precio_unitario || 0;
+            const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+
+            //console.log(`[${i}] Producto:`, product.producto);
+            //console.log(` - Precio: ${precio}, Cantidad: ${cantidad}, Comisión: ${comision}`);
+            //console.log(` - Utilidad calculada: ${utilidadCalculada}`);
+            //console.log(` - Utilidad existente: ${product.utilidad}`);
+
+            return {
+                ...product,
+                utilidad:
+                    product.utilidad !== undefined &&
+                    product.utilidad !== 1
+                        ? product.utilidad
+                        : utilidadCalculada,
+            };
+        });
+        setUpdatedProducts(withUtilidades);
+    }, [products, sellers]);
+
     const totalAmount = updatedProducts.reduce((acc: number, product: any) => {
         return acc + (product.precio_unitario * product.cantidad);
     }, 0);
@@ -21,19 +36,18 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
     const columns = [
         {
             title: 'Producto',
-            dataIndex: 'producto',
             key: 'producto',
             className: "text-mobile-sm xl:text-desktop-sm",
-            render: (text: string, record: any) => (
+            render: (_: any, record: any) => (
                 <span>
-            {text}
-                    {record.esTemporal && (
-                        <span style={{ marginLeft: 8, color: '#faad14', fontWeight: 500 }}>
-                    (Temporal)
+                  {record.nombre_variante || record.producto || "—"}
+                                {record.esTemporal && (
+                                    <span style={{ marginLeft: 8, color: '#faad14', fontWeight: 500 }}>
+                      (Temporal)
+                    </span>
+                                )}
                 </span>
-                    )}
-        </span>
-            )
+                        )
         },
         {
             title: 'Cantidad',
@@ -91,8 +105,12 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
         },
     ];
     useEffect(() => {
-        onUpdateTotalAmount(totalAmount)
-    }, [products, onUpdateTotalAmount]);
+        const recalculated = updatedProducts.reduce((acc: number, p: any) => {
+            return acc + (p.precio_unitario * p.cantidad);
+        }, 0);
+        onUpdateTotalAmount(recalculated);
+    }, [updatedProducts, onUpdateTotalAmount]);
+
 
     return (
         <div>

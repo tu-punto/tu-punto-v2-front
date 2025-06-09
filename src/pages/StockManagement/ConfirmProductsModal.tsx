@@ -1,6 +1,6 @@
 import { Modal, Button, Table, InputNumber, Popconfirm, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { createVariantAPI, registerProductAPI, updateSubvariantStockAPI } from "../../api/product";
+import {createVariantAPI, generateIngressPDFAPI, registerProductAPI, updateSubvariantStockAPI} from "../../api/product";
 import { getTempStock, getTempProducts, getTempVariants, clearTempStock, clearTempProducts, clearTempVariants } from "../../utils/storageHelpers";
 import {createEntryAPI} from "../../api/entry.ts";
 import jsPDF from 'jspdf';
@@ -179,104 +179,6 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
             message.error("Ocurrió un error al guardar los cambios.");
         }
     };
-    const generatePDF = async (sellerName: string = "Nombre del Vendedor") => {
-        setLoadingPDF(true);
-        const doc = new jsPDF();
-        const img = new Image();
-        img.src = logoImg;
-
-        await new Promise((resolve) => { img.onload = resolve; });
-
-        doc.addImage(img, 'PNG', 10, 10, 30, 20);
-        const date = new Date().toLocaleString();
-
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Vendedor: ${sellerName}`, 200, 15, { align: "right" });
-        doc.text(`Fecha: ${date}`, 200, 22, { align: "right" });
-
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text("COMPROBANTE DE INGRESOS", 105, 40, { align: "center" });
-
-        // Tabla 1: Ingresos a Productos Existentes
-        const ingresos = stockData.map((item) => {
-            const variantes = Object.entries(item.product.variantes || {})
-                .map(([_, v]) => v)
-                .join(" / ");
-            return [
-                `${item.product.nombre_producto} - ${variantes}`,
-                item.product.stock,
-                item.product.precio,
-                item.newStock.stock,
-                item.product.categoria || "Ropa"
-            ];
-        });
-
-        autoTable(doc, {
-            startY: 50,
-            head: [["Producto", "Stock actual", "Precio Unitario", "Ingresos", "Categoría"]],
-            body: ingresos,
-            styles: { fontSize: 10 },
-            headStyles: { fillColor: [242, 140, 40] },
-        });
-
-        let y = (doc as any).lastAutoTable.finalY + 10;
-
-        // Tabla 2: Variantes Nuevas
-        if (variantData.length > 0) {
-            doc.setFontSize(12);
-            doc.setTextColor(0);
-            doc.text("Variantes Nuevas", 14, y);
-
-            y += 5;
-            const variantesBody = variantData.flatMap(v =>
-                v.combinaciones.map(c => [
-                    v.product.nombre_producto,
-                    Object.entries(c.variantes).map(([k, v]) => `${k}: ${v}`).join(" / "),
-                    c.stock,
-                    c.precio
-                ])
-            );
-
-            autoTable(doc, {
-                startY: y + 5,
-                head: [["Producto", "Variantes", "Stock", "Precio"]],
-                body: variantesBody,
-                styles: { fontSize: 10 },
-                headStyles: { fillColor: [242, 140, 40] },
-            });
-
-            y = (doc as any).lastAutoTable.finalY + 10;
-        }
-
-        // Tabla 3: Productos Nuevos
-        if (flattenedCombinations.length > 0) {
-            doc.setFontSize(12);
-            doc.setTextColor(0);
-            doc.text("Productos Nuevos", 14, y);
-
-            y += 5;
-            const productosBody = flattenedCombinations.map(c => [
-                c.nombre_producto,
-                c.variantes,
-                c.stock,
-                c.precio
-            ]);
-
-            autoTable(doc, {
-                startY: y + 5,
-                head: [["Producto", "Variantes", "Stock", "Precio"]],
-                body: productosBody,
-                styles: { fontSize: 10 },
-                headStyles: { fillColor: [242, 140, 40] },
-            });
-        }
-
-        doc.save(`Comprobante_Ingresos_${Date.now()}.pdf`);
-        setLoadingPDF(false);
-    };
-
     return (
         <>
             {loadingPDF && (
@@ -315,12 +217,29 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                     loading={loadingPDF}
                     disabled={loadingPDF}
                     onClick={async () => {
-                        await generatePDF("Juan Pérez");
-                        await saveProducts();
+                        setLoadingPDF(true);
+
+                        try {
+                            await generateIngressPDFAPI({
+                                sellerName: "Juan Pérez",
+                                sucursalNombre: "Prado",
+                                ingresos: stockData, // <--- este nombre debe coincidir con el que espera el backend
+                                variantes: variantData,
+                                productos: flattenedCombinations,
+                                sucursalId
+                            });
+                            await saveProducts();
+                        } catch (err) {
+                            message.error("Error al generar el PDF.");
+                            console.error("❌ Error PDF:", err);
+                        } finally {
+                            setLoadingPDF(false);
+                        }
                     }}
                 >
                     Confirmar
                 </Button>
+
             ]}
             width={900}
         >
