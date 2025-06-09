@@ -10,6 +10,7 @@ interface CustomTableProps {
   onUpdateProduct: (id: string, fields: any) => void;
   handleValueChange: (key: any, field: any, value: any) => void;
   showClient: boolean;
+  allowActions?: boolean;
   onUpdateTotalAmount: (total: number) => void;
   isAdmin: boolean;
 }
@@ -21,6 +22,7 @@ const CustomTable = ({
   onUpdateTotalAmount,
   handleValueChange,
   showClient,
+  allowActions = false,
   isAdmin,
 }: CustomTableProps) => {
   const totalAmount = data.reduce((acc, product) => {
@@ -67,7 +69,7 @@ const CustomTable = ({
       title: "Precio Unitario",
       dataIndex: "precio_unitario",
       key: "precio_unitario",
-      render: (_: any, record: any) => (
+      render: (_: any, record: any) => (allowActions ? (
         <EditableCellInputNumber
           isAdmin={isAdmin}
           value={record.precio_unitario}
@@ -75,7 +77,7 @@ const CustomTable = ({
           onChange={(value) =>
             handleValueChange(record.key, "precio_unitario", value)
           }
-        />
+        />) : `Bs. ${record.precio_unitario}`
       ),
       className: "text-mobile-sm xl:text-desktop-sm",
     },
@@ -83,7 +85,7 @@ const CustomTable = ({
       title: "Cantidad",
       dataIndex: "cantidad",
       key: "cantidad",
-      render: (_: any, record: any) => (
+      render: (_: any, record: any) => ( allowActions ? (
         <EditableCellInputNumber
           isAdmin={isAdmin}
           value={record.cantidad}
@@ -91,7 +93,7 @@ const CustomTable = ({
           onChange={(value) =>
             handleValueChange(record.key, "cantidad", value)
           }
-        />
+        /> ) : `Bs. ${record.cantidad}`
       ),
       className: "text-mobile-sm xl:text-desktop-sm",
     },
@@ -112,12 +114,13 @@ const CustomTable = ({
       key: showClient ? "cliente" : "tipo",
       className: "text-mobile-sm xl:text-desktop-sm",
     },
-    ...(isAdmin
+    ...(isAdmin && allowActions
       ? [
         {
           title: "Acción",
           key: "action",
           render: (_: any, record: any) => (
+
             <div className="flex gap-2">
               {/* Confirmación de guardar */}
               <Popconfirm
