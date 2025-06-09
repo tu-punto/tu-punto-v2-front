@@ -94,16 +94,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const fetchSales = async () => {
     try {
       const res = await getSalesBySellerIdAPI(seller.key);
-      const productos: any[] = Array.isArray(res) ? res : [];
-      const pedidosIds = productos.map(p => p.id_pedido);
+      const sales: any[] = Array.isArray(res) ? res : [];
+      const sucursalId = localStorage.getItem('sucursalId')
+      const filteredSales = sales.filter(sale => sale.id_sucursal === sucursalId);
+      const pedidosIds = filteredSales.map(s => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
 
       const shipRes = await getShipingByIdsAPI(uniquePedidos.map(pedido => pedido._id));
 
-      const final = productos.map(prod => {
+      const final = filteredSales.map(sale => {
         const lugarEntrega =
           shipRes.success &&
-          shipRes.data.find((p: any) => p.id_pedido === prod.id_pedido)
+          shipRes.data.find((s: any) => s.id_pedido === sale.id_pedido)
             ?.lugar_entrega;
 
         const esVenta = lugarEntrega &&
@@ -111,10 +113,10 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
             s.nombre.toLowerCase() === lugarEntrega.toLowerCase());
 
         return {
-          ...prod,
+          ...sale,
           tipo: esVenta ? 'Venta' : 'Pedido',
-          subtotal: prod.precio_unitario * prod.cantidad,
-          key: `${prod.id_producto}-${prod.fecha_pedido}`,
+          subtotal: sale.precio_unitario * sale.cantidad,
+          key: `${sale.id_producto}-${sale.fecha_pedido}`,
         };
       });
 
