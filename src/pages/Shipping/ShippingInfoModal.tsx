@@ -16,53 +16,80 @@ import useEditableTable from '../../hooks/useEditableTable';
 import {
     addTemporaryProductsToShippingAPI, updateShippingAPI
 } from '../../api/shipping';
-import { UserOutlined, PhoneOutlined, CommentOutlined } from "@ant-design/icons";
+import {UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined} from "@ant-design/icons";
 import { useWatch } from 'antd/es/form/Form';
+import EditProductsModal from './EditProductsModal';
 
-const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] , isAdmin}: any) => {
+const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
     const [products, setProducts, handleValueChange] = useEditableTable([]);
+    const [originalProducts, setOriginalProducts] = useState<any[]>([]);
     const [deletedProducts, setDeletedProducts] = useState<string[]>([]);
+    const [tempModalVisible, setTempModalVisible] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
     const [adelantoVisible, setAdelantoVisible] = useState(false);
-    const [tempModalVisible, setTempModalVisible] = useState(false);
     const [quienPaga, setQuienPaga] = useState<string | null>(null);
     const [montoDelivery, setMontoDelivery] = useState(0);
     const [costoDelivery, setCostoDelivery] = useState(0);
-    const [adelantoClienteInput, setAdelantoClienteInput] = useState<number>(0);
+    //const [adelantoClienteInput, setAdelantoClienteInput] = useState<number>(0);
     const [isDeliveryPlaceInput, setIsDeliveryPlaceInput] = useState(false);
-    const { data } = useProducts();
-    const [loading, setLoading] = useState(false);
-    const [estadoPedido, setEstadoPedido] = useState('En Espera');
+    const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [qrInput, setQrInput] = useState<number>(0);
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [showWarning, setShowWarning] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const { data } = useProducts();
+    const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
+    const adelantoCliente = useWatch('adelanto_cliente', internalForm);
 
-    const selectedSucursal = sucursals[0]?.nombre?.trim().toLowerCase();
     const lugarEntrega = useWatch('lugar_entrega', internalForm);
-    const origenEsIgualADestino = lugarEntrega?.trim()?.toLowerCase() === selectedSucursal;
-    const adelantoCliente = useWatch('adelanto_cliente', internalForm) || 0;
-    const pagadoAlVendedor = useWatch('pagado_al_vendedor', internalForm); // '3' = Pago Adelanto
-    const cargoDelivery = useWatch('cargo_delivery', internalForm) || 0;
-    const quienPagaDelivery = useWatch('quien_paga_delivery', internalForm);
-    const hideDeliveryFields = quienPagaDelivery === 'tupunto';
+    const origenEsIgualADestino = lugarEntrega?.trim()?.toLowerCase() === sucursals?.[0]?.nombre?.trim().toLowerCase();
 
-    const adelantoValido = pagadoAlVendedor === '3' ? adelantoCliente : 0;
-    const deliveryExtra = quienPagaDelivery === 'comprador' ? cargoDelivery : 0;
-    const saldoACobrar = totalAmount - adelantoValido + deliveryExtra;
+    const saldoACobrar = useMemo(() => {
+        const deliveryAdicional = internalForm.getFieldValue("quien_paga_delivery") === "comprador" ? montoDelivery : 0;
+        const adelanto = adelantoCliente || 0;
+        return parseFloat((totalAmount - adelanto + deliveryAdicional).toFixed(2));
+    }, [totalAmount, montoDelivery, adelantoCliente, internalForm]);
+    const handleDeleteProduct = (key: any) => {
+        setProducts((prev: any) => {
+            const toDelete = prev.find((p: any) => p.key === key);
+            if (toDelete?.id_venta) setDeletedProducts((prevDels) => [...prevDels, toDelete.id_venta]);
+            return prev.filter((p: any) => p.key !== key);
+        });
+    };
+    useEffect(() => {
+        if ((adelantoCliente ?? 0) < 0) {
+            message.warning("El adelanto no puede ser negativo.");
+            internalForm.setFieldValue("adelanto_cliente", 0);
+        }
+    }, [adelantoCliente]);
 
+    useEffect(() => {
+        if (tipoPago === '3') {
+            internalForm.setFieldValue("adelanto_cliente", 0);
+        }
+    }, [tipoPago]);
+
+    useEffect(() => {
+        const estado = internalForm.getFieldValue("estado_pedido");
+        if (estado === "Entregado") {
+            internalForm.setFieldsValue({
+                fecha_pedido: dayjs(),
+                hora_entrega_acordada: dayjs()
+            });
+        }
+    }, [internalForm.getFieldValue("estado_pedido")]);
 
     useEffect(() => {
         if (!visible || !shipping) return;
 
         internalForm.resetFields();
-
         const lugar_entrega = sucursals.find(s => s.nombre === shipping.lugar_entrega)
             ? shipping.lugar_entrega
             : 'otro';
 
-        const prefill = {
+        internalForm.setFieldsValue({
             cliente: shipping.cliente,
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
@@ -75,13 +102,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
             cargo_delivery: shipping.cargo_delivery,
             costo_delivery: shipping.costo_delivery,
             adelanto_cliente: shipping.adelanto_cliente,
-            pagado_al_vendedor: shipping.pagado_al_vendedor ? '3' : '2',
             tipo_de_pago: shipping.tipo_de_pago || null,
             subtotal_qr: shipping.subtotal_qr || 0,
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
-        };
+            esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
+        });
 
-        internalForm.setFieldsValue(prefill);
         setAdelantoVisible(!!shipping.adelanto_cliente);
         setEstadoPedido(shipping.estado_pedido);
         setTipoPago(shipping.tipo_de_pago || null);
@@ -91,10 +117,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
         setCostoDelivery(shipping.costo_delivery || 0);
         setQuienPaga(shipping.quien_paga_delivery || null);
         setIsDeliveryPlaceInput(lugar_entrega === 'otro');
+
         if (!origenEsIgualADestino && !shipping.quien_paga_delivery) {
             internalForm.setFieldValue('quien_paga_delivery', 'comprador');
             setQuienPaga('comprador');
         }
+
         const ventas = [...(shipping.venta || []), ...(shipping.productos_temporales || [])];
         const enriched = ventas.map((p: any) => ({
             ...p,
@@ -102,12 +130,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
         }));
         setProducts(enriched);
     }, [visible, shipping, sucursals]);
-    useEffect(() => {
-        const estado = shipping?.estado_pedido;
-        const tipo = shipping?.tipo_de_pago;
-        if (estado) setEstadoPedido(estado);
-        if (tipo) setTipoPago(tipo);
-    }, [shipping]);
+
     useEffect(() => {
         const monto = saldoACobrar || 0;
         const suma = (qrInput || 0) + (efectivoInput || 0);
@@ -137,44 +160,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
             setEfectivoInput(saldoACobrar - mitad);
         }
     }, [tipoPago, saldoACobrar, internalForm]);
+    useEffect(() => {
+        const recalculated = products.reduce((acc: number, p: any) => {
+            return acc + (p.precio_unitario * p.cantidad);
+        }, 0);
+        setTotalAmount(parseFloat(recalculated.toFixed(2)));
+    }, [products]);
 
-    const handleProductSelect = (value: any) => {
-        const selectedProduct = data.find((p: any) => p.key === value);
-        if (selectedProduct) {
-            const key = `${selectedProduct.id_producto}-${Object.values(selectedProduct.variantes || {}).join("-") || "default"}`;
-            setProducts((prev: any) => {
-                if (!prev.find((p: any) => p.key === key)) {
-                    return [...prev, {
-                        key,
-                        producto: selectedProduct.producto,
-                        cantidad: 1,
-                        precio_unitario: selectedProduct.precio,
-                        utilidad: 1,
-                        id_producto: selectedProduct.id_producto,
-                        id_vendedor: selectedProduct.id_vendedor,
-                        variantes: selectedProduct.variantes,
-                        nombre_variante: selectedProduct.producto,
-                    }];
-                }
-                return prev;
-            });
-        }
-    };
-
-    const handleDeleteProduct = (key: any) => {
-        setProducts((prev: any) => {
-            const toDelete = prev.find((p: any) => p.key === key);
-            if (toDelete?.id_venta) setDeletedProducts((prevDels) => [...prevDels, toDelete.id_venta]);
-            return prev.filter((p: any) => p.key !== key);
-        });
-    };
 
     const handleSave = async (values: any) => {
+        setLoading(true);
         const newProducts = products.filter((p: any) => !p.id_venta);
         const existingProducts = products.filter((p: any) => p.id_venta);
         const productosTemporales = newProducts.filter((p: any) => p.esTemporal);
         const sucursalId = localStorage.getItem('sucursalId');
-        console.log("🛂 sucursalId:", sucursalId);
+
         const formattedNewProducts = newProducts.filter((p: any) => !p.esTemporal && p.id_producto?.length === 24)
             .map((p: any) => ({
                 cantidad: p.cantidad,
@@ -187,55 +187,31 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                 deposito_realizado: false,
                 nombre_variante: p.nombre_variante || p.producto,
             }));
-        console.log("🛒 formattedNewProducts:", formattedNewProducts);
-        if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
-        if (productosTemporales.length > 0) await addTemporaryProductsToShippingAPI(shipping._id, productosTemporales);
-        if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
-        if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
 
-        const updateShippingInfo: any = {
-            ...values,
-            lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
-            fecha_pedido: values.fecha_pedido?.format('YYYY-MM-DD HH:mm:ss'),
-            hora_entrega_acordada: values.hora_entrega_acordada
-                ? dayjs(values.hora_entrega_acordada).toDate()
-                : null,
-            pagado_al_vendedor: values.pagado_al_vendedor === '3',
-        };
+        try {
+            if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
+            if (productosTemporales.length > 0) await addTemporaryProductsToShippingAPI(shipping._id, productosTemporales);
+            if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
+            if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
 
-        await updateShippingAPI(updateShippingInfo, shipping._id);
-        message.success("Pedido actualizado con éxito");
-        onSave();
-        onClose();
-    };
-    //console.log("🛂 isAdmin:", isAdmin);
-    useEffect(() => {
-        const adelantoValido = pagadoAlVendedor === '3' ? adelantoCliente : 0;
-        const deliveryExtra = quienPagaDelivery === 'comprador' ? cargoDelivery : 0;
-        const saldo = totalAmount - adelantoValido + deliveryExtra;
+            const updateShippingInfo: any = {
+                ...values,
+                lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
+                fecha_pedido: values.fecha_pedido?.format('YYYY-MM-DD HH:mm:ss'),
+                hora_entrega_acordada: values.hora_entrega_acordada ? dayjs(values.hora_entrega_acordada).toDate() : null,
+                pagado_al_vendedor: values.esta_pagado === 'adelanto',
+            };
 
-        // Setear valores en el formulario visualmente
-        internalForm.setFieldValue("saldo_cobrar", saldo);
-
-        if (tipoPago === '1') {
-            internalForm.setFieldsValue({ subtotal_qr: saldo });
-            setQrInput(saldo);
-            setEfectivoInput(0);
-        } else if (tipoPago === '2' || tipoPago === '3') {
-            internalForm.setFieldsValue({ subtotal_efectivo: saldo });
-            setQrInput(0);
-            setEfectivoInput(saldo);
-        } else if (tipoPago === '4') {
-            const mitad = parseFloat((saldo / 2).toFixed(2));
-            internalForm.setFieldsValue({
-                subtotal_qr: mitad,
-                subtotal_efectivo: saldo - mitad
-            });
-            setQrInput(mitad);
-            setEfectivoInput(saldo - mitad);
+            await updateShippingAPI(updateShippingInfo, shipping._id);
+            message.success("Pedido actualizado con éxito");
+            onSave();
+            onClose();
+        } catch (error) {
+            message.error("Ocurrió un error al guardar los cambios");
+        } finally {
+            setLoading(false);
         }
-    }, [totalAmount, pagadoAlVendedor, adelantoCliente, cargoDelivery, quienPagaDelivery, tipoPago]);
-
+    };
     return (
         <Modal
             title={`Detalles del Pedido ${shipping?._id || ''}`}
@@ -248,8 +224,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                 form={internalForm}
                 layout="vertical"
                 onFinish={handleSave}
-                disabled={isAdmin === false}
+                disabled={!isAdmin}
+
             >
+                {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false}>
                     <Row gutter={16}>
                         <Col span={12}>
@@ -259,44 +237,65 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                         </Col>
                         <Col span={12}>
                             <Form.Item name="telefono_cliente" label="Celular" rules={[{ required: true }]}>
-                                <Input prefix={<PhoneOutlined />} />
+                                <Input
+                                    prefix={<PhoneOutlined />}
+                                    onKeyDown={(e) => {
+                                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'].includes(e.key)) {
+                                            e.preventDefault();
+                                        }
+                                    }}
+                                />
                             </Form.Item>
                         </Col>
                     </Row>
                 </Card>
-
+                {/* DATOS DEL PEDIDO */}
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name="fecha_pedido" label="Fecha Pedido" rules={[{ required: true }]}>
+                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
                             <Form.Item name="hora_entrega_acordada" label="Hora Entrega">
-                                <TimePicker format="HH:mm" style={{ width: '100%' }} />
+                                <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
                     </Row>
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="lugar_entrega" label="Lugar de Entrega" rules={[{ required: true }]}>
-                                <Select onChange={(value) => setIsDeliveryPlaceInput(value === 'otro')} disabled={!isAdmin}>
-                                    {[...sucursals.map(s => ({ value: s.nombre, label: s.nombre })), { value: 'otro', label: 'Otro' }]
-                                        .map(opt => (
-                                            <Select.Option key={opt.value} value={opt.value}>{opt.label}</Select.Option>
-                                        ))}
-                                </Select>
+                                {isDeliveryPlaceInput ? (
+                                    <div className='flex align-middle gap-2'>
+                                        <Input placeholder='Escriba el lugar de entrega' />
+                                        <Button
+                                            onClick={() => {
+                                                setIsDeliveryPlaceInput(false);
+                                                internalForm.resetFields(['lugar_entrega']);
+                                            }}
+                                        >
+                                            Volver a seleccionar
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <Select
+                                        placeholder="Seleccione el lugar de entrega"
+                                        allowClear
+                                        style={{ width: '100%' }}
+                                        onChange={(value) => {
+                                            if (value === 'otro') setIsDeliveryPlaceInput(true);
+                                        }}
+                                        options={[
+                                            ...sucursals.map((s: any) => ({
+                                                value: s.nombre,
+                                                label: s.nombre,
+                                            })),
+                                            { value: "otro", label: "Otro" }
+                                        ]}
+                                    />
+                                )}
                             </Form.Item>
-                            {isDeliveryPlaceInput && (
-                                <Form.Item
-                                    name="lugar_entrega_input"
-                                    label="Especifique Lugar de Entrega"
-                                    rules={[{ required: true }]}
-                                >
-                                    <Input placeholder="Especifique Lugar de Entrega" />
-                                </Form.Item>
-                            )}
                         </Col>
                     </Row>
                     <Row gutter={16}>
@@ -307,8 +306,23 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                         </Col>
                     </Row>
                 </Card>
-
-                <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}>
+                {/* PRODUCTOS */}
+                <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}
+                      extra={
+                          isAdmin && (
+                              <Button
+                                  icon={<EditOutlined />}
+                                  onClick={() => {
+                                      setOriginalProducts(products); // backup
+                                      setEditProductsModalVisible(true);
+                                  }}
+                                  type="link"
+                              >
+                                  Editar Productos
+                              </Button>
+                          )
+                      }
+                >
                     <EmptySalesTable
                         products={products}
                         onDeleteProduct={isAdmin ? handleDeleteProduct : undefined}
@@ -316,94 +330,51 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                         handleValueChange={handleValueChange}
                         sellers={[]}
                     />
-                    {isAdmin && (
-                        <div className="flex gap-2 mt-4">
-                            <Form.Item name="productos_lista" label="Producto" className="flex-grow">
-                                <Select
-                                    onChange={handleProductSelect}
-                                    placeholder="Selecciona un producto"
-                                    showSearch
-                                    filterOption={(input, option: any) =>
-                                        option?.label?.toLowerCase().includes(input.toLowerCase())
-                                    }
-                                >
-                                    {data.map((product: any) => (
-                                        <Select.Option key={product.key} value={product.key} label={product.producto}>
-                                            {product.producto}
-                                        </Select.Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-                            <Button onClick={() => setTempModalVisible(true)}>Agregar Temporal</Button>
-                        </div>
-                    )}
                 </Card>
 
-                <Card title="Detalles del Pago" bordered={false} style={{ marginTop: 16 }}>
+                <TempProductModal
+                    visible={tempModalVisible}
+                    onCancel={() => setTempModalVisible(false)}
+                    onAddProduct={(tempProduct: any) => setProducts((prev: any) => [...prev, tempProduct])}
+                />
+                {/* DETALLES DEL PAGO */}
+                <Card
+                    title={
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Detalles del Pago</span>
+                            <span style={{ fontWeight: 'bold' }}>Monto total: Bs. {totalAmount.toFixed(2)}</span>
+                        </div>
+                    }
+                    bordered={false}
+                    style={{ marginTop: 16 }}
+                >
+                    {/* ¿Está ya pagado? */}
                     <Row gutter={16}>
                         <Col span={24}>
-                            <Form.Item name="pagado_al_vendedor" label="¿Está ya pagado?">
-                                <Radio.Group onChange={(e) => setAdelantoVisible(e.target.value === '3')}>
-                                    <Radio.Button value="1">Sí</Radio.Button>
-                                    <Radio.Button value="2">No</Radio.Button>
-                                    <Radio.Button value="3">Pago Adelanto</Radio.Button>
+                            <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
+                                <Radio.Group
+                                    onChange={(e) => {
+                                        setAdelantoVisible(e.target.value === 'adelanto');
+                                        if (e.target.value !== 'adelanto') {
+                                            internalForm.setFieldValue("adelanto_cliente", 0);
+                                        }
+                                    }}
+                                >
+                                    <Radio.Button value="si">Sí</Radio.Button>
+                                    <Radio.Button value="no">No</Radio.Button>
+                                    <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
                         </Col>
                     </Row>
 
-                    {pagadoAlVendedor === '3' && (
+                    {adelantoVisible && (
                         <Row gutter={16}>
                             <Col span={24}>
-                                <Form.Item name="adelanto_cliente" label="Monto Adelanto" rules={[{ required: true }]}>
-                                    <InputNumber prefix="Bs." style={{ width: '100%' }} />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    )}
-
-                    <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                        <Radio.Group value={estadoPedido} disabled>
-                            <Radio.Button value="En Espera">En espera</Radio.Button>
-                            <Radio.Button value="Entregado">Entregado</Radio.Button>
-                        </Radio.Group>
-                    </Form.Item>
-
-                    <Row gutter={16}>
-                        <Col span={24}>
-                            {!origenEsIgualADestino && (
-                                <Form.Item name="quien_paga_delivery" label="¿Quién paga el delivery?">
-                                    <Radio.Group onChange={(e) => setQuienPaga(e.target.value)}>
-                                        <Radio.Button value="comprador">Comprador</Radio.Button>
-                                        <Radio.Button value="vendedor">Vendedor</Radio.Button>
-                                        <Radio.Button value="tupunto">Tu Punto</Radio.Button>
-                                    </Radio.Group>
-                                </Form.Item>
-                            )}
-
-                        </Col>
-                    </Row>
-
-                    {quienPaga && (
-                        <Row gutter={16}>
-                            {!hideDeliveryFields && (
-                                <Col span={12}>
-                                    <Form.Item name="cargo_delivery" label="Monto cobrado por Delivery">
-                                        <InputNumber
-                                            prefix="Bs."
-                                            value={montoDelivery}
-                                            onChange={setMontoDelivery}
-                                            style={{ width: '100%' }}
-                                        />
-                                    </Form.Item>
-                                </Col>
-                            )}
-                            <Col span={12}>
-                                <Form.Item name="costo_delivery" label="Costo de realizar el Delivery">
+                                <Form.Item name="adelanto_cliente" label="Monto del adelanto" rules={[{ required: true }]}>
                                     <InputNumber
                                         prefix="Bs."
-                                        value={costoDelivery}
-                                        onChange={setCostoDelivery}
+                                        min={0}
                                         style={{ width: '100%' }}
                                     />
                                 </Form.Item>
@@ -411,15 +382,93 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                         </Row>
                     )}
 
+                    {/* Estado del Pedido */}
                     <Row gutter={16}>
                         <Col span={24}>
-                            <Form.Item label="Saldo a Cobrar">
-                                <Input prefix="Bs." readOnly value={Number(internalForm.getFieldValue("saldo_cobrar") || 0).toFixed(2)} style={{ width: '100%' }} />
+                            <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
+                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "En Espera"}>
+                                    <Radio.Button value="En Espera">En espera</Radio.Button>
+                                    <Radio.Button value="Entregado">Entregado</Radio.Button>
+                                </Radio.Group>
                             </Form.Item>
                         </Col>
                     </Row>
 
-                    {estadoPedido === 'Entregado' && (
+                    {/* ¿Quién paga el delivery? */}
+                    {!origenEsIgualADestino && (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item
+                                        name="quien_paga_delivery"
+                                        label="¿Quién paga el delivery?"
+                                        rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}
+                                    >
+                                        <Radio.Group
+                                            onChange={(e) => {
+                                                setQuienPaga(e.target.value);
+                                                internalForm.setFieldValue("quien_paga_delivery", e.target.value);
+                                            }}
+                                        >
+                                            <Radio.Button value="comprador">COMPRADOR</Radio.Button>
+                                            <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
+                                            <Radio.Button value="tupunto">Tu Punto</Radio.Button>
+                                        </Radio.Group>
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+
+                            <Row gutter={16}>
+                                {quienPaga !== "tupunto" && (
+                                    <Col span={12}>
+                                        <Form.Item
+                                            name="cargo_delivery"
+                                            label="Monto cobrado por el Delivery"
+                                            rules={[{ required: true }]}
+                                        >
+                                            <InputNumber
+                                                prefix="Bs."
+                                                value={montoDelivery}
+                                                onChange={val => setMontoDelivery(val ?? 0)}
+                                                style={{ width: '100%' }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                )}
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="costo_delivery"
+                                        label="Costo de realizar el Delivery"
+                                        rules={[{ required: true }]}
+                                    >
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={costoDelivery}
+                                            onChange={val => setCostoDelivery(val ?? 0)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </>
+                    )}
+
+                    {/* Saldo a cobrar */}
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item label="Saldo a Cobrar">
+                                <Input
+                                    prefix="Bs."
+                                    readOnly
+                                    value={saldoACobrar.toFixed(2)}
+                                    style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    {/* Tipo de pago */}
+                    {estadoPedido === "Entregado" && (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>
@@ -434,53 +483,34 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                                 </Col>
                             </Row>
 
-                            {tipoPago === '1' && (
+                            {["1", "2"].includes(tipoPago || "") && (
                                 <Row gutter={16}>
                                     <Col span={24}>
-                                        <Form.Item label="Subtotal QR" name="subtotal_qr">
-                                            <InputNumber prefix="Bs." value={saldoACobrar} readOnly style={{ width: '100%' }} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
-                            )}
-
-                            {tipoPago === '2' && (
-                                <Row gutter={16}>
-                                    <Col span={24}>
-                                        <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                                            <InputNumber prefix="Bs." value={saldoACobrar} readOnly style={{ width: '100%' }} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
-                            )}
-
-                            {tipoPago === '4' && (
-                                <Row gutter={16}>
-                                    <Col span={12}>
-                                        <Form.Item
-                                            label="Subtotal QR"
-                                            name="subtotal_qr"
-                                            rules={[
-                                                { required: true, message: 'Debe ingresar un valor en QR' },
-                                                {
-                                                    validator: (_, value) =>
-                                                        value <= 0
-                                                            ? Promise.reject("El monto QR debe ser mayor a 0")
-                                                            : value >= saldoACobrar
-                                                                ? Promise.reject("El monto QR debe ser menor al total")
-                                                                : Promise.resolve()
-                                                }
-                                            ]}
-                                        >
+                                        <Form.Item label={tipoPago === "1" ? "Subtotal QR" : "Subtotal Efectivo"}>
                                             <InputNumber
                                                 prefix="Bs."
-                                                min={0.1}
+                                                value={saldoACobrar}
+                                                readOnly
+                                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            )}
+
+                            {tipoPago === "4" && (
+                                <Row gutter={16}>
+                                    <Col span={12}>
+                                        <Form.Item label="Subtotal QR" name="subtotal_qr">
+                                            <InputNumber
+                                                prefix="Bs."
+                                                min={0.01}
                                                 max={saldoACobrar - 0.01}
                                                 value={qrInput}
                                                 onChange={(val) => {
                                                     const qr = val ?? 0;
-                                                    setQrInput(qr);
                                                     const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
+                                                    setQrInput(qr);
                                                     setEfectivoInput(efectivo);
                                                     internalForm.setFieldValue('subtotal_efectivo', efectivo);
                                                 }}
@@ -490,7 +520,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                                     </Col>
                                     <Col span={12}>
                                         <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                                            <InputNumber prefix="Bs." value={efectivoInput} readOnly style={{ width: '100%' }} />
+                                            <InputNumber
+                                                prefix="Bs."
+                                                value={efectivoInput}
+                                                readOnly
+                                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                            />
                                         </Form.Item>
                                     </Col>
                                     {showWarning && (
@@ -506,23 +541,26 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [] 
                     )}
                 </Card>
 
-                {isAdmin && (
-                    <Form.Item style={{ marginTop: 16 }}>
-                        <Button type="primary" htmlType="submit" loading={loading}>
-                            Guardar
-                        </Button>
-                    </Form.Item>
-                )}
-
-                <TempProductModal
-                    visible={tempModalVisible}
-                    onCancel={() => setTempModalVisible(false)}
-                    onAddProduct={(tempProduct: any) => setProducts((prev: any) => [...prev, tempProduct])}
-                />
             </Form>
+            {isAdmin && (
+                <div style={{ marginTop: 24, textAlign: 'right' }}>
+                    <Button type="primary" loading={loading} onClick={() => internalForm.submit()}>
+                        Guardar Cambios
+                    </Button>
+                </div>
+            )}
+
+            <EditProductsModal
+                visible={editProductsModalVisible}
+                onCancel={() => setEditProductsModalVisible(false)}
+                products={products as any[]}
+                setProducts={setProducts}
+                allProducts={data}
+                sellers={[]} // pásalo si necesitas calcular utilidad
+            />
+
         </Modal>
     );
-
 };
 
 export default ShippingInfoModal;
