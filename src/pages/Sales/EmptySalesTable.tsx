@@ -5,23 +5,17 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
     const [updatedProducts, setUpdatedProducts] = useState(products);
 
     useEffect(() => {
-        const withUtilidades = products.map((product: any, i: number) => {
+        const withUtilidades = products.map((product: any) => {
             const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
-            const comision = Number(vendedor?.comision_porcentual) || 0;
-            const cantidad = product.cantidad || 0;
-            const precio = product.precio_unitario || 0;
+            const comision = Number(vendedor?.comision_porcentual || 0);
+            const cantidad = Number(product.cantidad || 0);
+            const precio = Number(product.precio_unitario || 0);
             const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
-
-            //console.log(`[${i}] Producto:`, product.producto);
-            //console.log(` - Precio: ${precio}, Cantidad: ${cantidad}, Comisión: ${comision}`);
-            //console.log(` - Utilidad calculada: ${utilidadCalculada}`);
-            //console.log(` - Utilidad existente: ${product.utilidad}`);
 
             return {
                 ...product,
                 utilidad:
-                    product.utilidad !== undefined &&
-                    product.utilidad !== 1
+                    product.utilidad !== undefined && product.utilidad !== 1
                         ? product.utilidad
                         : utilidadCalculada,
             };
