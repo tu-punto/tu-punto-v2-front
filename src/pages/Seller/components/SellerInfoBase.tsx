@@ -95,14 +95,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     try {
       const res = await getSalesBySellerIdAPI(seller.key);
       const sales: any[] = Array.isArray(res) ? res : [];
-      const sucursalId = localStorage.getItem('sucursalId')
-      const filteredSales = sales.filter(sale => sale.id_sucursal === sucursalId);
-      const pedidosIds = filteredSales.map(s => s.id_pedido);
+      const pedidosIds = sales.map(s => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
 
       const shipRes = await getShipingByIdsAPI(uniquePedidos.map(pedido => pedido._id));
 
-      const final = filteredSales.map(sale => {
+      const final = sales.map(sale => {
         const lugarEntrega =
           shipRes.success &&
           shipRes.data.find((s: any) => s.id_pedido === sale.id_pedido)
