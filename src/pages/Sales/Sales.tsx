@@ -300,7 +300,7 @@ export const Sales = () => {
                                             style={{ width: 200 }}
                                             allowClear
                                         />
-                                        { !isAdmin && (
+                                        {!isAdmin && (
                                             <Select
                                                 placeholder="Sucursal"
                                                 value={selectedBranchId}
@@ -313,7 +313,7 @@ export const Sales = () => {
                                                 allowClear
                                             />
                                         )}
-                                            <Button
+                                        <Button
                                             type="primary"
                                             onClick={() => setProductAddModal(true)}
                                             className="text-mobile-base xl:text-desktop-sm "
@@ -325,7 +325,7 @@ export const Sales = () => {
                                                 placeholder="Selecciona un vendedor"
                                                 options={sellers.map((vendedor: any) => ({
                                                     value: vendedor._id,
-                                                    label: vendedor.nombre+" "+vendedor.apellido,
+                                                    label: vendedor.nombre + " " + vendedor.apellido,
                                                 }))}
                                                 filterOption={(input, option: any) =>
                                                     option.label.toLowerCase().includes(input.toLowerCase())

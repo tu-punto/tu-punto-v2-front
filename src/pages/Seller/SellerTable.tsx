@@ -97,7 +97,6 @@ export default function SellerTable({
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
 
-          const saldoPendiente = await fetchSaldoPendiente(seller._id);
           const date = new Date(seller.fecha);
           const finish_date = new Date(seller.fecha_vigencia);
           const mensual = seller.pago_sucursales.reduce(
@@ -116,8 +115,8 @@ export default function SellerTable({
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
             deuda: seller.deuda,
-            pagoTotal: `Bs. ${saldoPendiente - seller.deuda}`,
-            pagoTotalInt: saldoPendiente - seller.deuda,
+            pagoTotal: `Bs. ${seller.saldo_pendiente - seller.deuda}`,
+            pagoTotalInt: seller.saldo_pendiente - seller.deuda,
             pago_mensual: `Bs. ${mensual}`,
           };
         })
