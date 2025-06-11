@@ -19,6 +19,7 @@ import { IBranch } from "../../models/branchModel";
 export const Sales = () => {
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role === 'admin';
+    //console.log ("🚀 user en Sales:", user);
 
     const [modalType, setModalType] = useState<'sales' | 'shipping' | null>(null);
     const [productAddModal, setProductAddModal] = useState(false);
@@ -389,6 +390,7 @@ export const Sales = () => {
                             onUpdateTotalAmount={updateTotalAmount}
                             key={refreshKey}
                             sellers={sellers}
+                            isAdmin={isAdmin}
                         />
                     </Card>
                 </Col>
@@ -398,8 +400,11 @@ export const Sales = () => {
                 onCancel={handleProductModalCancel}
                 onSuccess={handleSuccessProductModal}
                 onAddProduct={handleAddProduct}
-                selectedSeller={sellers.find((s: any) => s._id === selectedSellerId) || null}
-            />
+                selectedSeller={
+                    isAdmin
+                        ? sellers.find((s: any) => s._id === selectedSellerId) || null
+                        : { _id: user?.id_vendedor, nombre: user?.nombre_vendedor?.split(" ")[0] || "", apellido: user?.nombre_vendedor?.split(" ")[1] || "" }
+                }            />
             <SalesFormModal
                 visible={modalType === "sales"}
                 onCancel={handleCancel}
