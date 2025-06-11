@@ -192,16 +192,25 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   /* ─────────── valores para Stats ─────────── */
+  const pedidosProcesados = new Set()
+
   const saldoPendiente = salesData.reduce((acc, sale) => {
     if (sale.deposito_realizado) return acc;
+
     let subtotalDeuda = 0
+
     if (sale.id_pedido.pagado_al_vendedor) {
       subtotalDeuda = -sale.utilidad
     } else {
       subtotalDeuda = sale.subtotal - sale.utilidad;
     }
 
-    return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
+    if (!pedidosProcesados.has(sale.id_pedido._id)) {
+      subtotalDeuda -= sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery
+      pedidosProcesados.add(sale.id_pedido._id)
+    }
+
+    return acc + subtotalDeuda
   }, 0)
 
   const deuda = Number(seller.deuda) || 0;
