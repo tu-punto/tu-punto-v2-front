@@ -51,7 +51,7 @@ const protectedRoutes = [
       {
         path: "/shipping",
         element: (
-          <RoleGuard allowedRoles={["admin"]}>
+          <RoleGuard allowedRoles={["admin", "seller"]}>
             <Shipping />
           </RoleGuard>
         ),

@@ -72,7 +72,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         });
     };
     const columns = [
-        {
+        {/*{
             title: '',
             dataIndex: 'infoButton',
             key: 'infoButton',
@@ -84,7 +84,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         onClick={() => handleIconClick(record)}
                     />
                 )
-        },
+        },*/},
         {
             title: 'Fecha Pedido',
             dataIndex: 'fecha_pedido',
@@ -196,6 +196,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         };
         fetchVendedores();
     }, []);
+    //console.log("Rol", user?.role?.toLowerCase());
     return (
         <div>
             <div style={{ marginBottom: 16 }}>
@@ -321,7 +322,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     setIsModalVisible(false);
                     fetchShippings();
                 }}
-                isAdmin={user?.rol?.toLowerCase?.() !== 'seller'}
+                isAdmin={user?.role?.toLowerCase() === 'admin'}
 
             />
 

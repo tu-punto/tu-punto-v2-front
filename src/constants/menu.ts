@@ -17,7 +17,7 @@ export const menu = [
   { path: "/seller", label: "Vendedores", icon: sellerIcon, roles: ["admin"] },
   //{ path: "/sellerFactura", label: "Vendedores de Factura", icon: sellerIcon, roles: ["admin"] },
   { path: "/sales", label: "Ventas", icon: cartIcon, roles: ["admin"] },
-  { path: "/shipping", label: "Pedidos", icon: shippingIcon, roles: ["admin"] },
+  { path: "/shipping", label: "Pedidos", icon: shippingIcon, roles: ["admin", "seller"] },
   {
     path: "/financeFlux",
     label: "Flujo Financiero",

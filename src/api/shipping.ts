@@ -100,6 +100,15 @@ const getShippingsBySellerIdAPI = async (sellerId: any) => {
     parseError(error as AxiosError);
   }
 };
+const deleteShippingAPI = async (id: string) => {
+  try {
+    const res = await apiClient.delete(`/shipping/${id}`);
+    return { success: true, ...res.data };
+  } catch (error) {
+    return { success: false };
+  }
+};
+
 
 export {
   getShippingsAPI,
@@ -110,4 +119,5 @@ export {
   getShippingByIdAPI,
   getShippingsBySellerIdAPI,
   addTemporaryProductsToShippingAPI,
+  deleteShippingAPI
 };

@@ -504,6 +504,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 onClose={closePriceModal}
                 variantName={selectedVariantName}
                 producto={selectedProductForPrice}
+                onRefresh={onUpdateProducts}
             />
         </Spin>
     );

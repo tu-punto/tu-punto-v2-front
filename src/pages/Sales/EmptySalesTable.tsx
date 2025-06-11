@@ -1,7 +1,7 @@
 import { Button, InputNumber, Table } from "antd";
 import { useEffect, useState } from "react";
 
-const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers }: any) => {
+const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin }: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
 
     useEffect(() => {
@@ -73,20 +73,22 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             ),
             className: "text-mobile-sm xl:text-desktop-sm",
         },
-        {
-            title: 'Utilidad',
-            dataIndex: 'utilidad',
-            key: 'utilidad',
-            render: (_: any, record: any) => (
-                <InputNumber
-                    min={0}
-                    max={record.precio_unitario * record.cantidad}
-                    value={record.utilidad}
-                    onChange={value => handleValueChange(record.key, 'utilidad', value)}
-                    className="text-mobile-sm xl:text-desktop-sm"
-                />
-            ),
-        },
+        ...(isAdmin ? [
+            {
+                title: 'Utilidad',
+                dataIndex: 'utilidad',
+                key: 'utilidad',
+                render: (_: any, record: any) => (
+                    <InputNumber
+                        min={0}
+                        max={record.precio_unitario * record.cantidad}
+                        value={record.utilidad}
+                        onChange={value => handleValueChange(record.key, 'utilidad', value)}
+                        className="text-mobile-sm xl:text-desktop-sm"
+                    />
+                ),
+            }
+        ] : []),
         {
             title: 'Acción',
             key: 'action',

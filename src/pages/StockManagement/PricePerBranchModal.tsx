@@ -9,7 +9,8 @@ const PricePerBranchModal = ({
                                  onClose,
                                  variantName,
                                  producto,
-                             }: {
+                                 onRefresh
+}: {
     visible: boolean;
     onClose: () => void;
     variantName: string;
@@ -87,27 +88,29 @@ const PricePerBranchModal = ({
                 setSaving(true);
                 try {
                     const priceUpdates = dataSource
-                        .filter(item => item.disponible)
+                        .filter(item => item.precio > 0) // o simplemente: true
                         .map((item) => {
-                            const sucursal = producto.sucursales.find(
-                                (s) => (s.id_sucursal?.$oid || s.id_sucursal) === item.key
-                            );
+                            // Si no hay combinación, usamos variantes del variantName (manual)
+                            let variantes = item.variantes;
 
-                            const combinacion = sucursal?.combinaciones.find((c: any) => {
-                                const nombre = Object.entries(c.variantes || {})
-                                    .map(([_, v]) => v)
-                                    .join(' / ');
-                                return nombre === variantName;
-                            });
+                            if (!item.disponible || Object.keys(variantes || {}).length === 0) {
+                                const variantParts = variantName.split(" / ");
+                                const allCombinaciones = producto.sucursales?.flatMap(s => s.combinaciones) || [];
+                                const keysSet = new Set<string>();
+                                allCombinaciones.forEach(c => {
+                                    Object.keys(c.variantes || {}).forEach(k => keysSet.add(k));
+                                });
+                                const keys = Array.from(keysSet);
+                                variantes = Object.fromEntries(keys.map((k, i) => [k, variantParts[i] || ""]));
+                            }
 
                             return {
                                 productId: producto._id?.$oid || producto._id,
                                 sucursalId: item.key,
-                                variantes: combinacion?.variantes || {}, // ✅ aseguramos enviar TODAS las claves
+                                variantes,
                                 precio: item.precio,
                             };
                         });
-
                     console.log("📤 Enviando priceUpdates:", priceUpdates);
 
                     const res = await updateProductPriceAPI(priceUpdates);
@@ -115,6 +118,7 @@ const PricePerBranchModal = ({
                     if (res.success) {
                         message.success('Precios actualizados correctamente');
                         onClose();
+                        onRefresh?.();
                     } else {
                         message.error(res.message || 'Error al actualizar precios');
                     }

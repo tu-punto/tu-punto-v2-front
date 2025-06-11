@@ -27,11 +27,12 @@ function ShippingFormModal({
     const [form] = Form.useForm();
     const [showWarning, setShowWarning] = useState(false);
     const [quienPaga, setQuienPaga] = useState<string | null>(null);
+    const [estaPagado, setEstaPagado] = useState<string | null>(null);
 
     const saldoACobrar = useMemo(() => {
-        const deliveryAdicional = form.getFieldValue("quien_paga_delivery") === "comprador" ? montoCobradoDelivery : 0;
+        const deliveryAdicional = quienPaga === "comprador" ? montoCobradoDelivery : 0;
         return parseFloat((totalAmount - adelantoClienteInput + deliveryAdicional).toFixed(2));
-    }, [totalAmount, adelantoClienteInput, montoCobradoDelivery, form]);
+    }, [totalAmount, adelantoClienteInput, montoCobradoDelivery, quienPaga]);
 
     useEffect(() => {
         if (adelantoClienteInput < 0) {
@@ -78,7 +79,11 @@ function ShippingFormModal({
 
     const handleFinish = async (values: any) => {
         //console.log(" selectedProducts:", selectedProducts);
-
+        if (saldoACobrar <= 0) {
+            message.error("El saldo a cobrar debe ser mayor a 0.");
+            setLoading(false);
+            return;
+        }
         const sucursalId = sucursals?.[0]?._id || null;
         setLoading(true);
         const lugarOrigen = sucursals?.[0]?._id || null;
@@ -183,7 +188,7 @@ function ShippingFormModal({
             if (nuevoStock < 0) continue;
 
             try {
-
+                //console.log("Actualizando stock para:", id_producto, "en sucursal:", sucursalId," variantes ", variantes, "con stock:", nuevoStock);
                 const res = await updateSubvariantStockAPI({
                     productId: id_producto,
                     sucursalId,
@@ -335,9 +340,18 @@ function ShippingFormModal({
                             <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
                                 <Radio.Group
                                     onChange={(e) => {
-                                        setAdelantoVisible(e.target.value === 'adelanto');
-                                        if (e.target.value !== 'adelanto') {
+                                        const value = e.target.value;
+                                        setEstaPagado(value);
+                                        setAdelantoVisible(value === 'adelanto');
+
+                                        if (value !== 'adelanto') {
                                             setAdelantoClienteInput(0);
+                                            form.setFieldValue("adelanto_cliente", 0);
+                                        }
+
+                                        if (value === 'si') {
+                                            setTipoPago("3");
+                                            form.setFieldValue("tipo_de_pago", "3");
                                         }
                                     }}
                                 >
@@ -389,8 +403,14 @@ function ShippingFormModal({
                                     >
                                         <Radio.Group
                                             onChange={(e) => {
-                                                setQuienPaga(e.target.value);
-                                                form.setFieldValue("quien_paga_delivery", e.target.value);
+                                                const value = e.target.value;
+                                                setQuienPaga(value);
+                                                form.setFieldValue("quien_paga_delivery", value);
+
+                                                // Recalcular saldo al cambiar a comprador si ya había monto ingresado
+                                                if (value === "comprador") {
+                                                    setMontoCobradoDelivery(prev => prev); // forzar re-render de saldo
+                                                }
                                             }}
                                         >
                                             <Radio.Button value="comprador" disabled={hayMultiplesVendedores}>COMPRADOR</Radio.Button>
@@ -418,7 +438,7 @@ function ShippingFormModal({
                                         </Form.Item>
                                     </Col>
                                 )}
-                                {quienPaga === "comprador" && (
+                                {["comprador", "vendedor"].includes(quienPaga || "") && (
                                     <Col span={12}>
                                         <Form.Item
                                             name="cargo_delivery"
@@ -430,6 +450,7 @@ function ShippingFormModal({
                                                 value={montoCobradoDelivery}
                                                 onChange={val => setMontoCobradoDelivery(val ?? 0)}
                                                 style={{ width: '100%' }}
+                                                disabled={!isAdmin}
                                             />
                                         </Form.Item>
                                     </Col>
@@ -458,8 +479,13 @@ function ShippingFormModal({
                             <Row gutter={16}>
                                 <Col span={24}>
                                     <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
-                                        <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
-                                            <Radio.Button value="1">Transferencia o QR</Radio.Button>
+                                        <Radio.Group
+                                            onChange={(e) => setTipoPago(e.target.value.toString())}
+                                            value={tipoPago}
+                                            disabled={estaPagado === "si"}
+                                        >
+
+                                        <Radio.Button value="1">Transferencia o QR</Radio.Button>
                                             <Radio.Button value="2">Efectivo</Radio.Button>
                                             <Radio.Button value="3">Pagado al dueño</Radio.Button>
                                             <Radio.Button value="4">Efectivo + QR</Radio.Button>
