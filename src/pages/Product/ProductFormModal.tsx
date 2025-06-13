@@ -6,7 +6,7 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import VariantInputs from "./VariantInputs";
 import { registerVariantAPI } from "../../api/product.ts";
 import { saveTempProduct } from '../../utils/storageHelpers';
-const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
+const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) => {
     const [loading, setLoading] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -131,23 +131,9 @@ const ProductFormModal = ({ visible, onCancel, onSuccess }: any) => {
                     <Input placeholder="Nombre del Producto" />
                 </Form.Item>
 
-                <Form.Item
-                    name="id_vendedor"
-                    label="Vendedor"
-                    rules={[{ required: true, message: "Por favor seleccione un vendedor" }]}
-                >
-                    <Select
-                        placeholder="Selecciona un vendedor"
-                        options={sellers.map((seller: any) => ({
-                            value: seller._id,
-                            label: `${seller.nombre} ${seller.apellido}`,
-                        }))}
-                        showSearch
-                        filterOption={(input, option: any) =>
-                            option.label.toLowerCase().includes(input.toLowerCase())
-                        }
-                    />
-                </Form.Item>
+                <p style={{ fontWeight: 600, marginBottom: 10 }}>
+                    Vendedor: {selectedSeller?.nombre} {selectedSeller?.apellido}
+                </p>
 
                 <Form.Item
                     name="id_categoria"

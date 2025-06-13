@@ -5,15 +5,23 @@ import { UserContext } from "../../context/userContext";
 import { registerVariantAPI } from "../../api/product";
 import { createEntryAPI } from "../../api/entry";
 
-const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller  }: any) => {
+const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller, openFromEditProductsModal = false, sellers = [] }: any) => {
     const { user }: any = useContext(UserContext);
     const [loading, setLoading] = useState(false)
     const [categories, setCategories] = useState([])
     const [newCategory, setNewCategory] = useState('')
     const [form] = Form.useForm();
+    useEffect(() => {
+        if (visible && openFromEditProductsModal) {
+            form.resetFields();
+        }
+    }, [visible, openFromEditProductsModal]);
 
     const handleFinish = async (productData: any) => {
-        if (!selectedSeller) {
+        const idVendedor = productData.id_vendedor || selectedSeller?._id;
+        console.log("🧪 vendedor:", idVendedor, productData);
+
+        if (!idVendedor) {
             message.warning("Debe seleccionar un vendedor antes de registrar el producto.");
             return;
         }
@@ -22,11 +30,21 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
             title: 'Confirmación',
             content: '¿Está seguro de que desea registrar este producto?',
             okText: 'Sí',
-            onOk: () => submitProductData(productData),
+            onOk: () => submitProductData({ ...productData, id_vendedor: idVendedor }),
         });
     };
+
     const submitProductData = async (productData: any) => {
         const { nombre_producto, precio, id_categoria, cantidad_por_sucursal } = productData;
+        const idVendedor = openFromEditProductsModal
+            ? productData.id_vendedor
+            : selectedSeller?._id;
+        console.log("🧪 vendedor:", form.getFieldValue("id_vendedor"), productData);
+
+        if (!idVendedor) {
+            message.warning("Debe seleccionar un vendedor.");
+            return;
+        }
 
         const newProduct = {
             key: Date.now().toString(),
@@ -37,7 +55,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
             cantidad: cantidad_por_sucursal,
             precio_unitario: precio,
             utilidad: 1,
-            id_vendedor: selectedSeller._id,
+            id_vendedor: idVendedor,
             esTemporal: true
         };
         message.success("Producto temporal agregado al carrito");
@@ -73,36 +91,42 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
             footer={null}
             width={800}
         >
-            {selectedSeller ? (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                    <span style={{
-                        backgroundColor: '#f0f2f5',
-                        padding: '6px 12px',
-                        borderRadius: 8,
-                        fontWeight: 'bold'
-                    }}>
-                      Vendedor: {selectedSeller.nombre} {selectedSeller.apellido}
-                    </span>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                    <span style={{
-                        backgroundColor: '#fff1f0',
-                        padding: '6px 12px',
-                        borderRadius: 8,
-                        color: '#cf1322',
-                        fontWeight: 'bold'
-                    }}>
-                      Seleccione un vendedor
-                    </span>
-                </div>
-            )}
             <Form
                 form={form}
                 name="productForm"
                 onFinish={handleFinish}
                 layout="vertical"
             >
+                {openFromEditProductsModal ? (
+                    <Form.Item
+                        name="id_vendedor"
+                        label="Vendedor"
+                        rules={[{ required: true, message: 'Seleccione un vendedor' }]}
+                    >
+                        <Select
+                            placeholder="Selecciona un vendedor"
+                            options={sellers.map((s: any) => ({
+                                value: s._id,
+                                label: `${s.nombre} ${s.apellido}`
+                            }))}
+                            showSearch
+                            filterOption={(input, option: any) =>
+                                option.label.toLowerCase().includes(input.toLowerCase())
+                            }
+                        />
+                    </Form.Item>
+                ) : (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+      <span style={{
+          backgroundColor: '#f0f2f5',
+          padding: '6px 12px',
+          borderRadius: 8,
+          fontWeight: 'bold'
+      }}>
+        Vendedor: {selectedSeller?.nombre} {selectedSeller?.apellido}
+      </span>
+                    </div>
+                )}
                 <Form.Item
                     name="nombre_producto"
                     label="Nombre del Producto"

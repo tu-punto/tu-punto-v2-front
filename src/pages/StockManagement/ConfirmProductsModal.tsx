@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoImg from "../../../public/logo.png";
 
-const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursales  }) => {
+const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursales, selectedSeller }) => {
     const [stockData, setStockData] = useState([]);
     const [variantData, setVariantData] = useState([]);
     const [productData, setProductData] = useState([]);
@@ -132,7 +132,7 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                 const ingreso = entry.newStock.stock;
                 const productId = product._id || product.id_producto;
 
-                if (ingreso > 0) {
+
                     const productoOriginal = productosConSucursales.find(p =>
                         p._id === product._id || p._id === product.id_producto
                     );
@@ -167,7 +167,6 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                         categoria: product.categoria || "Ropa",
                         fecha: new Date().toISOString()
                     });
-                }
             }
 
             // 4. Limpiar
@@ -221,7 +220,7 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
 
                         try {
                             await generateIngressPDFAPI({
-                                sellerName: "Juan Pérez",
+                                sellerName: selectedSeller?.nombre + " " + selectedSeller?.apellido || "Sin definir",
                                 sucursalNombre: "Prado",
                                 ingresos: stockData, // <--- este nombre debe coincidir con el que espera el backend
                                 variantes: variantData,
@@ -275,7 +274,7 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                             title: "Ingresos",
                             render: (_, record) => (
                                 <InputNumber
-                                    min={0}
+                                    min={-9999}
                                     value={record.newStock.stock}
                                     onChange={(val) => handleEditStock(record, val)}
                                 />

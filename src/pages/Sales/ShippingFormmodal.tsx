@@ -256,7 +256,7 @@ function ShippingFormModal({
                             </Form.Item>
                         </Col>
                         <Col span={18}>
-                            <Form.Item name="telefono_cliente" label="Celular" rules={[{ required: true }]}>
+                            <Form.Item name="telefono_cliente" label="Celular" >
                                 <Input
                                     prefix={<PhoneOutlined />}
                                     onKeyDown={(e) => {

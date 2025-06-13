@@ -272,6 +272,8 @@ const StockManagement = () => {
                                 onClick={() => setProductFormVisible(true)}
                                 type="primary"
                                 block
+                                disabled={!selectedSeller}
+                                title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
                                 className="text-mobile-base xl:text-mobile-base"
                             >
                                 Agregar Producto
@@ -285,6 +287,8 @@ const StockManagement = () => {
                                     setIsConfirmModalVisible(true);
                                 }}
                                 block
+                                disabled={!selectedSeller}
+                                title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
                                 className="text-mobile-base xl:text-mobile-base"
                             >
                                 Actualizar Stock
@@ -375,6 +379,7 @@ const StockManagement = () => {
                     setSearchText={setSearchText}
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
+                    selectedSeller={selectedSeller}
                 />
 
             )}
@@ -395,6 +400,7 @@ const StockManagement = () => {
                         await fetchData(); // Recarga productos desde backend
                         setProductFormVisible(false); // Cierra modal
                     }}
+                    selectedSeller={sellers.find(s => s._id === selectedSeller)}
                 />
             )}
 
@@ -422,6 +428,7 @@ const StockManagement = () => {
                     newProducts={getTempProducts()}
                     newStock={stockListForConfirmModal}
                     productosConSucursales={products}
+                    selectedSeller={sellers.find(s => s._id === selectedSeller)}
                 />
             )}
             {isMoveModalVisible && (
