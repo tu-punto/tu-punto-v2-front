@@ -1,7 +1,15 @@
 import { Modal, Button, Select, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import EmptySalesTable from '../Sales/EmptySalesTable';
-
+import ProductSellerViewModal from "../Seller/ProductSellerViewModal.tsx";
+import {
+    deleteProductsByShippingAPI,
+    registerSalesAPI,
+    updateProductsByShippingAPI
+} from '../../api/sales';
+import {
+    addTemporaryProductsToShippingAPI, updateShippingAPI, deleteShippingAPI
+} from '../../api/shipping';
 interface EditProductsModalProps {
     visible: boolean;
     onCancel: () => void;
@@ -9,6 +17,10 @@ interface EditProductsModalProps {
     setProducts: (updater: any) => void;
     allProducts: any[];
     sellers: any[];
+    shippingId: string;
+    sucursalId: string | null;
+    onSave: () => void;
+
 }
 
 const EditProductsModal = ({
@@ -17,10 +29,15 @@ const EditProductsModal = ({
                                products,
                                setProducts,
                                allProducts,
-                               sellers
+                               sellers,
+                               shippingId,
+                               sucursalId,
+                               onSave
                            }: EditProductsModalProps) => {
+
     const [localProducts, setLocalProducts] = useState<any[]>([]);
     const [searchKey, setSearchKey] = useState<string | null>(null);
+    const [tempProductModalVisible, setTempProductModalVisible] = useState(false);
 
     // Backup al abrir el modal
     useEffect(() => {
@@ -28,7 +45,7 @@ const EditProductsModal = ({
             setLocalProducts(JSON.parse(JSON.stringify(products))); // Deep clone
         }
     }, [visible]);
-
+    //console.log("SHIPPING ID:", shippingId, "Sucursal ID:", sucursalId);
     const handleValueChange = (key: string, field: string, value: any) => {
         setLocalProducts((prev: any[]) =>
             prev.map((p) =>
@@ -41,52 +58,108 @@ const EditProductsModal = ({
         setLocalProducts((prev: any[]) => prev.filter((p) => p.key !== key));
     };
 
+    const allSelectedKeys = useMemo(() => {
+        return new Set(localProducts.map(p => p.key));
+    }, [localProducts]);
+
+    const allSelectedNames = useMemo(() => {
+        return new Set(localProducts.map(p => p.nombre_variante || p.producto));
+    }, [localProducts]);
+
     const filteredOptions = useMemo(() => {
         return allProducts
-            .filter((p) => !localProducts.some((prod) => prod.key === p.key))
+            .filter((p) => {
+                const nombre = p.nombre_variante || p.producto;
+                return !allSelectedNames.has(nombre);
+            })
             .map((p) => ({
-                label: `${p.producto}`,
+                label: p.nombre_variante || p.producto || "Sin nombre",
                 value: p.key,
+                rawProduct: p
             }));
-    }, [allProducts, localProducts]);
-
+    }, [allProducts, allSelectedNames]);
     const handleSelectProduct = (key: string) => {
-        const found = allProducts.find((p) => p.key === key);
-        if (found) {
+        const selected = allProducts.find((p) => p.key === key);
+
+        if (selected) {
             const yaExiste = localProducts.some((prod) => prod.key === key);
             if (yaExiste) {
                 message.warning("Este producto ya ha sido añadido.");
                 return;
             }
 
-            const vendedor = sellers.find((v: any) => v._id === found.id_vendedor);
-            const comision = Number(vendedor?.comision_porcentual || 0);
-            const utilidadCalculada = parseFloat(((found.precio * 1 * comision) / 100).toFixed(2));
+            const vendedor = sellers.find((v: any) => v._id === selected.id_vendedor);
+            const comision = vendedor?.comision_porcentual || 0; // Si quieres usar la comisión del vendedor
+            const utilidadCalculada = parseFloat(((selected.precio * 1 * comision) / 100).toFixed(2));
 
             setLocalProducts((prev: any[]) => [
                 ...prev,
                 {
-                    ...found,
+                    ...selected,
                     cantidad: 1,
-                    precio_unitario: found.precio,
+                    precio_unitario: selected.precio,
                     utilidad: utilidadCalculada,
                 },
             ]);
         } else {
             message.warning("Producto no encontrado.");
         }
+
         setSearchKey(null);
     };
 
-    const handleGuardar = () => {
-        setProducts(localProducts);
-        onCancel();
-    };
+    const handleGuardar = async () => {
+        const nuevos = localProducts.filter(p => !p.id_venta);
+        const existentes = localProducts.filter(p => p.id_venta);
+        const temporales = nuevos.filter(p => p.esTemporal);
+        const normales = nuevos.filter(p => !p.esTemporal && p.id_producto?.length === 24);
 
+        const eliminados = products
+            .filter((prevProd: any) => !localProducts.some((p: any) => p.key === prevProd.key))
+            .filter((p: any) => p.id_venta)
+            .map((p: any) => p.id_venta);
+
+        try {
+            if (normales.length > 0) {
+                await registerSalesAPI(normales.map(p => ({
+                    cantidad: p.cantidad,
+                    precio_unitario: p.precio_unitario,
+                    utilidad: p.utilidad,
+                    id_producto: p.id_producto,
+                    id_pedido: shippingId,
+                    id_vendedor: p.id_vendedor,
+                    sucursal: sucursalId,
+                    deposito_realizado: false,
+                    nombre_variante: p.nombre_variante || p.producto,
+                })));
+            }
+
+            if (temporales.length > 0) {
+                await addTemporaryProductsToShippingAPI(shippingId, temporales);
+            }
+
+            if (existentes.length > 0) {
+                await updateProductsByShippingAPI(shippingId, existentes);
+            }
+
+            if (eliminados.length > 0) {
+                await deleteProductsByShippingAPI(shippingId, eliminados);
+            }
+
+            message.success("Productos actualizados con éxito");
+            setProducts(localProducts); // actualiza lista en ShippingInfoModal
+            onSave(); // para recargar si hace falta
+            onCancel(); // cierra el modal
+        } catch (error) {
+            console.error("❌ Error guardando productos:", error);
+            message.error("Error al guardar productos");
+        }
+    };
     const handleCancelar = () => {
         setLocalProducts([]); // limpio backup
         onCancel();
     };
+
 
     return (
         <Modal
@@ -104,6 +177,14 @@ const EditProductsModal = ({
             ]}
         >
             <div style={{ marginBottom: 16 }}>
+                <Button
+                    style={{ marginBottom: 12 }}
+                    type="dashed"
+                    onClick={() => setTempProductModalVisible(true)}
+                >
+                    Agregar Producto Temporal
+                </Button>
+
                 <Select
                     showSearch
                     value={searchKey}
@@ -125,6 +206,18 @@ const EditProductsModal = ({
                 onUpdateTotalAmount={() => {}} // opcional
                 sellers={sellers}
             />
+            <ProductSellerViewModal
+                visible={tempProductModalVisible}
+                onCancel={() => setTempProductModalVisible(false)}
+                onSuccess={() => setTempProductModalVisible(false)}
+                onAddProduct={(tempProduct: any) => {
+                    setLocalProducts(prev => [...prev, tempProduct]);
+                }}
+                selectedSeller={null} // Esto indica que fue abierto desde edición
+                openFromEditProductsModal={true} // 💡 importante para el siguiente punto
+                sellers={sellers}
+            />
+
         </Modal>
     );
 };

@@ -24,9 +24,10 @@ interface ProductTableProps {
     setSearchText: (value: string) => void;
     selectedCategory: string;
     setSelectedCategory: (value: string) => void;
+    selectedSeller;
 }
 
-const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory}: ProductTableProps) => {
+const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller}: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -79,7 +80,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             const updated = { ...prev, [key]: value };
 
             const newStockArray = Object.entries(updated)
-                .filter(([_, stock]) => Number(stock) > 0) // <- ❗solo mayores a 0
+                .filter(([_, stock]) => Number(stock) !== 0) // <- diferentes a 0
                 .map(([k, stock]) => {
                 const [productId, sucursalId, index] = k.split("-");
                 const producto = productsList.find((p) => p._id === productId);
@@ -289,7 +290,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                         onChange={(e) => handleIngresoChange(record.key, Number(e.target.value))}
                         placeholder="Ingresar cantidad"
                         type="number"
-                        min={0}
+                        disabled={!selectedSeller}
+                        title={!selectedSeller ? "Seleccione un vendedor para habilitar" : undefined}
                     />
                 ) : null
         },
@@ -313,17 +315,19 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         !isSeller && {
             title: "Agregar Variante",
             key: "addVariant",
-            render: (_: any, record: any) => (
+            render: (_: any, record: any) =>
                 !record.variant && (
-                    <Button onClick={(e) => {
-                        e.stopPropagation(); // evita que se expanda la fila
-                        openVariantModal(record.productOriginal);
-                    }}>
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openVariantModal(record.productOriginal);
+                        }}
+                        disabled={!selectedSeller}
+                        title={!selectedSeller ? "Seleccione un vendedor para habilitar" : undefined}
+                    >
                         <PlusOutlined />
                     </Button>
-
                 )
-            )
         },
 
     ].filter(Boolean);
@@ -459,7 +463,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                                 columns={columns}
                                 dataSource={groupProductsByBaseName(group.products)}
                                 rowClassName={(record) =>
-                                    record.variant && ingresoData[record.key] && ingresoData[record.key] > 0
+                                    record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
                                         ? "bg-green-50 border-l-4 border-green-500"
                                         : ""
                                 }
