@@ -1,7 +1,7 @@
 import { Button, InputNumber, Table } from "antd";
 import { useEffect, useState } from "react";
 
-const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin }: any) => {
+const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin,readonly = false, }: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
 
     useEffect(() => {
@@ -47,30 +47,33 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             title: 'Cantidad',
             dataIndex: 'cantidad',
             key: 'cantidad',
-            render: (_: any, record: any) => (
-                <InputNumber
-                    min={1}
-                    max={record.stockActual ?? Infinity}
-                    value={record.cantidad}
-                    onChange={value => handleValueChange(record.key, 'cantidad', value)}
-                    className="text-mobile-sm xl:text-desktop-sm"
-                />
-
-            ),
+            render: (_: any, record: any) =>
+                readonly ? (
+                    <span>{record.cantidad}</span>
+                ) : (
+                    <InputNumber
+                        min={1}
+                        max={record.stockActual ?? Infinity}
+                        value={record.cantidad}
+                        onChange={value => handleValueChange(record.key, 'cantidad', value)}
+                    />
+                ),
             className: "text-mobile-sm xl:text-desktop-sm",
         },
         {
             title: 'Precio Unitario',
             dataIndex: 'precio_unitario',
             key: 'precio_unitario',
-            render: (_: any, record: any) => (
-                <InputNumber
-                    min={0}
-                    value={record.precio_unitario}
-                    onChange={value => handleValueChange(record.key, 'precio_unitario', value)}
-                    className="text-mobile-sm xl:text-desktop-sm"
-                />
-            ),
+            render: (_: any, record: any) =>
+                readonly ? (
+                    <span>{record.precio_unitario}</span>
+                ) : (
+                    <InputNumber
+                        min={0}
+                        value={record.precio_unitario}
+                        onChange={value => handleValueChange(record.key, 'precio_unitario', value)}
+                    />
+                ),
             className: "text-mobile-sm xl:text-desktop-sm",
         },
         ...(isAdmin ? [
@@ -78,27 +81,32 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                 title: 'Utilidad',
                 dataIndex: 'utilidad',
                 key: 'utilidad',
-                render: (_: any, record: any) => (
-                    <InputNumber
-                        min={0}
-                        max={record.precio_unitario * record.cantidad}
-                        value={record.utilidad}
-                        onChange={value => handleValueChange(record.key, 'utilidad', value)}
-                        className="text-mobile-sm xl:text-desktop-sm"
-                    />
-                ),
+                render: (_: any, record: any) =>
+                    readonly ? (
+                        <span>{record.utilidad}</span>
+                    ) : (
+                        <InputNumber
+                            min={0}
+                            max={record.precio_unitario * record.cantidad}
+                            value={record.utilidad}
+                            onChange={value => handleValueChange(record.key, 'utilidad', value)}
+                        />
+                    )
             }
         ] : []),
-        {
-            title: 'Acción',
-            key: 'action',
-            render: (_: any, record: any) => (
-                <Button type="link" onClick={() => onDeleteProduct(record.key)} className="text-mobile-sm xl:text-desktop-sm">
-                    Eliminar
-                </Button>
-            ),
-            className: "text-mobile-sm xl:text-desktop-sm",
-        },
+        ...(!readonly && onDeleteProduct
+            ? [
+                {
+                    title: 'Acción',
+                    key: 'action',
+                    render: (_: any, record: any) => (
+                        <Button type="link" onClick={() => onDeleteProduct(record.key)}>
+                            Eliminar
+                        </Button>
+                    )
+                }
+            ]
+            : []),
     ];
     useEffect(() => {
         const recalculated = updatedProducts.reduce((acc: number, p: any) => {

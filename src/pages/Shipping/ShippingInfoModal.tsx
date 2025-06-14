@@ -136,15 +136,24 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             setQuienPaga('comprador');
         }
 
-        const ventas = [...(shipping.venta || []), ...(shipping.productos_temporales || [])];
-        const enriched = ventas.map((p: any) => ({
+        const ventasTemporales = shipping.productos_temporales?.map((p: any, i: number) => ({
             ...p,
-            key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
+            key: `temp-${i}`,
+            esTemporal: true,
             producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
-    }));
+        })) || [];
 
-    setProducts(enriched);
-}, [visible, shipping, sucursals]);
+        const ventasNormales = (shipping.venta || []).map((p: any) => ({
+            ...p,
+            id_venta: p._id ?? null,
+            key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
+            esTemporal: false,
+            producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
+        }));
+
+        setProducts([...ventasNormales, ...ventasTemporales]);
+
+    }, [visible, shipping, sucursals]);
 
 useEffect(() => {
     const monto = saldoACobrar || 0;
@@ -315,10 +324,10 @@ const handleSave = async (values: any) => {
             setLoading(false);
             return;
         }
-        if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
-        if (productosTemporales.length > 0) await addTemporaryProductsToShippingAPI(shipping._id, productosTemporales);
-        if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
-        if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
+        //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
+        //if (productosTemporales.length > 0) await addTemporaryProductsToShippingAPI(shipping._id, productosTemporales);
+        //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
+        //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
 
         const updateShippingInfo: any = {
             ...values,
@@ -479,7 +488,7 @@ return (
                           <Button
                               icon={<EditOutlined />}
                               onClick={() => {
-                                  setOriginalProducts(products); // backup
+                                  setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
                                   setEditProductsModalVisible(true);
                               }}
                               type="link"
@@ -495,6 +504,8 @@ return (
                     onUpdateTotalAmount={setTotalAmount}
                     handleValueChange={handleValueChange}
                     sellers={[]}
+                    isAdmin={isAdmin}
+                    readonly={true}
                 />
             </Card>
 
@@ -753,9 +764,13 @@ return (
             setProducts={setProducts}
             allProducts={enrichedProducts}
             sellers={sellers}
+            isAdmin={isAdmin}
             shippingId={id_shipping}
             sucursalId={localStorage.getItem("sucursalId")}
-            onSave={onSave}
+            onSave={() => {
+                setEditProductsModalVisible(false); // cerrar modal hijo
+                message.success("Cambios guardados"); // opcional
+            }}
         />
     </Modal>
     );

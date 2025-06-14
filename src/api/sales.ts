@@ -68,7 +68,7 @@ export const getProductHistorySalesByProductIdAPI = async (productId: any) => {
     }
 }
 
-export const updateProductsByShippingAPI = async (shippingId: number, updatedEmtpySalesTable: any,) => {
+export const updateProductsByShippingAPI = async (shippingId: string, updatedEmtpySalesTable: any,) => {
     try {
         const res = await apiClient.put(`/sale/products/update/${shippingId}`, updatedEmtpySalesTable)
         return { success: true, ...res.data }
@@ -76,7 +76,7 @@ export const updateProductsByShippingAPI = async (shippingId: number, updatedEmt
         parseError(error as AxiosError)
     }
 }
-export const deleteProductsByShippingAPI = async (shippingId: number, deletedEmtpySalesTable: any,) => {
+export const deleteProductsByShippingAPI = async (shippingId: string, deletedEmtpySalesTable: any,) => {
     try {
         const res = await apiClient.delete(`/sale/products/delete/${shippingId}`, { data: deletedEmtpySalesTable })
         return { success: true, ...res.data }

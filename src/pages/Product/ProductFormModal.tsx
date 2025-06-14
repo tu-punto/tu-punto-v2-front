@@ -36,20 +36,16 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
         }));
 
         const tempProduct = {
-            productData,
+            productData: {
+                ...productData,
+                id_vendedor: selectedSeller?._id || '', // ⚠️ agrega el id_vendedor
+            },
             combinations,
             selectedFeatures: [],
             features: [],
             sucursales
         };
-
-        saveTempProduct({
-            productData,
-            combinations,
-            selectedFeatures: [],
-            features: [],
-            sucursales
-        });
+        saveTempProduct(tempProduct);
 
         message.success("Producto guardado localmente");
         form.resetFields();
