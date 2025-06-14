@@ -17,6 +17,7 @@ interface EditProductsModalProps {
     setProducts: (updater: any) => void;
     allProducts: any[];
     sellers: any[];
+    isAdmin?: boolean;
     shippingId: string;
     sucursalId: string | null;
     onSave: () => void;
@@ -30,6 +31,7 @@ const EditProductsModal = ({
                                setProducts,
                                allProducts,
                                sellers,
+                               isAdmin,
                                shippingId,
                                sucursalId,
                                onSave
@@ -48,12 +50,25 @@ const EditProductsModal = ({
     //console.log("SHIPPING ID:", shippingId, "Sucursal ID:", sucursalId);
     const handleValueChange = (key: string, field: string, value: any) => {
         setLocalProducts((prev: any[]) =>
-            prev.map((p) =>
-                p.key === key ? { ...p, [field]: value } : p
-            )
+            prev.map((p) => {
+                if (p.key !== key) return p;
+
+                const updated = { ...p, [field]: value };
+
+                if (field === 'cantidad' || field === 'precio_unitario') {
+                    const vendedorId = p.id_vendedor || p.vendedor?._id;
+                    const vendedor = sellers.find((v: any) => v._id === vendedorId);
+                    const comision = Number(vendedor?.comision_porcentual || 0);
+                    const cantidad = Number(updated.cantidad || 0);
+                    const precio = Number(updated.precio_unitario || 0);
+                    const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+                    updated.utilidad = utilidadCalculada;
+                }
+
+                return updated;
+            })
         );
     };
-
     const handleDeleteProduct = (key: string) => {
         setLocalProducts((prev: any[]) => prev.filter((p) => p.key !== key));
     };
@@ -96,6 +111,7 @@ const EditProductsModal = ({
                 ...prev,
                 {
                     ...selected,
+                    id_producto: selected._id,
                     cantidad: 1,
                     precio_unitario: selected.precio,
                     utilidad: utilidadCalculada,
@@ -109,15 +125,18 @@ const EditProductsModal = ({
     };
 
     const handleGuardar = async () => {
+        console.log("📦 localProducts:", localProducts);
+        console.log("📦 props.products:", products);
         const nuevos = localProducts.filter(p => !p.id_venta);
         const existentes = localProducts.filter(p => p.id_venta);
         const temporales = nuevos.filter(p => p.esTemporal);
         const normales = nuevos.filter(p => !p.esTemporal && p.id_producto?.length === 24);
 
         const eliminados = products
-            .filter((prevProd: any) => !localProducts.some((p: any) => p.key === prevProd.key))
-            .filter((p: any) => p.id_venta)
-            .map((p: any) => p.id_venta);
+            .filter(prev => !localProducts.some(p => p.key === prev.key || p.id_venta === prev.id_venta))
+            .filter(p => p.id_venta)
+            .map(p => p.id_venta);
+
 
         try {
             if (normales.length > 0) {
@@ -133,28 +152,41 @@ const EditProductsModal = ({
                     nombre_variante: p.nombre_variante || p.producto,
                 })));
             }
+            console.log("🆕 Nuevos normales:", normales);
+            console.log("🧾 Temporales:", temporales);
+            console.log("✏️ Existentes modificados:", existentes);
+            console.log("🗑️ Eliminados:", eliminados);
 
             if (temporales.length > 0) {
                 await addTemporaryProductsToShippingAPI(shippingId, temporales);
             }
 
             if (existentes.length > 0) {
-                await updateProductsByShippingAPI(shippingId, existentes);
+                const cleaned = existentes.map(p => ({
+                    id_venta: p.id_venta,
+                    cantidad: p.cantidad,
+                    precio_unitario: p.precio_unitario,
+                    utilidad: p.utilidad,
+                    ...(p.id_producto && { id_producto: p.id_producto }),
+                }));
+                const response = await updateProductsByShippingAPI(shippingId, cleaned);
+                console.log("🔄 Update response:", response);
             }
-
             if (eliminados.length > 0) {
                 await deleteProductsByShippingAPI(shippingId, eliminados);
             }
 
             message.success("Productos actualizados con éxito");
-            setProducts(localProducts); // actualiza lista en ShippingInfoModal
-            onSave(); // para recargar si hace falta
-            onCancel(); // cierra el modal
+            setProducts(localProducts); // Actualiza estado en ShippingInfoModal
+            onCancel(); // Cierra el modal
+
         } catch (error) {
-            console.error("❌ Error guardando productos:", error);
+            console.error("❌ Error actualizando productos:", error);
             message.error("Error al guardar productos");
         }
     };
+
+
     const handleCancelar = () => {
         setLocalProducts([]); // limpio backup
         onCancel();
@@ -205,14 +237,32 @@ const EditProductsModal = ({
                 handleValueChange={handleValueChange}
                 onUpdateTotalAmount={() => {}} // opcional
                 sellers={sellers}
+                isAdmin={isAdmin}
             />
             <ProductSellerViewModal
                 visible={tempProductModalVisible}
                 onCancel={() => setTempProductModalVisible(false)}
                 onSuccess={() => setTempProductModalVisible(false)}
                 onAddProduct={(tempProduct: any) => {
-                    setLocalProducts(prev => [...prev, tempProduct]);
+                    const vendedor = sellers.find((v: any) => v._id === tempProduct.id_vendedor);
+                    const comision = vendedor?.comision_porcentual || 0;
+                    const precio = tempProduct.precio_unitario || tempProduct.precio || 0;
+                    const cantidad = tempProduct.cantidad || 1;
+
+                    const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+
+                    setLocalProducts(prev => [
+                        ...prev,
+                        {
+                            ...tempProduct,
+                            cantidad,
+                            precio_unitario: precio,
+                            utilidad,
+                            esTemporal: true
+                        }
+                    ]);
                 }}
+
                 selectedSeller={null} // Esto indica que fue abierto desde edición
                 openFromEditProductsModal={true} // 💡 importante para el siguiente punto
                 sellers={sellers}
