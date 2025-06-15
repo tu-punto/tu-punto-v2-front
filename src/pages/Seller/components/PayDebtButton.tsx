@@ -10,9 +10,9 @@ interface Props {
 }
 
 const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
-  const [visible,   setVisible]   = useState(false);
-  const [checked,   setChecked]   = useState(false);
-  const [loading,   setLoading]   = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   /** click “Pagar” */
   const handleConfirm = async () => {
@@ -26,8 +26,12 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       const res = await paySellerDebtAPI(seller._id, { payAll: true });
       if (!res?.success) throw new Error('fail');
 
-      message.success('Pago realizado con éxito');
-      onSuccess();                   // 🔄 refresca los vendedores
+      const pdfBlob = new Blob([res.data], { type: 'application/pdf' });
+      const pdfUrl = window.URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+
+      message.success('Pago realizado con éxito y PDF generado');
+      onSuccess();
     } catch (err) {
       console.error(err);
       message.error('Error al realizar el pago');
