@@ -10,6 +10,7 @@ import {
 import {
     addTemporaryProductsToShippingAPI, updateShippingAPI, deleteShippingAPI
 } from '../../api/shipping';
+import {updateSubvariantStockAPI} from "../../api/product.ts";
 interface EditProductsModalProps {
     visible: boolean;
     onCancel: () => void;
@@ -44,7 +45,20 @@ const EditProductsModal = ({
     // Backup al abrir el modal
     useEffect(() => {
         if (visible) {
-            setLocalProducts(JSON.parse(JSON.stringify(products))); // Deep clone
+            setLocalProducts(products.map(p => {
+                const productoCompleto = allProducts.find(ap =>
+                    ap.nombre_variante === (p.nombre_variante || p.producto)
+                );
+
+                const stockActual = productoCompleto?.stockActual ?? 0;
+                const cantidadVendida = Number(p.cantidad || 0);
+                const cantidadMaximaEditable = stockActual + cantidadVendida;
+
+                return {
+                    ...p,
+                    cantidadMaximaEditable
+                };
+            }));
         }
     }, [visible]);
     //console.log("SHIPPING ID:", shippingId, "Sucursal ID:", sucursalId);
@@ -85,7 +99,8 @@ const EditProductsModal = ({
         return allProducts
             .filter((p) => {
                 const nombre = p.nombre_variante || p.producto;
-                return !allSelectedNames.has(nombre);
+                const stock = Number(p.stockActual ?? 0);
+                return !allSelectedNames.has(nombre) && stock > 0;
             })
             .map((p) => ({
                 label: p.nombre_variante || p.producto || "Sin nombre",
@@ -93,6 +108,7 @@ const EditProductsModal = ({
                 rawProduct: p
             }));
     }, [allProducts, allSelectedNames]);
+
     const handleSelectProduct = (key: string) => {
         const selected = allProducts.find((p) => p.key === key);
 
@@ -123,22 +139,156 @@ const EditProductsModal = ({
 
         setSearchKey(null);
     };
+    // 🔧 RESTAR stock (para nuevos o cuando se aumenta cantidad)
+    const restarStock = async (productos: any[]) => {
+        if (!sucursalId) return;
+
+        for (const prod of productos) {
+            if (!prod.id_producto) continue;
+
+            const productoOriginal = allProducts.find(p =>
+                p._id === prod.id_producto || p.id_producto === prod.id_producto
+            );
+            if (!productoOriginal) continue;
+
+            const sucursalData = productoOriginal.sucursales?.find((s: any) =>
+                String(s.id_sucursal) === String(sucursalId)
+            );
+            if (!sucursalData) continue;
+
+            const variantes = prod.variantes || productoOriginal.variantes;
+            const combinacion = sucursalData.combinaciones.find((c: any) =>
+                JSON.stringify(c.variantes) === JSON.stringify(variantes)
+            );
+            if (!combinacion) continue;
+            /*console.log("🛠️ Intentando actualizar stock para:", {
+                producto: prod.nombre_variante || prod.producto,
+                id_producto: prod.id_producto,
+                variantes: prod.variantes,
+                cantidad: prod.cantidad
+            });
+            */
+            const nuevoStock = (combinacion.stock ?? 0) - Number(prod.cantidad || 0);
+
+            try {
+                /*
+                console.log("✅ Update stock: ", {
+                    productId: prod.id_producto,
+                    sucursalId,
+                    variantes,
+                    nuevoStock
+                });
+                */
+
+                await updateSubvariantStockAPI({
+                    productId: prod.id_producto,
+                    sucursalId,
+                    variantes,
+                    stock: nuevoStock,
+                });
+            } catch (err) {
+                console.error("❌ Error al RESTAR stock:", err);
+            }
+        }
+    };
+
+// 🔧 SUMAR stock (para eliminados o reducción de cantidad)
+    const sumarStock = async (productos: any[]) => {
+        if (!sucursalId) return;
+
+        for (const prod of productos) {
+            if (!prod.id_producto) continue;
+
+            const productoOriginal = allProducts.find(p =>
+                p._id === prod.id_producto || p.id_producto === prod.id_producto
+            );
+            if (!productoOriginal) continue;
+
+            const sucursalData = productoOriginal.sucursales?.find((s: any) =>
+                String(s.id_sucursal) === String(sucursalId)
+            );
+            if (!sucursalData) continue;
+
+            const variantes = prod.variantes || productoOriginal.variantes;
+            const combinacion = sucursalData.combinaciones.find((c: any) =>
+                JSON.stringify(c.variantes) === JSON.stringify(variantes)
+            );
+            if (!combinacion) continue;
+            /*
+            console.log("🛠️ Intentando actualizar stock para:", {
+                producto: prod.nombre_variante || prod.producto,
+                id_producto: prod.id_producto,
+                variantes: prod.variantes,
+                cantidad: prod.cantidad
+            });
+
+             */
+
+            const nuevoStock = (combinacion.stock ?? 0) + Number(prod.cantidad || 0);
+
+            try {
+                /*
+                console.log("✅ Update stock: ", {
+                    productId: prod.id_producto,
+                    sucursalId,
+                    variantes,
+                    nuevoStock
+                });
+
+                 */
+
+                await updateSubvariantStockAPI({
+                    productId: prod.id_producto,
+                    sucursalId,
+                    variantes,
+                    stock: nuevoStock,
+                });
+            } catch (err) {
+                console.error("❌ Error al SUMAR stock:", err);
+            }
+        }
+    };
 
     const handleGuardar = async () => {
-        console.log("📦 localProducts:", localProducts);
-        console.log("📦 props.products:", products);
         const nuevos = localProducts.filter(p => !p.id_venta);
         const existentes = localProducts.filter(p => p.id_venta);
         const temporales = nuevos.filter(p => p.esTemporal);
         const normales = nuevos.filter(p => !p.esTemporal && p.id_producto?.length === 24);
 
-        const eliminados = products
-            .filter(prev => !localProducts.some(p => p.key === prev.key || p.id_venta === prev.id_venta))
-            .filter(p => p.id_venta)
-            .map(p => p.id_venta);
 
+        const originalesMap = new Map();
 
+        for (const p of products) {
+            if (p.key) originalesMap.set(p.key, p);
+            if (p.id_venta) originalesMap.set(p.id_venta, p);
+        }
+
+        const eliminadosConData = products.filter(prev =>
+            !localProducts.some(p => p.key === prev.key || p.id_venta === prev.id_venta)
+        );
+
+        const modificadosConCambioCantidad = existentes.filter(p => {
+            const original = originalesMap.get(p.key);
+            return original && Number(p.cantidad) !== Number(original.cantidad);
+        });
+
+        const aumentaron = modificadosConCambioCantidad.filter(p => {
+            const original = originalesMap.get(p.key);
+            return Number(p.cantidad) > Number(original?.cantidad);
+        });
+
+        const disminuyeron = modificadosConCambioCantidad.filter(p => {
+            const original = originalesMap.get(p.key);
+            return Number(p.cantidad) < Number(original?.cantidad);
+        });
+        //console.log("🆕 Nuevos normales:", normales);
+        //console.log("🧾 Temporales:", temporales);
+        //console.log("🖊️ Modificados:", modificadosConCambioCantidad);
+        //console.log("📉 Aumentaron:", aumentaron);
+        //console.log("📈 Disminuyeron:", disminuyeron);
+        //console.log("❌ Eliminados:", eliminadosConData);
         try {
+            // Nuevos normales
             if (normales.length > 0) {
                 await registerSalesAPI(normales.map(p => ({
                     cantidad: p.cantidad,
@@ -151,34 +301,92 @@ const EditProductsModal = ({
                     deposito_realizado: false,
                     nombre_variante: p.nombre_variante || p.producto,
                 })));
+                await restarStock(normales);
             }
-            console.log("🆕 Nuevos normales:", normales);
-            console.log("🧾 Temporales:", temporales);
-            console.log("✏️ Existentes modificados:", existentes);
-            console.log("🗑️ Eliminados:", eliminados);
 
+            // Nuevos temporales
             if (temporales.length > 0) {
                 await addTemporaryProductsToShippingAPI(shippingId, temporales);
             }
 
-            if (existentes.length > 0) {
-                const cleaned = existentes.map(p => ({
+            // Actualizar modificados
+            if (modificadosConCambioCantidad.length > 0) {
+                const cleaned = modificadosConCambioCantidad.map(p => ({
                     id_venta: p.id_venta,
                     cantidad: p.cantidad,
                     precio_unitario: p.precio_unitario,
                     utilidad: p.utilidad,
-                    ...(p.id_producto && { id_producto: p.id_producto }),
+                    id_producto: p.id_producto,
                 }));
-                const response = await updateProductsByShippingAPI(shippingId, cleaned);
-                console.log("🔄 Update response:", response);
+                await updateProductsByShippingAPI(shippingId, cleaned);
             }
-            if (eliminados.length > 0) {
-                await deleteProductsByShippingAPI(shippingId, eliminados);
+
+            // Stock por aumentos
+            // Stock por aumentos
+            if (aumentaron.length > 0) {
+                const aRestar = aumentaron.map(p => {
+                    const original = originalesMap.get(p.key) || {};
+                    const fullProduct = allProducts.find(ap =>
+                        ap.nombre_variante === (p.nombre_variante || original.nombre_variante)
+                    );
+
+                    return {
+                        ...p,
+                        cantidad: Number(p.cantidad) - Number(original?.cantidad || 0),
+                        id_producto: p.id_producto || original?.id_producto || fullProduct?._id,
+                        variantes: p.variantes || original?.variantes || fullProduct?.variantes,
+                    };
+                });
+                //console.log("🔻 A Restar con datos completos:", aRestar);
+                await restarStock(aRestar);
+            }
+
+// Stock por reducciones
+            if (disminuyeron.length > 0) {
+                const aSumar = disminuyeron.map(p => {
+                    const original = originalesMap.get(p.key) || {};
+                    const fullProduct = allProducts.find(ap =>
+                        ap.nombre_variante === (p.nombre_variante || original.nombre_variante)
+                    );
+
+                    return {
+                        ...p,
+                        cantidad: Number(original?.cantidad || 0) - Number(p.cantidad),
+                        id_producto: p.id_producto || original?.id_producto || fullProduct?._id,
+                        variantes: p.variantes || original?.variantes || fullProduct?.variantes,
+                    };
+                });
+                //console.log("🔺 A Sumar con datos completos:", aSumar);
+                await sumarStock(aSumar);
+            }
+            // Eliminados
+            if (eliminadosConData.length > 0) {
+                const eliminadosIds = eliminadosConData.map(p => p.id_venta);
+                await deleteProductsByShippingAPI(shippingId, eliminadosIds);
+                const eliminadosParaStock = eliminadosConData.map(p => {
+                    const original = products.find(pr => pr.key === p.key || pr.id_venta === p.id_venta) || {};
+
+                    // Intenta buscar el producto completo en allProducts
+                    const fullProduct = allProducts.find(ap =>
+                        ap.nombre_variante === (p.nombre_variante || original.nombre_variante)
+                    );
+
+                    const variantes = p.variantes || original.variantes || fullProduct?.variantes;
+                    const id_producto = p.id_producto || original.id_producto || fullProduct?._id;
+
+                    return {
+                        ...p,
+                        variantes,
+                        id_producto
+                    };
+                });
+                //console.log("🧪 Eliminados para stock (final):", eliminadosParaStock);
+                await sumarStock(eliminadosParaStock);
             }
 
             message.success("Productos actualizados con éxito");
-            setProducts(localProducts); // Actualiza estado en ShippingInfoModal
-            onCancel(); // Cierra el modal
+            setProducts(localProducts);
+            onCancel();
 
         } catch (error) {
             console.error("❌ Error actualizando productos:", error);

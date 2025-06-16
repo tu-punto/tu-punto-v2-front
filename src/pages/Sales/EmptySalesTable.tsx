@@ -15,9 +15,8 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             return {
                 ...product,
                 utilidad:
-                    product.utilidad !== undefined && product.utilidad !== 1
-                        ? product.utilidad
-                        : utilidadCalculada,
+                    product.utilidad != null ? product.utilidad : utilidadCalculada,
+
             };
         });
         setUpdatedProducts(withUtilidades);
@@ -53,7 +52,7 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                 ) : (
                     <InputNumber
                         min={1}
-                        max={record.stockActual ?? Infinity}
+                        max={record.cantidadMaximaEditable ?? record.stockActual ?? Infinity}
                         value={record.cantidad}
                         onChange={value => handleValueChange(record.key, 'cantidad', value)}
                     />

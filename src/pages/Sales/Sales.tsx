@@ -257,15 +257,22 @@ export const Sales = () => {
         }
     }
     const handleAddProduct = (newProduct: any) => {
+        const vendedor = sellers.find((v: any) => v._id === newProduct.id_vendedor);
+        const comision = Number(vendedor?.comision_porcentual || 0);
+        const precio = newProduct.precio_unitario || newProduct.precio || 0;
+        const cantidad = newProduct.cantidad || 1;
+
+        const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+
         setSelectedProducts((prevProducts: any) => [
             ...prevProducts,
             {
                 ...newProduct,
-                cantidad: newProduct.cantidad || 1,
-                precio_unitario: newProduct.precio || 0,
-                utilidad: 1,
-                stockActual: newProduct.cantidad || 1, // para controlar el límite de cantidad vendida
-                esTemporal: true, // ⚠️ marca como producto de ocasión
+                cantidad,
+                precio_unitario: precio,
+                utilidad,
+                stockActual: cantidad,
+                esTemporal: true,
             }
         ]);
     };

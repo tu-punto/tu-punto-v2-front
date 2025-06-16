@@ -31,10 +31,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [tempModalVisible, setTempModalVisible] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
     const [adelantoVisible, setAdelantoVisible] = useState(false);
-    const [quienPaga, setQuienPaga] = useState<string | null>(null);
+    //const [quienPaga, setQuienPaga] = useState<string | null>(null);
     const [montoDelivery, setMontoDelivery] = useState(0);
     const [costoDelivery, setCostoDelivery] = useState(0);
     //const [adelantoClienteInput, setAdelantoClienteInput] = useState<number>(0);
+    const quienPagaDelivery = useWatch("quien_paga_delivery", internalForm);
     const [isDeliveryPlaceInput, setIsDeliveryPlaceInput] = useState(false);
     const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
@@ -47,15 +48,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
     const [confirmDeleteAdelanto, setConfirmDeleteAdelanto] = useState(false);
     const [sellers, setSellers] = useState([]);
+    const [clickedOnce, setClickedOnce] = useState(false);
+    const cargoDelivery = useWatch('cargo_delivery', internalForm);
 
     const lugarEntrega = useWatch('lugar_entrega', internalForm);
     const origenEsIgualADestino = lugarEntrega?.trim()?.toLowerCase() === sucursals?.[0]?.nombre?.trim().toLowerCase();
 
     const saldoACobrar = useMemo(() => {
-        const deliveryAdicional = internalForm.getFieldValue("quien_paga_delivery") === "comprador" ? montoDelivery : 0;
+        const deliveryAdicional = internalForm.getFieldValue("quien_paga_delivery") === "comprador"
+            ? (cargoDelivery ?? 0)
+            : 0;
+
         const adelanto = adelantoCliente || 0;
         return parseFloat((totalAmount - adelanto + deliveryAdicional).toFixed(2));
-    }, [totalAmount, montoDelivery, adelantoCliente, quienPaga, internalForm]);
+    }, [totalAmount, adelantoCliente, cargoDelivery, quienPagaDelivery]);
+
     const handleDeleteProduct = (key: any) => {
         setProducts((prev: any) => {
             const toDelete = prev.find((p: any) => p.key === key);
@@ -102,6 +109,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             ? shipping.lugar_entrega
             : 'otro';
 
+        const quienPagaDeVenta =shipping.venta?.[0]?.quien_paga_delivery || shipping.quien_paga_delivery || "comprador";
+        //console.log("Quien paga de venta:", quienPagaDeVenta);
+        setTimeout(() => {
+            internalForm.setFieldValue("quien_paga_delivery", quienPagaDeVenta);
+        }, 0);
+        //setQuienPaga(quienPagaDeVenta);
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
             telefono_cliente: shipping.telefono_cliente,
@@ -111,8 +124,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'HH:mm') : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
-            quien_paga_delivery: shipping.quien_paga_delivery,
-            cargo_delivery: shipping.cargo_delivery,
+            quien_paga_delivery: quienPagaDeVenta,            cargo_delivery: shipping.cargo_delivery,
             costo_delivery: shipping.costo_delivery,
             adelanto_cliente: shipping.adelanto_cliente,
             tipo_de_pago: shipping.tipo_de_pago || null,
@@ -121,19 +133,20 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
-        setAdelantoVisible(!!shipping.adelanto_cliente);
+        const pagado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
+        setAdelantoVisible(pagado === "adelanto" && shipping.adelanto_cliente > 0);
         setEstadoPedido(shipping.estado_pedido);
         setTipoPago(shipping.tipo_de_pago || null);
         setQrInput(shipping.subtotal_qr || 0);
         setEfectivoInput(shipping.subtotal_efectivo || 0);
         setMontoDelivery(shipping.cargo_delivery || 0);
         setCostoDelivery(shipping.costo_delivery || 0);
-        setQuienPaga(shipping.quien_paga_delivery || null);
+        //setQuienPaga(quienPagaDeVenta);
         setIsDeliveryPlaceInput(lugar_entrega === 'otro');
 
         if (!origenEsIgualADestino && !shipping.quien_paga_delivery) {
             internalForm.setFieldValue('quien_paga_delivery', 'comprador');
-            setQuienPaga('comprador');
+            //setQuienPaga(quienPagaDeVenta);
         }
 
         const ventasTemporales = shipping.productos_temporales?.map((p: any, i: number) => ({
@@ -324,6 +337,16 @@ const handleSave = async (values: any) => {
             setLoading(false);
             return;
         }
+        // Actualizar solo el campo quien_paga_delivery en ventas existentes
+        const quienPagaActual = internalForm.getFieldValue("quien_paga_delivery");
+        const updatedExisting = existingProducts.map((p: any) => ({
+            _id: p.id_venta, // importante para identificar la venta en el backend
+            quien_paga_delivery: quienPagaActual,
+        }));
+        //console.log("Updated existing products:", updatedExisting);
+        if (updatedExisting.length > 0) {
+            await updateProductsByShippingAPI(shipping._id, updatedExisting);
+        }
         //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
         //if (productosTemporales.length > 0) await addTemporaryProductsToShippingAPI(shipping._id, productosTemporales);
         //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
@@ -335,7 +358,34 @@ const handleSave = async (values: any) => {
             fecha_pedido: values.fecha_pedido?.format('YYYY-MM-DD HH:mm:ss'),
             hora_entrega_acordada: values.hora_entrega_acordada ? dayjs(values.hora_entrega_acordada).toDate() : null,
             pagado_al_vendedor: values.esta_pagado === 'adelanto',
+            adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
+            quien_paga_delivery: values.quien_paga_delivery,
         };
+        if (values.quien_paga_delivery === "tupunto") {
+            updateShippingInfo.cargo_delivery = 0;
+        }
+
+// Forzar subtotales según el tipo de pago
+        switch (values.tipo_de_pago) {
+            case '1':
+                updateShippingInfo.subtotal_qr = saldoACobrar;
+                updateShippingInfo.subtotal_efectivo = 0;
+                break;
+            case '2':
+                updateShippingInfo.subtotal_qr = 0;
+                updateShippingInfo.subtotal_efectivo = saldoACobrar;
+                break;
+            case '3':
+                updateShippingInfo.subtotal_qr = 0;
+                updateShippingInfo.subtotal_efectivo = 0;
+                break;
+            case '4':
+                updateShippingInfo.subtotal_qr = qrInput;
+                updateShippingInfo.subtotal_efectivo = efectivoInput;
+                break;
+        }
+
+        //console.log("📤 Datos enviados al backend:", updateShippingInfo);
 
         await updateShippingAPI(updateShippingInfo, shipping._id);
         message.success("Pedido actualizado con éxito");
@@ -347,6 +397,8 @@ const handleSave = async (values: any) => {
         setLoading(false);
     }
 };
+
+
 //console.log("📦 enrichedProducts:", enrichedProducts);
 const id_shipping = shipping?._id || '';
 return (
@@ -375,7 +427,34 @@ return (
                                 try {
                                     // Restaurar stock antes de eliminar
                                     //console.log("Restaurando stock de productos antes de eliminar la entrega...",products);
-                                    await restaurarStock(products as any[]);
+                                    const enrichedForRestock = products.map((p) => {
+                                        const nombreVariante = p.nombre_variante || p.producto || '';
+                                        const [nombreProducto, variantesStr] = nombreVariante.split(" - ");
+                                        const atributos = variantesStr?.split(" / ") || [];
+
+                                        const productoCompleto = data.find(dp => dp.nombre_producto === nombreProducto);
+                                        if (!productoCompleto) {
+                                            console.warn("⚠️ Producto no encontrado en data:", nombreVariante);
+                                            return p;
+                                        }
+
+                                        const ejemploComb = productoCompleto?.sucursales?.[0]?.combinaciones?.[0];
+                                        const claves = Object.keys(ejemploComb?.variantes || {});
+
+                                        const variantesReconstruidas: Record<string, string> = {};
+                                        claves.forEach((k, i) => {
+                                            variantesReconstruidas[k] = atributos[i] || '';
+                                        });
+
+                                        return {
+                                            ...p,
+                                            id_producto: p.id_producto || productoCompleto._id,
+                                            variantes: Object.keys(p.variantes || {}).length > 0 ? p.variantes : variantesReconstruidas
+                                        };
+                                    });
+                                    //console.log("♻️ Restaurando con datos:", enrichedForRestock);
+
+                                    await restaurarStock(enrichedForRestock);
 
                                     const response = await deleteShippingAPI(shipping._id);
                                     if (response.success) {
@@ -400,7 +479,6 @@ return (
             layout="vertical"
             onFinish={handleSave}
             disabled={!isAdmin}
-
         >
             {/* INFORMACIÓN DEL CLIENTE */}
             <Card title="Información del Cliente" bordered={false}>
@@ -536,7 +614,7 @@ return (
                                     setAdelantoVisible(value === 'adelanto');
 
                                     if (value !== 'adelanto') {
-                                        internalForm.setFieldValue("adelanto_cliente", 0);
+                                        internalForm.setFieldsValue({ adelanto_cliente: 0 }); // << OBLIGATORIO para el form
                                     }
 
                                     if (value === 'si') {
@@ -545,7 +623,7 @@ return (
                                     }
                                 }}
                             >
-                                <Radio.Button value="si">Sí</Radio.Button>
+                            <Radio.Button value="si">Sí</Radio.Button>
                                 <Radio.Button value="no">No</Radio.Button>
                                 <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
                             </Radio.Group>
@@ -584,33 +662,32 @@ return (
                     <>
                         <Row gutter={16}>
                             <Col span={24}>
-                                <Form.Item
-                                    name="quien_paga_delivery"
-                                    label="¿Quién paga el delivery?"
-                                    rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}
-                                >
+                                <Form.Item name="quien_paga_delivery" noStyle>
                                     <Radio.Group
-                                        onChange={(e) => {
-                                            const value = e.target.value;
-                                            setQuienPaga(value);
-                                            internalForm.setFieldValue("quien_paga_delivery", value);
-                                        }}
+                                        value={quienPagaDelivery} //  esto lo hace controlado
+                                        onChange={e => internalForm.setFieldValue("quien_paga_delivery", e.target.value)}
+                                        disabled={!isAdmin}
                                     >
                                         <Radio.Button value="comprador">COMPRADOR</Radio.Button>
                                         <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
                                         <Radio.Button value="tupunto">Tu Punto</Radio.Button>
                                     </Radio.Group>
                                 </Form.Item>
+
                             </Col>
                         </Row>
 
                         <Row gutter={16}>
-                            {quienPaga !== "tupunto" && (
+                            {quienPagaDelivery !== "tupunto" && (
                                 <Col span={12}>
                                     <Form.Item
                                         name="cargo_delivery"
                                         label="Monto cobrado por el Delivery"
-                                        rules={[{ required: true }]}
+                                        rules={
+                                            (!isAdmin && (quienPagaDelivery === 'vendedor' ||quienPagaDelivery === 'comprador') )
+                                                ? []
+                                                : [{ required: true, message: "Este campo es obligatorio" }]
+                                        }
                                     >
                                         <InputNumber
                                             prefix="Bs."
@@ -619,21 +696,25 @@ return (
                                             style={{ width: '100%' }}
                                         />
                                     </Form.Item>
+
                                 </Col>
                             )}
+
                             <Col span={12}>
-                                <Form.Item
-                                    name="costo_delivery"
-                                    label="Costo de realizar el Delivery"
-                                    rules={[{ required: true }]}
-                                >
-                                    <InputNumber
-                                        prefix="Bs."
-                                        value={costoDelivery}
-                                        onChange={val => setCostoDelivery(val ?? 0)}
-                                        style={{ width: '100%' }}
-                                    />
-                                </Form.Item>
+                                {isAdmin && (
+                                    <Form.Item
+                                        name="costo_delivery"
+                                        label="Costo de realizar el Delivery"
+                                        rules={[{ required: true }]}
+                                    >
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={costoDelivery}
+                                            onChange={val => setCostoDelivery(val ?? 0)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </Form.Item>
+                                )}
                             </Col>
                         </Row>
                     </>
@@ -659,31 +740,62 @@ return (
                         <Row gutter={16}>
                             <Col span={24}>
                                 <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
-                                    <Radio.Group
-                                        value={tipoPago}
-                                        onChange={(e) => setTipoPago(e.target.value.toString())}
-                                        disabled={estaPagado === "si"}
-                                    >
-                                        <Radio.Button value="1">Transferencia o QR</Radio.Button>
-                                        <Radio.Button value="2">Efectivo</Radio.Button>
-                                        <Radio.Button
-                                            value="3"
-                                            onClick={() => {
-                                                if (tipoPago !== "3" && !confirmDeleteAdelanto) {
-                                                    message.warning("¿Seguro? Se borrará el adelanto");
-                                                    setConfirmDeleteAdelanto(true);
-                                                    setTimeout(() => setConfirmDeleteAdelanto(false), 3000);
-                                                } else {
-                                                    setTipoPago("3");
-                                                    internalForm.setFieldValue("tipo_de_pago", "3");
+                                    <div style={{ position: 'relative' }}>
+                                        <Radio.Group
+                                            value={tipoPago}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value !== "3") {
+                                                    setTipoPago(value);
+                                                    setClickedOnce(false); // reset si cambió a otro
+                                                    internalForm.setFieldValue("tipo_de_pago", value);
                                                 }
                                             }}
+                                            disabled={!isAdmin || estaPagado === "si"}
                                         >
-                                            Pagado al dueño
-                                        </Radio.Button>
-                                        <Radio.Button value="4">Efectivo + QR</Radio.Button>
-                                    </Radio.Group>
+                                        <Radio.Button value="1">Transferencia o QR</Radio.Button>
+                                            <Radio.Button value="2">Efectivo</Radio.Button>
+                                            <Radio.Button
+                                                value="3"
+                                                onClick={() => {
+                                                    if (tipoPago === "3") return; // ya está activo, ignorar
+
+                                                    if (!clickedOnce) {
+                                                        setClickedOnce(true);
+                                                        setTimeout(() => setClickedOnce(false), 4000); // volver a permitir después de 4s
+                                                    } else {
+                                                        setTipoPago("3");
+                                                        internalForm.setFieldValue("tipo_de_pago", "3");
+                                                        internalForm.setFieldValue("adelanto_cliente", 0);
+                                                        setClickedOnce(false);
+                                                    }
+                                                }}
+                                            >
+                                                Pagado al dueño
+                                            </Radio.Button>
+
+                                            <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                                        </Radio.Group>
+
+                                        {clickedOnce && (
+                                            <div
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '100%',
+                                                    left: '50%',
+                                                    transform: 'translateX(-50%)',
+                                                    color: 'red',
+                                                    fontSize: '12px',
+                                                    marginTop: 4,
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                Haz clic de nuevo para confirmar el cambio. Se borrará el adelanto.
+                                            </div>
+                                        )}
+                                    </div>
                                 </Form.Item>
+
                             </Col>
                         </Row>
 

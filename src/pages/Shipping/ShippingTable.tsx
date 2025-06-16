@@ -29,6 +29,9 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("Todos");
+    const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isVendedor = user?.role?.toLowerCase() === 'vendedor';
+    //console.log("Usuario:", user);
     const fetchShippings = async () => {
         try {
             const apiData = await getShippingsAPI();
@@ -63,14 +66,27 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     ? toSimpleDate(new Date(pedido.fecha_pedido)) >= toSimpleDate(dateRange[0]) &&
                     toSimpleDate(new Date(pedido.fecha_pedido)) <= toSimpleDate(dateRange[1])
                     : true;
-            const matchesVendedor =
-                selectedVendedor === "Todos" ||
-                pedido.venta?.some((v: any) => v.vendedor?._id === selectedVendedor);
+            const matchesVendedor = isAdmin
+                ? (selectedVendedor === "Todos" || pedido.venta?.some((v: any) =>
+                    v.vendedor?._id === selectedVendedor ||
+                    v.id_vendedor === selectedVendedor
+                ))
+                : pedido.venta?.some((v: any) =>
+                    v.id_vendedor === user?.id_vendedor ||
+                    v.vendedor?._id === user?.id_vendedor ||
+                    v.vendedor === user?.id_vendedor
+                );
 
 
             return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor;
         });
     };
+    useEffect(() => {
+        if (isVendedor && user?.id_vendedor) {
+            setSelectedVendedor(user.id_vendedor);
+        }
+    }, [isVendedor, user]);
+
     const columns = [
         {/*{
             title: '',
@@ -114,26 +130,39 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             dataIndex: 'vendedor',
             key: 'vendedor',
             render: (_: any, record: any) => {
-                const vendedoresUnicos = Array.from(
-                    new Map(
-                        record.venta
-                            ?.filter((v: any) => v.vendedor)
-                            .map((v: any) => [v.vendedor._id, `${v.vendedor.nombre} ${v.vendedor.apellido}`])
-                    ).values()
-                );
+                const vendedoresUnicos = new Map();
 
-                if (!vendedoresUnicos.length) return 'Sin vendedor';
+                // 1. De ventas normales
+                (record.venta || []).forEach((v: any) => {
+                    if (v.vendedor) {
+                        vendedoresUnicos.set(v.vendedor._id, `${v.vendedor.nombre} ${v.vendedor.apellido}`);
+                    } else if (v.id_vendedor) {
+                        const vend = vendedores.find(vend => vend._id === v.id_vendedor);
+                        if (vend) {
+                            vendedoresUnicos.set(vend._id, `${vend.nombre} ${vend.apellido}`);
+                        }
+                    }
+                });
 
-                if (vendedoresUnicos.length <= 3) {
-                    return vendedoresUnicos.join(', ');
-                }
+                // 2. De productos temporales
+                (record.productos_temporales || []).forEach((p: any) => {
+                    const vend = vendedores.find(vend => vend._id === p.id_vendedor);
+                    if (vend) {
+                        vendedoresUnicos.set(vend._id, `${vend.nombre} ${vend.apellido}`);
+                    }
+                });
+
+                const vendedorArray = Array.from(vendedoresUnicos.values());
+
+                if (vendedorArray.length === 0) return 'Sin vendedor';
+                if (vendedorArray.length <= 3) return vendedorArray.join(', ');
 
                 return (
                     <>
-                        {vendedoresUnicos.slice(0, 2).join(', ')}{' '}
-                        <span style={{ color: '#1890ff', cursor: 'pointer' }} title={vendedoresUnicos.join(', ')}>
-                          +{vendedoresUnicos.length - 2} más
-                        </span>
+                        {vendedorArray.slice(0, 2).join(', ')}{' '}
+                        <span style={{ color: '#1890ff', cursor: 'pointer' }} title={vendedorArray.join(', ')}>
+                    +{vendedorArray.length - 2} más
+                </span>
                     </>
                 );
             }
@@ -200,19 +229,22 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     return (
         <div>
             <div style={{ marginBottom: 16 }}>
-                <Select
-                    placeholder="Filtrar por vendedor"
-                    style={{ width: 200, marginBottom: 16 }}
-                    value={selectedVendedor}
-                    onChange={(value) => setSelectedVendedor(value)}
-                >
-                    <Select.Option value="Todos">Todos</Select.Option>
-                    {vendedores.map((v: any) => (
-                        <Select.Option key={v._id} value={v._id}>
-                            {v.nombre} {v.apellido}
-                        </Select.Option>
-                    ))}
-                </Select>
+                {isAdmin && (
+                    <Select
+                        placeholder="Filtrar por vendedor"
+                        style={{ width: 200, marginBottom: 16 }}
+                        value={selectedVendedor}
+                        onChange={(value) => setSelectedVendedor(value)}
+                    >
+                        <Select.Option value="Todos">Todos</Select.Option>
+                        {vendedores.map((v: any) => (
+                            <Select.Option key={v._id} value={v._id}>
+                                {v.nombre} {v.apellido}
+                            </Select.Option>
+                        ))}
+                    </Select>
+                )}
+
                 <Select
                     className="mt-2 w-full xl:w-1/5"
                     placeholder="Estado del pedido"

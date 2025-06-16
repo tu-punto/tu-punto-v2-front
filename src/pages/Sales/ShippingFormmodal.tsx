@@ -123,6 +123,8 @@ function ShippingFormModal({
                     variantes: p.variantes,
                     nombre_variante: `${p.producto}`,
                     stockActual: p.stockActual,
+                    quien_paga_delivery: form.getFieldValue("quien_paga_delivery") || "comprador" // ✅ agregar esto
+
                 };
             });
 
@@ -443,14 +445,17 @@ function ShippingFormModal({
                                         <Form.Item
                                             name="cargo_delivery"
                                             label="Monto cobrado por el Delivery"
-                                            rules={[{ required: true }]}
+                                            rules={
+                                                (!isAdmin && (quienPaga === 'vendedor' ||quienPaga === 'comprador') )
+                                                    ? [] // No requerido si es vendedor (no admin)
+                                                    : [{ required: true, message: "Este campo es obligatorio" }]
+                                            }
                                         >
                                             <InputNumber
                                                 prefix="Bs."
                                                 value={montoCobradoDelivery}
                                                 onChange={val => setMontoCobradoDelivery(val ?? 0)}
                                                 style={{ width: '100%' }}
-                                                disabled={!isAdmin}
                                             />
                                         </Form.Item>
                                     </Col>
