@@ -54,49 +54,68 @@ const CustomTable = ({
       dataIndex: "subtotal_deudas",
       className: "text-mobile-sm xl:text-desktop-sm",
       render: (_: any, record: any) => {
-        const subtotalVenta = record.cantidad * record.precio_unitario
+        const subtotalVenta = record.cantidad * record.precio_unitario;
         const subtotalDeudas = record.id_pedido.pagado_al_vendedor
-          ? - record.utilidad
-          : subtotalVenta - record.utilidad
+          ? -record.utilidad
+          : subtotalVenta - record.utilidad;
         return `Bs. ${subtotalDeudas.toFixed(2)}`;
-      }
+      },
     },
     {
       title: "Utilidad",
       dataIndex: "utilidad",
       key: "utilidad",
       className: "text-mobile-sm xl:text-desktop-sm",
+      render: (_: any, record: any) =>
+        allowActions ? (
+          <EditableCellInputNumber
+            isAdmin={isAdmin}
+            value={record.utilidad}
+            min={1}
+            onChange={(value) =>
+              handleValueChange(record.key, "utilidad", value)
+            }
+          />
+        ) : (
+          `Bs. ${record.utilidad}`
+        ),
     },
     {
       title: "Precio Unitario",
       dataIndex: "precio_unitario",
       key: "precio_unitario",
-      render: (_: any, record: any) => (allowActions ? (
-        <EditableCellInputNumber
-          isAdmin={isAdmin}
-          value={record.precio_unitario}
-          min={1}
-          onChange={(value) =>
-            handleValueChange(record.key, "precio_unitario", value)
-          }
-        />) : `Bs. ${record.precio_unitario}`
-      ),
+      render: (_: any, record: any) =>
+        allowActions ? (
+          <EditableCellInputNumber
+            isAdmin={isAdmin}
+            value={record.precio_unitario}
+            min={1}
+            onChange={(value) =>
+              handleValueChange(record.key, "precio_unitario", value)
+            }
+          />
+        ) : (
+          `Bs. ${record.precio_unitario}`
+        ),
       className: "text-mobile-sm xl:text-desktop-sm",
     },
     {
       title: "Cantidad",
       dataIndex: "cantidad",
       key: "cantidad",
-      render: (_: any, record: any) => (allowActions ? (
-        <EditableCellInputNumber
-          isAdmin={isAdmin}
-          value={record.cantidad}
-          min={1}
-          onChange={(value) =>
-            handleValueChange(record.key, "cantidad", value)
-          }
-        />) : `Bs. ${record.cantidad}`
-      ),
+      render: (_: any, record: any) =>
+        allowActions ? (
+          <EditableCellInputNumber
+            isAdmin={isAdmin}
+            value={record.cantidad}
+            min={1}
+            onChange={(value) =>
+              handleValueChange(record.key, "cantidad", value)
+            }
+          />
+        ) : (
+          `Bs. ${record.cantidad}`
+        ),
       className: "text-mobile-sm xl:text-desktop-sm",
     },
     {
@@ -104,8 +123,7 @@ const CustomTable = ({
       dataIndex: "subtotal",
       key: "subtotal",
       render: (_: any, record: any) => {
-        const subtotal =
-          (record.cantidad || 0) * (record.precio_unitario || 0);
+        const subtotal = (record.cantidad || 0) * (record.precio_unitario || 0);
         return `Bs. ${subtotal.toFixed(2)}`;
       },
       className: "text-mobile-sm xl:text-desktop-sm",
@@ -118,52 +136,48 @@ const CustomTable = ({
     },
     ...(isAdmin && allowActions
       ? [
-        {
-          title: "Acción",
-          key: "action",
-          render: (_: any, record: any) => (
+          {
+            title: "Acción",
+            key: "action",
+            render: (_: any, record: any) => (
+              <div className="flex gap-2">
+                {/* Confirmación de guardar */}
+                <Popconfirm
+                  title="¿Guardar cambios?"
+                  okText="Guardar"
+                  cancelText="Cancelar"
+                  onConfirm={() => {
+                    onUpdateProduct(record.id_venta, {
+                      precio_unitario: record.precio_unitario,
+                      cantidad: record.cantidad,
+                      utilidad: record.utilidad,
+                    });
+                  }}
+                >
+                  <Button icon={<SaveOutlined />} size="small" type="text" />
+                </Popconfirm>
 
-            <div className="flex gap-2">
-              {/* Confirmación de guardar */}
-              <Popconfirm
-                title="¿Guardar cambios?"
-                okText="Guardar"
-                cancelText="Cancelar"
-                onConfirm={() => {
-                  onUpdateProduct(record.id_venta, {
-                    precio_unitario: record.precio_unitario,
-                    cantidad: record.cantidad,
-                  });
-                }}
-              >
-                <Button
-                  icon={<SaveOutlined />}
-                  size="small"
-                  type="text"
-                />
-              </Popconfirm>
-
-              {/* Confirmación de eliminación */}
-              <Popconfirm
-                title="¿Estás seguro de eliminar este producto?"
-                okText="Sí"
-                cancelText="No"
-                onConfirm={() => {
-                  onDeleteProduct(record.key, record.id_venta);
-                }}
-              >
-                <Button
-                  icon={<DeleteOutlined />}
-                  size="small"
-                  type="text"
-                  danger
-                />
-              </Popconfirm>
-            </div>
-          ),
-          className: "text-mobile-sm xl:text-desktop-sm",
-        },
-      ]
+                {/* Confirmación de eliminación */}
+                <Popconfirm
+                  title="¿Estás seguro de eliminar este producto?"
+                  okText="Sí"
+                  cancelText="No"
+                  onConfirm={() => {
+                    onDeleteProduct(record.key, record.id_venta);
+                  }}
+                >
+                  <Button
+                    icon={<DeleteOutlined />}
+                    size="small"
+                    type="text"
+                    danger
+                  />
+                </Popconfirm>
+              </div>
+            ),
+            className: "text-mobile-sm xl:text-desktop-sm",
+          },
+        ]
       : []),
   ];
 
@@ -182,8 +196,11 @@ const CustomTable = ({
       <Table columns={columns} dataSource={data} pagination={{ pageSize: 5 }} />
     </>
   ) : (
-    <Empty description="No se encontraron ventas" className="text-mobile-sm xl:text-desktop-sm" />
-  )
+    <Empty
+      description="No se encontraron ventas"
+      className="text-mobile-sm xl:text-desktop-sm"
+    />
+  );
 };
 
 export default CustomTable;

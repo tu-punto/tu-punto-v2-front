@@ -28,7 +28,7 @@ const SellerInfoPageWrapper = () => {
                     nombre: `${sellerData.nombre} ${sellerData.apellido}`,
                     deuda: sellerData.deuda,
                     deudaInt: sellerData.deuda,
-                    pagoTotalInt: sellerData.deuda - (sellerData.adelanto_servicio || 0),
+                    pagoTotalInt: (sellerData.deuda - (sellerData.adelanto_servicio || 0)).toFixed(2),
                     fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
                     fecha: date.toLocaleDateString("es-ES"),
                     pago_mensual: `Bs. ${pagoMensualTotal}`,

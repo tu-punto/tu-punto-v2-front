@@ -38,20 +38,43 @@ export default function SellerTable({
 
   /* ---- columnas ---- */
   const columns = [
-    { title: "Nombre", dataIndex: "nombre", key: "nombre", fixed: "left" as const },
-    { title: "Pago total", dataIndex: "pagoTotal", key: "pagoTotal" },
-    { title: "Fecha Vigencia", dataIndex: "fecha_vigencia", key: "fecha_vigencia" },
+    {
+      title: "Nombre",
+      dataIndex: "nombre",
+      key: "nombre",
+      fixed: "left" as const,
+    },
+    {
+      title: "Pago total",
+      dataIndex: "pagoTotal",
+      key: "pagoTotal",
+    },
+    {
+      title: "Fecha Vigencia",
+      dataIndex: "fecha_vigencia",
+      key: "fecha_vigencia",
+    },
     {
       title: "Pago Mensual",
       dataIndex: "pago_mensual",
       key: "pago_mensual",
       render: (_: any, row: SellerRow) => (
-        <Button type="link" onClick={(e) => { e.stopPropagation(); openDrawer(row); }}>
+        <Button
+          type="link"
+          onClick={(e) => {
+            e.stopPropagation();
+            openDrawer(row);
+          }}
+        >
           {row.pago_mensual}
         </Button>
       ),
     },
-    { title: "Comisión %", dataIndex: "comision_porcentual", key: "comision_porcentual" },
+    {
+      title: "Comisión %",
+      dataIndex: "comision_porcentual",
+      key: "comision_porcentual",
+    },
     {
       title: "Acciones",
       key: "acciones",
@@ -59,7 +82,14 @@ export default function SellerTable({
         <div className="flex gap-2 justify-end">
           <PayDebtButton seller={row} onSuccess={refresh} />
           <Tooltip title="Renovar vendedor">
-            <Button icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); setSelected(row); setDebtModal(true); }} />
+            <Button
+              icon={<EditOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelected(row);
+                setDebtModal(true);
+              }}
+            />
           </Tooltip>
         </div>
       ),
@@ -74,19 +104,26 @@ export default function SellerTable({
       return saldoPendiente;
     }
 
-    saldoPendiente = sales && sales.reduce((acc: number, sale: any) => {
-      if (sale.deposito_realizado) return acc;
-      let subtotalDeuda = 0
-      if (sale.id_pedido.pagado_al_vendedor) {
-        subtotalDeuda = -sale.utilidad
-      } else {
-        subtotalDeuda = (sale.cantidad * sale.precio_unitario) - sale.utilidad;
-      }
+    saldoPendiente =
+      sales &&
+      sales.reduce((acc: number, sale: any) => {
+        if (sale.deposito_realizado) return acc;
+        let subtotalDeuda = 0;
+        if (sale.id_pedido.pagado_al_vendedor) {
+          subtotalDeuda = -sale.utilidad;
+        } else {
+          subtotalDeuda = sale.cantidad * sale.precio_unitario - sale.utilidad;
+        }
 
-      return acc + subtotalDeuda - sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
-    }, 0)
+        return (
+          acc +
+          subtotalDeuda -
+          sale.id_pedido.adelanto_cliente -
+          sale.id_pedido.cargo_delivery
+        );
+      }, 0);
     return saldoPendiente;
-  }
+  };
 
   /* ---- carga ---- */
   useEffect(() => {
@@ -96,7 +133,6 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-
           const date = new Date(seller.fecha);
           const finish_date = new Date(seller.fecha_vigencia);
           const mensual = seller.pago_sucursales.reduce(
@@ -115,7 +151,9 @@ export default function SellerTable({
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
             deuda: seller.deuda,
-            pagoTotal: `Bs. ${seller.saldo_pendiente - seller.deuda}`,
+            pagoTotal: `Bs. ${(seller.saldo_pendiente - seller.deuda).toFixed(
+              2
+            )}`,
             pagoTotalInt: seller.saldo_pendiente - seller.deuda,
             pago_mensual: `Bs. ${mensual}`,
           };
@@ -141,7 +179,9 @@ export default function SellerTable({
   };
 
   const filterFactura = (arr: SellerRow[]) =>
-    isFactura ? arr.filter((s) => s.emite_factura) : arr.filter((s) => !s.emite_factura);
+    isFactura
+      ? arr.filter((s) => s.emite_factura)
+      : arr.filter((s) => !s.emite_factura);
 
   /* ---- render ---- */
   return (
@@ -154,10 +194,17 @@ export default function SellerTable({
         title={() => (
           <h2 className="text-2xl font-bold">
             Pago pendiente Bs.&nbsp;
-            {filterFactura(pending).reduce((t, s) => t + s.pagoTotalInt, 0)}
+            {filterFactura(pending)
+              .reduce((t, s) => t + s.pagoTotalInt, 0)
+              .toFixed(2)}
           </h2>
         )}
-        onRow={(r) => ({ onClick: () => { setSelected(r); setInfoModal(true); } })}
+        onRow={(r) => ({
+          onClick: () => {
+            setSelected(r);
+            setInfoModal(true);
+          },
+        })}
       />
 
       <Table
@@ -166,7 +213,12 @@ export default function SellerTable({
         pagination={{ pageSize: 5 }}
         scroll={{ x: "max-content" }}
         title={() => <h2 className="text-2xl font-bold">Pago al día</h2>}
-        onRow={(r) => ({ onClick: () => { setSelected(r); setInfoModal(true); } })}
+        onRow={(r) => ({
+          onClick: () => {
+            setSelected(r);
+            setInfoModal(true);
+          },
+        })}
       />
 
       {selected && (
@@ -175,13 +227,19 @@ export default function SellerTable({
             visible={debtModal}
             seller={selected}
             onCancel={closeAll}
-            onSuccess={() => { closeAll(); refresh(); }}
+            onSuccess={() => {
+              closeAll();
+              refresh();
+            }}
           />
           <SellerInfoModalTry
             visible={infoModal && !debtModal}
             seller={selected}
             onCancel={closeAll}
-            onSuccess={() => { closeAll(); refresh(); }}
+            onSuccess={() => {
+              closeAll();
+              refresh();
+            }}
           />
           <SucursalDrawer
             open={drawerOpen}

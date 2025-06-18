@@ -7,38 +7,38 @@ import {
   InputNumber,
   message,
   Row,
-} from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import { useContext, useEffect, useState } from 'react';
-import dayjs from 'dayjs';
+} from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import { useContext, useEffect, useState } from "react";
+import dayjs from "dayjs";
 
 import {
   getProductsEntryAmount,
   updateEntry,
   deleteEntryProductsAPI,
-} from '../../../api/entry';
-import { getPaymentProofsBySellerIdAPI } from '../../../api/paymentProof';
+} from "../../../api/entry";
+import { getPaymentProofsBySellerIdAPI } from "../../../api/paymentProof";
 import {
   getSalesBySellerIdAPI,
   updateSale,
   deleteSalesAPI,
   deleteSaleByIdAPI,
   updateSaleByIdAPI,
-} from '../../../api/sales';
-import { getSellerDebtsAPI, updateSellerAPI } from '../../../api/seller';
-import { getSucursalsAPI } from '../../../api/sucursal';
-import { getShipingByIdsAPI } from '../../../api/shipping';
+} from "../../../api/sales";
+import { getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
+import { getSucursalsAPI } from "../../../api/sucursal";
+import { getShipingByIdsAPI } from "../../../api/shipping";
 
-import { UserContext } from '../../../context/userContext';
+import { UserContext } from "../../../context/userContext";
 
-import BranchFields from './BranchFields';
-import SellerHeader from './SellerHeader';
-import StatsCards from './StatsCards';
-import SalesSection from './SalesSection';
-import EntryHistorySection from './EntryHistorySection';
-import PaymentProofSection from './PaymentProofSection';
-import ActionButtons from './ActionButtons';
-import SellerDebtTable from './SellerDebtTable';
+import BranchFields from "./BranchFields";
+import SellerHeader from "./SellerHeader";
+import StatsCards from "./StatsCards";
+import SalesSection from "./SalesSection";
+import EntryHistorySection from "./EntryHistorySection";
+import PaymentProofSection from "./PaymentProofSection";
+import ActionButtons from "./ActionButtons";
+import SellerDebtTable from "./SellerDebtTable";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
@@ -59,11 +59,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [sellerDebts, setSellerDebts] = useState<any[]>([]);
 
   const { user } = useContext(UserContext);
-  const isSeller = user?.role === 'seller';
+  const isSeller = user?.role === "seller";
 
   /* ───── cargar sucursales y luego todo ───── */
-  useEffect(() => { if (seller.key) fetchSucursales(); }, [seller]);
-
+  useEffect(() => {
+    if (seller.key) fetchSucursales();
+  }, [seller]);
 
   useEffect(() => {
     if (sucursalesLoaded) {
@@ -79,7 +80,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     try {
       setSucursales(await getSucursalsAPI());
       setSucursalesLoaded(true);
-    } catch (e) { console.error('Error sucursales', e); }
+    } catch (e) {
+      console.error("Error sucursales", e);
+    }
   };
 
   const fetchSellerDebts = async (sellerId: string) => {
@@ -87,7 +90,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       const res = await getSellerDebtsAPI(sellerId);
       if (res?.success) setSellerDebts(res.data);
     } catch (e) {
-      console.error('Error al cargar deudas del vendedor', e);
+      console.error("Error al cargar deudas del vendedor", e);
     }
   };
 
@@ -95,36 +98,45 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     try {
       const res = await getSalesBySellerIdAPI(seller.key);
       const sales: any[] = Array.isArray(res) ? res : [];
-      const pedidosIds = sales.map(s => s.id_pedido);
+      const pedidosIds = sales.map((s) => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
 
-      const shipRes = await getShipingByIdsAPI(uniquePedidos.map(pedido => pedido._id));
+      const shipRes = await getShipingByIdsAPI(
+        uniquePedidos.map((pedido) => pedido._id)
+      );
 
-      const final = sales.map(sale => {
+      const final = sales.map((sale) => {
         const lugarEntrega =
           shipRes.success &&
           shipRes.data.find((s: any) => s.id_pedido === sale.id_pedido)
             ?.lugar_entrega;
 
-        const esVenta = lugarEntrega &&
-          sucursales.some(s =>
-            s.nombre.toLowerCase() === lugarEntrega.toLowerCase());
+        const esVenta =
+          lugarEntrega &&
+          sucursales.some(
+            (s) => s.nombre.toLowerCase() === lugarEntrega.toLowerCase()
+          );
 
         return {
           ...sale,
-          tipo: esVenta ? 'Venta' : 'Pedido',
+          tipo: esVenta ? "Venta" : "Pedido",
           subtotal: sale.precio_unitario * sale.cantidad,
           key: `${sale.id_producto}-${sale.fecha_pedido}`,
         };
       });
 
       setSalesData(final);
-    } catch (e) { console.error('Error ventas', e); }
+    } catch (e) {
+      console.error("Error ventas", e);
+    }
   };
 
   const handleUpdateSale = async (id: string, fields: any) => {
-    const sucursalId = localStorage.getItem('sucursalId');
-    const res = await updateSaleByIdAPI(id, { ...fields, id_sucursal: sucursalId });
+    const sucursalId = localStorage.getItem("sucursalId");
+    const res = await updateSaleByIdAPI(id, {
+      ...fields,
+      id_sucursal: sucursalId,
+    });
     if (res?.success) {
       message.success("Venta actualizada correctamente");
       await fetchSales(); // Refresca ventas
@@ -134,8 +146,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   const handleDeleteSale = async (id: string) => {
-
-    const id_sucursal = localStorage.getItem('sucursalId');
+    const id_sucursal = localStorage.getItem("sucursalId");
     const res = await deleteSaleByIdAPI(id, id_sucursal);
     if (res?.success) {
       message.success("Venta eliminada correctamente");
@@ -149,14 +160,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     try {
       const res = await getProductsEntryAmount(seller.key);
       setEntryData(res.map((p: any) => ({ ...p, key: p.id_ingreso })));
-    } catch (e) { console.error('Error entry', e); }
+    } catch (e) {
+      console.error("Error entry", e);
+    }
   };
 
   const fetchPaymentProofs = async (sellerId: string) => {
     try {
       const res = await getPaymentProofsBySellerIdAPI(sellerId);
       setPaymentProofs(Array.isArray(res) ? res : []);
-    } catch (e) { console.error('Error proofs', e); }
+    } catch (e) {
+      console.error("Error proofs", e);
+    }
   };
 
   /* ─────────── submit final ─────────── */
@@ -169,7 +184,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         pago_sucursales: formValues.sucursales,
       });
       if (!resSeller?.success) {
-        message.error('Error al editar vendedor');
+        message.error("Error al editar vendedor");
         setLoading(false);
         return;
       }
@@ -183,38 +198,41 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       if (deletedEntryData.length)
         await deleteEntryProductsAPI(deletedEntryData);
 
-      message.success('Cambios guardados');
+      message.success("Cambios guardados");
       onSuccess();
     } catch (e) {
       console.error(e);
-      message.error('Error al guardar');
-    } finally { setLoading(false); }
+      message.error("Error al guardar");
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ─────────── valores para Stats ─────────── */
-  const pedidosProcesados = new Set()
+  const pedidosProcesados = new Set();
 
   const saldoPendiente = salesData.reduce((acc, sale) => {
     if (sale.deposito_realizado) return acc;
 
-    let subtotalDeuda = 0
+    let subtotalDeuda = 0;
 
     if (sale.id_pedido.pagado_al_vendedor) {
-      subtotalDeuda = -sale.utilidad
+      subtotalDeuda = -sale.utilidad;
     } else {
       subtotalDeuda = sale.subtotal - sale.utilidad;
     }
 
     if (!pedidosProcesados.has(sale.id_pedido._id)) {
-      subtotalDeuda -= sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery
-      pedidosProcesados.add(sale.id_pedido._id)
+      subtotalDeuda -=
+        sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
+      pedidosProcesados.add(sale.id_pedido._id);
     }
 
-    return acc + subtotalDeuda
-  }, 0)
+    return acc + subtotalDeuda;
+  }, 0);
 
   const deuda = Number(seller.deuda) || 0;
-  const pagoPendiente = saldoPendiente - deuda
+  const pagoPendiente = saldoPendiente - deuda;
 
   /* ─────────── render ─────────── */
   return (
@@ -233,7 +251,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         layout="vertical"
         initialValues={{
           telefono: seller.telefono,
-          fecha_vigencia: dayjs(seller.fecha_vigencia, 'D-M-YYYY'),
+          fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales
             : [{}],
@@ -241,7 +259,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       >
         {/* Teléfono */}
         <Form.Item name="telefono" label="Teléfono">
-          <InputNumber style={{ width: '25%' }} />
+          <InputNumber style={{ width: "25%" }} />
         </Form.Item>
 
         {/* Fecha de vigencia */}
@@ -254,13 +272,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
         {/* Sucursales */}
         <Row justify="space-between" align="middle">
-          <Col><h4 className="font-bold text-lg">Servicios por sucursal</h4></Col>
+          <Col>
+            <h4 className="font-bold text-lg">Servicios por sucursal</h4>
+          </Col>
           <Col>
             <Button
               type="dashed"
               icon={<PlusOutlined />}
               onClick={() => {
-                const curr = form.getFieldValue('sucursales') || [];
+                const curr = form.getFieldValue("sucursales") || [];
                 form.setFieldsValue({ sucursales: [...curr, {}] });
               }}
               disabled={isSeller}
@@ -273,7 +293,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         <Form.List name="sucursales">
           {(fields, { remove }) => (
             <>
-              {fields.map(field => (
+              {fields.map((field) => (
                 <Card key={field.key} style={{ marginTop: 16 }}>
                   <BranchFields
                     field={field}
@@ -292,24 +312,23 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         <SalesSection
           initialSales={salesData}
           onSalesChange={setSalesData}
-          onDeletedSalesChange={() => { }}
-          onUpdateNoPagadasTotal={() => { }}
-          onUpdateHistorialTotal={() => { }}
+          onDeletedSalesChange={() => {}}
+          onUpdateNoPagadasTotal={() => {}}
+          onUpdateHistorialTotal={() => {}}
           isSeller={isSeller}
           onUpdateOneSale={handleUpdateSale}
           onDeleteOneSale={handleDeleteSale}
         />
 
-        <EntryHistorySection
-          initialEntries={entryData}
+        <EntryHistorySection initialEntries={entryData} />
+
+        <SellerDebtTable
+          data={sellerDebts}
+          setRefreshKey={setRefreshKey}
+          isSeller={isSeller}
         />
 
-        <SellerDebtTable data={sellerDebts} setRefreshKey={setRefreshKey} isSeller={isSeller} />
-
-        <PaymentProofSection
-          proofs={paymentProofs}
-          sellerId={seller.key}
-        />
+        <PaymentProofSection proofs={paymentProofs} sellerId={seller.key} />
 
         {/* Botones */}
         <Form.Item>
