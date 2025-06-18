@@ -152,6 +152,7 @@ export const Sales = () => {
         filteredData = filteredData.filter(product => product.stockActual > 0);
 
         return filteredData;
+
     };
 
     const handleProductSelect = (product: any) => {

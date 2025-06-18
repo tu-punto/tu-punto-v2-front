@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import useEditableTable from '../../../hooks/useEditableTable';
-import SalesTable from './SalesTable';
+import { useEffect } from "react";
+import useEditableTable from "../../../hooks/useEditableTable";
+import SalesTable from "./SalesTable";
 
 interface Props {
   initialSales: any[];
@@ -24,24 +24,21 @@ const SalesSection: React.FC<Props> = ({
   isSeller,
 }) => {
   // 1) Asignamos key = id_venta a cada objeto
-  const salesConKey = initialSales.map(sale => ({
+  const salesConKey = initialSales.map((sale) => ({
     ...sale,
     key: sale.id_venta, // aquí defines el valor de "key"
   }));
 
   // 2) Pasamos ese array al hook
-  const [
-    salesData,
-    setSalesData,
-    handleValueChange,
-  ] = useEditableTable(salesConKey);
+  const [salesData, setSalesData, handleValueChange] =
+    useEditableTable(salesConKey);
 
   const handleDelete = (key: any) => {
-    setSalesData(prev => {
-      const updated = prev.filter(p => p.key !== key);
-      const deleted = prev.find(p => p.key === key);
+    setSalesData((prev) => {
+      const updated = prev.filter((p) => p.key !== key);
+      const deleted = prev.find((p) => p.key === key);
       if (deleted?.id_venta) {
-        onDeletedSalesChange(d => [
+        onDeletedSalesChange((d) => [
           ...d,
           { id_venta: deleted.id_venta, id_producto: deleted.id_producto },
         ]);
@@ -50,10 +47,14 @@ const SalesSection: React.FC<Props> = ({
     });
   };
 
-  useEffect(() => { onSalesChange(salesData); }, [salesData]);
+  useEffect(() => {
+    onSalesChange(salesData);
+  }, [salesData]);
 
-  const idSucursal = localStorage.getItem('sucursalId')
-  const ventasNoPagadas = salesData.filter(s => !s.deposito_realizado && s.id_sucursal === idSucursal);
+  console.log("SalesSection salesData:", salesData);
+  const ventasNoPagadas = salesData.filter(
+    (s) => !s.deposito_realizado && s.id_pedido.estado_pedido === "En Espera"
+  );
 
   return (
     <>
@@ -85,9 +86,9 @@ const SalesSection: React.FC<Props> = ({
         <SalesTable
           data={salesData}
           onUpdateTotalAmount={onUpdateHistorialTotal}
-          onDeleteProduct={() => { }}
-          onUpdateProduct={() => { }}
-          handleValueChange={() => { }}
+          onDeleteProduct={() => {}}
+          onUpdateProduct={() => {}}
+          handleValueChange={() => {}}
           isAdmin={!isSeller}
           showClient
         />
