@@ -51,9 +51,13 @@ const SalesSection: React.FC<Props> = ({
     onSalesChange(salesData);
   }, [salesData]);
 
-  console.log("SalesSection salesData:", salesData);
+
+  const sucursalId = localStorage.getItem("sucursalId");
   const ventasNoPagadas = salesData.filter(
-    (s) => !s.deposito_realizado && s.id_pedido.estado_pedido === "En Espera"
+    (s) =>
+      !s.deposito_realizado &&
+      s.id_pedido.estado_pedido === "En Espera" &&
+      s.id_sucursal === sucursalId
   );
 
   return (
