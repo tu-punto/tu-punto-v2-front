@@ -97,7 +97,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const fetchSales = async () => {
     try {
       const res = await getSalesBySellerIdAPI(seller.key);
-      const sales: any[] = Array.isArray(res) ? res : [];
+      const sales: any[] = Array.isArray(res)
+        ? res.filter((sale) => sale.id_pedido.estado_pedido !== "En Espera")
+        : [];
       const pedidosIds = sales.map((s) => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
 
@@ -140,6 +142,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta actualizada correctamente");
       await fetchSales(); // Refresca ventas
+      onSuccess()
     } else {
       message.error("Error al actualizar la venta");
     }
