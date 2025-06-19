@@ -71,7 +71,7 @@ const CustomTable = ({
           <EditableCellInputNumber
             isAdmin={isAdmin}
             value={record.utilidad}
-            min={1}
+            min={0}
             onChange={(value) =>
               handleValueChange(record.key, "utilidad", value)
             }
@@ -89,7 +89,7 @@ const CustomTable = ({
           <EditableCellInputNumber
             isAdmin={isAdmin}
             value={record.precio_unitario}
-            min={1}
+            min={0}
             onChange={(value) =>
               handleValueChange(record.key, "precio_unitario", value)
             }
@@ -108,7 +108,7 @@ const CustomTable = ({
           <EditableCellInputNumber
             isAdmin={isAdmin}
             value={record.cantidad}
-            min={1}
+            min={0}
             onChange={(value) =>
               handleValueChange(record.key, "cantidad", value)
             }
