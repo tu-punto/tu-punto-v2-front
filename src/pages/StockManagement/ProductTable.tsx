@@ -450,40 +450,38 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 </Select>
             </div>
             */}
-            {tableGroup.length === 0 ? (
-                <p>No hay grupos de productos.</p>
-            ) : (
-                tableGroup.map((group, i) => (
+            {tableGroup
+                .filter(group => group.products && group.products.length > 0)
+                .map((group, i) => (
                     <div key={i}>
                         <h2 style={{ textAlign: 'left', marginTop: 30 }}>{group.name}</h2>
-                        {group.products.length === 0 ? (
-                            <p style={{ color: 'gray' }}>Este grupo no tiene productos.</p>
-                        ) : (
-                            <Table
-                                columns={columns}
-                                dataSource={groupProductsByBaseName(group.products)}
-                                rowClassName={(record) =>
-                                    record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
-                                        ? "bg-green-50 border-l-4 border-green-500"
-                                        : ""
-                                }
-                                expandable={{
-                                    expandedRowKeys,
-                                    onExpand: (expanded, record) => {
-                                        setExpandedRowKeys(
-                                            expanded
-                                                ? [...expandedRowKeys, record.key]
-                                                : expandedRowKeys.filter((key) => key !== record.key)
-                                        );
-                                    },
-                                    expandRowByClick: true,
-                                }}
-                                pagination={{ pageSize: 5 }}
-                                rowKey="key"
-                            />
-                        )}
+                        <Table
+                            columns={columns}
+                            dataSource={groupProductsByBaseName(group.products)}
+                            rowClassName={(record) =>
+                                record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
+                                    ? "bg-green-50 border-l-4 border-green-500"
+                                    : ""
+                            }
+                            expandable={{
+                                expandedRowKeys,
+                                onExpand: (expanded, record) => {
+                                    setExpandedRowKeys(
+                                        expanded
+                                            ? [...expandedRowKeys, record.key]
+                                            : expandedRowKeys.filter((key) => key !== record.key)
+                                    );
+                                },
+                                expandRowByClick: true,
+                            }}
+                            pagination={{ pageSize: 5 }}
+                            rowKey="key"
+                        />
                     </div>
-                ))
+                ))}
+
+            {tableGroup.filter(group => group.products && group.products.length > 0).length === 0 && (
+                <p>No hay grupos de productos.</p>
             )}
 
             {/* Modales */}

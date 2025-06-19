@@ -39,6 +39,7 @@ export const Sales = () => {
     const updateTotalAmount = (amount: number) => {
         setTotalAmount(amount);
     };
+
     const showSalesModal = () => {
         if (selectedProducts.length === 0) {
             message.warning("Debes seleccionar al menos un producto para realizar una venta.");
@@ -46,6 +47,7 @@ export const Sales = () => {
         }
         setModalType('sales');
     };
+
 
     const showShippingModal = () => {
         if (selectedProducts.length === 0) {
@@ -156,15 +158,28 @@ export const Sales = () => {
     };
 
     const handleProductSelect = (product: any) => {
-        // setEditableProducts((prevProducts: any) => {
         setSelectedProducts((prevProducts: any) => {
             const exists = prevProducts.find((p: any) => p.key === product.key);
-            if (!exists) {
-                return [...prevProducts, { ...product, cantidad: 1, precio_unitario: product.precio, utilidad: 1 }];
-            }
-            return prevProducts;
+            if (exists) return prevProducts;
+
+            const cantidad = 1;
+            const precio = product.precio;
+            const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
+            const comision = Number(vendedor?.comision_porcentual || 0);
+            const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+
+            return [
+                ...prevProducts,
+                {
+                    ...product,
+                    cantidad,
+                    precio_unitario: precio,
+                    utilidad,
+                }
+            ];
         });
     };
+
     const handleDeleteProduct = (key: any) => {
         setSelectedProducts((prevProducts: any) => {
             const updatedProducts = prevProducts.filter((product: any) => product.key !== key);
@@ -198,6 +213,25 @@ export const Sales = () => {
             return 0;
         }
     };
+    const handleEnhancedValueChange = (key: string, field: string, value: any) => {
+        setSelectedProducts((prev: any[]) => {
+            return prev.map((p) => {
+                if (p.key !== key) return p;
+                const updated = { ...p, [field]: value };
+
+                if (field === 'cantidad' || field === 'precio_unitario') {
+                    const vendedor = sellers.find((v: any) => v._id === p.id_vendedor);
+                    const comision = Number(vendedor?.comision_porcentual || 0);
+                    const cantidad = Number(updated.cantidad || 0);
+                    const precio = Number(updated.precio_unitario || 0);
+                    updated.utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+                }
+
+                return updated;
+            });
+        });
+    };
+
 
     const previousProductsDebt = async (sellerId: number) => {
         //TODO:Delete if it is not useful anymore
@@ -394,7 +428,7 @@ export const Sales = () => {
                         <EmptySalesTable
                             products={selectedProducts}
                             onDeleteProduct={handleDeleteProduct}
-                            handleValueChange={handleValueChange}
+                            handleValueChange={handleEnhancedValueChange}
                             onUpdateTotalAmount={updateTotalAmount}
                             key={refreshKey}
                             sellers={sellers}

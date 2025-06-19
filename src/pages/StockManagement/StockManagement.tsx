@@ -50,6 +50,7 @@ const StockManagement = () => {
 
     const fetchData = async () => {
         try {
+            const sucursalId = localStorage.getItem("sucursalId");
             const sellersResponse = await getSellersAPI();
             const categoriesResponse = await getCategoriesAPI();
             const groupsResponse = await getGroupsAPI();
@@ -57,7 +58,12 @@ const StockManagement = () => {
             //console.log("🧪 Productos recibidos:", productsResponse);
             //console.log("🧪 Usuario actual:", user);
 
-            setSellers(sellersResponse);
+            const filteredSellers = sellersResponse.filter((seller: any) =>
+                seller.pago_sucursales?.some((ps: any) =>
+                    String(ps.id_sucursal) === String(sucursalId)
+                )
+            );
+            setSellers(filteredSellers);
             setCategories(categoriesResponse);
             setGroups(groupsResponse);
             setProducts(productsResponse);
