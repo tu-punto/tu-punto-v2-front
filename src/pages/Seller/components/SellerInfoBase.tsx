@@ -154,6 +154,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
+      onSuccess()
     } else {
       message.error("Error al eliminar la venta");
     }
