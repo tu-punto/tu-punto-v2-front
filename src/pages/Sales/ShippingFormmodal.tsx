@@ -90,6 +90,7 @@ function ShippingFormModal({
         try {
             const response = await registerShippingAPI({
                 ...values,
+                pagado_al_vendedor: values.esta_pagado === "si",
                 id_sucursal: sucursalId,
                 lugar_origen: lugarOrigen,
             });
