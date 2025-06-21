@@ -109,9 +109,14 @@ const CustomTable = ({
             isAdmin={isAdmin}
             value={record.cantidad}
             min={0}
-            onChange={(value) =>
-              handleValueChange(record.key, "cantidad", value)
-            }
+            onChange={(value) => {
+              handleValueChange(record.key, "cantidad", value);
+              handleValueChange(
+                record.key,
+                "utilidad",
+                (value * record.utilidad) / record.cantidad
+              );
+            }}
           />
         ) : (
           `Bs. ${record.cantidad}`
