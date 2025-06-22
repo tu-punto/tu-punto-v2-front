@@ -26,13 +26,6 @@ const useEditableTable = (initialData: any) => {
       const newData = prevData.map((item: any) => {
         if (item.key === key) {
           const updates = { ...item, [field]: value };
-
-          // Handle cantidad updates
-          if (field === "cantidad" && item.utilidad) {
-            const utilidadPerUnit = item.utilidad / item.cantidad;
-            updates.utilidad = Number((utilidadPerUnit * value).toFixed(2));
-          }
-
           return updates;
         }
         return item;
