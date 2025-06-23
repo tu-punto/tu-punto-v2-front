@@ -5,6 +5,8 @@ import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
 import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
+import { getSucursalsAPI } from "../../api/sucursal";
+
 import dayjs from 'dayjs';
 
 
@@ -28,6 +30,18 @@ function ShippingFormModal({
     const [showWarning, setShowWarning] = useState(false);
     const [quienPaga, setQuienPaga] = useState<string | null>(null);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
+    const [allSucursals, setAllSucursals] = useState([]);
+    const sucursalId = localStorage.getItem('sucursalId');
+    const sucursalLogueada = allSucursals.find((s: any) => s._id === sucursalId);
+    const nombreSucursal = localStorage.getItem('sucursalNombre') || '';
+
+    useEffect(() => {
+        const fetchSucursals = async () => {
+            const res = await getSucursalsAPI();
+            if (res.success) setAllSucursals(res.sucursals);
+        };
+        fetchSucursals();
+    }, []);
 
     const saldoACobrar = useMemo(() => {
         const deliveryAdicional = quienPaga === "comprador" ? montoCobradoDelivery : 0;
@@ -71,11 +85,10 @@ function ShippingFormModal({
     const lugarEntrega = useWatch('lugar_entrega', form);
 
     const origenEsIgualADestino = useMemo(() => {
-        const origen = sucursals?.[0]?.nombre?.trim().toLowerCase();
-        const destino = lugarEntrega?.trim()?.toLowerCase();
-        return origen && destino ? origen === destino : true;
-    }, [lugarEntrega, sucursals]);
+        if (!lugarEntrega || !nombreSucursal) return false;
 
+        return lugarEntrega.trim().toLowerCase() === nombreSucursal.trim().toLowerCase();
+    }, [lugarEntrega, nombreSucursal]);
 
     const handleFinish = async (values: any) => {
         //console.log(" selectedProducts:", selectedProducts);
@@ -84,7 +97,7 @@ function ShippingFormModal({
             setLoading(false);
             return;
         }
-        const sucursalId = sucursals?.[0]?._id || null;
+        const sucursalId = localStorage.getItem('sucursalId');
         setLoading(true);
         const lugarOrigen = sucursals?.[0]?._id || null;
         try {
@@ -92,7 +105,7 @@ function ShippingFormModal({
                 ...values,
                 pagado_al_vendedor: values.esta_pagado === "si",
                 id_sucursal: sucursalId,
-                lugar_origen: lugarOrigen,
+                lugar_origen: sucursalId,
             });
 
             if (!response.success) {
@@ -176,7 +189,8 @@ function ShippingFormModal({
         setter(prev => parseFloat((prev - value).toFixed(2)));
     };
     const actualizarStock = async (productos: any[]) => {
-        const sucursalId = sucursals?.[0]?._id || null;
+        const sucursalId =  localStorage.getItem('sucursalId');
+
         for (const prod of productos) {
             if (prod.esTemporal) continue;
 
@@ -395,7 +409,7 @@ function ShippingFormModal({
                     </Row>
 
                     {/* ¿Quién paga el delivery? */}
-                    {!origenEsIgualADestino && (
+                    {lugarEntrega && !origenEsIgualADestino && (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>
@@ -457,6 +471,7 @@ function ShippingFormModal({
                                                 value={montoCobradoDelivery}
                                                 onChange={val => setMontoCobradoDelivery(val ?? 0)}
                                                 style={{ width: '100%' }}
+                                                disabled={!isAdmin}
                                             />
                                         </Form.Item>
                                     </Col>

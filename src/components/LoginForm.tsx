@@ -37,8 +37,11 @@ export default function LoginForm({
       if (!userRes.success) {
         return message.error("No se recuperó el usuario");
       }
-      localStorage.setItem("sucursalId", values.sucursalId);
+      const selectedBranch = branches.find((b) => b._id === values.sucursalId);
+      const branchName = selectedBranch?.nombre || '';
 
+      localStorage.setItem("sucursalId", values.sucursalId);
+      localStorage.setItem("sucursalNombre", branchName);
       setUser(userRes.data);
       message.success("¡Bienvenido!");
       navigate(redirectTo);

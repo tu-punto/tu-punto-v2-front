@@ -16,7 +16,8 @@ export const renewSellerAPI = async (id: string | number, data: any) => {
         const res = await apiClient.put(`/seller/renew/${id}`, data);
         return { success: true, data: res.data }
     } catch (error) {
-        parseError(error as AxiosError)
+        const axiosError = error as AxiosError;
+        throw axiosError;
     }
 }
 

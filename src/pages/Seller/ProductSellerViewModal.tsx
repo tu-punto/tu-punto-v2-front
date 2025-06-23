@@ -137,7 +137,10 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                 <Form.Item
                     name="precio"
                     label="Precio del producto"
-                    rules={[{ required: false, message: 'Por favor ingrese el precio del producto' }]}
+                    rules={[
+                        { required: true, message: 'Por favor ingrese el precio del producto' },
+                        { type: 'number', min: 0.01, message: 'El precio debe ser mayor a 0' }
+                    ]}
                 >
                     <InputNumber
                         suffix="Bs."
@@ -145,8 +148,11 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                 </Form.Item>
                 <Form.Item
                     name="cantidad_por_sucursal"
-                    label="Cantidad de ingreso del producto" 
-                    rules={[{ required: false, message: 'Por favor ingrese la cantidad de ingreso del producto' }]}
+                    label="Cantidad de ingreso del producto"
+                    rules={[
+                        { required: true, message: 'Por favor ingrese la cantidad de ingreso del producto' },
+                        { type: 'number', min: 1, message: 'Debe ser al menos 1 unidad' }
+                    ]}
                 >
                     <InputNumber
                         min={1}
@@ -190,7 +196,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                 <Form.Item
                     name="id_categoria"
                     label="Categoría"
-                    rules={[{ required: false, message: 'Por favor seleccione una categoría' }]}
+                    rules={[{ required: true, message: 'Por favor seleccione una categoría' }]}
                 >
                     <Select
                         placeholder="Selecciona una categoría"

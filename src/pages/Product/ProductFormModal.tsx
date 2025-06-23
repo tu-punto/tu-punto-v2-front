@@ -17,7 +17,9 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
     const [form] = Form.useForm();
     const handleFinish = async (productData: any) => {
         const sucursalId = localStorage.getItem("sucursalId");
-
+        if (combinations.length === 0) {
+            return message.warning("Debe agregar al menos una variante para el producto.");
+        }
         const sucursales = branches.map((b) => ({
             id_sucursal: b._id,
             combinaciones: combinations.map(combo => {

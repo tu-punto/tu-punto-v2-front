@@ -1,4 +1,4 @@
-import { Col, Form, InputNumber, Row, Select } from "antd";
+import { Col, Form, InputNumber, Input, Row, Select } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 
 export default function BranchFields({
@@ -45,10 +45,16 @@ export default function BranchFields({
             onChange={(value) => {
               const selected = sucursalOptions.find((s) => s._id === value);
               if (selected) {
-                form.setFieldValue(
-                  ['sucursales', field.name, 'sucursalName'],
-                  selected.nombre
-                );
+                const currentList = form.getFieldValue("sucursales") || [];
+                const updatedList = [...currentList];
+
+                updatedList[field.name] = {
+                  ...updatedList[field.name],
+                  id_sucursal: selected._id,
+                  sucursalName: selected.nombre,
+                };
+
+                form.setFieldValue("sucursales", updatedList);
               }
             }}
             disabled={isSeller}
@@ -57,12 +63,13 @@ export default function BranchFields({
 
         {/* Campo oculto para mantener sucursalName sincronizado */}
         <Form.Item
-          {...field}
-          name={[field.name, "sucursalName"]}
-          style={{ display: "none" }}
+            {...field}
+            name={[field.name, "sucursalName"]}
+            style={{ display: "none" }}
         >
-          <input type="hidden" />
+          <Input />
         </Form.Item>
+
       </Col>
 
       {["alquiler", "exhibicion", "delivery", "entrega_simple"].map((k) => (

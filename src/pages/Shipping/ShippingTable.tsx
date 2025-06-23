@@ -71,10 +71,15 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     v.vendedor?._id === selectedVendedor ||
                     v.id_vendedor === selectedVendedor
                 ))
-                : pedido.venta?.some((v: any) =>
-                    v.id_vendedor === user?.id_vendedor ||
-                    v.vendedor?._id === user?.id_vendedor ||
-                    v.vendedor === user?.id_vendedor
+                : (
+                    pedido.venta?.some((v: any) =>
+                        v.id_vendedor === user?.id_vendedor ||
+                        v.vendedor?._id === user?.id_vendedor ||
+                        v.vendedor === user?.id_vendedor
+                    ) ||
+                    pedido.productos_temporales?.some((p: any) =>
+                        p.id_vendedor === user?.id_vendedor
+                    )
                 );
 
 
