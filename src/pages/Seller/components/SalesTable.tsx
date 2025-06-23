@@ -90,9 +90,17 @@ const CustomTable = ({
             isAdmin={isAdmin}
             value={record.precio_unitario}
             min={0}
-            onChange={(value) =>
-              handleValueChange(record.key, "precio_unitario", value)
-            }
+            onChange={(value) => {
+              handleValueChange(record.key, "precio_unitario", value);
+
+              const comision = Number(record.comision_porcentual || 0);
+              const cantidad = Number(record.cantidad || 0);
+              const newUtilidad = parseFloat(
+                ((value * cantidad * comision) / 100).toFixed(2)
+              );
+
+              handleValueChange(record.key, "utilidad", newUtilidad);
+            }}
           />
         ) : (
           `Bs. ${record.precio_unitario}`
@@ -111,15 +119,18 @@ const CustomTable = ({
             min={0}
             onChange={(value) => {
               handleValueChange(record.key, "cantidad", value);
-              handleValueChange(
-                record.key,
-                "utilidad",
-                (value * record.utilidad) / record.cantidad
+
+              const comision = Number(record.comision_porcentual || 0);
+              const precio = Number(record.precio_unitario || 0);
+              const newUtilidad = parseFloat(
+                ((precio * value * comision) / 100).toFixed(2)
               );
+
+              handleValueChange(record.key, "utilidad", newUtilidad);
             }}
           />
         ) : (
-          `Bs. ${record.cantidad}`
+          record.cantidad
         ),
       className: "text-mobile-sm xl:text-desktop-sm",
     },
