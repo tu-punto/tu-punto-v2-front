@@ -4,11 +4,8 @@ import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
 import AddVariantModal from '../Product/AddVariantModal';
-//import ProductInfoModal from '../Product/ProductInfoModal';
 import StockPerBranchModal from './StockPerBranchModal';
-//import Product from "../Product/Product.tsx";
 import { IProduct } from "../../models/productModel.ts";
-import { getAllStockByProductIdAPI } from "../../api/product";
 import { getCategoryByIdAPI } from '../../api/category';
 import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
 import { saveTempStock } from "../../utils/storageHelpers";

@@ -34,17 +34,24 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
 
   useEffect(() => {
     if (!visible) return;
-    (async () => {
-      setSucursalOptions(await getSucursalsAPI());
 
-      const initSucursales = (seller.pago_sucursales || []).map((p: ISucursalPago) => ({
-        id_sucursal: p.id_sucursal,
-        sucursalName: p.sucursalName,
-        alquiler: p.alquiler,
-        exhibicion: p.exhibicion,
-        delivery: p.delivery,
-        entrega_simple: p.entrega_simple,
-      }));
+    (async () => {
+      const sucursales = await getSucursalsAPI();
+      //console.log("👉 Sucursales cargadas desde API:", sucursales);
+      setSucursalOptions(sucursales);
+
+      const initSucursales = (seller.pago_sucursales || []).map((p: ISucursalPago) => {
+        const id = p.id_sucursal?.$oid || p.id_sucursal;
+        const sucursal = sucursales.find((s) => s._id === id);
+        return {
+          id_sucursal: id,
+          sucursalName: sucursal?.nombre || p.sucursalName || "Sucursal sin nombre",
+          alquiler: p.alquiler,
+          exhibicion: p.exhibicion,
+          delivery: p.delivery,
+          entrega_simple: p.entrega_simple,
+        };
+      });
 
       form.setFieldsValue({
         fecha_vigencia: dayjs(seller.fecha_vigencia, "D/M/YYYY/"),
@@ -56,6 +63,7 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
     })();
   }, [visible]);
 
+
   const addBranch = () => {
     const list = form.getFieldValue("sucursales") || [];
     if (list.length >= sucursalOptions.length) {
@@ -65,6 +73,7 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
   };
 
   const onFinish = async (values: any) => {
+
     setLoading(true);
     try {
       const montoFinanceFlux = (values.sucursales || []).reduce(
@@ -92,10 +101,26 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
 
       message.success("Vendedor renovado con éxito");
       onSuccess();
-    } catch (err) {
-      console.error(err);
-      message.error("Error al renovar vendedor");
-    } finally {
+    } catch (err: any) {
+    console.error("Error al renovar vendedor:", err);
+
+    const msg =
+        err?.response?.data?.msg ||
+        err?.message ||
+        "Error al renovar vendedor";
+
+      message.error({
+        content: (
+            <div>
+              <strong>No se pueden eliminar estas sucursales:</strong>
+              <br />
+              <span style={{ color: "#cf1322", fontWeight: 600 }}>
+        {msg.split("stock:")[1]?.trim() || msg}
+      </span>
+            </div>
+        ),
+      });
+  } finally {
       setLoading(false);
     }
   };
@@ -154,6 +179,7 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
                     field={field}
                     remove={remove}
                     sucursalOptions={sucursalOptions}
+                    form={form}
                   />
                 </Card>
               ))}

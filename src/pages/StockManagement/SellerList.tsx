@@ -52,11 +52,12 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
         }
     }, [filterSelected])
 
-    for(const seller of sellers){
-        if(seller._id)
-            seller.name = `${seller.marca} - ${seller.nombre} ${seller.apellido}`
+    for (const seller of sellers) {
+        if (seller._id) {
+            const marca = seller.marca?.trim() || "Sin marca";
+            seller.name = `${marca} - ${seller.nombre} ${seller.apellido}`;
+        }
     }
-
 
     return (
         <div style={{marginTop: 30}}>

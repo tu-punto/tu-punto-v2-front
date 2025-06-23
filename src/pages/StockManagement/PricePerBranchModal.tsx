@@ -19,6 +19,12 @@ const PricePerBranchModal = ({
     const [dataSource, setDataSource] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [globalPrice, setGlobalPrice] = useState<number | null>(null);
+    useEffect(() => {
+        if (!visible) {
+            setGlobalPrice(null);
+        }
+    }, [visible]);
 
     useEffect(() => {
         if (visible && variantName && producto) {
@@ -34,27 +40,31 @@ const PricePerBranchModal = ({
                 producto?.sucursales?.[0]?.combinaciones?.[0]?.variantes || {}
             );
 
-            const combinedData = sucursales.map((branch: any) => {
-                const sucursalId = branch._id?.$oid || branch._id;
-                const sucursal = producto.sucursales?.find(
-                    (s: any) => (s.id_sucursal?.$oid || s.id_sucursal) === sucursalId
-                );
+            const combinedData = sucursales
+                .map((branch: any) => {
+                    const sucursalId = branch._id?.$oid || branch._id;
+                    const sucursal = producto.sucursales?.find(
+                        (s: any) => (s.id_sucursal?.$oid || s.id_sucursal) === sucursalId
+                    );
 
-                const combinacion = sucursal?.combinaciones?.find((c: any) => {
-                    const entry = Object.entries(c.variantes || {})
-                        .map(([_, v]) => v)
-                        .join(" / ");
-                    return entry === variantName;
-                });
+                    const combinacion = sucursal?.combinaciones?.find((c: any) => {
+                        const entry = Object.entries(c.variantes || {})
+                            .map(([_, v]) => v)
+                            .join(" / ");
+                        return entry === variantName;
+                    });
 
-                return {
-                    key: sucursalId,
-                    nombre: branch.nombre,
-                    precio: combinacion?.precio ?? 0,
-                    disponible: !!combinacion,
-                    variantes: combinacion?.variantes || {}, // ✅ envía el objeto real
-                };
-            });
+                    if (!combinacion) return null;
+
+                    return {
+                        key: sucursalId,
+                        nombre: branch.nombre,
+                        precio: combinacion.precio ?? 0,
+                        disponible: true,
+                        variantes: combinacion.variantes || {},
+                    };
+                })
+                .filter(Boolean);
 
             setDataSource(combinedData);
         } catch (error) {
@@ -162,6 +172,31 @@ const PricePerBranchModal = ({
             ]}
             width={600}
         >
+            <div style={{ marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span>Precio para todas las sucursales:</span>
+                <InputNumber
+                    min={0}
+                    value={globalPrice}
+                    onChange={(value) => setGlobalPrice(value ?? null)}
+                    placeholder="Ej. 10.00"
+                />
+                <Button
+                    onClick={() => {
+                        if (globalPrice == null || globalPrice < 0) {
+                            message.warning("Ingrese un precio válido");
+                            return;
+                        }
+                        const actualizadas = dataSource.map((item) =>
+                            item.disponible ? { ...item, precio: globalPrice } : item
+                        );
+                        setDataSource(actualizadas);
+                    }}
+                    type="default"
+                >
+                    Aplicar a todos
+                </Button>
+            </div>
+
             <Table
                 columns={columns}
                 dataSource={dataSource}

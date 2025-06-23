@@ -50,9 +50,37 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [sellers, setSellers] = useState([]);
     const [clickedOnce, setClickedOnce] = useState(false);
     const cargoDelivery = useWatch('cargo_delivery', internalForm);
+    const objetosIguales = (a: any, b: any) => {
+        const aOrdenado = JSON.stringify(Object.fromEntries(Object.entries(a).sort()));
+        const bOrdenado = JSON.stringify(Object.fromEntries(Object.entries(b).sort()));
+        return aOrdenado === bOrdenado;
+    };
+    const construirNombreVariante = (nombreProducto: string, variantes: Record<string, string>) => {
+        const valores = Object.values(variantes || {}).join(" / ");
+        return `${nombreProducto} - ${valores}`;
+    };
 
     const lugarEntrega = useWatch('lugar_entrega', internalForm);
-    const origenEsIgualADestino = lugarEntrega?.trim()?.toLowerCase() === sucursals?.[0]?.nombre?.trim().toLowerCase();
+    // Extraer nombre del lugar de origen desde el shipping usando el ID
+    const origenNombre = useMemo(() => {
+        const origenId = typeof shipping?.lugar_origen === 'object'
+            ? shipping.lugar_origen.$oid || shipping.lugar_origen._id
+            : shipping?.lugar_origen;
+
+        const sucursal = sucursals.find((s: any) => String(s._id) === String(origenId));
+        const nombre = sucursal?.nombre?.trim().toLowerCase() ?? null;
+
+        return nombre;
+    }, [shipping, sucursals]);
+
+    const origenEsIgualADestino = useMemo(() => {
+        const entrega = lugarEntrega?.trim().toLowerCase();
+        const origen = origenNombre?.trim().toLowerCase();
+
+        if (!entrega || !origen) return false;
+        return entrega === origen;
+    }, [lugarEntrega, origenNombre]);
+
 
     const saldoACobrar = useMemo(() => {
         const deliveryAdicional = internalForm.getFieldValue("quien_paga_delivery") === "comprador"
@@ -266,21 +294,26 @@ const restaurarStock = async (productos: any[]) => {
 
         // Reconstruir variantes desde nombre_variante si no existen
         let variantes = prod.variantes;
-        if (!variantes) {
-            const partes = nombreVariante.split(" - ");
-            const atributos = partes[1]?.split(" / ") || [];
-            variantes = {};
-            if (atributos.length === 2) {
-                variantes = { Tamaño: atributos[0], Color: atributos[1] };
-            } else if (atributos.length === 1) {
-                variantes = { Tamaño: atributos[0] };
-            }
-        }
 
-        const combinacion = sucursalData.combinaciones.find((c: any) => {
-            return JSON.stringify(c.variantes) === JSON.stringify(variantes);
+// Siempre reconstruimos las variantes desde el nombre_variante (más seguro)
+        const nombreBase = productoCompleto.nombre_producto;
+        const target = nombreVariante?.normalize("NFD").toLowerCase();
+
+        const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
+            const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
+            return nombreCombinacion === target;
         });
 
+        if (!combinacionExacta) {
+            console.warn("❌ No se encontró combinación por nombre exacto:", nombreVariante);
+            continue;
+        }
+
+        variantes = combinacionExacta.variantes;
+
+        const combinacion = sucursalData.combinaciones.find((c: any) => {
+            return objetosIguales(c.variantes, variantes);
+        });
         if (!combinacion) {
             console.warn("❌ No se encontró combinación exacta para:", variantes);
             continue;
@@ -429,28 +462,35 @@ return (
                                     //console.log("Restaurando stock de productos antes de eliminar la entrega...",products);
                                     const enrichedForRestock = products.map((p) => {
                                         const nombreVariante = p.nombre_variante || p.producto || '';
-                                        const [nombreProducto, variantesStr] = nombreVariante.split(" - ");
-                                        const atributos = variantesStr?.split(" / ") || [];
-
-                                        const productoCompleto = data.find(dp => dp.nombre_producto === nombreProducto);
+                                        const productoCompleto = data.find(dp =>
+                                            dp._id === p.id_producto || dp.nombre_producto === p.producto?.split(" - ")[0]
+                                        );
                                         if (!productoCompleto) {
-                                            console.warn("⚠️ Producto no encontrado en data:", nombreVariante);
+                                            console.warn("⚠️ Producto no encontrado en data:", p.producto);
                                             return p;
                                         }
 
-                                        const ejemploComb = productoCompleto?.sucursales?.[0]?.combinaciones?.[0];
-                                        const claves = Object.keys(ejemploComb?.variantes || {});
+                                        const variantes = p.variantes && Object.keys(p.variantes).length > 0
+                                            ? p.variantes
+                                            : (() => {
+                                                const partes = p.producto.split(" - ");
+                                                const atributos = partes[1]?.split(" / ") || [];
 
-                                        const variantesReconstruidas: Record<string, string> = {};
-                                        claves.forEach((k, i) => {
-                                            variantesReconstruidas[k] = atributos[i] || '';
-                                        });
+                                                const ejemploComb = productoCompleto?.sucursales?.[0]?.combinaciones?.[0];
+                                                const claves = Object.keys(ejemploComb?.variantes || {});
+                                                const reconstruidas: Record<string, string> = {};
+                                                claves.forEach((k, i) => {
+                                                    reconstruidas[k] = atributos[i] || '';
+                                                });
+                                                return reconstruidas;
+                                            })();
 
                                         return {
                                             ...p,
                                             id_producto: p.id_producto || productoCompleto._id,
-                                            variantes: Object.keys(p.variantes || {}).length > 0 ? p.variantes : variantesReconstruidas
+                                            variantes,
                                         };
+
                                     });
                                     //console.log("♻️ Restaurando con datos:", enrichedForRestock);
 

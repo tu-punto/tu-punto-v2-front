@@ -206,7 +206,7 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
             <Modal
             title="Confirmar Productos"
             visible={visible}
-            onCancel={clearAll}
+            onCancel={onClose}
             footer={[
                 <Button key="clear" danger onClick={clearAll}>Limpiar Cambios</Button>,
                 <Button key="cancel" onClick={onClose}>Cancelar</Button>,

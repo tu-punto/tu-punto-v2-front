@@ -19,18 +19,26 @@ const StockPerBranchModal = ({
         setLoading(true);
         try {
             const branches = await getSucursalsAPI();
-            const data = branches.map(branch => {
-                const id = branch._id.$oid || branch._id;
-                const sucursal = producto.sucursales?.find(s => (s.id_sucursal.$oid || s.id_sucursal) === id);
-                const match = sucursal?.combinaciones?.find(c =>
-                    Object.values(c.variantes || {}).join(" / ").toLowerCase() === variantName.toLowerCase()
-                );
-                return {
-                    key: id,
-                    nombre: branch.nombre,
-                    stock: match?.stock ?? 0,
-                };
-            });
+            const data = branches
+                .map(branch => {
+                    const id = branch._id?.$oid || branch._id;
+                    const sucursal = producto.sucursales?.find(
+                        s => (s.id_sucursal?.$oid || s.id_sucursal) === id
+                    );
+
+                    const match = sucursal?.combinaciones?.find(c =>
+                        Object.values(c.variantes || {}).join(" / ").toLowerCase() === variantName.toLowerCase()
+                    );
+
+                    if (!match) return null;
+
+                    return {
+                        key: id,
+                        nombre: branch.nombre,
+                        stock: match.stock,
+                    };
+                })
+                .filter(Boolean);
             setDataSource(data);
         } catch (err) {
             console.error("Error obteniendo stock por sucursal:", err);
