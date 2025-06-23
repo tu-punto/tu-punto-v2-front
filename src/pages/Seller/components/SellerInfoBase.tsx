@@ -123,6 +123,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           ...sale,
           tipo: esVenta ? "Venta" : "Pedido",
           subtotal: sale.precio_unitario * sale.cantidad,
+          comision_porcentual: seller.comision_porcentual || 0,
           key: `${sale.id_producto}-${sale.fecha_pedido}`,
         };
       });
@@ -142,7 +143,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta actualizada correctamente");
       await fetchSales(); // Refresca ventas
-      onSuccess()
+      onSuccess();
     } else {
       message.error("Error al actualizar la venta");
     }
@@ -154,7 +155,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
-      onSuccess()
+      onSuccess();
     } else {
       message.error("Error al eliminar la venta");
     }
