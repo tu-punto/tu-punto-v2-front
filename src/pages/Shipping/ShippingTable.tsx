@@ -200,6 +200,16 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         try {
             const response = await getSucursalsAPI();
             setSucursal(response);
+
+            const sucursalId = localStorage.getItem("sucursalId");
+            if (sucursalId) {
+                const sucursalActual = response.find((s: any) =>
+                    s._id === sucursalId || s.id_sucursal === sucursalId
+                );
+                if (sucursalActual) {
+                    setSelectedOrigin(sucursalActual.nombre);
+                }
+            }
         } catch (error) {
             message.error('Error al obtener las sucursales');
         }
@@ -262,6 +272,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 <Select
                     className="mr-2 w-2/3 xl:w-1/5"
                     placeholder="Sucursal de Origen"
+                    value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
                     allowClear
                 >
