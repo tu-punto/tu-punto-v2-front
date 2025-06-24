@@ -229,7 +229,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
     if (!pedidosProcesados.has(sale.id_pedido._id)) {
       subtotalDeuda -=
-        sale.id_pedido.adelanto_cliente - sale.id_pedido.cargo_delivery;
+        sale.id_pedido.adelanto_cliente + sale.id_pedido.cargo_delivery;
       pedidosProcesados.add(sale.id_pedido._id);
     }
 
