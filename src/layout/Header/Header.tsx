@@ -2,26 +2,38 @@ import { Button, Input, message } from "antd";
 import "./Header.css";
 import logoImg from "../../../public/logo-no-letter-dark-bg.png";
 import { logoutUserAPI } from "../../api/user";
+import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { UserContext } from "../../context/userContext";
 const { Search } = Input;
 
 const Header = () => {
-  const { setUser } = useContext(UserContext)!;
-  const handleLogout = async () => {
-    try {
-      const res = await logoutUserAPI();
-      if (!res?.success) {
-        message.error("Error al cerrar sesión");
-      }
-      setUser(null);
-      message.success("Sesión cerrada correctamente");
-    } catch (error) {
-      message.error("Error al cerrar sesión");
-      console.error(error);
-    }
-  };
+    const { user, setUser } = useContext(UserContext)!;
+    const navigate = useNavigate();
+    const handleLogout = async () => {
+        try {
+            const res = await logoutUserAPI();
 
+            if (!res?.success) {
+                message.error("Error al cerrar sesión");
+                return;
+            }
+
+            setUser(null);
+            message.success("Sesión cerrada correctamente");
+
+            // 👇 Redirige según el rol
+            if (user?.role === "admin") {
+                navigate("/login-admin");
+            } else {
+                navigate("/login-seller");
+            }
+
+        } catch (error) {
+            message.error("Error al cerrar sesión");
+            console.error(error);
+        }
+    };
   return (
     <div className="flex justify-between items-center p-5 bg-blue h-16 border-light-gray">
       <div className="flex items-center bg-blue">

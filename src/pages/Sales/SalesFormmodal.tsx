@@ -83,7 +83,8 @@ function SalesFormModal({
             pagado_al_vendedor: tipoPagoSeleccionado === 3,
             subtotal_qr: tipoPagoSeleccionado === 1 || tipoPagoSeleccionado === 4 ? (qrInput || totalAmount / 2) : 0,
             subtotal_efectivo: tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4 ? (efectivoInput || totalAmount / 2) : 0,
-            id_sucursal: sucursalId,
+            sucursal: sucursalId,
+            lugar_origen: sucursalId,
             cliente: "Sin nombre",
             telefono_cliente: "00000000",
             lugar_entrega: "No aplica",
@@ -99,9 +100,7 @@ function SalesFormModal({
             return;
         }
 
-        const productosTemporales = selectedProducts.filter((p: any) => p.esTemporal);
-        const productosNormales = selectedProducts.filter((p: any) => !p.esTemporal);
-        const ventas = productosNormales.map((p: any) => {
+        const ventas = selectedProducts.map((p: any) => {
             const vendedor = p.id_vendedor || p.vendedor;
             const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
             const utilidad = parseFloat(p.utilidad);
@@ -130,20 +129,6 @@ function SalesFormModal({
             await actualizarStock(ventas);
         }
 
-        if (productosTemporales.length > 0) {
-            const productosTemporalesData = productosTemporales.map((p: any) => ({
-                producto: p.producto,
-                cantidad: p.cantidad,
-                precio_unitario: p.precio_unitario,
-                utilidad: p.utilidad,
-                id_vendedor: p.id_vendedor
-            }));
-
-            await updateShippingAPI(
-                { productos_temporales: productosTemporalesData },
-                response.newShipping._id
-            );
-        }
 
         clearSelectedProducts();
         form.resetFields();

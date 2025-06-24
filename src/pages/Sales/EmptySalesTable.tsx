@@ -52,7 +52,9 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                 ) : (
                     <InputNumber
                         min={1}
-                        max={record.cantidadMaximaEditable ?? record.stockActual ?? Infinity}
+                        {...(!record.esTemporal && {
+                            max: record.cantidadMaximaEditable ?? record.stockActual ?? Infinity
+                        })}
                         value={record.cantidad}
                         onChange={value => handleValueChange(record.key, 'cantidad', value)}
                     />

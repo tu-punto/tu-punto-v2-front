@@ -86,11 +86,17 @@ export const Sales = () => {
     const fetchSellers = async () => {
         try {
             const response = await getSellersAPI();
-            setSellers(response);
+
+            const today = new Date();
+            const sellersVigentes = response.filter((v: any) => {
+                const fecha = v.fecha_vigencia ? new Date(v.fecha_vigencia) : null;
+                return !fecha || fecha >= new Date(today.setHours(0, 0, 0, 0));
+            });
+
+            setSellers(sellersVigentes);
         } catch (error) {
             message.error('Error al obtener los vendedores');
         }
-
     };
 
     const fetchSucursal = async () => {
@@ -133,17 +139,25 @@ export const Sales = () => {
     const filteredProducts = () => {
         let filteredData = data;
 
+        // 2. Excluir productos de vendedores no vigentes
+        const today = new Date();
+        const vendedoresVigentesIds = sellers
+            .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
+            .map(v => v._id);
+
+        filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(p.id_vendedor));
+
+        // 3. Filtrar por sucursal o vendedor según sea admin o no
         if (!isAdmin) {
             filteredData = filteredData.filter(p => p.id_vendedor === user.id_vendedor);
             if (selectedBranchId) {
                 filteredData = filteredData.filter(p => p.sucursalId === selectedBranchId);
             }
-        } else {
-            if (selectedSellerId) {
-                filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
-            }
+        } else if (selectedSellerId) {
+            filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
         }
 
+        // 4. Filtrar por búsqueda
         if (searchText.trim()) {
             const lowerSearch = searchText.toLowerCase();
             filteredData = filteredData.filter(product =>
@@ -151,12 +165,11 @@ export const Sales = () => {
             );
         }
 
+        // 5. Solo productos con stock
         filteredData = filteredData.filter(product => product.stockActual > 0);
 
         return filteredData;
-
     };
-
     const handleProductSelect = (product: any) => {
         setSelectedProducts((prevProducts: any) => {
             const exists = prevProducts.find((p: any) => p.key === product.key);

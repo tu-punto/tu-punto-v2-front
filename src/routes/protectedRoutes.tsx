@@ -13,6 +13,7 @@ import SellerInfoPageWrapper from "../pages/Seller/SellerInfo";
 import CashReconciliationPage from "../pages/BoxClose/BoxClosePage";
 import CierreCajaPage from "../pages/BoxClose/DailyBoxClose";
 import BranchPage from "../pages/Branch/BranchPage";
+import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 
 const protectedRoutes = [
   {
@@ -127,6 +128,14 @@ const protectedRoutes = [
           <RoleGuard allowedRoles={["admin"]}>
             <BranchPage />
           </RoleGuard>
+        ),
+      },
+      {
+        path: "/sales-history",
+        element: (
+            <RoleGuard allowedRoles={["admin"]}>
+              <SalesHistoryPage />
+            </RoleGuard>
         ),
       },
       {

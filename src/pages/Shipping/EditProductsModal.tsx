@@ -4,13 +4,13 @@ import EmptySalesTable from '../Sales/EmptySalesTable';
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal.tsx";
 import {
     deleteProductsByShippingAPI,
-    registerSalesAPI,
     updateProductsByShippingAPI
 } from '../../api/sales';
 import {
-    addTemporaryProductsToShippingAPI, updateShippingAPI, deleteShippingAPI
+    registerSalesToShippingAPI
 } from '../../api/shipping';
-import {updateSubvariantStockAPI} from "../../api/product.ts";
+
+import {registerProductAPI, updateSubvariantStockAPI} from "../../api/product.ts";
 interface EditProductsModalProps {
     visible: boolean;
     onCancel: () => void;
@@ -95,8 +95,17 @@ const EditProductsModal = ({
         return new Set(localProducts.map(p => p.nombre_variante || p.producto));
     }, [localProducts]);
 
+    const hoy = new Date().setHours(0, 0, 0, 0);
+
     const filteredOptions = useMemo(() => {
-        return allProducts
+        const vigentes = allProducts.filter(p => {
+            const vendedor = sellers.find(s => s._id === p.id_vendedor);
+            if (!vendedor) return false;
+            const fecha = vendedor.fecha_vigencia ? new Date(vendedor.fecha_vigencia).getTime() : Infinity;
+            return fecha >= hoy;
+        });
+
+        return vigentes
             .filter((p) => {
                 const nombre = p.nombre_variante || p.producto;
                 const stock = Number(p.stockActual ?? 0);
@@ -107,7 +116,7 @@ const EditProductsModal = ({
                 value: p.key,
                 rawProduct: p
             }));
-    }, [allProducts, allSelectedNames]);
+    }, [allProducts, sellers, allSelectedNames]);
 
     const handleSelectProduct = (key: string) => {
         const selected = allProducts.find((p) => p.key === key);
@@ -250,10 +259,21 @@ const EditProductsModal = ({
     };
 
     const handleGuardar = async () => {
-        const nuevos = localProducts.filter(p => !p.id_venta);
+        console.log("🧪 handleGuardar EJECUTADO");
+
         const existentes = localProducts.filter(p => p.id_venta);
-        const temporales = nuevos.filter(p => p.esTemporal);
-        const normales = nuevos.filter(p => !p.esTemporal && p.id_producto?.length === 24);
+        const nuevos = localProducts.filter(p => !('id_venta' in p));
+        console.log("🧪 Productos detectados como nuevos:", nuevos);
+
+        const temporales = nuevos.filter(p => p.esTemporal && (!p.id_producto || p.id_producto.length !== 24));
+
+        const temporalesYaRegistrados = nuevos.filter(
+            p => p.esTemporal && p.id_producto && p.id_producto.length === 24
+        );
+
+        const normales = nuevos.filter(
+            p => !p.esTemporal && p.id_producto?.length === 24
+        );
 
 
         const originalesMap = new Map();
@@ -269,7 +289,14 @@ const EditProductsModal = ({
 
         const modificadosConCambioCantidad = existentes.filter(p => {
             const original = originalesMap.get(p.key);
-            return original && Number(p.cantidad) !== Number(original.cantidad);
+
+            if (!original) return false;
+
+            return (
+                Number(p.cantidad) !== Number(original.cantidad) ||
+                Number(p.precio_unitario) !== Number(original.precio_unitario) ||
+                Number(p.utilidad) !== Number(original.utilidad)
+            );
         });
 
         const aumentaron = modificadosConCambioCantidad.filter(p => {
@@ -288,9 +315,54 @@ const EditProductsModal = ({
         //console.log("📈 Disminuyeron:", disminuyeron);
         //console.log("❌ Eliminados:", eliminadosConData);
         try {
-            // Nuevos normales
-            if (normales.length > 0) {
-                await registerSalesAPI(normales.map(p => ({
+            // ⚙️ 1. Registrar productos temporales si no existen y tratarlos como normales
+            const temporalesPreparados = [];
+
+            for (const temp of temporales) {
+                if (!temp.id_producto || temp.id_producto.length !== 24) {
+                    const nuevoProducto = await registerProductAPI({
+                        nombre_producto: temp.nombre_variante || temp.producto,
+                        id_vendedor: temp.id_vendedor,
+                        id_categoria: temp.id_categoria || undefined,
+                        esTemporal: true,
+                        sucursales: [{
+                            id_sucursal: sucursalId,
+                            combinaciones: [{
+                                variantes: temp.variantes || { Variante: "Temporal" },
+                                precio: temp.precio_unitario,
+                                stock: temp.cantidad || 1
+                            }]
+                        }]
+                    });
+
+                    if (nuevoProducto?.success) {
+                        temp.id_producto = nuevoProducto.newProduct._id;
+                    } else {
+                        message.error("Error al registrar un producto temporal");
+                        continue;
+                    }
+                }
+                //console.log('sucursal', sucursalId, 'shippingId', shippingId, 'temp', temp);
+
+                temporalesPreparados.push({
+                    cantidad: temp.cantidad,
+                    precio_unitario: temp.precio_unitario,
+                    utilidad: temp.utilidad,
+                    id_producto: temp.id_producto,
+                    id_pedido: shippingId,
+                    id_vendedor: temp.id_vendedor,
+                    sucursal: sucursalId,
+                    deposito_realizado: false,
+                    nombre_variante: temp.nombre_variante || temp.producto,
+                });
+            }
+
+// ⚙️ 2. Registrar los nuevos normales + temporales preparados
+            // ⚙️ 2. Registrar los nuevos normales + temporales preparados
+            const nuevosTodos = [
+                ...normales,
+                ...temporalesPreparados,
+                ...temporalesYaRegistrados.map(p => ({
                     cantidad: p.cantidad,
                     precio_unitario: p.precio_unitario,
                     utilidad: p.utilidad,
@@ -300,13 +372,32 @@ const EditProductsModal = ({
                     sucursal: sucursalId,
                     deposito_realizado: false,
                     nombre_variante: p.nombre_variante || p.producto,
-                })));
-                await restarStock(normales);
-            }
+                }))
+            ];
+            //console.log("📤 Nuevos productos antes de if:", nuevosTodos);
 
-            // Nuevos temporales
-            if (temporales.length > 0) {
-                await addTemporaryProductsToShippingAPI(shippingId, temporales);
+            if (nuevosTodos.length > 0) {
+
+                const payload = {
+                    shippingId,
+                    sales: nuevosTodos
+                };
+
+                try {
+                    const response = await registerSalesToShippingAPI(payload);
+
+                    if (!response?.success) {
+                        console.error("❌ Falló el registro de ventas. Detalles:", response);
+                        message.error("❌ No se pudo registrar las ventas");
+                        return;
+                    }
+                } catch (err) {
+                    console.error("💥 Error al ejecutar registerSalesToShippingAPI:", err);
+                    message.error("❌ Error crítico al registrar ventas");
+                    return;
+                }
+
+                await restarStock(nuevosTodos);
             }
 
             // Actualizar modificados
@@ -463,6 +554,7 @@ const EditProductsModal = ({
                         ...prev,
                         {
                             ...tempProduct,
+                            id_producto: tempProduct._id,
                             cantidad,
                             precio_unitario: precio,
                             utilidad,

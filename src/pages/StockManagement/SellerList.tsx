@@ -14,20 +14,36 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
     const [idKey, setIdKey] = useState("_id")
 
     const fetchData = async () => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         const sellersResponse = await getSellersAPI();
-        sellersResponse.unshift({_id: null, name: "Todos"})
-        setSellers(sellersResponse);
-        //console.log(sellersResponse);
-        const groupsResponse = await getGroupsAPI()
-        setGroups(groupsResponse)
-        //console.log(groupsResponse);
-        const categoriesResponse = await getCategoriesAPI()
-        for(const category of categoriesResponse)
-            category.name = category.categoria
-        setCategories(categoriesResponse)
-        //console.log(categoriesResponse);
-        setFilterList(sellersResponse)
-    }
+
+        const vigentes = sellersResponse.filter((seller: any) => {
+            const vigencia = seller.fecha_vigencia ? new Date(seller.fecha_vigencia) : null;
+            if (vigencia) vigencia.setHours(0, 0, 0, 0);
+            return !vigencia || vigencia >= today;
+        });
+
+        vigentes.unshift({ _id: null, name: "Todos" });
+
+        for (const seller of vigentes) {
+            if (seller._id) {
+                const marca = seller.marca?.trim() || "Sin marca";
+                seller.name = `${marca} - ${seller.nombre} ${seller.apellido}`;
+            }
+        }
+
+        setSellers(vigentes);
+        setFilterList(vigentes);
+
+        const groupsResponse = await getGroupsAPI();
+        setGroups(groupsResponse);
+
+        const categoriesResponse = await getCategoriesAPI();
+        for (const category of categoriesResponse) category.name = category.categoria;
+        setCategories(categoriesResponse);
+    };
 
     useEffect( () => {
         fetchData()
@@ -66,8 +82,12 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
                 style={{ width: '100%' }}
                 placeholder={placeholder}
                 onChange={(value) => onSelectSeller(value)}
+                showSearch
+                filterOption={(input, option) =>
+                    option?.children?.toString().toLowerCase().includes(input.toLowerCase())
+                }
             >
-                {filterList.map((item) => (
+            {filterList.map((item) => (
                     <Option key={item[idKey]} value={item[idKey]}>
                         {item.name}
                     </Option>
