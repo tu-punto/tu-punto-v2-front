@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Table, DatePicker, message, Tag } from "antd";
+import { Table, DatePicker, message, Tag, Modal } from "antd";
 import dayjs from "dayjs";
 import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
+import { getShippingByIdAPI } from "../../api/shipping"; // asegúrate de importar
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
@@ -10,7 +11,22 @@ const SalesHistoryTable = () => {
     const [loading, setLoading] = useState(false);
 
     const sucursalId = localStorage.getItem("sucursalId");
+    const [selectedSale, setSelectedSale] = useState<any | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
+    const handleRowClick = async (record: any) => {
+        if (record.isSummary) return;
+
+        try {
+            const res = await getShippingByIdAPI(record._id);
+            if (res) {
+                setSelectedSale(res); // ahora incluye productos
+                setIsModalOpen(true);
+            }
+        } catch {
+            message.error("Error al obtener los detalles del pedido");
+        }
+    };
     const fetchSales = async () => {
         setLoading(true);
         try {
@@ -108,11 +124,17 @@ const SalesHistoryTable = () => {
                     <div className="flex justify-center">
                         <Tag
                             color="green"
-                            className="text-white text-base font-semibold px-4 py-1"
-                            style={{ borderRadius: "999px" }}
+                            className="text-base font-semibold px-4 py-1"
+                            style={{
+                                borderRadius: "999px",
+                                backgroundColor: "transparent",
+                                color: "#389e0d", // verde antd
+                                border: "1px solid #b7eb8f",
+                            }}
                         >
                             {label}
                         </Tag>
+
                     </div>
                 );
             }
@@ -170,11 +192,45 @@ const SalesHistoryTable = () => {
                 dataSource={getGroupedData()}
                 rowKey={(r, i) => r.isSummary ? `summary-${r.fecha}-${i}` : `${r.fecha}-${r.hora}-${i}`}
                 rowClassName={(record) =>
-                    record.isSummary ? "bg-gray-50 text-center text-sm !align-middle" : ""
+                    record.isSummary ? "bg-gray-50 text-center text-sm !align-middle" : "hover:bg-gray-100"
                 }
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: "max-content" }}
+                onRow={(record) => ({
+                    onClick: () => handleRowClick(record),
+                })}
             />
+            <Modal
+                open={isModalOpen}
+                onCancel={() => setIsModalOpen(false)}
+                footer={null}
+                title="Detalle de la Venta"
+            >
+                {selectedSale && (
+                    <>
+                        <p><strong>Fecha:</strong> {dayjs(selectedSale.fecha).format("DD/MM/YYYY")}</p>
+                        <p><strong>Hora:</strong> {selectedSale.hora}</p>
+                        <p><strong>Tipo de pago:</strong> {selectedSale.tipo_de_pago}</p>
+                        <p><strong>Monto Total:</strong> Bs. {selectedSale.monto_total?.toFixed(2)}</p>
+                        <p><strong>Subtotal Efectivo:</strong> Bs. {selectedSale.subtotal_efectivo?.toFixed(2)}</p>
+                        <p><strong>Subtotal QR:</strong> Bs. {selectedSale.subtotal_qr?.toFixed(2)}</p>
+
+                        {/* Si tienes lista de productos */}
+                        {selectedSale?.productos?.length > 0 && (
+                            <div className="mt-4">
+                                <strong>Productos:</strong>
+                                <ul className="list-disc pl-6">
+                                    {selectedSale.productos.map((p: any, idx: number) => (
+                                        <li key={idx}>
+                                            {p.nombre_variante || p.nombre_producto || "Producto"} — {p.cantidad} x Bs. {p.precio_unitario}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </>
+                )}
+            </Modal>
         </>
     );
 };

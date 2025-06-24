@@ -146,6 +146,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const esOtroLugar = !sucursals.find(s => s.nombre === shipping.lugar_entrega);
         const lugar_entrega = esOtroLugar ? 'otro' : shipping.lugar_entrega;
         const lugar_entrega_input = esOtroLugar ? shipping.lugar_entrega : '';
+        const quienPagaDeVenta =
+            shipping?.venta?.[0]?.quien_paga_delivery ||
+            shipping?.quien_paga_delivery ||
+            "comprador";
 
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
@@ -156,7 +160,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'HH:mm') : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
-            quien_paga_delivery: shipping.quien_paga_delivery || "comprador",
+            quien_paga_delivery: quienPagaDeVenta,
             cargo_delivery: shipping.cargo_delivery,
             costo_delivery: shipping.costo_delivery,
             adelanto_cliente: shipping.adelanto_cliente,
@@ -165,13 +169,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
-
+        setTipoPago(shipping.tipo_de_pago || null);
+        setEstadoPedido(shipping.estado_pedido || "En Espera");
         setIsDeliveryPlaceInput(esOtroLugar);
-        if (!origenEsIgualADestino && !shipping.quien_paga_delivery) {
+        if (!origenEsIgualADestino && !quienPagaDeVenta) {
             internalForm.setFieldValue('quien_paga_delivery', 'comprador');
-            //setQuienPaga(quienPagaDeVenta);
         }
-
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
             ...p,
             id_venta: p._id ?? null,
@@ -691,7 +694,11 @@ return (
                     <>
                         <Row gutter={16}>
                             <Col span={24}>
-                                <Form.Item name="quien_paga_delivery" noStyle>
+                                <Form.Item
+                                    name="quien_paga_delivery"
+                                    label="¿Quién paga el delivery?"
+                                    rules={[{ required: true, message: "Seleccione quién paga el delivery" }]}
+                                >
                                     <Radio.Group
                                         value={quienPagaDelivery} //  esto lo hace controlado
                                         onChange={e => internalForm.setFieldValue("quien_paga_delivery", e.target.value)}
