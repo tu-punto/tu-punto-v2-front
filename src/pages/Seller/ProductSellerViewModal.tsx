@@ -4,6 +4,7 @@ import { getCategoriesAPI} from "../../api/category"
 import { UserContext } from "../../context/userContext";
 import { registerVariantAPI } from "../../api/product";
 import { createEntryAPI } from "../../api/entry";
+import { registerProductAPI } from "../../api/product";
 
 const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller, openFromEditProductsModal = false, sellers = [] }: any) => {
     const { user }: any = useContext(UserContext);
@@ -11,6 +12,9 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
     const [categories, setCategories] = useState([])
     const [newCategory, setNewCategory] = useState('')
     const [form] = Form.useForm();
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [pendingData, setPendingData] = useState<any>(null);
+
     useEffect(() => {
         if (visible && openFromEditProductsModal) {
             form.resetFields();
@@ -19,51 +23,59 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
 
     const handleFinish = async (productData: any) => {
         const idVendedor = productData.id_vendedor || selectedSeller?._id;
-        console.log("🧪 vendedor:", idVendedor, productData);
+        console.log("🧪 vendedor:", productData.id_vendedor, selectedSeller?._id, productData);
 
         if (!idVendedor) {
             message.warning("Debe seleccionar un vendedor antes de registrar el producto.");
             return;
         }
 
-        Modal.confirm({
-            title: 'Confirmación',
-            content: '¿Está seguro de que desea registrar este producto?',
-            okText: 'Sí',
-            onOk: () => submitProductData({ ...productData, id_vendedor: idVendedor }),
-        });
+        setPendingData({ ...productData, id_vendedor: idVendedor });
+        setShowConfirm(true);
     };
 
     const submitProductData = async (productData: any) => {
-        const { nombre_producto, precio, id_categoria, cantidad_por_sucursal } = productData;
-        const idVendedor = openFromEditProductsModal
-            ? productData.id_vendedor
-            : selectedSeller?._id;
-        console.log("🧪 vendedor:", form.getFieldValue("id_vendedor"), productData);
+        const sucursalId = localStorage.getItem("sucursalId");
 
-        if (!idVendedor) {
-            message.warning("Debe seleccionar un vendedor.");
+        const productPayload = {
+            nombre_producto: productData.nombre_producto,
+            id_categoria: productData.id_categoria,
+            id_vendedor: productData.id_vendedor || selectedSeller?._id,
+            esTemporal: true,
+            sucursales: [{
+                id_sucursal: sucursalId,
+                combinaciones: [{
+                    variantes: { Variante: "Temporal" },
+                    precio: productData.precio,
+                    stock: productData.cantidad_por_sucursal
+                }]
+            }]
+        };
+
+        const result = await registerProductAPI(productPayload);
+        if (!result.success) {
+            message.error("Error al registrar el producto temporal");
             return;
         }
 
-        const newProduct = {
-            key: Date.now().toString(),
-            producto: nombre_producto,
-            stockActual: cantidad_por_sucursal,
-            precio,
-            categoria: categories.find(c => c._id === id_categoria)?.categoria || "Sin categoría",
-            cantidad: cantidad_por_sucursal,
-            precio_unitario: precio,
+        const newProduct = result.newProduct;
+        onAddProduct({
+            ...newProduct,
+            id_producto: newProduct._id, // ✅ IMPORTANTE
+            producto: newProduct.nombre_producto,
+            precio_unitario: productData.precio,
+            cantidad: productData.cantidad_por_sucursal,
+            stockActual: productData.cantidad_por_sucursal,
             utilidad: 1,
-            id_vendedor: idVendedor,
-            esTemporal: true
-        };
-        message.success("Producto temporal agregado al carrito");
-        form.resetFields();
-        onAddProduct(newProduct);
-        onSuccess();
-    };
+            esTemporal: true,
+            key: newProduct._id + "-0"
+        });
 
+        message.success("Producto temporal registrado exitosamente");
+        setShowConfirm(false);
+        onSuccess();
+        form.resetFields();
+    };
 
     const fetchCategories = async () => {
         try {
@@ -229,6 +241,20 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                     </Button>
                 </Form.Item>
             </Form>
+            <Modal
+                title="Confirmación"
+                open={showConfirm}
+                onCancel={() => setShowConfirm(false)}
+                onOk={() => {
+                    submitProductData(pendingData);
+                    setShowConfirm(false);
+                }}
+                okText="Sí"
+                cancelText="Cancelar"
+            >
+                ¿Está seguro de que desea registrar este producto?
+            </Modal>
+
         </Modal>
     );
 };

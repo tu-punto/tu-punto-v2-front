@@ -58,11 +58,21 @@ const StockManagement = () => {
             //console.log("🧪 Productos recibidos:", productsResponse);
             //console.log("🧪 Usuario actual:", user);
 
-            const filteredSellers = sellersResponse.filter((seller: any) =>
-                seller.pago_sucursales?.some((ps: any) =>
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // 🔒 Resetear hora para comparar solo fechas
+
+            const filteredSellers = sellersResponse.filter((seller: any) => {
+                const vigencia = seller.fecha_vigencia ? new Date(seller.fecha_vigencia) : null;
+                if (vigencia) vigencia.setHours(0, 0, 0, 0); // 🔒 Asegurar comparación sin hora
+
+                const vigente = !vigencia || vigencia >= today;
+
+                const tieneSucursal = seller.pago_sucursales?.some((ps: any) =>
                     String(ps.id_sucursal) === String(sucursalId)
-                )
-            );
+                );
+
+                return vigente && tieneSucursal;
+            });
             setSellers(filteredSellers);
             setCategories(categoriesResponse);
             setGroups(groupsResponse);

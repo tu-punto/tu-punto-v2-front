@@ -6,6 +6,7 @@ import financeFluxIcon from "../assets/financeFluxIcon.svg";
 import stockManagementIcon from "../assets/stockManagement.svg";
 import statsIcon from "../assets/statsIcon.svg";
 import branchIcon from "../assets/branchIcon.svg";
+import salesHistoryIcon from "../assets/historyIcono.png"; // ⚠️ usa un ícono adecuado o reutiliza uno existente
 
 export const menu = [
   // {
@@ -59,6 +60,12 @@ export const menu = [
     path: "/branch",
     label: "Sucursales",
     icon: branchIcon,
+    roles: ["admin"],
+  },
+  {
+    path: "/sales-history",
+    label: "Historial de Ventas",
+    icon: salesHistoryIcon,
     roles: ["admin"],
   },
 ];

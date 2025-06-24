@@ -43,11 +43,12 @@ const registerShippingAPI = async (shippingData: any) => {
 };
 
 const registerSalesToShippingAPI = async (salesData: any) => {
-  console.log("Registering sales data:", salesData);
   try {
+    console.log("📤 Enviando ventas al backend:", salesData); // 👀
     const res = await apiClient.post("/shipping/register/sales", salesData);
     return { success: true, ...res.data };
   } catch (error) {
+    console.error("❌ Error al llamar registerSalesToShippingAPI:", error); // 👈 AÑADE ESTO
     const err = error as AxiosError;
     if (err && err.response && err.response.data) {
       return { success: false, ...err.response.data };
@@ -55,6 +56,7 @@ const registerSalesToShippingAPI = async (salesData: any) => {
     return { success: false };
   }
 };
+
 const getShippingByIdAPI = async (id: string) => {
   try {
     const res = await apiClient.get(`/shipping/by/${id}`);
@@ -108,7 +110,22 @@ const deleteShippingAPI = async (id: string) => {
     return { success: false };
   }
 };
+const getSalesHistoryAPI = async (date?: string, sucursalId?: string) => {
+  try {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    if (sucursalId) params.append("sucursalId", sucursalId);
 
+    const res = await apiClient.get(`/shipping/history/sales?${params.toString()}`);
+    return { success: true, ...res.data };
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
 
 export {
   getShippingsAPI,
@@ -119,5 +136,6 @@ export {
   getShippingByIdAPI,
   getShippingsBySellerIdAPI,
   addTemporaryProductsToShippingAPI,
-  deleteShippingAPI
+  deleteShippingAPI,
+  getSalesHistoryAPI
 };

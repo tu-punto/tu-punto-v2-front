@@ -102,8 +102,17 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     useEffect(() => {
         const fetchSellers = async () => {
             const res = await getSellersAPI();
-            setSellers(res);
+            const hoy = new Date().setHours(0, 0, 0, 0);
+
+            const vigentes = res.filter((v: any) => {
+                if (!v.fecha_vigencia) return true;
+                const fecha = new Date(v.fecha_vigencia).getTime();
+                return fecha >= hoy;
+            });
+
+            setSellers(vigentes);
         };
+
         fetchSellers();
     }, []);
     useEffect(() => {
@@ -133,26 +142,22 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         if (!visible || !shipping) return;
 
         internalForm.resetFields();
-        const lugar_entrega = sucursals.find(s => s.nombre === shipping.lugar_entrega)
-            ? shipping.lugar_entrega
-            : 'otro';
 
-        const quienPagaDeVenta =shipping.venta?.[0]?.quien_paga_delivery || shipping.quien_paga_delivery || "comprador";
-        //console.log("Quien paga de venta:", quienPagaDeVenta);
-        setTimeout(() => {
-            internalForm.setFieldValue("quien_paga_delivery", quienPagaDeVenta);
-        }, 0);
-        //setQuienPaga(quienPagaDeVenta);
+        const esOtroLugar = !sucursals.find(s => s.nombre === shipping.lugar_entrega);
+        const lugar_entrega = esOtroLugar ? 'otro' : shipping.lugar_entrega;
+        const lugar_entrega_input = esOtroLugar ? shipping.lugar_entrega : '';
+
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
-            lugar_entrega_input: lugar_entrega === 'otro' ? shipping.lugar_entrega : '',
+            lugar_entrega_input,
             fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido) : null,
             hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'HH:mm') : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
-            quien_paga_delivery: quienPagaDeVenta,            cargo_delivery: shipping.cargo_delivery,
+            quien_paga_delivery: shipping.quien_paga_delivery || "comprador",
+            cargo_delivery: shipping.cargo_delivery,
             costo_delivery: shipping.costo_delivery,
             adelanto_cliente: shipping.adelanto_cliente,
             tipo_de_pago: shipping.tipo_de_pago || null,
@@ -161,38 +166,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
-        const pagado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
-        setAdelantoVisible(pagado === "adelanto" && shipping.adelanto_cliente > 0);
-        setEstadoPedido(shipping.estado_pedido);
-        setTipoPago(shipping.tipo_de_pago || null);
-        setQrInput(shipping.subtotal_qr || 0);
-        setEfectivoInput(shipping.subtotal_efectivo || 0);
-        setMontoDelivery(shipping.cargo_delivery || 0);
-        setCostoDelivery(shipping.costo_delivery || 0);
-        //setQuienPaga(quienPagaDeVenta);
-        setIsDeliveryPlaceInput(lugar_entrega === 'otro');
-
+        setIsDeliveryPlaceInput(esOtroLugar);
         if (!origenEsIgualADestino && !shipping.quien_paga_delivery) {
             internalForm.setFieldValue('quien_paga_delivery', 'comprador');
             //setQuienPaga(quienPagaDeVenta);
         }
 
-        const ventasTemporales = shipping.productos_temporales?.map((p: any, i: number) => ({
-            ...p,
-            key: `temp-${i}`,
-            esTemporal: true,
-            producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
-        })) || [];
-
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
             ...p,
             id_venta: p._id ?? null,
             key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
-            esTemporal: false,
+            esTemporal: p?.producto?.esTemporal || false, // ✅ nuevo
             producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
         }));
 
-        setProducts([...ventasNormales, ...ventasTemporales]);
+        setProducts(ventasNormales);
 
     }, [visible, shipping, sucursals]);
 
@@ -348,10 +336,10 @@ const handleSave = async (values: any) => {
     setLoading(true);
     const newProducts = products.filter((p: any) => !p.id_venta);
     const existingProducts = products.filter((p: any) => p.id_venta);
-    const productosTemporales = newProducts.filter((p: any) => p.esTemporal);
     const sucursalId = localStorage.getItem('sucursalId');
 
-    const formattedNewProducts = newProducts.filter((p: any) => !p.esTemporal && p.id_producto?.length === 24)
+    const formattedNewProducts = newProducts
+        .filter((p: any) => p.id_producto?.length === 24) // ✅ incluye temporales ya registrados
         .map((p: any) => ({
             cantidad: p.cantidad,
             precio_unitario: p.precio_unitario,
@@ -380,8 +368,7 @@ const handleSave = async (values: any) => {
         if (updatedExisting.length > 0) {
             await updateProductsByShippingAPI(shipping._id, updatedExisting);
         }
-        //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
-        //if (productosTemporales.length > 0) await addTemporaryProductsToShippingAPI(shipping._id, productosTemporales);
+        if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
         //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
         //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
 
@@ -561,7 +548,9 @@ return (
                         <Form.Item name="lugar_entrega" label="Lugar de Entrega" rules={[{ required: true }]}>
                             {isDeliveryPlaceInput ? (
                                 <div className='flex align-middle gap-2'>
+                                    <Form.Item name="lugar_entrega_input" noStyle>
                                     <Input placeholder='Escriba el lugar de entrega' />
+                                    </Form.Item>
                                     <Button
                                         onClick={() => {
                                             setIsDeliveryPlaceInput(false);
