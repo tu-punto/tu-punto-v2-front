@@ -97,31 +97,40 @@ export default function SellerTable({
   ];
 
   const fetchSaldoPendiente = async (sellerId: string) => {
-    let saldoPendiente = 0;
     const sales = await getSalesBySellerIdAPI(sellerId);
     if (!sales.length) {
-      console.error("Error fetching sales for seller:", sellerId);
-      return saldoPendiente;
+      return 0;
     }
 
-    saldoPendiente =
-      sales &&
-      sales.reduce((acc: number, sale: any) => {
-        if (sale.deposito_realizado) return acc;
-        let subtotalDeuda = 0;
-        if (sale.id_pedido.pagado_al_vendedor) {
-          subtotalDeuda = -sale.utilidad;
-        } else {
-          subtotalDeuda = sale.cantidad * sale.precio_unitario - sale.utilidad;
-        }
+    const pedidosProcesados = new Set();
 
-        return (
-          acc +
-          subtotalDeuda -
-          sale.id_pedido.adelanto_cliente -
-          sale.id_pedido.cargo_delivery
-        );
-      }, 0);
+    const saldoPendiente = sales.reduce((acc: number, sale: any) => {
+      // Skip if deposito realizado
+      if (sale.deposito_realizado) {
+        return acc;
+      }
+
+      let subtotalDeuda = 0;
+
+      // Calculate subtotalDeuda based on pagado_al_vendedor
+      if (sale.id_pedido.pagado_al_vendedor) {
+        subtotalDeuda = -sale.utilidad;
+      } else {
+        subtotalDeuda = sale.cantidad * sale.precio_unitario - sale.utilidad;
+      }
+
+      // Process adelanto and delivery only once per pedido
+      if (!pedidosProcesados.has(sale.id_pedido._id)) {
+        const adelanto = sale.id_pedido.adelanto_cliente || 0;
+        const delivery = sale.id_pedido.cargo_delivery || 0;
+
+        subtotalDeuda -= adelanto + delivery;
+        pedidosProcesados.add(sale.id_pedido._id);
+      }
+
+      return acc + subtotalDeuda;
+    }, 0);
+
     return saldoPendiente;
   };
 
@@ -145,17 +154,21 @@ export default function SellerTable({
             0
           );
 
+          // Calculate saldoPendiente using the same logic as SellerInfoBase
+          const saldoPendiente = await fetchSaldoPendiente(seller._id);
+          const deuda = Number(seller.deuda) || 0;
+          const pagoPendiente = saldoPendiente - deuda;
+
           return {
             ...seller,
             key: seller._id,
             fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
             fecha: date.toLocaleDateString("es-ES"),
-            deuda: seller.deuda,
-            pagoTotal: `Bs. ${(seller.saldo_pendiente - seller.deuda).toFixed(
-              2
-            )}`,
-            pagoTotalInt: seller.saldo_pendiente - seller.deuda,
+            deuda: deuda,
+            pagoTotal: `Bs. ${pagoPendiente.toFixed(2)}`,
+            pagoTotalInt: pagoPendiente,
             pago_mensual: `Bs. ${mensual}`,
+            saldo_pendiente: saldoPendiente,
           };
         })
       );
