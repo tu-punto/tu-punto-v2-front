@@ -50,6 +50,16 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [sellers, setSellers] = useState([]);
     const [clickedOnce, setClickedOnce] = useState(false);
     const cargoDelivery = useWatch('cargo_delivery', internalForm);
+    const estadoPedidoForm = useWatch("estado_pedido", internalForm);
+
+    useEffect(() => {
+        if (visible && shipping) {
+            const pagoEstado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
+            setEstaPagado(pagoEstado);
+            setAdelantoVisible(pagoEstado === "adelanto");
+        }
+    }, [visible, shipping]);
+
     const objetosIguales = (a: any, b: any) => {
         const aOrdenado = JSON.stringify(Object.fromEntries(Object.entries(a).sort()));
         const bOrdenado = JSON.stringify(Object.fromEntries(Object.entries(b).sort()));
@@ -129,14 +139,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }, [tipoPago]);
 
     useEffect(() => {
-        const estado = internalForm.getFieldValue("estado_pedido");
-        if (estado === "Entregado") {
+        if (estadoPedidoForm === "Entregado") {
             internalForm.setFieldsValue({
                 fecha_pedido: dayjs(),
                 hora_entrega_acordada: dayjs()
             });
         }
-    }, [internalForm.getFieldValue("estado_pedido")]);
+    }, [estadoPedidoForm]);
 
     useEffect(() => {
         if (!visible || !shipping) return;
@@ -157,7 +166,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             lugar_entrega,
             lugar_entrega_input,
             fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido) : null,
-            hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'HH:mm') : null,
+            hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada): null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
@@ -374,12 +383,17 @@ const handleSave = async (values: any) => {
         if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
         //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
         //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
+        let horaEntrega = values.hora_entrega_acordada;
 
+        if (values.estado_pedido === "Entregado") {
+            horaEntrega = new Date(); // ⬅️ fuerza hora actual al marcar como entregado
+        }
+        console.log("🕒 Hora de entrega acordada:", horaEntrega);
         const updateShippingInfo: any = {
             ...values,
             lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
             fecha_pedido: values.fecha_pedido?.format('YYYY-MM-DD HH:mm:ss'),
-            hora_entrega_acordada: values.hora_entrega_acordada ? dayjs(values.hora_entrega_acordada).toDate() : null,
+            hora_entrega_acordada: horaEntrega,
             pagado_al_vendedor: values.esta_pagado === 'si',
             adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
             quien_paga_delivery: values.quien_paga_delivery,

@@ -6,7 +6,7 @@ import { registerVariantAPI } from "../../api/product";
 import { createEntryAPI } from "../../api/entry";
 import { registerProductAPI } from "../../api/product";
 
-const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller, openFromEditProductsModal = false, sellers = [] }: any) => {
+const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller, openFromEditProductsModal = false, sellers = [] , sucursalId }: any) => {
     const { user }: any = useContext(UserContext);
     const [loading, setLoading] = useState(false)
     const [categories, setCategories] = useState([])
@@ -35,15 +35,18 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
     };
 
     const submitProductData = async (productData: any) => {
-        const sucursalId = localStorage.getItem("sucursalId");
-
+        const sucursalToUse = sucursalId || localStorage.getItem("sucursalId");
+        if (!sucursalToUse) {
+            message.error("No se ha seleccionado una sucursal válida.");
+            return;
+        }
         const productPayload = {
             nombre_producto: productData.nombre_producto,
             id_categoria: productData.id_categoria,
             id_vendedor: productData.id_vendedor || selectedSeller?._id,
             esTemporal: true,
             sucursales: [{
-                id_sucursal: sucursalId,
+                id_sucursal: sucursalToUse,
                 combinaciones: [{
                     variantes: { Variante: "Temporal" },
                     precio: productData.precio,

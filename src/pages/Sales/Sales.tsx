@@ -126,7 +126,9 @@ export const Sales = () => {
         if (!isAdmin && branches.length > 0 && !selectedBranchId) {
             setSelectedBranchId(branches[0]._id);
         }
-    }, [branches, isAdmin]);
+    }, [branches, isAdmin, selectedBranchId]);
+
+    const fallbackSucursalId = selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
     useEffect(() => {
         if (!isAdmin && selectedBranchId) {
@@ -326,6 +328,7 @@ export const Sales = () => {
     };
     //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
 
+
     return (
         <>
             <div className="flex justify-between items-center mb-4">
@@ -459,7 +462,9 @@ export const Sales = () => {
                     isAdmin
                         ? sellers.find((s: any) => s._id === selectedSellerId) || null
                         : { _id: user?.id_vendedor, nombre: user?.nombre_vendedor?.split(" ")[0] || "", apellido: user?.nombre_vendedor?.split(" ")[1] || "" }
-                }            />
+                }
+                sellers={sellers}
+                sucursalId={fallbackSucursalId}            />
             <SalesFormModal
                 visible={modalType === "sales"}
                 onCancel={handleCancel}
@@ -472,6 +477,7 @@ export const Sales = () => {
                 //handleDebt={updateSellerDebt}
                 clearSelectedProducts={() => setSelectedProducts([])}
                 sellers={sellers}
+                suc={fallbackSucursalId}
             />
             <ShippingFormModal
                 visible={modalType === "shipping"}
@@ -486,6 +492,7 @@ export const Sales = () => {
                 clearSelectedProducts={() => setSelectedProducts([])}
                 isAdmin={isAdmin}
                 sellers={sellers}
+                suc={fallbackSucursalId}
             />
         </>
     );
