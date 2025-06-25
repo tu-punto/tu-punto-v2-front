@@ -14,8 +14,9 @@ function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
                                totalAmount, handleSales, sucursals,
                                //handleDebt,
-                               clearSelectedProducts, isAdmin,sellers
+                               clearSelectedProducts, isAdmin,sellers, suc
                            }: any) {
+    const branchIdFromProps = suc || localStorage.getItem("sucursalId");
     const [loading, setLoading] = useState(false);
     const [qrInput, setQrInput] = useState<number>(0);
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
@@ -33,7 +34,12 @@ function ShippingFormModal({
     const [allSucursals, setAllSucursals] = useState([]);
     const sucursalId = localStorage.getItem('sucursalId');
     const sucursalLogueada = allSucursals.find((s: any) => s._id === sucursalId);
-    const nombreSucursal = localStorage.getItem('sucursalNombre') || '';
+    const sucursalSeleccionada = sucursals.find((s: any) =>
+        isAdmin
+            ? s._id === localStorage.getItem("sucursalId")
+            : s._id === branchIdFromProps
+    );
+    const nombreSucursal = sucursalSeleccionada?.nombre || '';
 
     useEffect(() => {
         const fetchSucursals = async () => {
@@ -104,8 +110,8 @@ function ShippingFormModal({
             const response = await registerShippingAPI({
                 ...values,
                 pagado_al_vendedor: values.esta_pagado === "si",
-                id_sucursal: sucursalId,
-                lugar_origen: sucursalId,
+                id_sucursal: branchIdFromProps,
+                lugar_origen: branchIdFromProps,
             });
 
             if (!response.success) {
@@ -126,7 +132,7 @@ function ShippingFormModal({
                     id_vendedor: vendedor,
                     vendedor,
                     id_pedido: response.newShipping._id,
-                    sucursal: sucursalId,
+                    sucursal: suc || localStorage.getItem("sucursalId"),
                     cantidad: p.cantidad,
                     precio_unitario: p.precio_unitario,
                     utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
@@ -190,7 +196,7 @@ function ShippingFormModal({
                 //console.log("Actualizando stock para:", id_producto, "en sucursal:", sucursalId," variantes ", variantes, "con stock:", nuevoStock);
                 const res = await updateSubvariantStockAPI({
                     productId: id_producto,
-                    sucursalId,
+                    sucursalId: suc || localStorage.getItem("sucursalId"),
                     variantes,
                     stock: nuevoStock
                 });

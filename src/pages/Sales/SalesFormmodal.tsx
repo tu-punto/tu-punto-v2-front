@@ -20,6 +20,7 @@ function SalesFormModal({
                             //handleDebt,
                             clearSelectedProducts,
                             sellers,
+                            suc
                         }: any) {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
@@ -27,8 +28,8 @@ function SalesFormModal({
     const [qrInput, setQrInput] = useState<number>(0);
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [showWarning, setShowWarning] = useState(false);
+    const branchIdFromProps = suc || localStorage.getItem("sucursalId");
     const sucursalId = localStorage.getItem('sucursalId');
-
     useEffect(() => {
         form.setFieldsValue({
             montoTotal: totalAmount ? totalAmount.toFixed(2) : "0.00"
@@ -83,8 +84,8 @@ function SalesFormModal({
             pagado_al_vendedor: tipoPagoSeleccionado === 3,
             subtotal_qr: tipoPagoSeleccionado === 1 || tipoPagoSeleccionado === 4 ? (qrInput || totalAmount / 2) : 0,
             subtotal_efectivo: tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4 ? (efectivoInput || totalAmount / 2) : 0,
-            sucursal: sucursalId,
-            lugar_origen: sucursalId,
+            sucursal: branchIdFromProps,
+            lugar_origen: branchIdFromProps,
             cliente: "Sin nombre",
             telefono_cliente: "00000000",
             lugar_entrega: "No aplica",
@@ -112,7 +113,7 @@ function SalesFormModal({
                 id_vendedor: vendedor,
                 vendedor,
                 id_pedido: response.newShipping._id,
-                sucursal: sucursalId,
+                sucursal: branchIdFromProps,
                 cantidad: p.cantidad,
                 precio_unitario: p.precio_unitario,
                 utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
@@ -156,7 +157,7 @@ function SalesFormModal({
             try {
                 const res = await updateSubvariantStockAPI({
                     productId: id_producto,
-                    sucursalId,
+                    sucursalId: sucursalId || branchIdFromProps,
                     variantes,
                     stock: nuevoStock
                 });

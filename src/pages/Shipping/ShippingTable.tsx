@@ -201,14 +201,18 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             const response = await getSucursalsAPI();
             setSucursal(response);
 
-            const sucursalId = localStorage.getItem("sucursalId");
-            if (sucursalId) {
-                const sucursalActual = response.find((s: any) =>
-                    s._id === sucursalId || s.id_sucursal === sucursalId
-                );
-                if (sucursalActual) {
-                    setSelectedOrigin(sucursalActual.nombre);
+            if (isAdmin) {
+                const sucursalId = localStorage.getItem("sucursalId");
+                if (sucursalId) {
+                    const sucursalActual = response.find((s: any) =>
+                        s._id === sucursalId || s.id_sucursal === sucursalId
+                    );
+                    if (sucursalActual) {
+                        setSelectedOrigin(sucursalActual.nombre);
+                    }
                 }
+            } else {
+                setSelectedOrigin('');
             }
         } catch (error) {
             message.error('Error al obtener las sucursales');

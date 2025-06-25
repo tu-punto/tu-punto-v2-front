@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Table, DatePicker, message, Tag, Modal } from "antd";
 import dayjs from "dayjs";
 import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
-import { getShippingByIdAPI } from "../../api/shipping"; // asegúrate de importar
+import { getShippingByIdAPI } from "../../api/shipping";
+import EmptySalesTable from "../Sales/EmptySalesTable.tsx"; // asegúrate de importar
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
@@ -13,17 +14,35 @@ const SalesHistoryTable = () => {
     const sucursalId = localStorage.getItem("sucursalId");
     const [selectedSale, setSelectedSale] = useState<any | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalProducts, setModalProducts] = useState<any[]>([]);
 
     const handleRowClick = async (record: any) => {
-        if (record.isSummary) return;
+        if (record.isSummary || !record._id) return;
 
         try {
             const res = await getShippingByIdAPI(record._id);
             if (res) {
-                setSelectedSale(res); // ahora incluye productos
+                const ventasNormales = (res.venta || []).map((v: any) => ({
+                    ...v,
+                    key: v._id,
+                    producto: v.nombre_variante || v.nombre_producto || v.producto || "Sin nombre",
+                    esTemporal: v.producto?.esTemporal || false,
+                }));
+
+                const temporales = (res.productos_temporales || []).map((p: any, idx: number) => ({
+                    ...p,
+                    key: `temp-${idx}`,
+                    producto: p.nombre_variante || p.nombre_producto || "Producto Temporal",
+                    esTemporal: true,
+                    utilidad: p.utilidad || 0,
+                }));
+
+                setModalProducts([...ventasNormales, ...temporales]);
+                setSelectedSale(res);
                 setIsModalOpen(true);
             }
-        } catch {
+        } catch (err) {
+            console.error("Error cargando detalle del pedido:", err);
             message.error("Error al obtener los detalles del pedido");
         }
     };
@@ -121,21 +140,17 @@ const SalesHistoryTable = () => {
                 const label = map[valor] || val;
 
                 return (
-                    <div className="flex justify-center">
                         <Tag
-                            color="green"
                             className="text-base font-semibold px-4 py-1"
                             style={{
                                 borderRadius: "999px",
-                                backgroundColor: "transparent",
-                                color: "#389e0d", // verde antd
+                                color: "#389e0d",
+                                backgroundColor: "#f6ffed", // opcionalmente verde claro
                                 border: "1px solid #b7eb8f",
                             }}
                         >
                             {label}
                         </Tag>
-
-                    </div>
                 );
             }
         },
@@ -190,7 +205,7 @@ const SalesHistoryTable = () => {
             <Table
                 columns={columns}
                 dataSource={getGroupedData()}
-                rowKey={(r, i) => r.isSummary ? `summary-${r.fecha}-${i}` : `${r.fecha}-${r.hora}-${i}`}
+                rowKey={(r) => r._id || `${r.fecha}-${r.hora}`}
                 rowClassName={(record) =>
                     record.isSummary ? "bg-gray-50 text-center text-sm !align-middle" : "hover:bg-gray-100"
                 }
@@ -205,31 +220,17 @@ const SalesHistoryTable = () => {
                 onCancel={() => setIsModalOpen(false)}
                 footer={null}
                 title="Detalle de la Venta"
+                width={1000}
             >
-                {selectedSale && (
-                    <>
-                        <p><strong>Fecha:</strong> {dayjs(selectedSale.fecha).format("DD/MM/YYYY")}</p>
-                        <p><strong>Hora:</strong> {selectedSale.hora}</p>
-                        <p><strong>Tipo de pago:</strong> {selectedSale.tipo_de_pago}</p>
-                        <p><strong>Monto Total:</strong> Bs. {selectedSale.monto_total?.toFixed(2)}</p>
-                        <p><strong>Subtotal Efectivo:</strong> Bs. {selectedSale.subtotal_efectivo?.toFixed(2)}</p>
-                        <p><strong>Subtotal QR:</strong> Bs. {selectedSale.subtotal_qr?.toFixed(2)}</p>
-
-                        {/* Si tienes lista de productos */}
-                        {selectedSale?.productos?.length > 0 && (
-                            <div className="mt-4">
-                                <strong>Productos:</strong>
-                                <ul className="list-disc pl-6">
-                                    {selectedSale.productos.map((p: any, idx: number) => (
-                                        <li key={idx}>
-                                            {p.nombre_variante || p.nombre_producto || "Producto"} — {p.cantidad} x Bs. {p.precio_unitario}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </>
-                )}
+                <EmptySalesTable
+                    products={modalProducts}
+                    onDeleteProduct={undefined}
+                    onUpdateTotalAmount={() => {}} // puedes ignorar este callback
+                    handleValueChange={() => {}}
+                    sellers={[]} // no necesitas vendedores aquí
+                    isAdmin={true}
+                    readonly={true}
+                />
             </Modal>
         </>
     );
