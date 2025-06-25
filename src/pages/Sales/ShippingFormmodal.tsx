@@ -106,9 +106,16 @@ function ShippingFormModal({
         const sucursalId = localStorage.getItem('sucursalId');
         setLoading(true);
         const lugarOrigen = sucursals?.[0]?._id || null;
+        const tipoPagoMap: Record<number, string> = {
+            1: 'Transferencia o QR',
+            2: 'Efectivo',
+            3: 'Pagado al dueño',
+            4: 'Efectivo + QR'
+        };
         try {
             const response = await registerShippingAPI({
                 ...values,
+                tipo_de_pago: tipoPagoMap[parseInt(values.tipo_de_pago)],
                 pagado_al_vendedor: values.esta_pagado === "si",
                 id_sucursal: branchIdFromProps,
                 lugar_origen: branchIdFromProps,
