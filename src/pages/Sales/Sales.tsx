@@ -35,6 +35,13 @@ export const Sales = () => {
     const [searchText, setSearchText] = useState("");
 
     const sucursalId = localStorage.getItem('sucursalId');
+    useEffect(() => {
+        if (selectedProducts.length > 0) {
+            setSelectedProducts([]);
+            setTotalAmount(0);
+            message.info("La sucursal ha cambiado, se vació el carrito.");
+        }
+    }, [selectedBranchId]);
 
     const updateTotalAmount = (amount: number) => {
         setTotalAmount(amount);

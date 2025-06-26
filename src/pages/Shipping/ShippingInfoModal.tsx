@@ -146,6 +146,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             });
         }
     }, [estadoPedidoForm]);
+    const tipoPagoTextoAValor: Record<string, string> = {
+        'Transferencia o QR': '1',
+        'Efectivo': '2',
+        'Pagado al dueño': '3',
+        'Efectivo + QR': '4',
+    };
 
     useEffect(() => {
         if (!visible || !shipping) return;
@@ -178,7 +184,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
-        setTipoPago(shipping.tipo_de_pago || null);
+        const tipoPagoRaw = shipping.tipo_de_pago;
+        const tipoPagoId = tipoPagoTextoAValor[tipoPagoRaw] || tipoPagoRaw || null;
+        setTipoPago(tipoPagoId);
         setEstadoPedido(shipping.estado_pedido || "En Espera");
         setIsDeliveryPlaceInput(esOtroLugar);
         if (!origenEsIgualADestino && !quienPagaDeVenta) {
