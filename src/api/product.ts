@@ -45,6 +45,17 @@ export const getProductsAPI = async () => {
     }
 }
 
+export const getFlatProductListAPI = async () => {
+    try {
+        const res = await apiClient.get("/product/flat");
+        return res.data;
+    } catch (error) {
+        console.error("❌ Error al obtener productos planos:", error);
+        return [];
+    }
+};
+
+
 export const getProductByIdAPI = async (idProduct) => {
     try {
         const res = await apiClient.get(`/product/${idProduct}`)

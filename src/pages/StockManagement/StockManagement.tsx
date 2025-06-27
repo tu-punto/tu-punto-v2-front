@@ -3,7 +3,7 @@ import { Row, Col } from 'antd';
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
-import { addProductFeaturesAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
+import { getFlatProductListAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
 import { Button, Input, Select, Spin } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 //import ProductInfoModal from '../Product/ProductInfoModal';
@@ -54,7 +54,7 @@ const StockManagement = () => {
             const sellersResponse = await getSellersAPI();
             const categoriesResponse = await getCategoriesAPI();
             const groupsResponse = await getGroupsAPI();
-            const productsResponse = await getProductsAPI();
+            const productsResponse = await getFlatProductListAPI();
             //console.log("🧪 Productos recibidos:", productsResponse);
             //console.log("🧪 Usuario actual:", user);
 

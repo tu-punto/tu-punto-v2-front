@@ -70,44 +70,39 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             setIngresoData({});
         }
     }, [resetSignal]);
-
     const handleIngresoChange = (key: string, value: number) => {
-
         setIngresoData((prev) => {
             const updated = { ...prev, [key]: value };
 
             const newStockArray = Object.entries(updated)
-                .filter(([_, stock]) => Number(stock) !== 0) // <- diferentes a 0
+                .filter(([_, stock]) => Number(stock) !== 0)
                 .map(([k, stock]) => {
-                const [productId, sucursalId, index] = k.split("-");
-                const producto = productsList.find((p) => p._id === productId);
-                const sucursal = producto?.sucursales?.find((s) => s.id_sucursal === sucursalId);
-                const combinacion = sucursal?.combinaciones?.[index];
+                    const [productId, sucursalId] = k.split("-");
+                    const producto = productsList.find(p => p._id === productId && p.sucursalId === sucursalId);
 
-                return {
-                    product: {
-                        _id: producto._id,
-                        nombre_producto: producto.nombre_producto,
-                        nombre_categoria: producto.nombre_categoria || "Sin categoría",
-                        variantes: combinacion?.variantes || {},
-                        precio: combinacion?.precio ?? "-",
-                        stock: combinacion?.stock ?? "-"
-                    },
-                    newStock: {
-                        productId,
-                        sucursalId,
-                        index: Number(index),
-                        stock: Number(stock),
-                    }
-                };
-            });
+                    return {
+                        product: {
+                            _id: producto._id,
+                            nombre_producto: producto.nombre_producto,
+                            nombre_categoria: producto.categoria || "Sin categoría",
+                            variantes: producto.variant || {},
+                            precio: producto.precio ?? "-",
+                            stock: producto.stock ?? "-"
+                        },
+                        newStock: {
+                            productId,
+                            sucursalId,
+                            stock: Number(stock)
+                        }
+                    };
+                });
+
             if (setStockListForConfirmModal) {
                 setStockListForConfirmModal(newStockArray);
             }
 
             return updated;
         });
-
     };
 
     const openInfoModal = (product: any) => {
@@ -175,7 +170,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         const newStock = [];
 
         for (const product of updatedProductsList) {
-            const ingreso = ingresoData[product._id] || 0;
+            const key = `${product._id}-${product.sucursalId}`;
+            const ingreso = ingresoData[key] || 0;
             if (ingreso > 0) {
                 newStock.push({
                     productId: product._id,
@@ -190,16 +186,12 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         setIngresoData({});
     };
     const groupProductsByBaseName = (products: any[]) => {
-        const sucursalId = localStorage.getItem('sucursalId');
         const groups: { [key: string]: any } = {};
 
         products.forEach((product) => {
             if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
 
             const baseName = product.nombre_producto;
-            const sucursales = product.sucursales || [];
-            const sucursal = sucursales.find((s: any) => s.id_sucursal === sucursalId);
-            if (!sucursal || !sucursal.combinaciones) return;
 
             if (!groups[baseName]) {
                 groups[baseName] = {
@@ -208,36 +200,23 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                     children: [],
                     totalStock: 0,
                     nombre_categoria: product.nombre_categoria,
-                    productOriginal: product,
+                    productOriginal: product
                 };
             }
 
-            sucursal.combinaciones.forEach((comb: any, index: number) => {
-                const variant = Object.entries(comb.variantes)
-                    .map(([_, v]) => `${v}`)
-                    .join(' / ');
+            if (
+                searchText &&
+                !baseName.toLowerCase().includes(searchText.toLowerCase()) &&
+                !product.variant.toLowerCase().includes(searchText.toLowerCase())
+            ) return;
 
-                if (
-                    searchText &&
-                    !baseName.toLowerCase().includes(searchText.toLowerCase()) &&
-                    !variant.toLowerCase().includes(searchText.toLowerCase())
-                ) return;
-
-                groups[baseName].children.push({
-                    ...product,
-                    variant,
-                    stock: comb.stock,
-                    precio: comb.precio,
-                    key: `${product._id}-${sucursalId}-${index}`,
-                    sucursalData: sucursal,
-                });
-
-                groups[baseName].totalStock += comb.stock;
-            });
+            groups[baseName].children.push(product);
+            groups[baseName].totalStock += product.stock;
         });
 
-        return Object.values(groups).filter(group => group.children.length > 0);
+        return Object.values(groups);
     };
+
     const columns = [
         {
             title: "Producto",
@@ -334,93 +313,66 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         setSearcher(criteria);
     };
 
-    const getProductInGroup = (products: any[]) => {
-        const newGroupList = groupList.map((group: any) => {
-            const groupId = group.id || group._id;
-            const groupName =  (group.nombre+" "+group.apellido) || "Sin nombre";
-
-            const productsInGroup = groupCriteria(group, products);
-
-            const sucursalId = (localStorage.getItem('sucursalId') || "0");
-
-            const filtered = productsInGroup.filter(product => {
-                const { nombre_producto, id_categoria, sucursal, features } = searcher;
-
-                // Solo productos que contengan variantes de esta sucursal
-                const perteneceASucursal = product.sucursales?.some(suc => suc.id_sucursal === sucursalId);
-                //console.log("Sucursal ID:", sucursalId);
-                //console.log("Sucursal:", product.sucursales);
-                //console.log("Pertenece a sucursal:", perteneceASucursal);
-                return (
-                    perteneceASucursal &&
-                    (!nombre_producto || product.nombre_producto.toLowerCase().includes(nombre_producto.toLowerCase())) &&
-                    (!id_categoria || product.id_categoria === id_categoria) &&
-                    (!features || features.every(feat =>
-                        product.features?.some(pf =>
-                            pf.feature === feat.key && pf.value.toLowerCase() === feat.value.toLowerCase()
-                        )
-                    ))
-                );
-            });
-
-
-            return { ...group, name: groupName, products: filtered };
-        });
-
-        setTableGroup(newGroupList);
-    };
-
 
     useEffect(() => {
-        const fetchStockForProducts = async () => {
-            const updatedProducts = await Promise.all(productsList.map(async (product) => {
-                if (!product.id_categoria) return { ...product, nombre_categoria: "Sin categoría" };
+        const sucursalId = localStorage.getItem("sucursalId");
 
-                try {
-                    const categoryRes = getCategoryByIdAPI(product.id_categoria);
-                    return { ...product, nombre_categoria: (await categoryRes)?.categoria || "Sin categoría" };
-                } catch {
-                    return { ...product, nombre_categoria: "Sin categoría" };
-                }
+        // Base: productos que vienen desde el backend optimizado
+        const updatedProducts = productsList
+            .filter(p => p.sucursalId === sucursalId)
+            .map(p => ({
+                ...p,
+                key: `${p._id}-${p.sucursalId}`,
+                variant: p.variante,
+                nombre_categoria: p.categoria
             }));
 
-            const sucursalId = localStorage.getItem("sucursalId");
+        // Nuevos productos creados desde el frontend
+        const newProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
+        newProducts.forEach((prod: any) => {
+            prod.isNew = true;
+            updatedProducts.push(prod);
+        });
 
-            const newProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
-            const newVariants = JSON.parse(localStorage.getItem("newVariants") || "[]");
+        // Nuevas variantes locales: las agregamos como si fueran combinaciones nuevas del producto base
+        const newVariants = JSON.parse(localStorage.getItem("newVariants") || "[]");
+        newVariants.forEach((variant: any) => {
+            const base = updatedProducts.find(p =>
+                p._id === variant.product?._id || p.product?._id === variant.product?._id
+            );
+            if (base) {
+                const combinacionesFiltradas = variant.combinaciones.filter((c: any) => c.stock > 0);
+                combinacionesFiltradas.forEach((combo: any) => {
+                    updatedProducts.push({
+                        ...base,
+                        key: `${base._id}-${variant.sucursalId}-${combo.variantes.Tipo}-${combo.variantes.Color}`,
+                        variant: Object.values(combo.variantes).join(" / "),
+                        precio: combo.precio,
+                        stock: combo.stock,
+                        isNew: true
+                    });
+                });
+            }
+        });
 
-            // Agregar productos nuevos locales
-            newProducts.forEach((prod: any) => {
-                prod.isNew = true;
-                updatedProducts.push(prod);
-            });
+        setUpdatedProductsList(updatedProducts);
+        const grouped = updatedProducts.reduce((acc, product) => {
+            const vendedor = product.vendedor || "Sin vendedor";
+            if (!acc[vendedor]) acc[vendedor] = [];
+            acc[vendedor].push(product);
+            return acc;
+        }, {} as Record<string, any[]>);
 
-            // Agregar variantes nuevas a productos existentes (solo sucursal actual)
-            newVariants.forEach((variant: any) => {
-                const base = updatedProducts.find(p => p._id === variant.product?._id || p.product?._id === variant.product?._id);
-                if (base) {
-                    if (!base.sucursales) base.sucursales = [];
-                    const sucursalIndex = base.sucursales.findIndex((s: any) => s.id_sucursal === variant.sucursalId);
-                    const combinacionesFiltradas = variant.combinaciones.filter((c: any) => c.stock > 0);
-                    if (sucursalIndex !== -1) {
-                        base.sucursales[sucursalIndex].combinaciones.push(...combinacionesFiltradas);
-                    } else {
-                        base.sucursales.push({
-                            id_sucursal: variant.sucursalId,
-                            combinaciones: combinacionesFiltradas
-                        });
-                    }
-                }
-            });
+        const groups = Object.entries(grouped).map(([vendedor, products]) => ({
+            name: vendedor,
+            products
+        }));
 
-            setUpdatedProductsList(updatedProducts);
-            getProductInGroup(updatedProducts);
-        };
+        setTableGroup(groups);
 
-        if (productsList.length > 0) {
-            fetchStockForProducts();
-        }
-    }, [productsList, groupList, searcher]);
+
+    }, [productsList]);
+
     const loading = updatedProductsList.length === 0;
     return (
         <Spin spinning={loading} tip="Cargando productos...">

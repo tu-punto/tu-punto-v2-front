@@ -20,12 +20,11 @@ const BranchPage = () => {
     }
   };
 
-  const showEditModal = (branch: IBranch) => {
-    setSelectedBranch(branch);
-    setIsFormModal(true);
-  };
-
-  useEffect(() => {
+    const showEditModal = (branch: IBranch) => {
+        setSelectedBranch(branch);
+        setIsFormModal(true);
+    };
+    useEffect(() => {
     fetchBranches();
   }, [refreshKey]);
 

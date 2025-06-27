@@ -12,13 +12,13 @@ const BranchFormModal: React.FC<{
   const [form] = Form.useForm();
 
   const handleEdit = async (values: IBranch) => {
-    if (!branch || !branch.id_sucursal) {
+    if (!branch || !branch._id) {
       message.error("Error al actualizar la información");
       return;
     }
     try {
       message.loading("Actualizando...");
-      await updateSucursalAPI(branch.id_sucursal, values);
+      await updateSucursalAPI(branch._id, values);
     } catch (error) {
       message.error("Error al actualizar la información");
       console.error(error);

@@ -28,15 +28,13 @@ export const registerSucursalAPI = async (newSucursal: any) => {
 };
 
 export const updateSucursalAPI = async (
-  sucursalId: number,
-  updateData: any
+    sucursalId: string,
+    updateData: any
 ) => {
   try {
-    const response = await apiClient.put(`/sucursal/${sucursalId}`, {
-      newData: updateData,
-    });
+    const response = await apiClient.put(`/sucursal/${sucursalId}`, updateData); // <--- sin "newData"
     return response.data;
   } catch (error) {
-    parseError(error as AxiosError);
+    return parseError(error as AxiosError);
   }
 };
