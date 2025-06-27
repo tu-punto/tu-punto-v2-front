@@ -177,9 +177,13 @@ const StockManagement = () => {
     };
 
     const filterBySeller = (product, sellerId) => {
-        return sellerId === null || product.id_vendedor === sellerId;
-    };
+        const sucursalId = localStorage.getItem("sucursalId");
+        const perteneceASucursal = product.sucursalId === sucursalId;
 
+        return sellerId === null
+            ? perteneceASucursal // si es "Todos", mostrar solo los de esta sucursal
+            : product.id_vendedor === sellerId && perteneceASucursal;
+    };
     const filterByCategoria = (product, sellerId) => {
         return sellerId === null || product.id_categoria === sellerId;
     };

@@ -135,7 +135,9 @@ export const Sales = () => {
         }
     }, [branches, isAdmin, selectedBranchId]);
 
-    const fallbackSucursalId = selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
+    const fallbackSucursalId = isAdmin
+        ? localStorage.getItem('sucursalId')
+        : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
     useEffect(() => {
         if (!isAdmin && selectedBranchId) {

@@ -19,23 +19,30 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
 
         const sellersResponse = await getSellersAPI();
 
+        const sucursalId = localStorage.getItem("sucursalId");
+
         const vigentes = sellersResponse.filter((seller: any) => {
             const vigencia = seller.fecha_vigencia ? new Date(seller.fecha_vigencia) : null;
             if (vigencia) vigencia.setHours(0, 0, 0, 0);
-            return !vigencia || vigencia >= today;
-        });
 
+            const perteneceASucursal = seller.pago_sucursales?.some(
+                (s: any) => String(s.id_sucursal) === String(sucursalId)
+            );
+
+            return (!vigencia || vigencia >= today) && perteneceASucursal;
+        });
         vigentes.unshift({ _id: null, name: "Todos" });
 
-        for (const seller of vigentes) {
-            if (seller._id) {
-                const marca = seller.marca?.trim() || "Sin marca";
-                seller.name = `${marca} - ${seller.nombre} ${seller.apellido}`;
-            }
-        }
-
-        setSellers(vigentes);
-        setFilterList(vigentes);
+        const vigentesConNombre = vigentes.map((seller) => {
+            if (!seller._id) return seller; // deja "Todos" intacto
+            const marca = seller.marca?.trim() || "Sin marca";
+            return {
+                ...seller,
+                name: `${marca} - ${seller.nombre} ${seller.apellido}`
+            };
+        });
+        setSellers(vigentesConNombre);
+        setFilterList(vigentesConNombre);
 
         const groupsResponse = await getGroupsAPI();
         setGroups(groupsResponse);
@@ -68,12 +75,6 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
         }
     }, [filterSelected])
 
-    for (const seller of sellers) {
-        if (seller._id) {
-            const marca = seller.marca?.trim() || "Sin marca";
-            seller.name = `${marca} - ${seller.nombre} ${seller.apellido}`;
-        }
-    }
 
     return (
         <div style={{marginTop: 30}}>
@@ -81,7 +82,7 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
             <Select
                 style={{ width: '100%' }}
                 placeholder={placeholder}
-                onChange={(value) => onSelectSeller(value)}
+                defaultValue={null}                onChange={(value) => onSelectSeller(value)}
                 showSearch
                 filterOption={(input, option) =>
                     option?.children?.toString().toLowerCase().includes(input.toLowerCase())
