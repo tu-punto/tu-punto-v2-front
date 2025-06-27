@@ -403,7 +403,18 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 .filter(group => group.products && group.products.length > 0)
                 .map((group, i) => (
                     <div key={i}>
-                        <h2 style={{ textAlign: 'left', marginTop: 30 }}>{group.name}</h2>
+                        <h2 style={{ textAlign: 'left', marginTop: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {group.name}
+                            <span style={{
+                                backgroundColor: "#f0f0f0",
+                                borderRadius: "12px",
+                                padding: "2px 10px",
+                                fontSize: "0.8rem",
+                                fontWeight: 500
+                            }}>
+                            {group.products.reduce((sum, p) => sum + (p.stock ?? 0), 0)}
+                          </span>
+                        </h2>
                         <Table
                             columns={columns}
                             dataSource={groupProductsByBaseName(group.products)}
