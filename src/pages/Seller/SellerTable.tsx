@@ -105,8 +105,10 @@ export default function SellerTable({
     const pedidosProcesados = new Set();
 
     const saldoPendiente = sales.reduce((acc: number, sale: any) => {
-      // Skip if deposito realizado
-      if (sale.deposito_realizado) {
+      if (
+        sale.deposito_realizado ||
+        sale.id_pedido.estado_pedido === "En Espera"
+      ) {
         return acc;
       }
 
