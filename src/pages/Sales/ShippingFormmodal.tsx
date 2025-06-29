@@ -116,7 +116,7 @@ function ShippingFormModal({
             const response = await registerShippingAPI({
                 ...values,
                 tipo_de_pago: tipoPagoMap[parseInt(values.tipo_de_pago)],
-                pagado_al_vendedor: values.esta_pagado === "si",
+                pagado_al_vendedor: values.esta_pagado === "si" || values.tipo_de_pago === "3",
                 id_sucursal: branchIdFromProps,
                 lugar_origen: branchIdFromProps,
             });
