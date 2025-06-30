@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { Row, Col } from 'antd';
+import {Row, Col, message} from 'antd';
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
@@ -15,7 +15,7 @@ import { getCategoriesAPI } from '../../api/category';
 import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
-import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempVariants} from "../../utils/storageHelpers.ts";
+import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
 
 const StockManagement = () => {
@@ -25,7 +25,7 @@ const StockManagement = () => {
     const [resetSignal, setResetSignal] = useState(false);
     const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
-    const [selectedGroup, setSelectedGroup] = useState(null);
+    const [selectedGroup, setSelectedGroup] = useState<{ product: any; name: string } | null>(null);
     const [selectedSeller, setSelectedSeller] = useState<number | null>(null);
     const [infoModalVisible, setInfoModalVisible] = useState<boolean>(false);
     const [isProductFormVisible, setProductFormVisible] = useState<boolean>(false);
@@ -47,14 +47,27 @@ const StockManagement = () => {
     const [groups, setGroups] = useState<any[]>([]);
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
+    const [productosFull, setProductosFull] = useState([]);
 
+    const fetchFullProducts = async () => {
+        const fullData = await getProductsAPI();
+        setProductosFull(fullData);
+    };
+
+    useEffect(() => {
+        if (isConfirmModalVisible) {
+            fetchFullProducts();
+        }
+    }, [isConfirmModalVisible]);
     const fetchData = async () => {
         try {
             const sucursalId = localStorage.getItem("sucursalId");
             const sellersResponse = await getSellersAPI();
             const categoriesResponse = await getCategoriesAPI();
             const groupsResponse = await getGroupsAPI();
-            const productsResponse = await getFlatProductListAPI();
+            const productsResponse = await getFlatProductListAPI(sucursalId);
+            console.log("🧾 Flat products recibidos:", productsResponse);
+
             //console.log("🧪 Productos recibidos:", productsResponse);
             //console.log("🧪 Usuario actual:", user);
 
@@ -87,6 +100,7 @@ const StockManagement = () => {
 
     useEffect(() => {
         fetchData();
+        fetchFullProducts(); // ← cargamos el listado completo al inicio
     }, []);
 
     useEffect(() => {
@@ -137,8 +151,24 @@ const StockManagement = () => {
     //console.log("Productos originales:", products);
     //console.log("🧪 Productos filtrados:", finalProductList);
     const showVariantModal = async (product: any) => {
-        const group = await getGroupByIdAPI(product.groupId);
-        group.product = product;
+        if (!product) return;
+
+        const sucursalId = localStorage.getItem("sucursalId");
+        const rebuiltProduct = reconstructProductFromFlat({
+            flatProducts: productosFull,
+            productId: product._id,
+            sucursalId
+        });
+
+        if (!rebuiltProduct) {
+            return message.error("No se pudo reconstruir el producto.");
+        }
+
+        const group = {
+            name: product.nombre_producto,
+            product: rebuiltProduct
+        };
+
         setSelectedGroup(group);
         setIsVariantModalVisible(true);
     };
@@ -178,11 +208,8 @@ const StockManagement = () => {
 
     const filterBySeller = (product, sellerId) => {
         const sucursalId = localStorage.getItem("sucursalId");
-        const perteneceASucursal = product.sucursalId === sucursalId;
 
-        return sellerId === null
-            ? perteneceASucursal // si es "Todos", mostrar solo los de esta sucursal
-            : product.id_vendedor === sellerId && perteneceASucursal;
+        return sellerId === null || product.id_vendedor === sellerId;
     };
     const filterByCategoria = (product, sellerId) => {
         return sellerId === null || product.id_categoria === sellerId;
@@ -302,7 +329,17 @@ const StockManagement = () => {
                         <Col xs={24} sm={12} lg={6}>
                             <Button
                                 onClick={() => {
-                                    saveTempStock(stockListForConfirmModal);
+                                    const stockMapped = stockListForConfirmModal.map(item => ({
+                                        ...item,
+                                        product: {
+                                            ...item.product,
+                                            variantes: item.product.variantes || item.product.variantes_obj || {}
+                                        }
+                                    }));
+
+                                    console.log("🧪 Payload enviado al modal ConfirmProducts:", stockMapped);
+
+                                    saveTempStock(stockMapped);
                                     setStock(stockListForConfirmModal);
                                     setIsConfirmModalVisible(true);
                                 }}
@@ -400,6 +437,7 @@ const StockManagement = () => {
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
                     selectedSeller={selectedSeller}
+                    onShowVariantModal={showVariantModal}
                 />
 
             )}
@@ -447,7 +485,7 @@ const StockManagement = () => {
                     newVariants={getTempVariants()}
                     newProducts={getTempProducts()}
                     newStock={stockListForConfirmModal}
-                    productosConSucursales={products}
+                    productosConSucursales={productosFull}
                     selectedSeller={sellers.find(s => s._id === selectedSeller)}
                 />
             )}

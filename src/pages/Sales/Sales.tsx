@@ -14,6 +14,7 @@ import { getSellerProductsById } from "../../helpers/salesHelpers";
 import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import { IBranch } from "../../models/branchModel";
+import useProductsFlat from "../../hooks/useProductsFlat.tsx";
 
 
 export const Sales = () => {
@@ -29,7 +30,8 @@ export const Sales = () => {
     //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-    const { data, fetchProducts } = useProducts(!isAdmin ? selectedBranchId || undefined : undefined);
+    const branchIdForFetch = selectedBranchId ?? localStorage.getItem("sucursalId") ?? undefined;
+    const { data, fetchProducts } = useProductsFlat(branchIdForFetch);
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [branches, setBranches] = useState([] as any[]);
     const [searchText, setSearchText] = useState("");
@@ -93,11 +95,19 @@ export const Sales = () => {
     const fetchSellers = async () => {
         try {
             const response = await getSellersAPI();
-
             const today = new Date();
+            const todayWithoutTime = new Date(today.setHours(0, 0, 0, 0));
+            const sucursalId = localStorage.getItem("sucursalId");
+
             const sellersVigentes = response.filter((v: any) => {
                 const fecha = v.fecha_vigencia ? new Date(v.fecha_vigencia) : null;
-                return !fecha || fecha >= new Date(today.setHours(0, 0, 0, 0));
+                const vigente = !fecha || fecha >= todayWithoutTime;
+
+                const tieneSucursal = v.pago_sucursales?.some(
+                    (ps: any) => String(ps.id_sucursal) === String(sucursalId)
+                );
+
+                return vigente && tieneSucursal;
             });
 
             setSellers(sellersVigentes);
@@ -105,7 +115,6 @@ export const Sales = () => {
             message.error('Error al obtener los vendedores');
         }
     };
-
     const fetchSucursal = async () => {
         try {
             const response = await getSucursalsAPI()

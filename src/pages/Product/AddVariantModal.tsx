@@ -10,8 +10,15 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
 
     useEffect(() => {
         if (visible && group?.product) {
-            const sucursal = group.product.sucursales?.find(s => (s.id_sucursal.$oid || s.id_sucursal) === sucursalId);
+            console.log("🧪 group.product:", group.product);
+
+            const sucursal = group.product.sucursales?.find(
+                s => String(s.id_sucursal) === String(sucursalId)
+            );
+            console.log("🧪 sucursal encontrada:", sucursal);
+
             const current = sucursal?.combinaciones || [];
+            console.log("🧪 combinaciones actuales:", current);
 
             const formatted = current.map((combo: any, index: number) => {
                 const varianteEntries = Object.entries(combo.variantes || {});
@@ -30,11 +37,12 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
                 return entry;
             });
 
+            console.log("🧪 combinaciones formateadas:", formatted);
+
             setExistingCombinations(formatted);
-            setCombinations(formatted); // inicializamos con los existentes visibles pero desactivados
+            setCombinations(formatted);
         }
     }, [visible]);
-
     const handleFinish = async () => {
         if (!sucursalId) return message.error("No se encontró la sucursal en localStorage");
 

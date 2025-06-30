@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { Button, Input, Table, Spin, Select } from 'antd';
+import {Button, Input, Table, Spin, Select, message} from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
@@ -9,6 +9,7 @@ import { IProduct } from "../../models/productModel.ts";
 import { getCategoryByIdAPI } from '../../api/category';
 import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
 import { saveTempStock } from "../../utils/storageHelpers";
+import { reconstructProductFromFlat, fetchFullProductById } from "../../utils/storageHelpers";
 
 
 interface ProductTableProps {
@@ -22,9 +23,10 @@ interface ProductTableProps {
     selectedCategory: string;
     setSelectedCategory: (value: string) => void;
     selectedSeller;
+    onShowVariantModal?: (product: any) => void;
 }
 
-const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller}: ProductTableProps) => {
+const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller, onShowVariantModal}: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -78,14 +80,14 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 .filter(([_, stock]) => Number(stock) !== 0)
                 .map(([k, stock]) => {
                     const [productId, sucursalId] = k.split("-");
-                    const producto = productsList.find(p => p._id === productId && p.sucursalId === sucursalId);
+                    const producto = productsList.find(p => `${p._id}-${p.sucursalId}-${p.variante || 'base'}` === k);
 
                     return {
                         product: {
                             _id: producto._id,
                             nombre_producto: producto.nombre_producto,
                             nombre_categoria: producto.categoria || "Sin categoría",
-                            variantes: producto.variant || {},
+                            variantes: producto.variantes_obj || producto.variantes || producto.variant || {},
                             precio: producto.precio ?? "-",
                             stock: producto.stock ?? "-"
                         },
@@ -133,9 +135,15 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         }
         closeVariantModal();
     };
-    const openStockModal = (variantName: string, product: any) => {
+    const openStockModal = async (variantName: string, product: any) => {
+        const fullProduct = await fetchFullProductById(product._id);
+        if (!fullProduct) {
+            message.error("No se pudo obtener el producto completo");
+            return;
+        }
+
         setSelectedVariantName(variantName);
-        setSelectedProductForStock(product);
+        setSelectedProductForStock(fullProduct);
         setStockModalOpen(true);
     };
 
@@ -147,7 +155,13 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     const [priceModalOpen, setPriceModalOpen] = useState(false);
     const [selectedProductForPrice, setSelectedProductForPrice] = useState<any>(null);
 
-    const openPriceModal = (variantName: string, product: any) => {
+    const openPriceModal = async (variantName: string, flatProduct: any) => {
+        const product = await fetchFullProductById(flatProduct._id);
+
+        if (!product) {
+            return message.error("No se pudo obtener el producto completo");
+        }
+
         setSelectedVariantName(variantName);
         setSelectedProductForPrice(product);
         setPriceModalOpen(true);
@@ -294,9 +308,9 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             render: (_: any, record: any) =>
                 !record.variant && (
                     <Button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            openVariantModal(record.productOriginal);
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onShowVariantModal?.(record.productOriginal);
                         }}
                         disabled={!selectedSeller}
                         title={!selectedSeller ? "Seleccione un vendedor para habilitar" : undefined}
@@ -322,7 +336,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             .filter(p => p.sucursalId === sucursalId)
             .map(p => ({
                 ...p,
-                key: `${p._id}-${p.sucursalId}`,
+                key: `${p._id}-${p.sucursalId}-${p.variante || 'base'}`,
                 variant: p.variante,
                 nombre_categoria: p.categoria
             }));
