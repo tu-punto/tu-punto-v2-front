@@ -73,8 +73,8 @@ const VariantInputs = ({
             if (index === variants.length) {
                 const combination: any = {
                     key: path.map(p => `${p.name}-${p.value}`).join('-'),
-                    stock: 0,
-                    price: 0,
+                    stock: undefined,
+                    price: undefined,
                 };
                 path.forEach((p, i) => {
                     combination[`var${i}`] = p.value;
@@ -143,7 +143,7 @@ const VariantInputs = ({
                 <InputNumber
                     min={0}
                     value={record.stock}
-                    onChange={(value) => handleChange(record.key, 'stock', value || 0)}
+                    onChange={(value) => handleChange(record.key, 'stock', value)}
                     disabled={record.disabled}
                 />
             )

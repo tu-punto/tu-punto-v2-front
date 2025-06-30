@@ -19,7 +19,6 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
         //const newVariants = JSON.parse(localStorage.getItem("newVariants") || "[]");
         const newProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
         //console.log("Productos cargados desde localStorage:", newProducts);
-        // Solo tomar combinaciones de la sucursal actual
         const filteredProducts = newProducts.map((p) => {
             const prod = p.productData || p;
             const filteredSucursales = prod.sucursales.map((s) => ({
@@ -128,7 +127,12 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
             // 3. Actualizar stock e ingresar registro de entrada
             for (const entry of stockData) {
                 const { product } = entry;
-                const variantes = product.variantes;
+                //console.log("📦 Procesando producto:", product);
+                const variantes = product?.variantes
+                    ?? product?.variantes_obj
+                    ?? product?.variantesObj
+                    ?? product?.variant
+                    ?? {};
                 const ingreso = entry.newStock.stock;
                 const productId = product._id || product.id_producto;
 
@@ -151,6 +155,12 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                     const stockActual = combinacion?.stock || 0;
                     const nuevoStock = stockActual + ingreso;
 
+                console.warn("📦 Payload para updateSubvariantStockAPI:");
+
+                if (!variantes || Object.keys(variantes).length === 0) {
+                    console.error("❌ ERROR: variantes vacío o malformado para producto:", productId);
+                    continue; // o return
+                }
                     await updateSubvariantStockAPI({
                         productId,
                         sucursalId,
@@ -158,10 +168,20 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                         stock: nuevoStock
                     });
 
-                    await createEntryAPI({
+                if (!variantes || Object.keys(variantes).length === 0) {
+                    console.warn("🚨 Variantes vacías para producto", productId);
+                    continue; // o throw
+                }
+
+                await createEntryAPI({
                         producto: productId,
                         sucursal: sucursalId,
-                        nombre_variante: Object.entries(variantes || {}).map(([k, v]) => `${k}: ${v}`).join(" / "),
+                        nombre_variante: variantes && Object.keys(variantes).length > 0
+                            ? Object.entries(variantes).map(([k, v]) => `${k}: ${v}`).join(" / ")
+                            : (() => {
+                                console.warn("⚠️ Variantes vacías. Saltando ingreso para", productId);
+                                return undefined; // o lanzá error si querés cortar
+                            })(),
                         cantidad_ingreso: ingreso,
                         estado: "confirmado",
                         categoria: product.categoria || "Ropa",
@@ -252,10 +272,17 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                         {
                             title: "Producto",
                             render: (_, record) => {
-                                const variantes = Object.entries(record.product.variantes || {})
-                                    .map(([k, v]) => `${v}`)
-                                    .join(" / ");
-                                return `→ ${record.product.nombre_producto || ''} - ${variantes}`;
+                                const variantes =
+                                    Object.entries(
+                                        record.product.variantes ||
+                                        record.product.variantes_obj ||
+                                        record.product.variant ||
+                                        {}
+                                    )
+                                        .map(([_, v]) => `${v}`)
+                                        .join(" / ");
+
+                                return `→ ${record.product.nombre_producto || ''}${variantes ? ' - ' + variantes : ''}`;
                             }
                         },
                         {
