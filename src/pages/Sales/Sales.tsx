@@ -3,7 +3,6 @@ import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
 import { getSellerAPI, getSellersAPI, updateSellerAPI } from "../../api/seller";
-import useProducts from "../../hooks/useProducts";
 import EmptySalesTable from "./EmptySalesTable";
 import useEditableTable from "../../hooks/useEditableTable";
 import { registerSalesToShippingAPI } from "../../api/shipping";
@@ -13,7 +12,6 @@ import { getSellerInfoAPI } from "../../api/financeFlux";
 import { getSellerProductsById } from "../../helpers/salesHelpers";
 import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
-import { IBranch } from "../../models/branchModel";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
 
 
@@ -59,7 +57,6 @@ export const Sales = () => {
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [searchText, setSearchText] = useState("");
 
-    const sucursalId = localStorage.getItem('sucursalId');
     useEffect(() => {
         if (selectedProducts.length > 0) {
             setSelectedProducts([]);
