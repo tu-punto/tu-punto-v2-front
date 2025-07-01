@@ -2,7 +2,6 @@ import { DatePicker, Input, message, Select, Table } from 'antd';
 import {useContext, useEffect, useState} from 'react';
 import { getShippingsAPI, getShippingByIdAPI  } from '../../api/shipping';
 import ShippingInfoModal from './ShippingInfoModal';
-import { InfoCircleOutlined } from '@ant-design/icons';
 import ShippingStateModal from './ShippingStateModal';
 import { getSucursalsAPI } from '../../api/sucursal';
 import { getSellersAPI } from "../../api/seller";
