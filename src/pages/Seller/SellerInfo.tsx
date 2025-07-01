@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { getSellerAPI } from "../../api/seller";
 import SellerInfoPage from "./components/SellerInfoBase";
 import { UserContext } from "../../context/userContext";
+import dayjs from "dayjs";
 
 const SellerInfoPageWrapper = () => {
     const { user } = useContext(UserContext);
@@ -29,8 +30,8 @@ const SellerInfoPageWrapper = () => {
                     deuda: sellerData.deuda,
                     deudaInt: sellerData.deuda,
                     pagoTotalInt: (sellerData.deuda - (sellerData.adelanto_servicio || 0)).toFixed(2),
-                    fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
-                    fecha: date.toLocaleDateString("es-ES"),
+                    fecha_vigencia: dayjs(sellerData.fecha_vigencia).format("DD/MM/YYYY"),
+                    fecha: dayjs(sellerData.fecha).format("DD/MM/YYYY"),
                     pago_mensual: `Bs. ${pagoMensualTotal}`,
                     alquiler: totalAlquiler,
                     exhibicion: totalExhibicion,

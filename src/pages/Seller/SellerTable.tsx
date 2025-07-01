@@ -1,7 +1,7 @@
 import { Button, Table, Tooltip } from "antd";
 import { useEffect, useState } from "react";
 import { EditOutlined } from "@ant-design/icons";
-
+import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
@@ -164,8 +164,9 @@ export default function SellerTable({
           return {
             ...seller,
             key: seller._id,
-            fecha_vigencia: finish_date.toLocaleDateString("es-ES"),
-            fecha: date.toLocaleDateString("es-ES"),
+            nombre: `${seller.nombre} ${seller.apellido || ''}`.trim(),
+            fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
+            fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
             deuda: deuda,
             pagoTotal: `Bs. ${pagoPendiente.toFixed(2)}`,
             pagoTotalInt: pagoPendiente,
