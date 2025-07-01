@@ -1,7 +1,8 @@
 import { IBoxClose } from "./boxClose";
 
 export interface IDailyEffective {
-  id_efectivo_diario: number;
+  _id: string;
+  //id_efectivo_diario: string;
   corte_0_2: number;
   corte_0_5: number;
   corte_1: number;

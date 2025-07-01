@@ -29,11 +29,34 @@ export const Sales = () => {
     const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined);
     //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
-    const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-    const branchIdForFetch = selectedBranchId ?? localStorage.getItem("sucursalId") ?? undefined;
-    const { data, fetchProducts } = useProductsFlat(branchIdForFetch);
-    const [totalAmount, setTotalAmount] = useState<number>(0);
     const [branches, setBranches] = useState([] as any[]);
+    const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+    const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
+    useEffect(() => {
+        fetchSellers();
+        fetchSucursal();
+    }, []);
+    useEffect(() => {
+        if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+            setSelectedBranchId(branches[0]._id);
+        }
+    }, [branches, isAdmin, selectedBranchId]);
+    useEffect(() => {
+        if (isAdmin) {
+            const sucursalId = localStorage.getItem("sucursalId");
+            if (sucursalId) setBranchIdForFetch(sucursalId);
+        } else if (selectedBranchId) {
+            setBranchIdForFetch(selectedBranchId);
+        } else if (branches.length > 0) {
+            setBranchIdForFetch(branches[0]._id);
+        }
+    }, [branches, isAdmin, selectedBranchId]);
+
+    const { data, fetchProducts } = useProductsFlat(
+        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
+    );
+    //console.log(" Productos desde useProductsFlat:", data);
+    const [totalAmount, setTotalAmount] = useState<number>(0);
     const [searchText, setSearchText] = useState("");
 
     const sucursalId = localStorage.getItem('sucursalId');
@@ -97,16 +120,24 @@ export const Sales = () => {
             const response = await getSellersAPI();
             const today = new Date();
             const todayWithoutTime = new Date(today.setHours(0, 0, 0, 0));
-            const sucursalId = localStorage.getItem("sucursalId");
+
+            // ¡Este sucursalId no es confiable si aún no se ha cargado!
+            const sucursalId = isAdmin
+                ? localStorage.getItem("sucursalId")
+                : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
+
+            if (!sucursalId) {
+                console.warn("Sucursal ID no disponible aún para filtrar vendedores");
+                setSellers([]); // Vacío hasta que esté listo
+                return;
+            }
 
             const sellersVigentes = response.filter((v: any) => {
                 const fecha = v.fecha_vigencia ? new Date(v.fecha_vigencia) : null;
                 const vigente = !fecha || fecha >= todayWithoutTime;
-
                 const tieneSucursal = v.pago_sucursales?.some(
                     (ps: any) => String(ps.id_sucursal) === String(sucursalId)
                 );
-
                 return vigente && tieneSucursal;
             });
 
@@ -135,10 +166,6 @@ export const Sales = () => {
     }
 
     useEffect(() => {
-        fetchSellers();
-        fetchSucursal();
-    }, []);
-    useEffect(() => {
         if (!isAdmin && branches.length > 0 && !selectedBranchId) {
             setSelectedBranchId(branches[0]._id);
         }
@@ -149,47 +176,46 @@ export const Sales = () => {
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
     useEffect(() => {
-        if (!isAdmin && selectedBranchId) {
+        if (branchIdForFetch) {
             fetchProducts();
         }
-        if (isAdmin) {
-            fetchProducts();
+    }, [branchIdForFetch]);
+    useEffect(() => {
+        if (branchIdForFetch) {
+            fetchSellers();
         }
-    }, [selectedBranchId, isAdmin]);
-    const filteredProducts = () => {
-        let filteredData = data;
+    }, [branchIdForFetch]);
 
-        // 2. Excluir productos de vendedores no vigentes
+
+    const filteredProducts = () => {
+
+        let filteredData = data;
         const today = new Date();
         const vendedoresVigentesIds = sellers
             .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
-            .map(v => v._id);
+            .map(v => String(v._id));
 
-        filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(p.id_vendedor));
-
-        // 3. Filtrar por sucursal o vendedor según sea admin o no
+        filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
         if (!isAdmin) {
-            filteredData = filteredData.filter(p => p.id_vendedor === user.id_vendedor);
+            filteredData = filteredData.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
             if (selectedBranchId) {
-                filteredData = filteredData.filter(p => p.sucursalId === selectedBranchId);
+                filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
             }
         } else if (selectedSellerId) {
             filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
         }
-
-        // 4. Filtrar por búsqueda
         if (searchText.trim()) {
             const lowerSearch = searchText.toLowerCase();
             filteredData = filteredData.filter(product =>
                 product.producto.toLowerCase().includes(lowerSearch)
             );
         }
-
-        // 5. Solo productos con stock
         filteredData = filteredData.filter(product => product.stockActual > 0);
 
+        //console.log(" Productos finales que se muestran:", filteredData);
         return filteredData;
     };
+
     const handleProductSelect = (product: any) => {
         setSelectedProducts((prevProducts: any) => {
             const exists = prevProducts.find((p: any) => p.key === product.key);

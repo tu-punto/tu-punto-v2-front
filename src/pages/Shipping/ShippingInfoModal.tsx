@@ -402,7 +402,7 @@ const handleSave = async (values: any) => {
             lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
             fecha_pedido: values.fecha_pedido?.format('YYYY-MM-DD HH:mm:ss'),
             hora_entrega_acordada: horaEntrega,
-            pagado_al_vendedor: values.esta_pagado === 'si',
+            pagado_al_vendedor: values.tipo_de_pago === '3',
             adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
             quien_paga_delivery: values.quien_paga_delivery,
         };

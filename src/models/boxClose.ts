@@ -2,7 +2,8 @@ import { IBranch } from "./branchModel";
 import { IDailyEffective } from "./dailyEffective";
 
 export interface IBoxClose {
-  id_cierre_caja: number;
+  _id: string;
+  //id_cierre_caja: string;
   responsible: string;
   ventas_efectivo: number;
   ventas_qr: number;

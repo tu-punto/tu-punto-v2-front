@@ -10,9 +10,8 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import { getCategoriesAPI } from "../../api/category";
 
 
-const ProductTableSeller = ({ productsList, onUpdateProducts }) => {
+const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSucursalId}) => {
     const [updatedProductsList, setUpdatedProductsList] = useState<any[]>([]);
-    const [sucursalId, setSucursalId] = useState<string>('');
     const [branches, setBranches] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const { user }: any = useContext(UserContext);
@@ -41,7 +40,6 @@ const ProductTableSeller = ({ productsList, onUpdateProducts }) => {
 
             const branches = await getSucursalsAPI();
             setBranches(branches);
-            if (branches.length > 0) setSucursalId(branches[0]._id);
 
             const categories = await getCategoriesAPI();
             setCategories(categories);
@@ -55,33 +53,45 @@ const ProductTableSeller = ({ productsList, onUpdateProducts }) => {
 
         products.forEach((product) => {
             if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
+
             const baseName = product.nombre_producto;
-            const sucursal = product.sucursales?.find((s: any) => s.id_sucursal?.toString() === sucursalId);
-            if (!sucursal || !sucursal.combinaciones) return;
 
-            if (!groups[baseName]) {
-                groups[baseName] = {
-                    key: baseName,
-                    nombre_producto: baseName,
-                    children: [],
-                    totalStock: 0,
-                    nombre_categoria: product.nombre_categoria,
-                    productOriginal: product,
-                };
-            }
+            const sucursales = sucursalId === "all"
+                ? product.sucursales || []
+                : product.sucursales?.filter((s: any) => s.id_sucursal?.toString() === sucursalId) || [];
 
-            sucursal.combinaciones.forEach((comb: any, index: number) => {
-                const variant = Object.entries(comb.variantes).map(([_, v]) => v).join(' / ');
-                if (search && !baseName.toLowerCase().includes(search.toLowerCase()) && !variant.toLowerCase().includes(search.toLowerCase())) return;
-                groups[baseName].children.push({
-                    ...product,
-                    variant,
-                    stock: comb.stock,
-                    precio: comb.precio,
-                    key: `${product._id}-${sucursalId}-${index}`,
+            sucursales.forEach((sucursal: any) => {
+                if (!sucursal?.combinaciones) return;
+
+                if (!groups[baseName]) {
+                    groups[baseName] = {
+                        key: baseName,
+                        nombre_producto: baseName,
+                        children: [],
+                        totalStock: 0,
+                        nombre_categoria: product.nombre_categoria,
+                        productOriginal: product,
+                    };
+                }
+
+                sucursal.combinaciones.forEach((comb: any, index: number) => {
+                    const variant = Object.entries(comb.variantes).map(([_, v]) => v).join(' / ');
+                    if (
+                        search &&
+                        !baseName.toLowerCase().includes(search.toLowerCase()) &&
+                        !variant.toLowerCase().includes(search.toLowerCase())
+                    ) return;
+
+                    groups[baseName].children.push({
+                        ...product,
+                        variant,
+                        stock: comb.stock,
+                        precio: comb.precio,
+                        key: `${product._id}-${sucursal.id_sucursal}-${index}`,
+                    });
+
+                    groups[baseName].totalStock += comb.stock;
                 });
-
-                groups[baseName].totalStock += comb.stock;
             });
         });
 
@@ -92,7 +102,6 @@ const ProductTableSeller = ({ productsList, onUpdateProducts }) => {
             )
         );
     };
-
     const columns = [
         {
             title: "Producto",
@@ -134,6 +143,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts }) => {
                     style={{ width: 240 }}
                     placeholder="Seleccionar sucursal"
                 >
+                    <Select.Option value="all">Todas las sucursales</Select.Option>
                     {branches.map(branch => (
                         <Select.Option key={branch._id} value={branch._id}>{branch.nombre}</Select.Option>
                     ))}

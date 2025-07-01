@@ -26,13 +26,10 @@ interface Props {
   onSuccess: () => void;
   onCancel: () => void;
   lastClosingBalance?: any;
+  selectedDate?: dayjs.Dayjs | null;
 }
 
-const BoxCloseForm = ({
-  onSuccess,
-  onCancel,
-  lastClosingBalance = "0",
-}: Props) => {
+const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = "0", selectedDate }: Props) => {
   const [coinTotals, setCoinTotals] = useState(0);
   const [billTotals, setBillTotals] = useState(0);
   const [salesSummary, setSalesSummary] = useState<IDailySummary>();
@@ -40,22 +37,84 @@ const BoxCloseForm = ({
 
   const fetchSalesSummary = async () => {
     try {
-      const summary = await getDailySummary();
+      const summary = await getDailySummary(selectedDate?.toISOString());
       setSalesSummary(summary || { cash: 0, bank: 0, total: 0 });
+      const efectivoInicial = parseFloat(lastClosingBalance.efectivo_real) || 0;
+      const efectivoEsperado = efectivoInicial + (summary?.cash || 0);
+
       form.setFieldsValue({
-        efectivo_inicial: parseFloat(lastClosingBalance.efectivo_real) || 0,
+        efectivo_inicial: efectivoInicial,
         bancario_inicial: 0,
         ventas_efectivo: summary?.cash || 0,
         ventas_qr: summary?.bank || 0,
-        efectivo_esperado:
-          parseInt(lastClosingBalance.efectivo_real) || 0 + summary?.cash,
+        efectivo_esperado: efectivoEsperado,
         bancario_esperado: summary?.bank,
+
       });
     } catch (error) {
       console.error("Error while fetching sales summary", error);
       setSalesSummary({ cash: 0, bank: 0, total: 0 });
     }
   };
+
+  useEffect(() => {
+    fetchSalesSummary();
+  }, []);
+
+  useEffect(() => {
+    const esperado = form.getFieldValue("efectivo_esperado") || 0;
+    const real = coinTotals + billTotals;
+    form.setFieldValue("efectivo_real", real.toFixed(2));
+    form.setFieldValue("diferencia_efectivo", (real - esperado).toFixed(2));
+  }, [coinTotals, billTotals]);
+
+  const handleSubmit = async (values: any) => {
+    try {
+      const dailyEffectiveValues: Record<string, number> = {};
+
+      Object.keys(coinDenominations).forEach((denomination) => {
+        dailyEffectiveValues[`corte_${denomination.replace(".", "_")}`] =
+            values.coins?.[denomination] || 0;
+      });
+
+      Object.keys(billDenominations).forEach((denomination) => {
+        dailyEffectiveValues[`corte_${denomination.replace(".", "_")}`] =
+            values.bills?.[denomination] || 0;
+      });
+
+      dailyEffectiveValues["total_coins"] = coinTotals;
+      dailyEffectiveValues["total_bills"] = billTotals;
+
+      const { coins, bills, ...boxCloseValues } = values;
+      const resDailyEffective = await registerDailyEffectiveAPI(dailyEffectiveValues);
+      const dailyEffectiveID = resDailyEffective.newDailyEffective.id_efectivo_diario;
+
+      const newBoxClose = {
+        ...boxCloseValues,
+        id_efectivo_diario: dailyEffectiveID,
+        ingresos_efectivo: values.ventas_efectivo,
+        ventas_efectivo: salesSummary?.cash,
+        id_sucursal: localStorage.getItem("sucursalId"),
+      };
+
+      const boxCloseRes = await registerBoxCloseAPI(newBoxClose);
+      const boxCloseID = boxCloseRes.newBoxClose.id_cierre_caja;
+
+      const dailyEffectiveValuesWithBoxClose = {
+        ...dailyEffectiveValues,
+        id_cierre_caja: boxCloseID,
+      };
+
+      await updateDailyEffectiveAPI(dailyEffectiveID, dailyEffectiveValuesWithBoxClose);
+
+      message.success("Proceso completado con éxito.");
+      onSuccess();
+    } catch (error) {
+      console.error("Error saving reconciliation:", error);
+      message.error("Error al intentar registrar el cierre de caja.");
+    }
+  };
+
   const coinDenominations = {
     "0.1": "10 ctvs.",
     "0.2": "20 ctvs.",
@@ -72,465 +131,278 @@ const BoxCloseForm = ({
     "200": "Bs. 200",
   };
 
-  useEffect(() => {
-    fetchSalesSummary();
-  }, []);
-
-  useEffect(() => {
-    form.setFieldValue("efectivo_real", (coinTotals + billTotals).toFixed(2));
-    form.setFieldValue(
-      "diferencia_efectivo",
-      (
-        coinTotals +
-        billTotals -
-        form.getFieldValue("efectivo_esperado")
-      ).toFixed(2)
-    );
-  }, [coinTotals, billTotals]);
-
-  const handleSubmit = async (values: any) => {
-    try {
-      let dailyEffectiveValues: Record<string, number> = {};
-
-      Object.keys(coinDenominations).forEach((denomination) => {
-        dailyEffectiveValues[`corte_${denomination.replace(".", "_")}`] =
-          values.coins[denomination] || 0;
-      });
-
-      Object.keys(billDenominations).forEach((denomination) => {
-        dailyEffectiveValues[`corte_${denomination.replace(".", "_")}`] =
-          values.bills[denomination] || 0;
-      });
-
-      dailyEffectiveValues["total_coins"] = coinTotals;
-      dailyEffectiveValues["total_bills"] = billTotals;
-      const boxCloseValues = values;
-      delete boxCloseValues.coins;
-      delete boxCloseValues.bills;
-
-      try {
-        const resDailyEffective = await registerDailyEffectiveAPI(
-          dailyEffectiveValues
-        );
-
-        const dailyEffectiveID =
-          resDailyEffective.newDailyEffective.id_efectivo_diario;
-
-        const newBoxClose = {
-          ...boxCloseValues,
-          id_efectivo_diario: dailyEffectiveID,
-          ingresos_efectivo: values.ventas_efectivo,
-          ventas_efectivo: salesSummary?.cash,
-        };
-
-        try {
-          const boxCloseRes = await registerBoxCloseAPI(newBoxClose);
-          const boxCloseID = boxCloseRes.newBoxClose.id_cierre_caja;
-
-          const dailyEffectiveValuesWithBoxClose = {
-            ...dailyEffectiveValues,
-            id_cierre_caja: boxCloseID,
-          };
-
-          await updateDailyEffectiveAPI(
-            dailyEffectiveID,
-            dailyEffectiveValuesWithBoxClose
-          );
-          message.success("Proceso completado con éxito.");
-        } catch (error) {
-          message.error("Error al intentar crear el cierre de caja.");
-        }
-      } catch (error) {
-        message.error(
-          "Error al registrar las monedas y billetes. Intente nuevamente."
-        );
-      }
-
-      onSuccess();
-    } catch (error) {
-      console.error("Error saving reconciliation:", error);
-    }
-  };
-
   return (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={handleSubmit}
-      className="space-y-4"
-    >
-      <Card>
-        <Title level={5}>Información General</Title>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
+        <Card>
+          <Title level={5}>Información General</Title>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                  label="Responsable"
+                  name="responsible"
+                  rules={[{ required: true, message: "Campo requerido" }]}
+              >
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Fecha">
+                <Input
+                    readOnly
+                    value={dayjs().format("DD/MM/YYYY")}
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        <Card>
+          <Title level={5}>Resumen de Ventas</Title>
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item label="Último cierre de caja (Efectivo)">
+                <InputNumber
+                    value={lastClosingBalance.efectivo_real}
+                    readOnly
+                    prefix="Bs. "
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Efectivo">
+                <InputNumber
+                    value={salesSummary?.cash}
+                    readOnly
+                    prefix="Bs. "
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Bancario">
+                <InputNumber
+                    value={salesSummary?.bank}
+                    readOnly
+                    prefix="Bs. "
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Total">
+                <InputNumber
+                    value={salesSummary?.total}
+                    readOnly
+                    prefix="Bs. "
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        <Card>
+          <Title level={5}>Recuento de Efectivo</Title>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Efectivo inicial" name="efectivo_inicial">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Ingresos en efectivo" name="ventas_efectivo">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Efectivo esperado" name="efectivo_esperado">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Efectivo real" name="efectivo_real">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Diferencia" name="diferencia_efectivo">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Card>
+              <Title level={5}>Monedas</Title>
+              <Table
+                  dataSource={Object.entries(coinDenominations).map(([value, name]) => ({
+                    value,
+                    name,
+                  }))}
+                  columns={[
+                    { title: "Denominación", dataIndex: "name", key: "name" },
+                    {
+                      title: "Cantidad",
+                      key: "cantidad",
+                      render: (_, record) => (
+                          <Form.Item name={["coins", record.value]} noStyle>
+                            <InputNumber min={0} />
+                          </Form.Item>
+                      ),
+                    },
+                    {
+                      title: "Total",
+                      key: "total",
+                      render: (_, record) => {
+                        const qty = form.getFieldValue(["coins", record.value]) || 0;
+                        return `Bs. ${(qty * parseFloat(record.value)).toFixed(2)}`;
+                      },
+                    },
+                  ]}
+                  pagination={false}
+                  size="small"
+                  summary={() => (
+                      <Table.Summary.Row>
+                        <Table.Summary.Cell colSpan={2}>
+                          <strong>Total</strong>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell>
+                          <strong>Bs. {coinTotals.toFixed(2)}</strong>
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                  )}
+              />
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card>
+              <Title level={5}>Billetes</Title>
+              <Table
+                  dataSource={Object.entries(billDenominations).map(([value, name]) => ({
+                    value,
+                    name,
+                  }))}
+                  columns={[
+                    { title: "Denominación", dataIndex: "name", key: "name" },
+                    {
+                      title: "Cantidad",
+                      key: "cantidad",
+                      render: (_, record) => (
+                          <Form.Item name={["bills", record.value]} noStyle>
+                            <InputNumber min={0} />
+                          </Form.Item>
+                      ),
+                    },
+                    {
+                      title: "Total",
+                      key: "total",
+                      render: (_, record) => {
+                        const qty = form.getFieldValue(["bills", record.value]) || 0;
+                        return `Bs. ${(qty * parseFloat(record.value)).toFixed(2)}`;
+                      },
+                    },
+                  ]}
+                  pagination={false}
+                  size="small"
+                  summary={() => (
+                      <Table.Summary.Row>
+                        <Table.Summary.Cell colSpan={2}>
+                          <strong>Total</strong>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell>
+                          <strong>Bs. {billTotals.toFixed(2)}</strong>
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                  )}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        <Card>
+          <Title level={5}>Recuento Bancario</Title>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Bancario inicial" name="bancario_inicial">
+                <InputNumber prefix="Bs. " className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Ingresos bancarios" name="ventas_qr">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Bancario esperado" name="bancario_esperado">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Bancario real" name="bancario_real">
+                <InputNumber prefix="Bs. " className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Diferencia" name="diferencia_bancario">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        <Card>
+          <Title level={5}>Observaciones</Title>
           <Form.Item
-            label="Responsable"
-            name="responsible"
-            rules={[{ required: true, message: "Campo requerido" }]}
+              name="observaciones"
+              rules={[{ required: true, message: "Campo requerido" }]}
           >
-            <Input />
+            <Input.TextArea rows={4} />
           </Form.Item>
-          <Form.Item label="Fecha">
-            <Input
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-              value={dayjs().format("DD/MM/YYYY")}
-            />
-          </Form.Item>
+        </Card>
+
+        <div className="flex justify-end gap-2">
+          <Button onClick={onCancel}>Cancelar</Button>
+          <Button type="primary" htmlType="submit">
+            Guardar
+          </Button>
         </div>
-      </Card>
-
-      <Card>
-        <Title level={5}>Resumen de Ventas</Title>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Form.Item label="Ultimo cierre de caja (Efectivo)">
-            <InputNumber
-              prefix="Bs."
-              value={lastClosingBalance.efectivo_real}
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item label="Efectivo">
-            <InputNumber
-              prefix="Bs."
-              value={salesSummary?.cash}
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item label="Bancario">
-            <InputNumber
-              prefix="Bs."
-              value={salesSummary?.bank}
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item label="Total">
-            <InputNumber
-              prefix="Bs."
-              value={salesSummary?.total}
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-        </div>
-      </Card>
-
-      <Card>
-        <Title level={5}>Recuento de Efectivo</Title>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Form.Item
-            label="Efectivo inicial"
-            name="efectivo_inicial"
-            rules={[{ required: true, message: "Campo requerido" }]}
-          >
-            <InputNumber
-              prefix="Bs."
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item
-            label="Ingresos en efectivo"
-            name="ventas_efectivo"
-            rules={[{ required: true, message: "Campo requerido" }]}
-          >
-            <InputNumber
-              prefix="Bs."
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item label="Efectivo esperado" name="efectivo_esperado">
-            <InputNumber
-              prefix="Bs."
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item label="Efectivo real" name="efectivo_real">
-            <InputNumber
-              prefix="Bs."
-              readOnly
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-            />
-          </Form.Item>
-          <Form.Item label="Diferencia" name="diferencia_efectivo">
-            <InputNumber
-              prefix="Bs."
-              onChange={(value: any) => {
-                form.setFieldValue(
-                  "diferencia_efectivo",
-                  value - form.getFieldValue("efectivo_esperado") || 0
-                );
-              }}
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-              readOnly
-            />
-          </Form.Item>
-        </div>
-      </Card>
-
-      {/* TABLA DE COINS Y BILLS */}
-      <Row gutter={16}>
-        <Col span={12}>
-          <Card>
-            <Title level={5}>Monedas</Title>
-            <Table
-              dataSource={Object.entries(coinDenominations).map(
-                ([value, name]) => ({
-                  value,
-                  name,
-                })
-              )}
-              columns={[
-                {
-                  title: "Denominación",
-                  dataIndex: "name",
-                  key: "name",
-                  width: "40%",
-                },
-                {
-                  title: "Cantidad",
-                  key: "quantity",
-                  width: "30%",
-                  render: (_, record) => (
-                    <Form.Item
-                      name={["coins", record.value]}
-                      rules={[{ required: true, message: "Requerido" }]}
-                    >
-                      <InputNumber min={0} />
-                    </Form.Item>
-                  ),
-                },
-                {
-                  title: "Total",
-                  key: "total",
-                  width: "30%",
-                  render: (_, record) => (
-                    <Form.Item shouldUpdate noStyle>
-                      {() => {
-                        const quantity = form.getFieldValue([
-                          "coins",
-                          record.value,
-                        ]);
-                        return (
-                          <strong>
-                            Bs.{" "}
-                            {(quantity * parseFloat(record.value) || 0).toFixed(
-                              2
-                            )}
-                          </strong>
-                        );
-                      }}
-                    </Form.Item>
-                  ),
-                },
-              ]}
-              pagination={false}
-              size="small"
-              summary={() => (
-                <Table.Summary.Row>
-                  <Table.Summary.Cell index={0}>
-                    <strong>Total</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={1} />
-                  <Table.Summary.Cell index={2}>
-                    <Form.Item shouldUpdate noStyle>
-                      {() => {
-                        const coinSum = Object.keys(coinDenominations).reduce(
-                          (sum, key) =>
-                            sum +
-                            (form.getFieldValue(["coins", key]) || 0) *
-                              parseFloat(key),
-                          0
-                        );
-                        setCoinTotals(coinSum);
-                        return <strong>Bs. {coinTotals.toFixed(2)}</strong>;
-                      }}
-                    </Form.Item>
-                  </Table.Summary.Cell>
-                </Table.Summary.Row>
-              )}
-            />
-          </Card>
-        </Col>
-        {/* BILLETES   */}
-        <Col span={12}>
-          <Card>
-            <Title level={5}>Billetes</Title>
-            <Table
-              dataSource={Object.entries(billDenominations).map(
-                ([value, name]) => ({
-                  value,
-                  name,
-                })
-              )}
-              columns={[
-                {
-                  title: "Denominación",
-                  dataIndex: "name",
-                  key: "name",
-                  width: "40%",
-                },
-                {
-                  title: "Cantidad",
-                  key: "quantity",
-                  width: "30%",
-                  render: (_, record) => (
-                    <Form.Item
-                      name={["bills", record.value]}
-                      rules={[{ required: true, message: "Requerido" }]}
-                    >
-                      <InputNumber min={0} />
-                    </Form.Item>
-                  ),
-                },
-                {
-                  title: "Total",
-                  key: "total",
-                  width: "30%",
-                  render: (_, record) => (
-                    <Form.Item shouldUpdate noStyle>
-                      {() => {
-                        const quantity = form.getFieldValue([
-                          "bills",
-                          record.value,
-                        ]);
-                        return (
-                          <strong>
-                            Bs.{" "}
-                            {(quantity * parseFloat(record.value) || 0).toFixed(
-                              2
-                            )}
-                          </strong>
-                        );
-                      }}
-                    </Form.Item>
-                  ),
-                },
-              ]}
-              pagination={false}
-              size="small"
-              summary={() => (
-                <Table.Summary.Row>
-                  <Table.Summary.Cell index={0}>
-                    <strong>Total</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={1} />
-                  <Table.Summary.Cell index={2}>
-                    <Form.Item shouldUpdate noStyle>
-                      {() => {
-                        const billSum = Object.keys(billDenominations).reduce(
-                          (sum, key) =>
-                            sum +
-                            (form.getFieldValue(["bills", key]) || 0) *
-                              parseFloat(key),
-                          0
-                        );
-                        setBillTotals(billSum);
-                        return <strong>Bs. {billTotals.toFixed(2)}</strong>;
-                      }}
-                    </Form.Item>
-                  </Table.Summary.Cell>
-                </Table.Summary.Row>
-              )}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Card>
-        <Title level={5}>Recuento Bancario</Title>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Form.Item
-            label="Bancario inicial"
-            name="bancario_inicial"
-            rules={[{ required: true, message: "Campo requerido" }]}
-          >
-            <InputNumber
-              prefix="Bs."
-              onChange={(value: any) => {
-                form.setFieldValue(
-                  "bancario_esperado",
-                  form.getFieldValue("ventas_qr") + value
-                );
-              }}
-              className="w-full"
-            />
-          </Form.Item>
-          <Form.Item
-            label="Ingresos bancarios"
-            name={"ventas_qr"}
-            rules={[{ required: true, message: "Campo requerido" }]}
-          >
-            <InputNumber
-              prefix="Bs."
-              onChange={(value: any) => {
-                form.setFieldValue(
-                  "bancario_esperado",
-                  form.getFieldValue("bancario_inicial") + value
-                );
-              }}
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-              readOnly
-            />
-          </Form.Item>
-          <Form.Item
-            label="Bancario esperado"
-            name="bancario_esperado"
-            rules={[{ required: true, message: "Campo requerido" }]}
-          >
-            <InputNumber
-              prefix="Bs."
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-              readOnly
-            />
-          </Form.Item>
-          <Form.Item
-            label="Bancario real"
-            name="bancario_real"
-            rules={[{ required: true, message: "Campo requerido" }]}
-          >
-            <InputNumber
-              prefix="Bs."
-              onChange={(value: any) => {
-                form.setFieldValue(
-                  "diferencia_bancario",
-                  (value - form.getFieldValue("bancario_esperado")).toFixed(2)
-                );
-              }}
-              className="w-full"
-            />
-          </Form.Item>
-          <Form.Item label="Diferencia" name="diferencia_bancario">
-            <InputNumber
-              prefix="Bs."
-              className="w-full bg-gray-300 text-gray-500 pointer-events-none"
-              readOnly
-            />
-          </Form.Item>
-        </div>
-      </Card>
-
-      <Card>
-        <Title level={5}>Observaciones</Title>
-        <Form.Item
-          name="observaciones"
-          rules={[{ required: true, message: "Campo requerido" }]}
-        >
-          <Input.TextArea rows={4} />
-        </Form.Item>
-      </Card>
-
-      <div className="flex justify-end space-x-2">
-        <Button onClick={onCancel}>Cancelar</Button>
-        <Button type="primary" htmlType="submit">
-          Guardar
-        </Button>
-      </div>
-    </Form>
+      </Form>
   );
 };
 
