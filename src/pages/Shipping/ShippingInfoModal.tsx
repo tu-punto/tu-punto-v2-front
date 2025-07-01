@@ -386,9 +386,9 @@ const handleSave = async (values: any) => {
         }));
         //console.log("Updated existing products:", updatedExisting);
         if (updatedExisting.length > 0) {
-            await updateProductsByShippingAPI(shipping._id, updatedExisting);
+            //await updateProductsByShippingAPI(shipping._id, updatedExisting);
         }
-        if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
+        //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
         //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
         //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
         let horaEntrega = values.hora_entrega_acordada;
