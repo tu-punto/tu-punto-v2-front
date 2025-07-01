@@ -144,8 +144,6 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-          const date = new Date(seller.fecha);
-          const finish_date = new Date(seller.fecha_vigencia);
           const mensual = seller.pago_sucursales.reduce(
             (t: number, p: ISucursalPago) =>
               t +
