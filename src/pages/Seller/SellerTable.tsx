@@ -263,7 +263,11 @@ export default function SellerTable({
       <Table
         columns={columns}
         dataSource={filterFactura(pending)}
-        pagination={{ pageSize: 5 }}
+        pagination={{ 
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20', '50'],
+          defaultPageSize: 5
+        }}
         scroll={{ x: "max-content" }}
         title={() => (
           <h2 className="text-2xl font-bold">
@@ -284,7 +288,11 @@ export default function SellerTable({
       <Table
         columns={columns}
         dataSource={filterFactura(onTime)}
-        pagination={{ pageSize: 5 }}
+        pagination={{ 
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20', '50'],
+          defaultPageSize: 5
+        }}
         scroll={{ x: "max-content" }}
         title={() => <h2 className="text-2xl font-bold">Pago al día</h2>}
         onRow={(r) => ({
