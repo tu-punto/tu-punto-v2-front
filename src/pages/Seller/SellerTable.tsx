@@ -1,4 +1,4 @@
-import { Button, Table, Tooltip, Select } from "antd";
+import { Button, Table, Tooltip, Select, Space } from "antd";
 import { useEffect, useState } from "react";
 import { EditOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -8,7 +8,6 @@ import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
 import { getSellersAPI } from "../../api/seller";
-import { getSellerAdvancesById } from "../../helpers/sellerHelpers";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 import { getSalesBySellerIdAPI } from "../../api/sales";
@@ -26,10 +25,10 @@ export default function SellerTable({
   setRefreshKey,
   isFactura,
 }: any) {
-  const [pending, setPending] = useState<SellerRow[]>([]);
-  const [onTime, setOnTime] = useState<SellerRow[]>([]);
   const [selected, setSelected] = useState<SellerRow | null>(null);
-  const [estadoFilter, setEstadoFilter] = useState<string>("todos");
+  const [estadoFilter, setEstadoFilter] = useState("todos");
+  const [pagoFilter, setPagoFilter] = useState("todos");
+  const [sellers, setSellers] = useState<SellerRow[]>([]);
 
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
@@ -41,7 +40,7 @@ export default function SellerTable({
   const getEstadoVendedor = (fechaVigencia: string) => {
     const hoy = dayjs();
     const vigencia = dayjs(fechaVigencia, "DD/MM/YYYY");
-    const diasVencido = hoy.diff(vigencia, 'day');
+    const diasVencido = hoy.diff(vigencia, "day");
 
     if (diasVencido <= 0) return "Activo";
     if (diasVencido <= 20) return "Debe renovar";
@@ -51,11 +50,26 @@ export default function SellerTable({
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case "Activo":
-        return { color: "#52c41a", backgroundColor: "#f6ffed", padding: "4px 8px", borderRadius: "4px" };
+        return {
+          color: "#52c41a",
+          backgroundColor: "#f6ffed",
+          padding: "4px 8px",
+          borderRadius: "4px",
+        };
       case "Debe renovar":
-        return { color: "#fa8c16", backgroundColor: "#fff7e6", padding: "4px 8px", borderRadius: "4px" };
+        return {
+          color: "#fa8c16",
+          backgroundColor: "#fff7e6",
+          padding: "4px 8px",
+          borderRadius: "4px",
+        };
       case "Ya no es cliente":
-        return { color: "#ff4d4f", backgroundColor: "#fff2f0", padding: "4px 8px", borderRadius: "4px" };
+        return {
+          color: "#ff4d4f",
+          backgroundColor: "#fff2f0",
+          padding: "4px 8px",
+          borderRadius: "4px",
+        };
       default:
         return {};
     }
@@ -74,11 +88,7 @@ export default function SellerTable({
       key: "estado",
       render: (_: any, row: SellerRow) => {
         const estado = getEstadoVendedor(row.fecha_vigencia);
-        return (
-          <span style={getEstadoColor(estado)}>
-            {estado}
-          </span>
-        );
+        return <span style={getEstadoColor(estado)}>{estado}</span>;
       },
     },
     {
@@ -199,7 +209,7 @@ export default function SellerTable({
           return {
             ...seller,
             key: seller._id,
-            nombre: `${seller.nombre} ${seller.apellido || ''}`.trim(),
+            nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
             fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
             fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
             deuda: deuda,
@@ -211,8 +221,7 @@ export default function SellerTable({
         })
       );
 
-      setPending(rows.filter((r) => r.pagoTotalInt !== 0));
-      setOnTime(rows.filter((r) => r.pagoTotalInt === 0));
+      setSellers(rows);
     })();
   }, [refreshKey]);
 
@@ -229,14 +238,27 @@ export default function SellerTable({
     setSelected(null);
   };
 
-  const filterFactura = (arr: SellerRow[]) => {
+  const filterSellers = (arr: SellerRow[]) => {
     let filtered = arr;
-    
+
     // Filtrar por estado
     if (estadoFilter !== "todos") {
-      filtered = filtered.filter(s => getEstadoVendedor(s.fecha_vigencia) === estadoFilter);
+      filtered = filtered.filter(
+        (s) => getEstadoVendedor(s.fecha_vigencia) === estadoFilter
+      );
     }
-    
+
+    if (pagoFilter !== "todos") {
+      filtered = filtered.filter((s) => {
+        if (pagoFilter === "con deuda") {
+          return s.pagoTotalInt !== 0;
+        } else if (pagoFilter === "sin deuda") {
+          return s.pagoTotalInt === 0;
+        }
+        return true;
+      });
+    }
+
     // Filtrar por factura
     return isFactura
       ? filtered.filter((s) => s.emite_factura)
@@ -246,7 +268,7 @@ export default function SellerTable({
   /* ---- render ---- */
   return (
     <>
-      <div className="mb-4">
+      <Space direction="horizontal" size="middle" className="mb-4">
         <Select
           value={estadoFilter}
           onChange={setEstadoFilter}
@@ -255,46 +277,38 @@ export default function SellerTable({
             { value: "todos", label: "Todos" },
             { value: "Activo", label: "Activos" },
             { value: "Debe renovar", label: "Debe renovar" },
-            { value: "Ya no es cliente", label: "Ya no es cliente" }
+            { value: "Ya no es cliente", label: "Ya no es cliente" },
           ]}
         />
-      </div>
+        <Select
+          value={pagoFilter}
+          onChange={setPagoFilter}
+          style={{ width: 200 }}
+          options={[
+            { value: "todos", label: "Todos" },
+            { value: "con deuda", label: "Pago Pendiente" },
+            { value: "sin deuda", label: "Sin Pago Pendiente" },
+          ]}
+        />
+      </Space>
 
       <Table
         columns={columns}
-        dataSource={filterFactura(pending)}
-        pagination={{ 
+        dataSource={filterSellers(sellers)}
+        pagination={{
           showSizeChanger: true,
-          pageSizeOptions: ['5', '10', '20', '50'],
-          defaultPageSize: 5
+          pageSizeOptions: ["5", "10", "20", "50"],
+          defaultPageSize: 5,
         }}
         scroll={{ x: "max-content" }}
         title={() => (
           <h2 className="text-2xl font-bold">
             Pago pendiente Bs.&nbsp;
-            {filterFactura(pending)
+            {filterSellers(sellers)
               .reduce((t, s) => t + s.pagoTotalInt, 0)
               .toFixed(2)}
           </h2>
         )}
-        onRow={(r) => ({
-          onClick: () => {
-            setSelected(r);
-            setInfoModal(true);
-          },
-        })}
-      />
-
-      <Table
-        columns={columns}
-        dataSource={filterFactura(onTime)}
-        pagination={{ 
-          showSizeChanger: true,
-          pageSizeOptions: ['5', '10', '20', '50'],
-          defaultPageSize: 5
-        }}
-        scroll={{ x: "max-content" }}
-        title={() => <h2 className="text-2xl font-bold">Pago al día</h2>}
         onRow={(r) => ({
           onClick: () => {
             setSelected(r);
