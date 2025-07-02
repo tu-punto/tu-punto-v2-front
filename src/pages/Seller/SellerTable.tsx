@@ -1,4 +1,4 @@
-import { Button, Table, Tooltip } from "antd";
+import { Button, Table, Tooltip, Select } from "antd";
 import { useEffect, useState } from "react";
 import { EditOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -29,12 +29,37 @@ export default function SellerTable({
   const [pending, setPending] = useState<SellerRow[]>([]);
   const [onTime, setOnTime] = useState<SellerRow[]>([]);
   const [selected, setSelected] = useState<SellerRow | null>(null);
+  const [estadoFilter, setEstadoFilter] = useState<string>("todos");
 
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
+
+  /* ---- helpers ---- */
+  const getEstadoVendedor = (fechaVigencia: string) => {
+    const hoy = dayjs();
+    const vigencia = dayjs(fechaVigencia, "DD/MM/YYYY");
+    const diasVencido = hoy.diff(vigencia, 'day');
+
+    if (diasVencido <= 0) return "Activo";
+    if (diasVencido <= 20) return "Debe renovar";
+    return "Ya no es cliente";
+  };
+
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case "Activo":
+        return { color: "#52c41a", backgroundColor: "#f6ffed", padding: "4px 8px", borderRadius: "4px" };
+      case "Debe renovar":
+        return { color: "#fa8c16", backgroundColor: "#fff7e6", padding: "4px 8px", borderRadius: "4px" };
+      case "Ya no es cliente":
+        return { color: "#ff4d4f", backgroundColor: "#fff2f0", padding: "4px 8px", borderRadius: "4px" };
+      default:
+        return {};
+    }
+  };
 
   /* ---- columnas ---- */
   const columns = [
@@ -43,6 +68,18 @@ export default function SellerTable({
       dataIndex: "nombre",
       key: "nombre",
       fixed: "left" as const,
+    },
+    {
+      title: "Estado",
+      key: "estado",
+      render: (_: any, row: SellerRow) => {
+        const estado = getEstadoVendedor(row.fecha_vigencia);
+        return (
+          <span style={getEstadoColor(estado)}>
+            {estado}
+          </span>
+        );
+      },
     },
     {
       title: "Pago total",
@@ -192,14 +229,37 @@ export default function SellerTable({
     setSelected(null);
   };
 
-  const filterFactura = (arr: SellerRow[]) =>
-    isFactura
-      ? arr.filter((s) => s.emite_factura)
-      : arr.filter((s) => !s.emite_factura);
+  const filterFactura = (arr: SellerRow[]) => {
+    let filtered = arr;
+    
+    // Filtrar por estado
+    if (estadoFilter !== "todos") {
+      filtered = filtered.filter(s => getEstadoVendedor(s.fecha_vigencia) === estadoFilter);
+    }
+    
+    // Filtrar por factura
+    return isFactura
+      ? filtered.filter((s) => s.emite_factura)
+      : filtered.filter((s) => !s.emite_factura);
+  };
 
   /* ---- render ---- */
   return (
     <>
+      <div className="mb-4">
+        <Select
+          value={estadoFilter}
+          onChange={setEstadoFilter}
+          style={{ width: 200 }}
+          options={[
+            { value: "todos", label: "Todos" },
+            { value: "Activo", label: "Activos" },
+            { value: "Debe renovar", label: "Debe renovar" },
+            { value: "Ya no es cliente", label: "Ya no es cliente" }
+          ]}
+        />
+      </div>
+
       <Table
         columns={columns}
         dataSource={filterFactura(pending)}
