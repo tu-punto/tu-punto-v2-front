@@ -21,6 +21,7 @@ const useProductsFlat = (externalSucursalId?: string) => {
     const fetchProducts = async () => {
         setLoading(true);
         try {
+            console.log("📦 Sucursal enviada al API:", externalSucursalId);
             const all = await getFlatProductListAPI(externalSucursalId);
             // Solo productos con stock > 0
             const withStock = all.filter((p: any) => p.stock > 0);
