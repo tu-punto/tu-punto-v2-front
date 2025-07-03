@@ -220,12 +220,19 @@ export const Sales = () => {
         console.log("🔍 user.id_vendedor:", user?.id_vendedor);
 
         if (!isAdmin) {
+            // Para no-admins: se filtra por su propio vendedor y sucursal
             filteredData = filteredData.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
             if (selectedBranchId) {
                 filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
             }
-        } else if (selectedSellerId) {
-            filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
+        } else {
+            // Para admins: filtra por vendedor si está seleccionado
+            if (selectedSellerId) {
+                filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
+            }
+            if (selectedBranchId) {
+                filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
+            }
         }
         if (searchText.trim()) {
             const lowerSearch = searchText.toLowerCase();
@@ -399,13 +406,7 @@ export const Sales = () => {
         ]);
     };
     //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
-    if (!sellers.length || !data.length) {
-        return (
-            <div className="flex justify-center items-center h-96">
-                <Spin tip="Cargando inventario..." size="large" />
-            </div>
-        );
-    }
+    const isLoadingInventory = !sellers.length || !data.length;
 
     return (
         <>
@@ -480,11 +481,13 @@ export const Sales = () => {
                         }
                         bordered={false}
                     >
+                        <Spin spinning={isLoadingInventory} tip="Cargando inventario...">
                         <ProductTable
                             onSelectProduct={handleProductSelect}
                             refreshKey={refreshKey}
                             data={filteredProducts()}
                         />
+                        </Spin>
                     </Card>
                 </Col>
 
