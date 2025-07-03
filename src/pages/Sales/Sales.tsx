@@ -200,54 +200,52 @@ export const Sales = () => {
             console.warn("⛔ Sellers aún no cargados, devolviendo vacío");
             return [];
         }
+
         let filteredData = data;
+
         const today = new Date();
         const vendedoresVigentesIds = sellers
             .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
             .map(v => String(v._id));
-        console.log("🔍 isAdmin:", isAdmin);
-        console.log("📦 Total productos antes de filtrar:", data.length);
-        console.log("✅ Vendedores vigentes:", vendedoresVigentesIds);
-        console.log("👤 selectedSellerId:", selectedSellerId);
-        console.log("🏢 selectedBranchId:", selectedBranchId);
-        console.log("📦 branchIdForFetch:", branchIdForFetch);
 
+        // ✅ Siempre filtra por vendedores vigentes
         filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
-        console.log("🔍 isAdmin:", isAdmin);
-        console.log("🔍 selectedSellerId:", selectedSellerId);
-        console.log("🔍 selectedBranchId:", selectedBranchId);
-        console.log("🔍 branchIdForFetch:", branchIdForFetch);
-        console.log("🔍 user.id_vendedor:", user?.id_vendedor);
 
         if (!isAdmin) {
-            // Para no-admins: se filtra por su propio vendedor y sucursal
-            filteredData = filteredData.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
+            // No-admin: filtra por vendedor y sucursal
+            filteredData = filteredData.filter(p =>
+                String(p.id_vendedor) === String(user.id_vendedor)
+            );
             if (selectedBranchId) {
-                filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
+                filteredData = filteredData.filter(p =>
+                    String(p.sucursalId) === String(selectedBranchId)
+                );
             }
         } else {
-            // Para admins: filtra por vendedor si está seleccionado
+            // ✅ Admin: solo filtra por vendedor si se seleccionó uno
             if (selectedSellerId) {
-                filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
+                filteredData = filteredData.filter(p =>
+                    String(p.id_vendedor) === String(selectedSellerId)
+                );
             }
-            if (selectedBranchId) {
-                filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
-            }
+
+            // ❌ Evita este filtro por sucursal si es admin
+            // if (selectedBranchId) {
+            //     filteredData = filteredData.filter(p =>
+            //         String(p.sucursalId) === String(selectedBranchId)
+            //     );
+            // }
         }
+
         if (searchText.trim()) {
             const lowerSearch = searchText.toLowerCase();
             filteredData = filteredData.filter(product =>
                 product.producto.toLowerCase().includes(lowerSearch)
             );
         }
+
         filteredData = filteredData.filter(product => product.stockActual > 0);
-        console.log("📦 Productos filtrados FINAL:", filteredData.map(p => ({
-            producto: p.producto,
-            sucursalId: p.sucursalId,
-            vendedor: p.id_vendedor,
-            stock: p.stockActual,
-        })));
-        //console.log(" Productos finales que se muestran:", filteredData);
+
         return filteredData;
     };
 
@@ -407,6 +405,11 @@ export const Sales = () => {
     };
     //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
     const isLoadingInventory = !sellers.length || !data.length;
+    useEffect(() => {
+        if (isAdmin) {
+            fetchProducts();
+        }
+    }, [selectedBranchId, selectedSellerId]);
 
     return (
         <>
