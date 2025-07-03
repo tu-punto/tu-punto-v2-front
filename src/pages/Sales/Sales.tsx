@@ -66,9 +66,16 @@ export const Sales = () => {
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [searchText, setSearchText] = useState("");
+    useEffect(() => {
+        console.log("📦 selectedProducts actualizado:", selectedProducts);
+    }, [selectedProducts]);
 
     useEffect(() => {
         if (!isAdmin && selectedProducts.length > 0) {
+            console.log("🧹 Limpiando productos por cambio de sucursal", {
+                prevSelectedProducts: selectedProducts,
+                selectedBranchId,
+            });
             setSelectedProducts([]);
             setTotalAmount(0);
             message.info("La sucursal ha cambiado, se vació el carrito.");
@@ -197,6 +204,12 @@ export const Sales = () => {
             .map(v => String(v._id));
 
         filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
+        console.log("🔍 isAdmin:", isAdmin);
+        console.log("🔍 selectedSellerId:", selectedSellerId);
+        console.log("🔍 selectedBranchId:", selectedBranchId);
+        console.log("🔍 branchIdForFetch:", branchIdForFetch);
+        console.log("🔍 user.id_vendedor:", user?.id_vendedor);
+
         if (!isAdmin) {
             filteredData = filteredData.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
             if (selectedBranchId) {
@@ -212,7 +225,12 @@ export const Sales = () => {
             );
         }
         filteredData = filteredData.filter(product => product.stockActual > 0);
-
+        console.log("📦 Productos filtrados FINAL:", filteredData.map(p => ({
+            producto: p.producto,
+            sucursalId: p.sucursalId,
+            vendedor: p.id_vendedor,
+            stock: p.stockActual,
+        })));
         //console.log(" Productos finales que se muestran:", filteredData);
         return filteredData;
     };
