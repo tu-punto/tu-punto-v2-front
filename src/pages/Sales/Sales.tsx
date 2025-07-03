@@ -1,4 +1,4 @@
-import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
+import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin  } from "antd";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -196,12 +196,21 @@ export const Sales = () => {
 
 
     const filteredProducts = () => {
-
+        if (!sellers.length) {
+            console.warn("⛔ Sellers aún no cargados, devolviendo vacío");
+            return [];
+        }
         let filteredData = data;
         const today = new Date();
         const vendedoresVigentesIds = sellers
             .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
             .map(v => String(v._id));
+        console.log("🔍 isAdmin:", isAdmin);
+        console.log("📦 Total productos antes de filtrar:", data.length);
+        console.log("✅ Vendedores vigentes:", vendedoresVigentesIds);
+        console.log("👤 selectedSellerId:", selectedSellerId);
+        console.log("🏢 selectedBranchId:", selectedBranchId);
+        console.log("📦 branchIdForFetch:", branchIdForFetch);
 
         filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
         console.log("🔍 isAdmin:", isAdmin);
@@ -390,7 +399,13 @@ export const Sales = () => {
         ]);
     };
     //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
-
+    if (!sellers.length || !data.length) {
+        return (
+            <div className="flex justify-center items-center h-96">
+                <Spin tip="Cargando inventario..." size="large" />
+            </div>
+        );
+    }
 
     return (
         <>
