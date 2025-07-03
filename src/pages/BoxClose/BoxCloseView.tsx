@@ -118,6 +118,15 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 <Form.Item label="QR/Bancario">
                                     <InputNumber value={ventas_qr} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
+                                <Form.Item label="Cambios Externos">
+                                    <InputNumber
+                                        value={boxClose.cambios_externos}
+                                        readOnly
+                                        style={{ width: "100%" }}
+                                        prefix="Bs."
+                                    />
+                                </Form.Item>
+
                             </Form>
                         </Card>
 
