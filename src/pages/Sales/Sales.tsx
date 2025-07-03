@@ -39,16 +39,26 @@ export const Sales = () => {
             setSelectedBranchId(branches[0]._id);
         }
     }, [branches, isAdmin, selectedBranchId]);
+    // ADMIN: sucursal fija desde localStorage
     useEffect(() => {
         if (isAdmin) {
             const sucursalId = localStorage.getItem("sucursalId");
-            if (sucursalId) setBranchIdForFetch(sucursalId);
-        } else if (selectedBranchId) {
-            setBranchIdForFetch(selectedBranchId);
-        } else if (branches.length > 0) {
-            setBranchIdForFetch(branches[0]._id);
+            if (sucursalId) {
+                setBranchIdForFetch(sucursalId);
+            }
         }
-    }, [branches, isAdmin, selectedBranchId]);
+    }, [isAdmin]); // SOLO se ejecuta al cargar
+
+    useEffect(() => {
+        if (!isAdmin) {
+            if (selectedBranchId) {
+                setBranchIdForFetch(selectedBranchId);
+            } else if (branches.length > 0) {
+                setBranchIdForFetch(branches[0]._id);
+            }
+        }
+    }, [branches, selectedBranchId, isAdmin]);
+
 
     const { data, fetchProducts } = useProductsFlat(
         branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
@@ -58,12 +68,12 @@ export const Sales = () => {
     const [searchText, setSearchText] = useState("");
 
     useEffect(() => {
-        if (selectedProducts.length > 0) {
+        if (!isAdmin && selectedProducts.length > 0) {
             setSelectedProducts([]);
             setTotalAmount(0);
             message.info("La sucursal ha cambiado, se vació el carrito.");
         }
-    }, [selectedBranchId]);
+    }, [selectedBranchId, isAdmin]);
 
     const updateTotalAmount = (amount: number) => {
         setTotalAmount(amount);
@@ -161,12 +171,6 @@ export const Sales = () => {
             message.error('Error al obtener los vendedores');
         }
     }
-
-    useEffect(() => {
-        if (!isAdmin && branches.length > 0 && !selectedBranchId) {
-            setSelectedBranchId(branches[0]._id);
-        }
-    }, [branches, isAdmin, selectedBranchId]);
 
     const fallbackSucursalId = isAdmin
         ? localStorage.getItem('sucursalId')

@@ -40,7 +40,20 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = "0", selectedD
       const summary = await getDailySummary(selectedDate?.toISOString());
       setSalesSummary(summary || { cash: 0, bank: 0, total: 0 });
       const efectivoInicial = parseFloat(lastClosingBalance.efectivo_real) || 0;
-      const efectivoEsperado = efectivoInicial + (summary?.cash || 0);
+      const cambiosExternos = form.getFieldValue("cambios_externos") || 0;
+      const efectivoEsperado =
+          efectivoInicial + (summary?.cash || 0) + cambiosExternos;
+
+      useEffect(() => {
+        const efectivoInicial = form.getFieldValue("efectivo_inicial") || 0;
+        const ventas = form.getFieldValue("ventas_efectivo") || 0;
+        const cambios = form.getFieldValue("cambios_externos") || 0;
+        form.setFieldValue("efectivo_esperado", (efectivoInicial + ventas + cambios).toFixed(2));
+      }, [
+        form.getFieldValue("efectivo_inicial"),
+        form.getFieldValue("ventas_efectivo"),
+        form.getFieldValue("cambios_externos"),
+      ]);
 
       form.setFieldsValue({
         efectivo_inicial: efectivoInicial,
@@ -91,12 +104,12 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = "0", selectedD
 
       const newBoxClose = {
         ...boxCloseValues,
+        cambios_externos: values.cambios_externos || 0, // NUEVO CAMPO
         id_efectivo_diario: dailyEffectiveID,
         ingresos_efectivo: values.ventas_efectivo,
         ventas_efectivo: salesSummary?.cash,
         id_sucursal: localStorage.getItem("sucursalId"),
       };
-
       const boxCloseRes = await registerBoxCloseAPI(newBoxClose);
       const boxCloseID = boxCloseRes.newBoxClose.id_cierre_caja;
 
@@ -200,6 +213,27 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = "0", selectedD
                 />
               </Form.Item>
             </Col>
+            <Col span={6}>
+              <Form.Item
+                  label="Cambios Externos"
+                  name="cambios_externos"
+                  rules={[{ required: true, message: "Campo requerido" }]}
+              >
+                <InputNumber
+                    min={0}
+                    prefix="Bs. "
+                    className="w-full"
+                    onChange={(value) => {
+                      const efectivoInicial = form.getFieldValue("efectivo_inicial") || 0;
+                      const ingresos = form.getFieldValue("ventas_efectivo") || 0;
+                      const extra = value || 0;
+                      const esperado = efectivoInicial + ingresos + extra;
+                      form.setFieldValue("efectivo_esperado", esperado.toFixed(2));
+                    }}
+                />
+              </Form.Item>
+            </Col>
+
           </Row>
         </Card>
 
