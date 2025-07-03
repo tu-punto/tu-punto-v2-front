@@ -18,6 +18,7 @@ import { updateSubvariantStockAPI } from '../../api/product';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
+import { deleteShippingAPI } from '../../api/shipping';
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();

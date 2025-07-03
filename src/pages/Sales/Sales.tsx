@@ -1,4 +1,4 @@
-import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin  } from "antd";
+import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -39,26 +39,16 @@ export const Sales = () => {
             setSelectedBranchId(branches[0]._id);
         }
     }, [branches, isAdmin, selectedBranchId]);
-    // ADMIN: sucursal fija desde localStorage
     useEffect(() => {
         if (isAdmin) {
             const sucursalId = localStorage.getItem("sucursalId");
-            if (sucursalId) {
-                setBranchIdForFetch(sucursalId);
-            }
+            if (sucursalId) setBranchIdForFetch(sucursalId);
+        } else if (selectedBranchId) {
+            setBranchIdForFetch(selectedBranchId);
+        } else if (branches.length > 0) {
+            setBranchIdForFetch(branches[0]._id);
         }
-    }, [isAdmin]); // SOLO se ejecuta al cargar
-
-    useEffect(() => {
-        if (!isAdmin) {
-            if (selectedBranchId) {
-                setBranchIdForFetch(selectedBranchId);
-            } else if (branches.length > 0) {
-                setBranchIdForFetch(branches[0]._id);
-            }
-        }
-    }, [branches, selectedBranchId, isAdmin]);
-
+    }, [branches, isAdmin, selectedBranchId]);
 
     const { data, fetchProducts } = useProductsFlat(
         branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
@@ -66,21 +56,14 @@ export const Sales = () => {
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [searchText, setSearchText] = useState("");
-    useEffect(() => {
-        console.log("📦 selectedProducts actualizado:", selectedProducts);
-    }, [selectedProducts]);
 
     useEffect(() => {
-        if (!isAdmin && selectedProducts.length > 0) {
-            console.log("🧹 Limpiando productos por cambio de sucursal", {
-                prevSelectedProducts: selectedProducts,
-                selectedBranchId,
-            });
+        if (selectedProducts.length > 0) {
             setSelectedProducts([]);
             setTotalAmount(0);
             message.info("La sucursal ha cambiado, se vació el carrito.");
         }
-    }, [selectedBranchId, isAdmin]);
+    }, [selectedBranchId]);
 
     const updateTotalAmount = (amount: number) => {
         setTotalAmount(amount);
@@ -179,6 +162,12 @@ export const Sales = () => {
         }
     }
 
+    useEffect(() => {
+        if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+            setSelectedBranchId(branches[0]._id);
+        }
+    }, [branches, isAdmin, selectedBranchId]);
+
     const fallbackSucursalId = isAdmin
         ? localStorage.getItem('sucursalId')
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
@@ -196,71 +185,31 @@ export const Sales = () => {
 
 
     const filteredProducts = () => {
-        console.log("📦 Inventario original recibido (sin filtrar):", data);
-
-        if (!sellers.length) {
-            console.warn("⛔ Sellers aún no cargados, devolviendo vacío");
-            return [];
-        }
 
         let filteredData = data;
-
         const today = new Date();
         const vendedoresVigentesIds = sellers
             .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
             .map(v => String(v._id));
-        console.log("✅ IDs de vendedores vigentes:", vendedoresVigentesIds);
 
-        // ✅ Siempre filtra por vendedores vigentes
         filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
-        console.log("🔍 Productos tras filtro por vendedor vigente:", filteredData);
-
         if (!isAdmin) {
-            console.log("🧑‍💼 Usuario NO ADMIN");
-            console.log("👉 Filtrando por id_vendedor:", user.id_vendedor);
-            console.log("👉 Filtrando por sucursal:", selectedBranchId);
-            filteredData = filteredData.filter(p =>
-                String(p.id_vendedor) === String(user.id_vendedor)
-            );
+            filteredData = filteredData.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
             if (selectedBranchId) {
-                filteredData = filteredData.filter(p =>
-                    String(p.sucursalId) === String(selectedBranchId)
-                );
+                filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
             }
-        } else {
-            console.log("🛠️ Usuario ADMIN");
-            if (selectedSellerId) {
-                console.log("👉 Admin filtrando por vendedor ID:", selectedSellerId);
-                filteredData = filteredData.filter(p =>
-                    String(p.id_vendedor) === String(selectedSellerId)
-                );
-            } else{
-                console.log("🛠️ Admin sin filtro de vendedor");
-            }
-
-            // ❌ Evita este filtro por sucursal si es admin
-            // if (selectedBranchId) {
-            //     filteredData = filteredData.filter(p =>
-            //         String(p.sucursalId) === String(selectedBranchId)
-            //     );
-            // }
+        } else if (selectedSellerId) {
+            filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
         }
-
         if (searchText.trim()) {
             const lowerSearch = searchText.toLowerCase();
             filteredData = filteredData.filter(product =>
                 product.producto.toLowerCase().includes(lowerSearch)
             );
-            console.log("🔎 Filtro por texto aplicado:", searchText, filteredData);
-
         }
-
         filteredData = filteredData.filter(product => product.stockActual > 0);
-        console.log("📉 Filtro de stock aplicado, productos finales:", filteredData);
 
-        if (filteredData.length === 0) {
-            console.warn("⚠️ Todos los productos fueron filtrados, lista vacía.");
-        }
+        //console.log(" Productos finales que se muestran:", filteredData);
         return filteredData;
     };
 
@@ -419,49 +368,7 @@ export const Sales = () => {
         ]);
     };
     //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
-    const isLoadingInventory = !sellers.length || !data.length;
-    useEffect(() => {
-        if (isAdmin) {
-            fetchProducts();
-        }
-    }, [selectedBranchId, selectedSellerId]);
-    // ========== 🧪 DEBUG LOGS COMPLETOS ANTES DE RENDER ==========
-    console.group("🔎 [DEBUG] Estado actual de Sales");
 
-    console.log("👤 Usuario:", user);
-    console.log("🛡️ Es Admin:", isAdmin);
-    console.log("🏬 selectedBranchId:", selectedBranchId);
-    console.log("📥 branchIdForFetch:", branchIdForFetch);
-    console.log("💾 sucursalId en localStorage:", localStorage.getItem("sucursalId"));
-
-    console.log("🏪 Sucursales cargadas:", branches.map(b => ({ _id: b._id, nombre: b.nombre })));
-    console.log("🧑‍🤝‍🧑 Vendedores filtrados (vigentes):", sellers.map(s => ({
-        _id: s._id,
-        nombre: `${s.nombre} ${s.apellido}`,
-        fecha_vigencia: s.fecha_vigencia
-    })));
-    console.log("🔢 Cantidad total de vendedores:", sellers.length);
-
-    console.log("📦 Inventario recibido (data):", data.map(p => ({
-        key: p.key,
-        producto: p.producto,
-        id_vendedor: p.id_vendedor,
-        sucursalId: p.sucursalId,
-        stockActual: p.stockActual
-    })));
-    console.log("📦 Cantidad total de productos en data:", data.length);
-
-    const filtered = filteredProducts();
-    console.log("✅ Productos luego de aplicar `filteredProducts()`:", filtered.map(p => ({
-        key: p.key,
-        producto: p.producto,
-        id_vendedor: p.id_vendedor,
-        sucursalId: p.sucursalId,
-        stockActual: p.stockActual
-    })));
-    console.log("✅ Cantidad total productos filtrados:", filtered.length);
-
-    console.groupEnd();
 
     return (
         <>
@@ -536,13 +443,11 @@ export const Sales = () => {
                         }
                         bordered={false}
                     >
-                        <Spin spinning={isLoadingInventory} tip="Cargando inventario...">
                         <ProductTable
                             onSelectProduct={handleProductSelect}
                             refreshKey={refreshKey}
                             data={filteredProducts()}
                         />
-                        </Spin>
                     </Card>
                 </Col>
 
