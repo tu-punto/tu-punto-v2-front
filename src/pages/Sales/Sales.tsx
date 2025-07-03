@@ -196,6 +196,8 @@ export const Sales = () => {
 
 
     const filteredProducts = () => {
+        console.log("📦 Inventario original recibido (sin filtrar):", data);
+
         if (!sellers.length) {
             console.warn("⛔ Sellers aún no cargados, devolviendo vacío");
             return [];
@@ -207,12 +209,16 @@ export const Sales = () => {
         const vendedoresVigentesIds = sellers
             .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
             .map(v => String(v._id));
+        console.log("✅ IDs de vendedores vigentes:", vendedoresVigentesIds);
 
         // ✅ Siempre filtra por vendedores vigentes
         filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
+        console.log("🔍 Productos tras filtro por vendedor vigente:", filteredData);
 
         if (!isAdmin) {
-            // No-admin: filtra por vendedor y sucursal
+            console.log("🧑‍💼 Usuario NO ADMIN");
+            console.log("👉 Filtrando por id_vendedor:", user.id_vendedor);
+            console.log("👉 Filtrando por sucursal:", selectedBranchId);
             filteredData = filteredData.filter(p =>
                 String(p.id_vendedor) === String(user.id_vendedor)
             );
@@ -222,11 +228,14 @@ export const Sales = () => {
                 );
             }
         } else {
-            // ✅ Admin: solo filtra por vendedor si se seleccionó uno
+            console.log("🛠️ Usuario ADMIN");
             if (selectedSellerId) {
+                console.log("👉 Admin filtrando por vendedor ID:", selectedSellerId);
                 filteredData = filteredData.filter(p =>
                     String(p.id_vendedor) === String(selectedSellerId)
                 );
+            } else{
+                console.log("🛠️ Admin sin filtro de vendedor");
             }
 
             // ❌ Evita este filtro por sucursal si es admin
@@ -242,10 +251,16 @@ export const Sales = () => {
             filteredData = filteredData.filter(product =>
                 product.producto.toLowerCase().includes(lowerSearch)
             );
+            console.log("🔎 Filtro por texto aplicado:", searchText, filteredData);
+
         }
 
         filteredData = filteredData.filter(product => product.stockActual > 0);
+        console.log("📉 Filtro de stock aplicado, productos finales:", filteredData);
 
+        if (filteredData.length === 0) {
+            console.warn("⚠️ Todos los productos fueron filtrados, lista vacía.");
+        }
         return filteredData;
     };
 
