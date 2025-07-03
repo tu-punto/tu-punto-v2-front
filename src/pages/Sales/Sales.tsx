@@ -425,6 +425,43 @@ export const Sales = () => {
             fetchProducts();
         }
     }, [selectedBranchId, selectedSellerId]);
+    // ========== 🧪 DEBUG LOGS COMPLETOS ANTES DE RENDER ==========
+    console.group("🔎 [DEBUG] Estado actual de Sales");
+
+    console.log("👤 Usuario:", user);
+    console.log("🛡️ Es Admin:", isAdmin);
+    console.log("🏬 selectedBranchId:", selectedBranchId);
+    console.log("📥 branchIdForFetch:", branchIdForFetch);
+    console.log("💾 sucursalId en localStorage:", localStorage.getItem("sucursalId"));
+
+    console.log("🏪 Sucursales cargadas:", branches.map(b => ({ _id: b._id, nombre: b.nombre })));
+    console.log("🧑‍🤝‍🧑 Vendedores filtrados (vigentes):", sellers.map(s => ({
+        _id: s._id,
+        nombre: `${s.nombre} ${s.apellido}`,
+        fecha_vigencia: s.fecha_vigencia
+    })));
+    console.log("🔢 Cantidad total de vendedores:", sellers.length);
+
+    console.log("📦 Inventario recibido (data):", data.map(p => ({
+        key: p.key,
+        producto: p.producto,
+        id_vendedor: p.id_vendedor,
+        sucursalId: p.sucursalId,
+        stockActual: p.stockActual
+    })));
+    console.log("📦 Cantidad total de productos en data:", data.length);
+
+    const filtered = filteredProducts();
+    console.log("✅ Productos luego de aplicar `filteredProducts()`:", filtered.map(p => ({
+        key: p.key,
+        producto: p.producto,
+        id_vendedor: p.id_vendedor,
+        sucursalId: p.sucursalId,
+        stockActual: p.stockActual
+    })));
+    console.log("✅ Cantidad total productos filtrados:", filtered.length);
+
+    console.groupEnd();
 
     return (
         <>
