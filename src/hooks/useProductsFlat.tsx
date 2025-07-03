@@ -25,19 +25,23 @@ const useProductsFlat = (externalSucursalId?: string) => {
             // Solo productos con stock > 0
             const withStock = all.filter((p: any) => p.stock > 0);
 
-            const mapped = withStock.map((item: any, index: number) => ({
-                key: `${item._id}-${index}`,
-                producto: `${item.nombre_producto} - ${item.variante}`,
-                precio: item.precio,
-                stockActual: item.stock,
-                categoria: item.categoria || "Sin categoría",
-                id_vendedor: item.id_vendedor,
-                id_producto: item._id,
-                sucursalId: item.sucursalId.toString(),
-                variantes: item.variantes_obj || {},
+            const mapped = withStock.map((item: any) => {
+                const variantKey = Object.entries(item.variantes_obj || {})
+                    .map(([k, v]) => `${k}:${v}`)
+                    .join("|");
 
-            }));
-
+                return {
+                    key: `${item._id}_${item.sucursalId}_${variantKey}`, // ✅ clave única por variante + sucursal
+                    producto: `${item.nombre_producto} - ${item.variante}`,
+                    precio: item.precio,
+                    stockActual: item.stock,
+                    categoria: item.categoria || "Sin categoría",
+                    id_vendedor: item.id_vendedor,
+                    id_producto: item._id,
+                    sucursalId: item.sucursalId.toString(),
+                    variantes: item.variantes_obj || {},
+                };
+            });
             setData(mapped);
         } catch (error) {
             console.error("Error cargando productos optimizados:", error);
