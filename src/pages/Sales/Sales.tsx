@@ -30,6 +30,9 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
+    const { data, fetchProducts } = useProductsFlat(
+        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
+    );
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     useEffect(() => {
         if (!data || data.length === 0) {
@@ -68,9 +71,7 @@ export const Sales = () => {
         }
     }, [branches, isAdmin, selectedBranchId]);
 
-    const { data, fetchProducts } = useProductsFlat(
-        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
-    );
+
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
     const [searchText, setSearchText] = useState("");
