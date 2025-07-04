@@ -40,15 +40,15 @@ export const Sales = () => {
             return;
         }
 
+        let filtered = data.filter(p => p.stockActual > 0); // 👈 filtramos primero por stock positivo
+
         if (isAdmin && selectedSellerId) {
-            const filtered = data.filter(p => String(p.id_vendedor) === String(selectedSellerId));
-            setFilteredBySeller(filtered);
+            filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
         } else if (!isAdmin) {
-            const filtered = data.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
-            setFilteredBySeller(filtered);
-        } else {
-            setFilteredBySeller(data); // Admin sin filtro de vendedor
+            filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
         }
+
+        setFilteredBySeller(filtered);
     }, [data, selectedSellerId, isAdmin, user?.id_vendedor]);
 
     useEffect(() => {
@@ -68,7 +68,7 @@ export const Sales = () => {
         if (newSucursalId && newSucursalId !== branchIdForFetch) {
             setBranchIdForFetch(newSucursalId);
         }
-    }, [branches, isAdmin, selectedBranchId]);
+    }, [branches, isAdmin, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -80,6 +80,9 @@ export const Sales = () => {
             setTotalAmount(0);
             message.info("La sucursal ha cambiado, se vació el carrito.");
         }
+    }, [selectedBranchId]);
+    useEffect(() => {
+        console.log("🔄 Combo de sucursal cambió:", selectedBranchId);
     }, [selectedBranchId]);
 
     const updateTotalAmount = (amount: number) => {
@@ -164,6 +167,13 @@ export const Sales = () => {
         try {
             const response = await getSucursalsAPI()
             setBranches(response)
+            if (isAdmin) {
+                const sucursalIdLogin = localStorage.getItem("sucursalId");
+                if (sucursalIdLogin) {
+                    setSelectedBranchId(sucursalIdLogin);
+                }
+            }
+
         } catch (error) {
             message.error('Error al obtener los vendedores');
         }
