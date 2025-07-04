@@ -277,7 +277,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     placeholder="Sucursal de Origen"
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
-                    allowClear
+                    allowClear={!isAdmin}
+                    disabled={isAdmin} // ← Bloquea si es admin
                 >
                     {sucursal.map((suc: any) => (
                         <Option key={suc.id_sucursal} value={suc.nombre}>

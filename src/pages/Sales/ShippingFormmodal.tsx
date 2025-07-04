@@ -113,8 +113,13 @@ function ShippingFormModal({
             4: 'Efectivo + QR'
         };
         try {
+            const fechaEntrega = dayjs(values.fecha_pedido).format("YYYY-MM-DD");
+            const horaEntrega = dayjs(values.hora_entrega_acordada || dayjs()).format("HH:mm:ss");
+            const fechaHoraEntrega = `${fechaEntrega} ${horaEntrega}`;
             const response = await registerShippingAPI({
                 ...values,
+                fecha_pedido: dayjs(values.fecha_pedido).format("YYYY-MM-DD HH:mm:ss"),
+                hora_entrega_acordada: fechaHoraEntrega,
                 tipo_de_pago: tipoPagoMap[parseInt(values.tipo_de_pago)],
                 pagado_al_vendedor: values.esta_pagado === "si" || values.tipo_de_pago === "3",
                 id_sucursal: branchIdFromProps,

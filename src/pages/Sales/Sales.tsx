@@ -31,8 +31,10 @@ export const Sales = () => {
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
     const { data, fetchProducts } = useProductsFlat(
-        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : null
+        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
     );
+    const [searchText, setSearchText] = useState("");
+
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     useEffect(() => {
         if (!data || data.length === 0) {
@@ -40,7 +42,7 @@ export const Sales = () => {
             return;
         }
 
-        let filtered = data.filter(p => p.stockActual > 0); // 👈 filtramos primero por stock positivo
+        let filtered = data.filter(p => p.stockActual > 0);
 
         if (isAdmin && selectedSellerId) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
@@ -48,9 +50,15 @@ export const Sales = () => {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
         }
 
-        setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, user?.id_vendedor]);
+        if (searchText.trim()) {
+           const lower = searchText.trim().toLowerCase();
+            filtered = filtered.filter(p =>
+                (p.producto ?? '').toString().toLowerCase().includes(lower)
+            );
+        }
 
+        setFilteredBySeller(filtered);
+    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText]);
     useEffect(() => {
         fetchSellers();
         fetchSucursal();
@@ -72,7 +80,6 @@ export const Sales = () => {
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
-    const [searchText, setSearchText] = useState("");
 
     useEffect(() => {
         if (selectedProducts.length > 0) {
@@ -80,9 +87,6 @@ export const Sales = () => {
             setTotalAmount(0);
             message.info("La sucursal ha cambiado, se vació el carrito.");
         }
-    }, [selectedBranchId]);
-    useEffect(() => {
-        console.log("🔄 Combo de sucursal cambió:", selectedBranchId);
     }, [selectedBranchId]);
 
     const updateTotalAmount = (amount: number) => {

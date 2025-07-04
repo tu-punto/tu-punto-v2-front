@@ -388,19 +388,24 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
             //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
+            const fechaEntrega = dayjs(values.fecha_pedido).format("YYYY-MM-DD");
             let horaEntrega = values.hora_entrega_acordada;
 
             if (values.estado_pedido === "Entregado") {
-                horaEntrega = new Date(); // ⬅️ fuerza hora actual al marcar como entregado
+                horaEntrega = dayjs(); // hora actual como dayjs
             }
+
+            const horaFormateada = dayjs(horaEntrega).format("HH:mm:ss");
+            const fechaHoraEntrega = `${fechaEntrega} ${horaFormateada}`; // ⏰ combinado y local
+
             console.log("🕒 Hora de entrega acordada:", horaEntrega);
             const updateShippingInfo: any = {
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
-                fecha_pedido: values.fecha_pedido?.format('YYYY-MM-DD HH:mm:ss'),
-                hora_entrega_acordada: horaEntrega,
+                fecha_pedido: dayjs(values.fecha_pedido).format('YYYY-MM-DD HH:mm:ss'),
+                hora_entrega_acordada: fechaHoraEntrega,
                 pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
-                esta_pagado: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
+                esta_pagado: values.esta_pagado,
                 adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
                 quien_paga_delivery: values.quien_paga_delivery,
             };
