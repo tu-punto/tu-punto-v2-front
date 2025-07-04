@@ -37,6 +37,7 @@ const useProductsFlat = (externalSucursalId?: string) => {
                 variantes: item.variantes_obj || {},
 
             }));
+            console.log("🧪 Productos cargados por useProductsFlat:", mapped);
 
             setData(mapped);
         } catch (error) {
