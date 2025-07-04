@@ -18,6 +18,13 @@ const EntryProductSellerTable = ({
       className: "text-mobile-sm xl:text-desktop-sm"
     },
     {
+      title: "Sucursal",
+      dataIndex: "nombreSucursal",
+      key: "nombre_sucursal",
+      className: "text-mobile-sm xl:text-desktop-sm"
+
+    },
+    {
       title: "Producto",
       dataIndex: ["producto", "nombre_producto"],
       key: "nombre_producto",
