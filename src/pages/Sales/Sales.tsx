@@ -30,6 +30,24 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
+    const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
+    useEffect(() => {
+        if (!data || data.length === 0) {
+            setFilteredBySeller([]);
+            return;
+        }
+
+        if (isAdmin && selectedSellerId) {
+            const filtered = data.filter(p => String(p.id_vendedor) === String(selectedSellerId));
+            setFilteredBySeller(filtered);
+        } else if (!isAdmin) {
+            const filtered = data.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
+            setFilteredBySeller(filtered);
+        } else {
+            setFilteredBySeller(data); // Admin sin filtro de vendedor
+        }
+    }, [data, selectedSellerId, isAdmin, user?.id_vendedor]);
+
     useEffect(() => {
         fetchSellers();
         fetchSucursal();
@@ -183,7 +201,7 @@ export const Sales = () => {
         }
     }, [branchIdForFetch]);
 
-
+    /*
     const filteredProducts = () => {
 
         let filteredData = data;
@@ -212,6 +230,7 @@ export const Sales = () => {
         //console.log(" Productos finales que se muestran:", filteredData);
         return filteredData;
     };
+    */
 
     const handleProductSelect = (product: any) => {
         setSelectedProducts((prevProducts: any) => {
@@ -446,7 +465,7 @@ export const Sales = () => {
                         <ProductTable
                             onSelectProduct={handleProductSelect}
                             refreshKey={refreshKey}
-                            data={filteredProducts()}
+                            data={filteredBySeller}
                         />
                     </Card>
                 </Col>
