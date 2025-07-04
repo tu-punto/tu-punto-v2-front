@@ -61,16 +61,14 @@ export const Sales = () => {
         }
     }, [branches, isAdmin, selectedBranchId]);
     useEffect(() => {
-        if (isAdmin) {
-            const sucursalId = localStorage.getItem("sucursalId");
-            if (sucursalId) setBranchIdForFetch(sucursalId);
-        } else if (selectedBranchId) {
-            setBranchIdForFetch(selectedBranchId);
-        } else if (branches.length > 0) {
-            setBranchIdForFetch(branches[0]._id);
+        const newSucursalId = isAdmin
+            ? localStorage.getItem("sucursalId")
+            : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
+
+        if (newSucursalId && newSucursalId !== branchIdForFetch) {
+            setBranchIdForFetch(newSucursalId);
         }
     }, [branches, isAdmin, selectedBranchId]);
-
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
