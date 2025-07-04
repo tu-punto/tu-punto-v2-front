@@ -30,9 +30,8 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
-    const { data, fetchProducts } = useProductsFlat(
-        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
-    );
+    const { data, fetchProducts } = useProductsFlat(branchIdForFetch || undefined);
+
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     useEffect(() => {
         if (!data || data.length === 0) {
@@ -200,10 +199,10 @@ export const Sales = () => {
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
     useEffect(() => {
-        if (branchIdForFetch) {
-            fetchProducts();
-        }
+        if (!branchIdForFetch || branchIdForFetch === "undefined") return;
+        fetchProducts();
     }, [branchIdForFetch]);
+
     useEffect(() => {
         if (branchIdForFetch) {
             fetchSellers();
