@@ -30,8 +30,9 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
-    const { data, fetchProducts } = useProductsFlat(branchIdForFetch || undefined);
-
+    const { data, fetchProducts } = useProductsFlat(
+        branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : null
+    );
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     useEffect(() => {
         if (!data || data.length === 0) {

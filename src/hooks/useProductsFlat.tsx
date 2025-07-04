@@ -49,6 +49,7 @@ const useProductsFlat = (externalSucursalId?: string) => {
     };
 
     useEffect(() => {
+        if (!externalSucursalId || externalSucursalId === "undefined") return;
         fetchProducts();
     }, [externalSucursalId]);
 
