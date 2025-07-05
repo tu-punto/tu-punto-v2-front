@@ -4,11 +4,19 @@ import {
   Col,
   DatePicker,
   Form,
+  Input,
   InputNumber,
   message,
   Row,
+  Space,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  PhoneOutlined,
+  MailOutlined,
+  CalendarOutlined,
+  PercentageOutlined,
+} from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import dayjs from "dayjs";
 
@@ -124,6 +132,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           tipo: esVenta ? "Venta" : "Pedido",
           subtotal: sale.precio_unitario * sale.cantidad,
           comision_porcentual: seller.comision_porcentual || 0,
+          sucursal:
+            sucursales.find((s) => s._id === sale.id_sucursal).nombre ||
+            "Sucursal no encontrada",
           key: `${sale.id_producto}-${sale.fecha_pedido}`,
         };
       });
@@ -164,7 +175,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const fetchEntryProducts = async () => {
     try {
       const res = await getProductsEntryAmount(seller.key);
-      setEntryData(res.map((p: any) => ({ ...p, key: p.id_ingreso })));
+      setEntryData(
+        res.map((p: any) => ({
+          ...p,
+          key: p.id_ingreso,
+          nombreSucursal:
+            sucursales.find((s) => s._id === p.sucursal).nombre ||
+            "Sucursal no encontrada",
+        }))
+      );
     } catch (e) {
       console.error("Error entry", e);
     }
@@ -257,30 +276,67 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         initialValues={{
           telefono: seller.telefono,
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
+          email: seller.mail || "",
+          comision_porcentual: seller.comision_porcentual || 0,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales
             : [{}],
         }}
       >
-        {/* Teléfono */}
-        <Form.Item name="telefono" label="Teléfono">
-          <InputNumber style={{ width: "25%" }} />
-        </Form.Item>
+        {/* Información del vendedor */}
+        <Card style={{ marginBottom: 24 }} className="seller-info-card">
+          <Row gutter={[16, 16]}>
+            <Col xs={24}>
+              <Form.Item name="email" label="Correo electrónico">
+                <Input
+                  prefix={<MailOutlined />}
+                  style={{ width: "100%" }}
+                  placeholder="correo@ejemplo.com"
+                  type="email"
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="telefono" label="Teléfono">
+                <InputNumber
+                  prefix={<PhoneOutlined />}
+                  style={{ width: "100%" }}
+                  placeholder="Número de teléfono"
+                />
+              </Form.Item>
+            </Col>
 
-        {/* Fecha de vigencia */}
-        <Form.Item
-          name="fecha_vigencia"
-          label="Fecha final/máxima del servicio"
-        >
-          <DatePicker format="DD/MM/YYYY" disabled={isSeller} />
-        </Form.Item>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="fecha_vigencia" label="Fecha de vigencia">
+                <DatePicker
+                  format="DD/MM/YYYY"
+                  disabled={isSeller}
+                  style={{ width: "100%" }}
+                  placeholder="Seleccionar fecha"
+                />
+              </Form.Item>
+            </Col>
 
-        {/* Sucursales */}
-        <Row justify="space-between" align="middle">
-          <Col>
-            <h4 className="font-bold text-lg">Servicios por sucursal</h4>
-          </Col>
-          <Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="comision_porcentual" label="Comisión">
+                <InputNumber
+                  prefix={<PercentageOutlined />}
+                  min={0}
+                  max={100}
+                  style={{ width: "100%" }}
+                  placeholder="0"
+                  addonAfter="%"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* Servicios por sucursal */}
+        <Card
+          title="Servicios por sucursal"
+          style={{ marginBottom: 24 }}
+          extra={
             <Button
               type="dashed"
               icon={<PlusOutlined />}
@@ -292,26 +348,33 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
             >
               Añadir sucursal
             </Button>
-          </Col>
-        </Row>
-
-        <Form.List name="sucursales">
-          {(fields, { remove }) => (
-            <>
-              {fields.map((field) => (
-                <Card key={field.key} style={{ marginTop: 16 }}>
-                  <BranchFields
-                    field={field}
-                    remove={remove}
-                    sucursalOptions={sucursales}
-                    form={form}
-                    isSeller={isSeller}
-                  />
-                </Card>
-              ))}
-            </>
-          )}
-        </Form.List>
+          }
+        >
+          <Form.List name="sucursales">
+            {(fields, { remove }) => (
+              <Space direction="vertical" style={{ width: "100%" }}>
+                {fields.map((field) => (
+                  <Card
+                    key={field.key}
+                    size="small"
+                    style={{
+                      backgroundColor: "#fafafa",
+                      border: "1px solid #e8e8e8",
+                    }}
+                  >
+                    <BranchFields
+                      field={field}
+                      remove={remove}
+                      sucursalOptions={sucursales}
+                      form={form}
+                      isSeller={isSeller}
+                    />
+                  </Card>
+                ))}
+              </Space>
+            )}
+          </Form.List>
+        </Card>
 
         {/* Secciones independientes */}
         <SalesSection

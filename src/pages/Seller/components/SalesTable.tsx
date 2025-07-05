@@ -49,6 +49,12 @@ const CustomTable = ({
       className: "text-mobile-sm xl:text-desktop-sm",
     },
     {
+      title: "Sucursal",
+      dataIndex: "sucursal",
+      key: "sucursal",
+      className: "text-mobile-sm xl:text-desktop-sm",
+    },
+    {
       title: "Subtotal deudas",
       key: "subtotal_deudas",
       dataIndex: "subtotal_deudas",
