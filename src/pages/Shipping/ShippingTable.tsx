@@ -31,10 +31,15 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const isAdmin = user?.role?.toLowerCase() === 'admin';
     const isVendedor = user?.role?.toLowerCase() === 'vendedor';
     //console.log("Usuario:", user);
+    const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
+
     const fetchShippings = async () => {
         try {
             const apiData = await getShippingsAPI();
-            const dataWithKey = apiData.map((pedido: any) => ({
+            const sortedData = apiData.sort(
+                (a: any, b: any) => new Date(b.fecha_pedido).getTime() - new Date(a.fecha_pedido).getTime()
+            );
+            const dataWithKey = sortedData.map((pedido: any) => ({
                 ...pedido,
                 key: pedido._id
             }));
@@ -109,7 +114,15 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             title: 'Fecha Pedido',
             dataIndex: 'fecha_pedido',
             key: 'fecha_pedido',
-            render: (text: string) => new Date(text).toLocaleDateString('es-ES')
+            render: (text: string) => new Date(text).toLocaleDateString('es-ES'),
+            sorter: (a: any, b: any) =>
+                new Date(a.fecha_pedido).getTime() - new Date(b.fecha_pedido).getTime(),
+            sortOrder, // 👈 manual control
+            onHeaderCell: () => ({
+                onClick: () => {
+                    setSortOrder(prev => (prev === 'ascend' ? 'descend' : 'ascend'));
+                },
+            }),
         },
         {
             title: 'Lugar de Origen',
@@ -231,7 +244,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     useEffect(() => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [esperaData, entregadoData, selectedLocation, selectedOrigin, dateRange]);
+    }, [esperaData, entregadoData, selectedLocation, selectedOrigin, dateRange, selectedVendedor]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {

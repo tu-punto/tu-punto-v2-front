@@ -802,50 +802,39 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             <Row gutter={16}>
                                 <Col span={24}>
                                     <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
-                                        <div style={{ position: 'relative' }}>
+                                        <>
                                             <Radio.Group
                                                 value={tipoPago}
                                                 onChange={(e) => {
                                                     const value = e.target.value;
-                                                    if (value !== "3") {
-                                                        setTipoPago(value);
-                                                        setClickedOnce(false); // reset si cambió a otro
-                                                        internalForm.setFieldValue("tipo_de_pago", value);
+
+                                                    if (value === "3") {
+                                                        if (tipoPago === "3") return;
+
+                                                        if (!clickedOnce) {
+                                                            setClickedOnce(true);
+                                                            setTimeout(() => setClickedOnce(false), 4000);
+                                                            return;
+                                                        }
+
+                                                        internalForm.setFieldValue("adelanto_cliente", 0);
+                                                        setClickedOnce(false);
                                                     }
+
+                                                    setTipoPago(value);
+                                                    internalForm.setFieldValue("tipo_de_pago", value);
                                                 }}
                                                 disabled={!isAdmin || estaPagado === "si"}
                                             >
                                                 <Radio.Button value="1">Transferencia o QR</Radio.Button>
                                                 <Radio.Button value="2">Efectivo</Radio.Button>
-                                                <Radio.Button
-                                                    value="3"
-                                                    onClick={() => {
-                                                        if (tipoPago === "3") return; // ya está activo, ignorar
-
-                                                        if (!clickedOnce) {
-                                                            setClickedOnce(true);
-                                                            setTimeout(() => setClickedOnce(false), 4000); // volver a permitir después de 4s
-                                                        } else {
-                                                            setTipoPago("3");
-                                                            internalForm.setFieldValue("tipo_de_pago", "3");
-                                                            internalForm.setFieldValue("adelanto_cliente", 0);
-                                                            setClickedOnce(false);
-                                                        }
-                                                    }}
-                                                >
-                                                    Pagado al dueño
-                                                </Radio.Button>
-
+                                                <Radio.Button value="3">Pagado al dueño</Radio.Button>
                                                 <Radio.Button value="4">Efectivo + QR</Radio.Button>
                                             </Radio.Group>
 
                                             {clickedOnce && (
                                                 <div
                                                     style={{
-                                                        position: 'absolute',
-                                                        top: '100%',
-                                                        left: '50%',
-                                                        transform: 'translateX(-50%)',
                                                         color: 'red',
                                                         fontSize: '12px',
                                                         marginTop: 4,
@@ -855,9 +844,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                                     Haz clic de nuevo para confirmar el cambio. Se borrará el adelanto.
                                                 </div>
                                             )}
-                                        </div>
+                                        </>
                                     </Form.Item>
-
                                 </Col>
                             </Row>
 
