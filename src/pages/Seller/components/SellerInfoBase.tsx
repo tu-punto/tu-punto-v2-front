@@ -14,7 +14,6 @@ import {
   PlusOutlined,
   PhoneOutlined,
   MailOutlined,
-  CalendarOutlined,
   PercentageOutlined,
 } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
@@ -279,7 +278,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           email: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
           sucursales: seller.pago_sucursales.length
-            ? seller.pago_sucursales
+            ? seller.pago_sucursales.map((sucursal: any) => ({
+                ...sucursal,
+                fecha_ingreso: sucursal.fecha_ingreso
+                  ? dayjs(sucursal.fecha_ingreso)
+                  : null,
+                fecha_salida: sucursal.fecha_salida
+                  ? dayjs(sucursal.fecha_salida)
+                  : null,
+              }))
             : [{}],
         }}
       >

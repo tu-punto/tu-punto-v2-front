@@ -6,12 +6,15 @@ import { IWorker } from "./workerModel";
 
 // ✅ Definimos la estructura del array
 export interface ISucursalPago {
-  id_sucursal: string; // o number si usás otro tipo
+  id_sucursal: string 
   sucursalName: string;
   alquiler: number;
   exhibicion: number;
   delivery: number;
   entrega_simple: number;
+  fecha_ingreso: Date | string;
+  fecha_salida?: Date | string; 
+  comentario?: string; 
 }
 
 export interface ISeller {

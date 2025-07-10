@@ -50,6 +50,9 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
           exhibicion: p.exhibicion,
           delivery: p.delivery,
           entrega_simple: p.entrega_simple,
+          fecha_ingreso: p.fecha_ingreso ? dayjs(p.fecha_ingreso) : null,
+          fecha_salida: p.fecha_salida ? dayjs(p.fecha_salida) : null,
+          comentario: p.comentario || "",
         };
       });
 
@@ -91,7 +94,12 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
       const payload = {
         ...values,
         fecha_vigencia: values.fecha_vigencia.toISOString(),
-        pago_sucursales: values.sucursales,
+        pago_sucursales: values.sucursales.map((formSucursal: any) => ({
+          ...formSucursal,
+          sucursalName: sucursalOptions.find((optionSucursal) => 
+            optionSucursal._id=== formSucursal.id_sucursal
+          )?.nombre 
+        })),
         deuda: nuevaDeuda,
         esDeuda: values.isDebt,
       };
