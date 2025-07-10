@@ -1,9 +1,8 @@
 import { SaveOutlined, DeleteOutlined } from "@ant-design/icons";
-import { Button, Popconfirm, message, Table, Empty } from "antd";
+import { Button, Popconfirm, Table, Empty, Select, Row } from "antd";
 import dayjs from "dayjs";
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { EditableCellInputNumber } from "../../components/editableCell";
-import { render } from "@react-pdf/renderer";
 
 interface CustomTableProps {
   data: any[];
@@ -26,7 +25,27 @@ const CustomTable = ({
   allowActions = false,
   isAdmin,
 }: CustomTableProps) => {
-  const totalAmount = data.reduce((acc, product) => {
+  const [selectedSucursal, setSelectedSucursal] = useState("todos");
+
+  // Filtrar datos
+  const filteredData = useMemo(() => {
+    return selectedSucursal === "todos"
+      ? data
+      : data.filter((sale) => sale.sucursal === selectedSucursal);
+  }, [data, selectedSucursal]);
+
+  // Sucursales únicas
+  const sucursales = useMemo(() => {
+    return [...new Set(data.map((s) => s.sucursal))];
+  }, [data]);
+
+  // Total de productos
+  const totalProductos = filteredData.reduce(
+    (sum, sale) => sum + (sale.cantidad || 0),
+    0
+  );
+
+  const totalAmount = filteredData.reduce((acc, product) => {
     const cantidad = product.cantidad || 0;
     const precio = product.precio_unitario || 0;
     return acc + precio * cantidad;
@@ -205,17 +224,40 @@ const CustomTable = ({
 
   useEffect(() => {
     onUpdateTotalAmount(totalAmount);
-  }, [data]);
+  }, [filteredData]);
 
-  return data.length > 0 ? (
+  return filteredData.length > 0 ? (
     <>
+      <Row justify="space-between" align="middle" className="my-4">
+        <Select
+          placeholder="Filtrar por sucursal"
+          style={{ width: 200 }}
+          value={selectedSucursal}
+          onChange={setSelectedSucursal}
+          options={[
+            { value: "todos", label: "Todas las sucursales" },
+            ...sucursales.map((sucursal) => ({
+              value: sucursal,
+              label: sucursal,
+            })),
+          ]}
+        />
+        <span className="text-mobile-sm xl:text-desktop-sm">
+          <strong>Total productos: {totalProductos}</strong>
+        </span>
+      </Row>
+
       <div style={{ textAlign: "right" }}>
         <strong className="text-mobile-sm xl:text-desktop-sm">
           Monto Total:
         </strong>{" "}
         Bs.{totalAmount.toFixed(2)}
       </div>
-      <Table columns={columns} dataSource={data} pagination={{ pageSize: 5 }} />
+      <Table
+        columns={columns}
+        dataSource={filteredData}
+        pagination={{ pageSize: 5 }}
+      />
     </>
   ) : (
     <Empty
