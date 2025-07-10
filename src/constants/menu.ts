@@ -68,4 +68,10 @@ export const menu = [
     icon: salesHistoryIcon,
     roles: ["admin"],
   },
+  {
+    path: "/user",
+    label: "Usuarios",
+    icon: sellerIcon,
+    roles: ["admin"],
+  }
 ];

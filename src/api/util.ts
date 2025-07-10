@@ -5,5 +5,5 @@ export const parseError = (error: AxiosError) => {
     if (err && err.response && err.response.data) {
         return { success: false, ...err.response.data }
     }
-    return { succcess: false }
+    return { success: false }
 }
