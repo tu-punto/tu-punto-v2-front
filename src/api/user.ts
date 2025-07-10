@@ -11,16 +11,16 @@ export const checkLoginAPI = async (userData: any) => {
     parseError(error as AxiosError);
   }
 };
+
 export const getUserByCookieAPI = async () => {
   try {
-    const res = await apiClient.get("/user/info"); // o como se llame tu endpoint
-    return res.data ;
+    const res = await apiClient.get("/user/info");
+    return res.data;
   } catch (error) {
     console.log(error);
     return { success: false };
   }
 };
-
 
 export const logoutUserAPI = async () => {
   try {
@@ -37,6 +37,42 @@ export const logoutUserAPI = async () => {
 export const registerUserAPI = async (userData: any) => {
   try {
     const res = await apiClient.post("/user/register", userData);
+    return { success: true, data: res.data };
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
+
+export const getUsersAPI = async () => {
+  try {
+    const res = await apiClient.get("/user");
+    return { success: true, data: res.data.data };
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
+
+export const createUserAPI = async (userData: any) => {
+  try {
+    const res = await apiClient.post("/user", userData);
+    return { success: true, data: res.data };
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
+
+export const updateUserAPI = async (id: string, userData: any) => {
+  try {
+    const res = await apiClient.put(`/user/${id}`, userData);
+    return { success: true, data: res.data };
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
+
+export const deleteUserAPI = async (id: string) => {
+  try {
+    const res = await apiClient.delete(`/user/${id}`);
     return { success: true, data: res.data };
   } catch (error) {
     parseError(error as AxiosError);
