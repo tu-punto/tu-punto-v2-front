@@ -80,6 +80,9 @@ export default function SellerFormModal({
           exhibicion: s.exhibicion ?? 0,
           delivery: s.delivery ?? 0,
           entrega_simple: s.entrega_simple ?? 0,
+          fecha_ingreso: s.fecha_ingreso ? s.fecha_ingreso.toISOString() : new Date().toISOString(),
+          fecha_salida: s.fecha_salida ? s.fecha_salida.toISOString() : null,
+          comentario: s.comentario || "",
         })),
         esDeuda: true, // alta siempre entra como deuda
       };
