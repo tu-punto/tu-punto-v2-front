@@ -110,7 +110,6 @@ const StockManagement = () => {
                 });
                 setSellerSucursales(Array.from(sucursalesMap.values()));
             } else {
-                // ADMIN → necesita sucursalId válido
                 const idToUse = localStorage.getItem("sucursalId");
                 if (!idToUse || idToUse.length !== 24) {
                     console.warn("❌ ID de sucursal inválido o ausente:", idToUse);

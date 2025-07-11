@@ -242,12 +242,15 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                             await generateIngressPDFAPI({
                                 sellerName: selectedSeller?.nombre + " " + selectedSeller?.apellido || "Sin definir",
                                 sucursalNombre: "Prado",
-                                ingresos: stockData, // <--- este nombre debe coincidir con el que espera el backend
+                                ingresos: stockData,
                                 variantes: variantData,
                                 productos: flattenedCombinations,
                                 sucursalId
                             });
                             await saveProducts();
+
+                            window.location.reload();
+
                         } catch (err) {
                             message.error("Error al generar el PDF.");
                             console.error("❌ Error PDF:", err);
