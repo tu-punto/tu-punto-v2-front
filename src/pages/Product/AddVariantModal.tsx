@@ -10,15 +10,15 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
 
     useEffect(() => {
         if (visible && group?.product) {
-            console.log("🧪 group.product:", group.product);
+            //console.log("🧪 group.product:", group.product);
 
             const sucursal = group.product.sucursales?.find(
                 s => String(s.id_sucursal) === String(sucursalId)
             );
-            console.log("🧪 sucursal encontrada:", sucursal);
+            //console.log("🧪 sucursal encontrada:", sucursal);
 
             const current = sucursal?.combinaciones || [];
-            console.log("🧪 combinaciones actuales:", current);
+            //console.log("🧪 combinaciones actuales:", current);
 
             const formatted = current.map((combo: any, index: number) => {
                 const varianteEntries = Object.entries(combo.variantes || {});
@@ -37,7 +37,7 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
                 return entry;
             });
 
-            console.log("🧪 combinaciones formateadas:", formatted);
+            //console.log("🧪 combinaciones formateadas:", formatted);
 
             setExistingCombinations(formatted);
             setCombinations(formatted);
@@ -51,10 +51,18 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
             return message.warning("No se han agregado nuevas combinaciones");
         }
 
+        const combinacionesFiltradas = newCombinations.filter(
+            combo => Number(combo.stock) > 0 && Number(combo.price) > 0
+        );
+
+        if (combinacionesFiltradas.length === 0) {
+            return message.warning("Debe ingresar al menos una combinación con stock y precio.");
+        }
+
         const payload = {
             product: group.product,
             sucursalId,
-            combinaciones: newCombinations.map(combo => {
+            combinaciones: combinacionesFiltradas.map(combo => {
                 const variantes: Record<string, string> = {};
                 let i = 0;
                 while (combo[`varName${i}`] && combo[`var${i}`]) {
@@ -65,11 +73,10 @@ const AddVariantModal = ({ visible, onCancel, group, onAdd }: any) => {
                     variantes,
                     precio: combo.price,
                     stock: combo.stock,
-                    isNew: true // 🔴 Marca visual de nuevo
+                    isNew: true
                 };
             })
         };
-
         saveTempVariant(payload);
         message.success("Variantes guardadas localmente");
         onCancel();

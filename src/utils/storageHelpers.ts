@@ -69,9 +69,9 @@ export const clearTempStock = () => {
 
 
 export const reconstructProductFromFlat = ({ flatProducts, productId, sucursalId }) => {
-    console.log("🧪 reconstructProductFromFlat → flatProducts:", flatProducts);
-    console.log("🧪 reconstructProductFromFlat → productId:", productId);
-    console.log("🧪 reconstructProductFromFlat → sucursalId:", sucursalId);
+    //console.log("🧪 reconstructProductFromFlat → flatProducts:", flatProducts);
+    //console.log("🧪 reconstructProductFromFlat → productId:", productId);
+    //console.log("🧪 reconstructProductFromFlat → sucursalId:", sucursalId);
 
     // 1. Buscar producto con estructura completa (con sucursales)
     const productWithSucursales = flatProducts.find(p =>

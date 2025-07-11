@@ -15,7 +15,7 @@ import { getCategoriesAPI } from '../../api/category';
 import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
-import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
+import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
 
 const StockManagement = () => {
@@ -135,6 +135,9 @@ const StockManagement = () => {
     };
 
     useEffect(() => {
+        clearTempStock();
+        clearTempProducts();
+        clearTempVariants();
         fetchData();
         fetchFullProducts(); // ← cargamos el listado completo al inicio
     }, []);
