@@ -207,6 +207,11 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
             const baseName = product.nombre_producto;
 
+            const nombreMatch = baseName?.toLowerCase().includes(searchText.toLowerCase());
+            const varianteMatch = product.variant?.toLowerCase().includes(searchText.toLowerCase());
+
+            if (searchText && !nombreMatch && !varianteMatch) return;
+
             if (!groups[baseName]) {
                 groups[baseName] = {
                     key: baseName,
@@ -218,18 +223,13 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 };
             }
 
-            if (
-                searchText &&
-                !baseName.toLowerCase().includes(searchText.toLowerCase()) &&
-                !product.variant.toLowerCase().includes(searchText.toLowerCase())
-            ) return;
-
             groups[baseName].children.push(product);
             groups[baseName].totalStock += product.stock;
         });
 
         return Object.values(groups);
     };
+
 
     const columns = [
         {
@@ -370,14 +370,26 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         });
 
         setUpdatedProductsList(updatedProducts);
-        const grouped = updatedProducts.reduce((acc, product) => {
+        const lowerSearch = searchText.toLowerCase();
+
+        const filteredProducts = updatedProducts.filter(product => {
+            const nombre = product.nombre_producto?.toLowerCase() || "";
+            const variante = product.variant?.toLowerCase() || "";
+            return (
+                lowerSearch === "" ||
+                nombre.includes(lowerSearch) ||
+                variante.includes(lowerSearch)
+            );
+        });
+
+        const groupedByVendedor = filteredProducts.reduce((acc, product) => {
             const vendedor = product.vendedor || "Sin vendedor";
             if (!acc[vendedor]) acc[vendedor] = [];
             acc[vendedor].push(product);
             return acc;
         }, {} as Record<string, any[]>);
 
-        const groups = Object.entries(grouped).map(([vendedor, products]) => ({
+        const groups = Object.entries(groupedByVendedor).map(([vendedor, products]) => ({
             name: vendedor,
             products
         }));
@@ -415,44 +427,56 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             */}
             {tableGroup
                 .filter(group => group.products && group.products.length > 0)
-                .map((group, i) => (
-                    <div key={i}>
-                        <h2 style={{ textAlign: 'left', marginTop: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {group.name}
-                            <span style={{
-                                backgroundColor: "#f0f0f0",
-                                borderRadius: "12px",
-                                padding: "2px 10px",
-                                fontSize: "0.8rem",
-                                fontWeight: 500
-                            }}>
-                            {group.products.reduce((sum, p) => sum + (p.stock ?? 0), 0)}
-                          </span>
-                        </h2>
-                        <Table
-                            columns={columns}
-                            dataSource={groupProductsByBaseName(group.products)}
-                            rowClassName={(record) =>
-                                record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
-                                    ? "bg-green-50 border-l-4 border-green-500"
-                                    : ""
-                            }
-                            expandable={{
-                                expandedRowKeys,
-                                onExpand: (expanded, record) => {
-                                    setExpandedRowKeys(
-                                        expanded
-                                            ? [...expandedRowKeys, record.key]
-                                            : expandedRowKeys.filter((key) => key !== record.key)
-                                    );
-                                },
-                                expandRowByClick: true,
-                            }}
-                            pagination={{ pageSize: 5 }}
-                            rowKey="key"
-                        />
-                    </div>
-                ))}
+                .map((group, i) => {
+                    const groupedProducts = groupProductsByBaseName(group.products);
+
+                    if (groupedProducts.length === 0) return null;
+
+                    return (
+                        <div key={i}>
+                            <h2 style={{ textAlign: 'left', marginTop: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {group.name}
+                                <span style={{
+                                    backgroundColor: "#f0f0f0",
+                                    borderRadius: "12px",
+                                    padding: "2px 10px",
+                                    fontSize: "0.8rem",
+                                    fontWeight: 500
+                                }}>
+            {group.products.reduce((sum, p) => sum + (p.stock ?? 0), 0)}
+          </span>
+                            </h2>
+
+                            <Table
+                                columns={columns}
+                                dataSource={groupedProducts}
+                                rowClassName={(record) =>
+                                    record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
+                                        ? "bg-green-50 border-l-4 border-green-500"
+                                        : ""
+                                }
+                                expandable={{
+                                    expandedRowKeys,
+                                    onExpand: (expanded, record) => {
+                                        setExpandedRowKeys(
+                                            expanded
+                                                ? [...expandedRowKeys, record.key]
+                                                : expandedRowKeys.filter((key) => key !== record.key)
+                                        );
+                                    },
+                                    expandRowByClick: true,
+                                }}
+                                pagination={{
+                                    pageSize: 10,
+                                    showSizeChanger: true,
+                                    pageSizeOptions: ['5', '10', '20', '50'],
+                                    showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`
+                                }}
+                                rowKey="key"
+                            />
+                        </div>
+                    );
+                })}
 
             {tableGroup.filter(group => group.products && group.products.length > 0).length === 0 && (
                 <p>No hay grupos de productos.</p>

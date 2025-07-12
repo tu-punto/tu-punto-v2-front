@@ -34,6 +34,33 @@ export const Sales = () => {
         branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
     );
     const [searchText, setSearchText] = useState("");
+    const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
+    useEffect(() => {
+        const fetchSellerAndSetSucursales = async () => {
+            if (isAdmin || !user?.id_vendedor) return;
+
+            try {
+                const vendedor = await getSellerAPI(user.id_vendedor);
+
+                if (vendedor?.pago_sucursales?.length > 0) {
+                    const sucursales = vendedor.pago_sucursales.map((s: any) => ({
+                        value: s.id_sucursal?.$oid || s.id_sucursal,
+                        label: s.sucursalName,
+                    }));
+                    setSucursalesPagadas(sucursales);
+
+                    // Si aún no hay seleccionada, usar la primera
+                    if (!selectedBranchId) {
+                        setSelectedBranchId(sucursales[0].value);
+                    }
+                }
+            } catch (error) {
+                message.error("No se pudo cargar las sucursales del vendedor");
+            }
+        };
+
+        fetchSellerAndSetSucursales();
+    }, [isAdmin, user?.id_vendedor]);
 
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     useEffect(() => {
@@ -437,14 +464,12 @@ export const Sales = () => {
                                                 placeholder="Sucursal"
                                                 value={selectedBranchId}
                                                 onChange={(value) => setSelectedBranchId(value)}
-                                                options={branches.map((sucursal: any) => ({
-                                                    value: sucursal._id,
-                                                    label: sucursal.nombre,
-                                                }))}
+                                                options={sucursalesPagadas}
                                                 style={{ minWidth: 180 }}
                                                 allowClear
                                             />
                                         )}
+
                                         <Button
                                             type="primary"
                                             onClick={() => setProductAddModal(true)}

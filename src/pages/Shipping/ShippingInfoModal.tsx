@@ -19,6 +19,7 @@ import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
+import moment from "moment-timezone";
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
@@ -138,8 +139,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     useEffect(() => {
         if (estadoPedidoForm === "Entregado") {
             internalForm.setFieldsValue({
-                fecha_pedido: dayjs(),
-                hora_entrega_acordada: dayjs()
+                fecha_pedido: moment().tz("America/La_Paz"),
+                hora_entrega_acordada: moment().tz("America/La_Paz"),
             });
         }
     }, [estadoPedidoForm]);
@@ -168,8 +169,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
             lugar_entrega_input,
-            fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido) : null,
-            hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada) : null,
+            fecha_pedido: shipping.fecha_pedido ? moment(shipping.fecha_pedido).tz("America/La_Paz") : null,
+            hora_entrega_acordada: shipping.hora_entrega_acordada ? moment(shipping.hora_entrega_acordada).tz("America/La_Paz") : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
@@ -388,21 +389,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
             //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
-            const fechaEntrega = dayjs(values.fecha_pedido).format("YYYY-MM-DD");
+            const fechaEntrega = moment(values.fecha_pedido).tz("America/La_Paz").format("YYYY-MM-DD");
             let horaEntrega = values.hora_entrega_acordada;
 
             if (values.estado_pedido === "Entregado") {
-                horaEntrega = dayjs(); // hora actual como dayjs
+                horaEntrega = moment().tz("America/La_Paz");
             }
 
-            const horaFormateada = dayjs(horaEntrega).format("HH:mm:ss");
-            const fechaHoraEntrega = `${fechaEntrega} ${horaFormateada}`; // ⏰ combinado y local
+            const horaFormateada = moment(horaEntrega).tz("America/La_Paz").format("HH:mm:ss");
+            const fechaHoraEntrega = `${fechaEntrega} ${horaFormateada}`;
 
             console.log("🕒 Hora de entrega acordada:", horaEntrega);
             const updateShippingInfo: any = {
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
-                fecha_pedido: dayjs(values.fecha_pedido).format('YYYY-MM-DD HH:mm:ss'),
+                fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntrega,
                 pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
                 esta_pagado: values.esta_pagado,

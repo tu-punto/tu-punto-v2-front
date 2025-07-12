@@ -6,6 +6,7 @@ import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
 import { getSucursalsAPI } from "../../api/sucursal";
+import moment from "moment-timezone";
 
 import dayjs from 'dayjs';
 
@@ -76,8 +77,8 @@ function ShippingFormModal({
         const estado = form.getFieldValue("estado_pedido");
         if (estado === "Entregado") {
             form.setFieldsValue({
-                fecha_pedido: dayjs(),
-                hora_entrega_acordada: dayjs()
+                fecha_pedido: moment().tz("America/La_Paz"),
+                hora_entrega_acordada: moment().tz("America/La_Paz"),
             });
         }
     }, [form.getFieldValue("estado_pedido")]);
@@ -113,12 +114,12 @@ function ShippingFormModal({
             4: 'Efectivo + QR'
         };
         try {
-            const fechaEntrega = dayjs(values.fecha_pedido).format("YYYY-MM-DD");
-            const horaEntrega = dayjs(values.hora_entrega_acordada || dayjs()).format("HH:mm:ss");
-            const fechaHoraEntrega = `${fechaEntrega} ${horaEntrega}`;
-            const response = await registerShippingAPI({
+            const fechaHoraEntrega = moment.tz(
+                `${values.fecha_pedido.format("YYYY-MM-DD")} ${values.hora_entrega_acordada?.format("HH:mm:ss") || "00:00:00"}`,
+                "America/La_Paz"
+            ).format("YYYY-MM-DD HH:mm:ss");            const response = await registerShippingAPI({
                 ...values,
-                fecha_pedido: dayjs(values.fecha_pedido).format("YYYY-MM-DD HH:mm:ss"),
+                fecha_pedido: moment.tz(values.fecha_pedido, "America/La_Paz").format("YYYY-MM-DD HH:mm:ss"),
                 hora_entrega_acordada: fechaHoraEntrega,
                 tipo_de_pago: tipoPagoMap[parseInt(values.tipo_de_pago)],
                 pagado_al_vendedor: values.esta_pagado === "si" || values.tipo_de_pago === "3",
