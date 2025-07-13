@@ -67,8 +67,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 : !selectedLocation || pedido.lugar_entrega.toLowerCase().includes(selectedLocation.toLowerCase());
             const matchesDateRange =
                 dateRange[0] && dateRange[1]
-                    ? toSimpleDate(new Date(pedido.fecha_pedido)) >= toSimpleDate(dateRange[0]) &&
-                    toSimpleDate(new Date(pedido.fecha_pedido)) <= toSimpleDate(dateRange[1])
+                    ? toSimpleDate(new Date(pedido.hora_entrega_acordada)) >= toSimpleDate(dateRange[0]) &&
+                    toSimpleDate(new Date(pedido.hora_entrega_acordada)) <= toSimpleDate(dateRange[1])
                     : true;
             const matchesVendedor = isAdmin
                 ? (selectedVendedor === "Todos" || pedido.venta?.some((v: any) =>
@@ -112,12 +112,12 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         },*/},
         {
             title: 'Fecha Pedido',
-            dataIndex: 'fecha_pedido',
-            key: 'fecha_pedido',
+            dataIndex: 'hora_entrega_acordada',
+            key: 'hora_entrega_acordada',
             render: (text: string) => new Date(text).toLocaleDateString('es-ES'),
             sorter: (a: any, b: any) =>
-                new Date(a.fecha_pedido).getTime() - new Date(b.fecha_pedido).getTime(),
-            sortOrder, // 👈 manual control
+                new Date(a.hora_entrega_acordada).getTime() - new Date(b.hora_entrega_acordada).getTime(),
+            sortOrder,
             onHeaderCell: () => ({
                 onClick: () => {
                     setSortOrder(prev => (prev === 'ascend' ? 'descend' : 'ascend'));

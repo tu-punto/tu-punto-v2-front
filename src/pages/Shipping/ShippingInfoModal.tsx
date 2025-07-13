@@ -139,7 +139,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     useEffect(() => {
         if (estadoPedidoForm === "Entregado") {
             internalForm.setFieldsValue({
-                fecha_pedido: moment().tz("America/La_Paz"),
+                fecha_entrega: moment().tz("America/La_Paz"),
                 hora_entrega_acordada: moment().tz("America/La_Paz"),
             });
         }
@@ -163,14 +163,17 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             shipping?.venta?.[0]?.quien_paga_delivery ||
             shipping?.quien_paga_delivery ||
             "comprador";
+        const horaEntregaMoment = shipping.hora_entrega_acordada
+            ? moment(shipping.hora_entrega_acordada).tz("America/La_Paz")
+            : null;
 
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
             lugar_entrega_input,
-            fecha_pedido: shipping.fecha_pedido ? moment(shipping.fecha_pedido).tz("America/La_Paz") : null,
-            hora_entrega_acordada: shipping.hora_entrega_acordada ? moment(shipping.hora_entrega_acordada).tz("America/La_Paz") : null,
+            fecha_entrega: horaEntregaMoment ? horaEntregaMoment.clone().startOf('day') : null,
+            hora_entrega_acordada: horaEntregaMoment,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
@@ -389,7 +392,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
             //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
-            const fechaEntrega = moment(values.fecha_pedido).tz("America/La_Paz").format("YYYY-MM-DD");
+            const fechaEntrega = moment(values.fecha_entrega).tz("America/La_Paz").format("YYYY-MM-DD");
             let horaEntrega = values.hora_entrega_acordada;
 
             if (values.estado_pedido === "Entregado") {
@@ -403,7 +406,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             const updateShippingInfo: any = {
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
-                fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
+                //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntrega,
                 pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
                 esta_pagado: values.esta_pagado,
@@ -563,7 +566,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
+                            <Form.Item name='fecha_entrega' label='Fecha de la Entrega' rules={[{ required: true }]}>
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>

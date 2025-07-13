@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Table, DatePicker, message, Tag, Modal } from "antd";
 import dayjs from "dayjs";
-import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
+import { getSalesHistoryAPI } from "../../api/shipping";
 import { getShippingByIdAPI } from "../../api/shipping";
-import EmptySalesTable from "../Sales/EmptySalesTable.tsx"; // asegúrate de importar
+import EmptySalesTable from "../Sales/EmptySalesTable.tsx";
+import moment from "moment-timezone";
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
@@ -49,7 +50,10 @@ const SalesHistoryTable = () => {
     const fetchSales = async () => {
         setLoading(true);
         try {
-            const res = await getSalesHistoryAPI(selectedDate?.toISOString(), sucursalId);
+            const fechaFormateada = selectedDate
+                ? moment(selectedDate).tz("America/La_Paz").format("YYYY-MM-DD")
+                : null;
+            const res = await getSalesHistoryAPI(fechaFormateada?.toISOString(), sucursalId);
             if (res.success) {
                 setSales(res.resumen);
                 setTotales(res.totales);
@@ -69,7 +73,7 @@ const SalesHistoryTable = () => {
 
         const grouped: Record<string, any[]> = {};
         sales.forEach(item => {
-            const fecha = dayjs(item.fecha).format("DD/MM/YYYY");
+            const fecha = moment(item.fecha).tz("America/La_Paz").format("DD/MM/YYYY");
             if (!grouped[fecha]) grouped[fecha] = [];
             grouped[fecha].push(item);
         });
@@ -105,12 +109,13 @@ const SalesHistoryTable = () => {
                         <span className="italic text-gray-600">{record.fecha}</span>
                     );
                 }
-                return dayjs(val).format("DD/MM/YYYY");
+                return moment(val).tz("America/La_Paz").format("DD/MM/YYYY");
             }
         },
         {
             title: "Hora",
-            dataIndex: "hora",
+            dataIndex: "fecha", // Usamos "fecha" que es un Date ISO
+            render: (val) => moment(val).tz("America/La_Paz").format("HH:mm"),
         },
         {
             title: "Tipo de pago",
