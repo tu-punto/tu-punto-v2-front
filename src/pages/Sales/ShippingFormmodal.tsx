@@ -77,7 +77,7 @@ function ShippingFormModal({
         const estado = form.getFieldValue("estado_pedido");
         if (estado === "Entregado") {
             form.setFieldsValue({
-                fecha_pedido: moment().tz("America/La_Paz"),
+                fecha_pedido: moment.tz(values.fecha_pedido.format("YYYY-MM-DD"), "YYYY-MM-DD", "America/La_Paz").format("YYYY-MM-DD HH:mm:ss"),
                 hora_entrega_acordada: moment().tz("America/La_Paz"),
             });
         }
@@ -114,13 +114,18 @@ function ShippingFormModal({
             4: 'Efectivo + QR'
         };
         try {
-            const fechaHoraEntrega = moment.tz(
-                `${values.fecha_pedido.format("YYYY-MM-DD")} ${values.hora_entrega_acordada?.format("HH:mm:ss") || "00:00:00"}`,
-                "America/La_Paz"
-            ).format("YYYY-MM-DD HH:mm:ss");            const response = await registerShippingAPI({
+            const fechaSeleccionada = values.fecha_pedido?.format("YYYY-MM-DD") || moment().tz("America/La_Paz").format("YYYY-MM-DD");
+            const horaSeleccionada = values.hora_entrega_acordada?.format("HH:mm:ss") || "00:00:00";
+
+            const fechaPedido = moment.tz("America/La_Paz").toDate();
+            const horaEntregaAcordada = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "America/La_Paz").toDate();
+            const horaEntregaReal = moment.tz("America/La_Paz").toDate(); // si querés registrar el momento actual
+
+            const response = await registerShippingAPI({
                 ...values,
-                fecha_pedido: moment.tz(values.fecha_pedido, "America/La_Paz").format("YYYY-MM-DD HH:mm:ss"),
-                hora_entrega_acordada: fechaHoraEntrega,
+                fecha_pedido: fechaPedido,
+                hora_entrega_acordada: horaEntregaAcordada,
+                hora_entrega_real: horaEntregaReal,
                 tipo_de_pago: tipoPagoMap[parseInt(values.tipo_de_pago)],
                 pagado_al_vendedor: values.esta_pagado === "si" || values.tipo_de_pago === "3",
                 id_sucursal: branchIdFromProps,
