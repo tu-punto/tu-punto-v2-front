@@ -164,7 +164,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             shipping?.quien_paga_delivery ||
             "comprador";
         const horaEntregaMoment = shipping.hora_entrega_acordada
-            ? moment(shipping.hora_entrega_acordada).tz("America/La_Paz")
+            ? moment.parseZone(shipping.hora_entrega_acordada)
             : null;
 
         internalForm.setFieldsValue({

@@ -114,9 +114,11 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             title: 'Fecha Pedido',
             dataIndex: 'hora_entrega_acordada',
             key: 'hora_entrega_acordada',
-            render: (text: string) => new Date(text).toLocaleDateString('es-ES'),
+            render: (text: string) =>
+                moment.parseZone(text).format("DD/MM/YYYY"),
             sorter: (a: any, b: any) =>
-                new Date(a.hora_entrega_acordada).getTime() - new Date(b.hora_entrega_acordada).getTime(),
+                moment.parseZone(a.hora_entrega_acordada).valueOf() -
+                moment.parseZone(b.hora_entrega_acordada).valueOf(),
             sortOrder,
             onHeaderCell: () => ({
                 onClick: () => {
