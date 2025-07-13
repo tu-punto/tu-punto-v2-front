@@ -164,7 +164,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             shipping?.quien_paga_delivery ||
             "comprador";
         const horaEntregaMoment = shipping.hora_entrega_acordada
-            ? moment.parseZone(shipping.hora_entrega_acordada)
+            ? moment(shipping.hora_entrega_acordada)
             : null;
 
         internalForm.setFieldsValue({
@@ -172,8 +172,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
             lugar_entrega_input,
-            fecha_entrega: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()).startOf('day') : null,
-            hora_entrega_acordada: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()) : null,
+            fecha_entrega: horaEntregaMoment ? dayjs(horaEntregaMoment).startOf('day') : null,
+            hora_entrega_acordada: horaEntregaMoment ? dayjs(horaEntregaMoment) : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
@@ -407,11 +407,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ? values.hora_entrega_acordada.format("HH:mm:ss")
                 : moment().format("HH:mm:ss");
 
-            const fechaHoraEntregaAcordada = moment.tz(
-                `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`,
-                "YYYY-MM-DD HH:mm:ss",
-                "America/La_Paz"
-            ).format("YYYY-MM-DD HH:mm:ss");
+            const fechaHoraEntregaAcordada = `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`;
 
             let horaEntregaReal = values.estado_pedido === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
