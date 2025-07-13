@@ -172,8 +172,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
             lugar_entrega_input,
-            fecha_entrega: horaEntregaMoment ? horaEntregaMoment.clone().startOf('day') : null,
-            hora_entrega_acordada: horaEntregaMoment,
+            fecha_entrega: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()).startOf('day') : null,
+            hora_entrega_acordada: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()) : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
@@ -379,7 +379,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 setLoading(false);
                 return;
             }
-            // Actualizar solo el campo quien_paga_delivery en ventas existentes
             const quienPagaActual = internalForm.getFieldValue("quien_paga_delivery");
             const updatedExisting = existingProducts.map((p: any) => ({
                 _id: p.id_venta, // importante para identificar la venta en el backend
@@ -392,23 +391,43 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
             //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
-            const fechaEntrega = moment(values.fecha_entrega).tz("America/La_Paz").format("YYYY-MM-DD");
-            let horaEntrega = values.hora_entrega_acordada;
+            console.log("📝 Valores recibidos del formulario:");
+            console.log("→ fecha_entrega:", values.fecha_entrega);
+            console.log("→ hora_entrega_acordada:", values.hora_entrega_acordada);
+            console.log("→ estado_pedido:", values.estado_pedido);
+            console.log("→ tipo (fecha):", typeof values.fecha_entrega);
+            console.log("→ tipo (hora):", typeof values.hora_entrega_acordada);
+            console.log("→ es Dayjs?", dayjs.isDayjs(values.hora_entrega_acordada));
 
-            if (values.estado_pedido === "Entregado") {
-                horaEntrega = moment().tz("America/La_Paz");
-            }
+            const fechaEntrega = values.fecha_entrega
+                ? moment.tz(values.fecha_entrega.format("YYYY-MM-DD"), "YYYY-MM-DD", "America/La_Paz")
+                : moment().tz("America/La_Paz");
 
-            const horaFormateada = moment(horaEntrega).tz("America/La_Paz").format("HH:mm:ss");
-            const fechaHoraEntrega = `${fechaEntrega} ${horaFormateada}`;
+            const horaAcordada = values.hora_entrega_acordada && dayjs.isDayjs(values.hora_entrega_acordada)
+                ? values.hora_entrega_acordada.format("HH:mm:ss")
+                : moment().tz("America/La_Paz").format("HH:mm:ss");
 
-            console.log("🕒 Hora de entrega acordada:", horaEntrega);
+            const fechaHoraEntregaAcordada = moment.tz(
+                `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`,
+                "YYYY-MM-DD HH:mm:ss",
+                "America/La_Paz"
+            ).format("YYYY-MM-DD HH:mm:ss");
+
+// ✅ Si no se manda hora_entrega_real, usar la acordada
+            let horaEntregaReal = values.estado_pedido === "Entregado"
+                ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
+                : fechaHoraEntregaAcordada;
+
+
+            console.log("📦 Fecha final (acordada):", fechaHoraEntregaAcordada);
+            console.log("📦 Hora entrega real:", horaEntregaReal);
+
+            console.log("🕒 Hora de entrega acordada:", fechaHoraEntregaAcordada);
             const updateShippingInfo: any = {
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
-                hora_entrega_acordada: fechaHoraEntrega,
-                pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
+                hora_entrega_acordada: fechaHoraEntregaAcordada,                pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
                 esta_pagado: values.esta_pagado,
                 adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
                 quien_paga_delivery: values.quien_paga_delivery,
