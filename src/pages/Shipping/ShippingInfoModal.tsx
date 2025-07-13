@@ -400,12 +400,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             console.log("→ es Dayjs?", dayjs.isDayjs(values.hora_entrega_acordada));
 
             const fechaEntrega = values.fecha_entrega
-                ? moment.tz(values.fecha_entrega.format("YYYY-MM-DD"), "YYYY-MM-DD", "America/La_Paz")
-                : moment().tz("America/La_Paz");
+                ? moment(values.fecha_entrega.format("YYYY-MM-DD"), "YYYY-MM-DD")
+                : moment();
 
             const horaAcordada = values.hora_entrega_acordada && dayjs.isDayjs(values.hora_entrega_acordada)
                 ? values.hora_entrega_acordada.format("HH:mm:ss")
-                : moment().tz("America/La_Paz").format("HH:mm:ss");
+                : moment().format("HH:mm:ss");
 
             const fechaHoraEntregaAcordada = moment.tz(
                 `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`,
@@ -413,7 +413,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 "America/La_Paz"
             ).format("YYYY-MM-DD HH:mm:ss");
 
-// ✅ Si no se manda hora_entrega_real, usar la acordada
             let horaEntregaReal = values.estado_pedido === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
                 : fechaHoraEntregaAcordada;
