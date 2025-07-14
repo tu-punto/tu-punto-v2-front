@@ -5,10 +5,10 @@ import {
     Radio, Select, InputNumber, message
 } from 'antd';
 import dayjs from 'dayjs';
-import {
-    registerSalesAPI,
-    updateProductsByShippingAPI
-} from '../../api/sales';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import EmptySalesTable from '../Sales/EmptySalesTable';
 import useEditableTable from '../../hooks/useEditableTable';
 import { UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -164,17 +164,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             shipping?.venta?.[0]?.quien_paga_delivery ||
             shipping?.quien_paga_delivery ||
             "comprador";
-        const horaEntregaMoment = shipping.hora_entrega_acordada
-            ? moment.parseZone(shipping.hora_entrega_acordada)
-            : null;
+        const rawFecha = shipping.hora_entrega_acordada;
+        const originalHoraEntregaUTC = rawFecha ? dayjs.utc(rawFecha) : null;
+
+        console.log("🟢 UTC:", dayjs.utc(shipping.hora_entrega_acordada).format());
+        console.log("🟡 Local:", dayjs.utc(shipping.hora_entrega_acordada).local().format());
 
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
             lugar_entrega_input,
-            fecha_entrega: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()).startOf('day') : null,
-            hora_entrega_acordada: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()) : null,
+            fecha_entrega: originalHoraEntregaUTC ? dayjs(originalHoraEntregaUTC.format("YYYY-MM-DD"), "YYYY-MM-DD") : null,
+            hora_entrega_acordada: originalHoraEntregaUTC
+                ? dayjs(originalHoraEntregaUTC.format("HH:mm:ss"), "HH:mm:ss")
+                : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,

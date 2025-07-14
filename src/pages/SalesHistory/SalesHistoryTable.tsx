@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { Table, DatePicker, message, Tag, Modal } from "antd";
 import dayjs from "dayjs";
-import { getSalesHistoryAPI } from "../../api/shipping";
+import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
 import { getShippingByIdAPI } from "../../api/shipping";
-import EmptySalesTable from "../Sales/EmptySalesTable.tsx";
-import moment from "moment-timezone";
+import EmptySalesTable from "../Sales/EmptySalesTable.tsx"; // asegúrate de importar
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
@@ -50,10 +49,8 @@ const SalesHistoryTable = () => {
     const fetchSales = async () => {
         setLoading(true);
         try {
-            const fechaFormateada = selectedDate
-                ? moment(selectedDate).tz("America/La_Paz").format("YYYY-MM-DD")
-                : null;
-            const res = await getSalesHistoryAPI(fechaFormateada?.toISOString(), sucursalId);
+            const res = await getSalesHistoryAPI(selectedDate?.toISOString(), sucursalId);
+            console.log("📦 Datos recibidos del backend:", res.resumen);
             if (res.success) {
                 setSales(res.resumen);
                 setTotales(res.totales);
@@ -73,7 +70,7 @@ const SalesHistoryTable = () => {
 
         const grouped: Record<string, any[]> = {};
         sales.forEach(item => {
-            const fecha = moment(item.fecha).tz("America/La_Paz").format("DD/MM/YYYY");
+            const fecha = dayjs(item.fecha).add(4, "hour").format("DD/MM/YYYY");
             if (!grouped[fecha]) grouped[fecha] = [];
             grouped[fecha].push(item);
         });
@@ -104,18 +101,17 @@ const SalesHistoryTable = () => {
             title: "Fecha",
             dataIndex: "fecha",
             render: (val, record) => {
-                if (record.isSummary) {
-                    return (
-                        <span className="italic text-gray-600">{record.fecha}</span>
-                    );
-                }
-                return moment(val).tz("America/La_Paz").format("DD/MM/YYYY");
+                if (record.isSummary) return <span className="italic text-gray-600">{record.fecha}</span>;
+                return val?.substring(0, 10).split("-").reverse().join("/");
             }
         },
         {
             title: "Hora",
-            dataIndex: "fecha", // Usamos "fecha" que es un Date ISO
-            render: (val) => moment(val).tz("America/La_Paz").format("HH:mm"),
+            dataIndex: "fecha",
+            render: (val) => {
+                if (!val) return "-";
+                return dayjs(val).add(4, "hour").format("HH:mm"); // 👉 suma las 4 horas
+            }
         },
         {
             title: "Tipo de pago",
@@ -145,17 +141,17 @@ const SalesHistoryTable = () => {
                 const label = map[valor] || val;
 
                 return (
-                        <Tag
-                            className="text-base font-semibold px-4 py-1"
-                            style={{
-                                borderRadius: "999px",
-                                color: "#389e0d",
-                                backgroundColor: "#f6ffed", // opcionalmente verde claro
-                                border: "1px solid #b7eb8f",
-                            }}
-                        >
-                            {label}
-                        </Tag>
+                    <Tag
+                        className="text-base font-semibold px-4 py-1"
+                        style={{
+                            borderRadius: "999px",
+                            color: "#389e0d",
+                            backgroundColor: "#f6ffed", // opcionalmente verde claro
+                            border: "1px solid #b7eb8f",
+                        }}
+                    >
+                        {label}
+                    </Tag>
                 );
             }
         },
@@ -230,9 +226,9 @@ const SalesHistoryTable = () => {
                 <EmptySalesTable
                     products={modalProducts}
                     onDeleteProduct={undefined}
-                    onUpdateTotalAmount={() => {}} // puedes ignorar este callback
+                    onUpdateTotalAmount={() => {}}
                     handleValueChange={() => {}}
-                    sellers={[]} // no necesitas vendedores aquí
+                    sellers={[]}
                     isAdmin={true}
                     readonly={true}
                 />
