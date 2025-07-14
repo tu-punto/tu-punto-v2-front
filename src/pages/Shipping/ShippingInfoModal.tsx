@@ -155,6 +155,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         if (!visible || !shipping) return;
 
         internalForm.resetFields();
+        console.log("📦 Valor original hora_entrega_acordada (sin parsear):", shipping.hora_entrega_acordada);
 
         const esOtroLugar = !sucursals.find(s => s.nombre === shipping.lugar_entrega);
         const lugar_entrega = esOtroLugar ? 'otro' : shipping.lugar_entrega;
@@ -172,8 +173,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             telefono_cliente: shipping.telefono_cliente,
             lugar_entrega,
             lugar_entrega_input,
-            fecha_entrega: horaEntregaMoment ? dayjs(horaEntregaMoment).startOf('day') : null,
-            hora_entrega_acordada: horaEntregaMoment ? dayjs(horaEntregaMoment) : null,
+            fecha_entrega: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()).startOf('day') : null,
+            hora_entrega_acordada: horaEntregaMoment ? dayjs(horaEntregaMoment.toISOString()) : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
