@@ -164,7 +164,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             shipping?.quien_paga_delivery ||
             "comprador";
         const horaEntregaMoment = shipping.hora_entrega_acordada
-            ? moment(shipping.hora_entrega_acordada)
+            ? moment.parseZone(shipping.hora_entrega_acordada)
             : null;
 
         internalForm.setFieldsValue({
@@ -391,14 +391,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
             //if (deletedProducts.length > 0) await deleteProductsByShippingAPI(shipping._id, deletedProducts);
-            console.log("📝 Valores recibidos del formulario:");
-            console.log("→ fecha_entrega:", values.fecha_entrega);
-            console.log("→ hora_entrega_acordada:", values.hora_entrega_acordada);
-            console.log("→ estado_pedido:", values.estado_pedido);
-            console.log("→ tipo (fecha):", typeof values.fecha_entrega);
-            console.log("→ tipo (hora):", typeof values.hora_entrega_acordada);
-            console.log("→ es Dayjs?", dayjs.isDayjs(values.hora_entrega_acordada));
-
             const fechaEntrega = values.fecha_entrega
                 ? moment(values.fecha_entrega.format("YYYY-MM-DD"), "YYYY-MM-DD")
                 : moment();
@@ -413,11 +405,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
                 : fechaHoraEntregaAcordada;
 
-
-            console.log("📦 Fecha final (acordada):", fechaHoraEntregaAcordada);
-            console.log("📦 Hora entrega real:", horaEntregaReal);
-
-            console.log("🕒 Hora de entrega acordada:", fechaHoraEntregaAcordada);
+            //console.log("🕒 Hora de entrega acordada:", fechaHoraEntregaAcordada);
             const updateShippingInfo: any = {
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
