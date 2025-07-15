@@ -7,7 +7,10 @@ import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
 import { getSucursalsAPI } from "../../api/sucursal";
 import moment from "moment-timezone";
-
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import dayjs from 'dayjs';
 
 
@@ -75,13 +78,16 @@ function ShippingFormModal({
 
     useEffect(() => {
         const estado = form.getFieldValue("estado_pedido");
+
         if (estado === "Entregado") {
+            const now = dayjs().tz("America/La_Paz");
+
             form.setFieldsValue({
-                fecha_pedido: moment.tz(values.fecha_pedido.format("YYYY-MM-DD"), "YYYY-MM-DD", "America/La_Paz").format("YYYY-MM-DD HH:mm:ss"),
-                hora_entrega_acordada: moment().tz("America/La_Paz"),
+                fecha_pedido: now,
+                hora_entrega_acordada: now,
             });
         }
-    }, [form.getFieldValue("estado_pedido")]);
+    }, [estadoPedido]);
 
     const hideDeliveryCosts = !isAdmin;
     const hayMultiplesVendedores = useMemo(() => {
