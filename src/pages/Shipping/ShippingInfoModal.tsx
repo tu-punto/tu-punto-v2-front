@@ -37,6 +37,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [isDeliveryPlaceInput, setIsDeliveryPlaceInput] = useState(false);
     const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
+    const [estadoInicialPedido, setEstadoInicialPedido] = useState<string | null>(null);
     const [qrInput, setQrInput] = useState<number>(0);
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [showWarning, setShowWarning] = useState(false);
@@ -49,6 +50,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [clickedOnce, setClickedOnce] = useState(false);
     const cargoDelivery = useWatch('cargo_delivery', internalForm);
     const estadoPedidoForm = useWatch("estado_pedido", internalForm);
+    const normalizarTipoPago = (valor: string): string | null => {
+        const mapping: Record<string, string> = {
+            'transferencia o qr': '1',
+            'efectivo': '2',
+            'pagado al dueño': '3',
+            'efectivo + qr': '4',
+            '1': '1',
+            '2': '2',
+            '3': '3',
+            '4': '4',
+        };
+
+        const clave = valor.trim().toLowerCase();
+        return mapping[clave] || null;
+    };
 
     useEffect(() => {
         if (visible && shipping) {
@@ -137,25 +153,40 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }, [tipoPago]);
 
     useEffect(() => {
-        if (estadoPedidoForm === "Entregado") {
+        if (
+            estadoPedidoForm === "Entregado" &&
+            estadoInicialPedido !== "Entregado"
+        ) {
+            const ahora = dayjs().tz("America/La_Paz");
             internalForm.setFieldsValue({
-                fecha_entrega: moment().tz("America/La_Paz"),
-                hora_entrega_acordada: moment().tz("America/La_Paz"),
+                fecha_entrega: ahora,
+                hora_entrega_acordada: ahora,
             });
         }
-    }, [estadoPedidoForm]);
+    }, [estadoPedidoForm, estadoInicialPedido]);
+
     const tipoPagoTextoAValor: Record<string, string> = {
         'Transferencia o QR': '1',
         'Efectivo': '2',
         'Pagado al dueño': '3',
         'Efectivo + QR': '4',
     };
+    useEffect(() => {
+        if (visible && shipping?.tipo_de_pago) {
+            const tipo = shipping.tipo_de_pago;
+
+            const tipoPagoId = normalizarTipoPago(tipo);
+
+            setTipoPago(tipoPagoId);
+            internalForm.setFieldValue("tipo_de_pago", tipoPagoId);
+        }
+    }, [visible, shipping?.tipo_de_pago]);
 
     useEffect(() => {
         if (!visible || !shipping) return;
 
         internalForm.resetFields();
-        console.log("📦 Valor original hora_entrega_acordada (sin parsear):", shipping.hora_entrega_acordada);
+        //console.log("📦 Valor original hora_entrega_acordada (sin parsear):", shipping.hora_entrega_acordada);
 
         const esOtroLugar = !sucursals.find(s => s.nombre === shipping.lugar_entrega);
         const lugar_entrega = esOtroLugar ? 'otro' : shipping.lugar_entrega;
@@ -167,8 +198,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const rawFecha = shipping.hora_entrega_acordada;
         const originalHoraEntregaUTC = rawFecha ? dayjs.utc(rawFecha) : null;
 
-        console.log("🟢 UTC:", dayjs.utc(shipping.hora_entrega_acordada).format());
-        console.log("🟡 Local:", dayjs.utc(shipping.hora_entrega_acordada).local().format());
+        //console.log("🟢 UTC:", dayjs.utc(shipping.hora_entrega_acordada).format());
+        //console.log("🟡 Local:", dayjs.utc(shipping.hora_entrega_acordada).local().format());
 
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
@@ -185,15 +216,14 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             cargo_delivery: shipping.cargo_delivery,
             costo_delivery: shipping.costo_delivery,
             adelanto_cliente: shipping.adelanto_cliente,
-            tipo_de_pago: shipping.tipo_de_pago || null,
+            tipo_de_pago: normalizarTipoPago(shipping.tipo_de_pago || '') || null,
             subtotal_qr: shipping.subtotal_qr || 0,
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
-        const tipoPagoRaw = shipping.tipo_de_pago;
-        const tipoPagoId = tipoPagoTextoAValor[tipoPagoRaw] || tipoPagoRaw || null;
-        setTipoPago(tipoPagoId);
+
         setEstadoPedido(shipping.estado_pedido || "En Espera");
+        setEstadoInicialPedido(shipping.estado_pedido || "En Espera");
         setIsDeliveryPlaceInput(esOtroLugar);
         if (!origenEsIgualADestino && !quienPagaDeVenta) {
             internalForm.setFieldValue('quien_paga_delivery', 'comprador');
@@ -808,7 +838,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     </Row>
 
                     {/* Tipo de pago */}
-                    {estadoPedido === "Entregado" && (
+                    {estadoPedidoForm === "Entregado" && (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>
