@@ -9,9 +9,9 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import dayjs from 'dayjs';
 dayjs.extend(utc);
 dayjs.extend(timezone);
-import dayjs from 'dayjs';
 
 
 function ShippingFormModal({

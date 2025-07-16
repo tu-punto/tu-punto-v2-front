@@ -20,6 +20,7 @@ import {
 } from "../../api/financeFlux";
 import { getWorkersAPI } from "../../api/worker";
 import { getSellersAPI, registerSellerAPI } from "../../api/seller";
+import { getSucursalsAPI } from "../../api/sucursal"; 
 
 function FinanceFluxFormModal({
   visible,
@@ -30,13 +31,17 @@ function FinanceFluxFormModal({
   const [loading, setLoading] = useState(false);
   const [workers, setWorkers] = useState([]);
   const [sellers, setSellers] = useState([]);
+  const [sucursals, setSucursals] = useState([]); 
   const [newSeller, setNewSeller] = useState("");
   const [form] = Form.useForm();
 
   const handleFinish = async (financeFluxData: any) => {
     setLoading(true);
 
-    const sucursalId = localStorage.getItem("sucursalId");
+    // Usar la sucursal seleccionada en el form o la del localStorage como fallback
+    const sucursalId =
+      financeFluxData.id_sucursal || localStorage.getItem("sucursalId");
+
     const payload = {
       ...financeFluxData,
       id_sucursal: sucursalId,
@@ -78,6 +83,7 @@ function FinanceFluxFormModal({
       message.error("Error al crear Vendedor");
     }
   };
+
   const fetchWorkers = async () => {
     try {
       const response = await getWorkersAPI();
@@ -86,6 +92,7 @@ function FinanceFluxFormModal({
       message.error("Error al obtener los trabajadores");
     }
   };
+
   const fetchSellers = async () => {
     try {
       const response = await getSellersAPI();
@@ -94,6 +101,16 @@ function FinanceFluxFormModal({
       message.error("Error al obtener los vendedores");
     }
   };
+
+  const fetchSucursals = async () => {
+    try {
+      const response = await getSucursalsAPI();
+      setSucursals(response);
+    } catch (error) {
+      message.error("Error al obtener las sucursales");
+    }
+  };
+
   const handleTipoChange = () => {
     form.validateFields(["_id"]);
   };
@@ -101,6 +118,7 @@ function FinanceFluxFormModal({
   useEffect(() => {
     fetchWorkers();
     fetchSellers();
+    fetchSucursals(); 
   }, []);
 
   useEffect(() => {
@@ -110,18 +128,22 @@ function FinanceFluxFormModal({
         fecha: editingFlux.fecha ? dayjs(editingFlux.fecha) : null,
         id_vendedor: editingFlux.id_vendedor,
         id_trabajador: editingFlux.id_trabajador,
+        id_sucursal: editingFlux.id_sucursal, 
         esDeuda: editingFlux.esDeuda,
       });
     } else {
       form.resetFields();
+      // Establecer sucursal actual como valor por defecto (opcional)
+      const currentSucursal = localStorage.getItem("sucursalId");
+      if (currentSucursal) {
+        form.setFieldValue("id_sucursal", currentSucursal);
+      }
     }
   }, [editingFlux, form]);
 
   return (
     <Modal
-      title={`Agregar Gasto o Ingreso | 📍 Los registros se crearán automáticamente para la sucursal : ${
-        localStorage.getItem("sucursalNombre") || "Sucursal actual"
-      }`}
+      title="Agregar Gasto o Ingreso"
       open={visible}
       onCancel={onCancel}
       footer={null}
@@ -146,24 +168,52 @@ function FinanceFluxFormModal({
                 <Radio.Button value="Inversion">Inversion</Radio.Button>
               </Radio.Group>
             </Form.Item>
-          </Col>
-        </Row>
-        <Row gutter={16}>
-          <Col span={12}>
+
             <Form.Item
               name="categoria"
               label="Categoria"
               rules={[{ required: true, message: "Este campo es obligatorio" }]}
             >
-              <Input prefix={<NotificationOutlined />}></Input>
+              <Input prefix={<NotificationOutlined />} />
+            </Form.Item>
+
+            <Form.Item
+              name="fecha"
+              label="Fecha"
+              rules={[{ required: true, message: "Este campo es obligatorio" }]}
+            >
+              <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
+            </Form.Item>
+
+            <Form.Item
+              name="concepto"
+              label="Concepto"
+              rules={[{ required: true, message: "Este campo es obligatorio" }]}
+            >
+              <Input prefix={<CommentOutlined />} />
             </Form.Item>
           </Col>
-        </Row>
-        <Row gutter={16}>
+
           <Col span={12}>
+            <Form.Item name="id_sucursal" label="Sucursal">
+              <Select
+                placeholder="Selecciona una sucursal (opcional)"
+                allowClear
+                options={sucursals.map((sucursal: any) => ({
+                  value: sucursal._id,
+                  label: sucursal.nombre,
+                }))}
+                showSearch
+                filterOption={(input, option: any) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+
             <Form.Item name="id_vendedor" label="Vendedor">
               <Select
                 placeholder="Selecciona un vendedor"
+                allowClear
                 dropdownRender={(menu) => (
                   <>
                     {menu}
@@ -193,21 +243,7 @@ function FinanceFluxFormModal({
                 }
               />
             </Form.Item>
-          </Col>
-        </Row>
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="fecha"
-              label="Fecha"
-              rules={[{ required: true, message: "Este campo es obligatorio" }]}
-            >
-              <DatePicker format="DD/MM/YYYY" />
-            </Form.Item>
-          </Col>
-        </Row>
-        <Row gutter={16}>
-          <Col span={12}>
+
             <Form.Item
               name="esDeuda"
               label="¿Es deuda?"
@@ -218,31 +254,14 @@ function FinanceFluxFormModal({
                 <Radio value={false}>No</Radio>
               </Radio.Group>
             </Form.Item>
-          </Col>
-        </Row>
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="concepto"
-              label="Concepto"
-              rules={[{ required: true, message: "Este campo es obligatorio" }]}
-            >
-              <Input prefix={<CommentOutlined />}></Input>
-            </Form.Item>
-          </Col>
-        </Row>
-        <Row gutter={16}>
-          <Col span={12}>
+
             <Form.Item
               name="monto"
               label="Monto"
               rules={[{ required: true, message: "Este campo es obligatorio" }]}
               initialValue={0.0}
             >
-              <InputNumber
-                prefix={"Bs. "}
-                style={{ width: "30%" }}
-              ></InputNumber>
+              <InputNumber prefix={"Bs. "} style={{ width: "100%" }} min={0} />
             </Form.Item>
           </Col>
         </Row>
@@ -267,6 +286,7 @@ function FinanceFluxFormModal({
             >
               <Select
                 placeholder="Selecciona un Founder"
+                allowClear
                 options={workers.map((worker: any) => ({
                   value: worker._id,
                   label: worker.nombre,
@@ -280,8 +300,13 @@ function FinanceFluxFormModal({
           </Col>
         </Row>
 
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading}>
+        <Form.Item style={{ marginTop: 24 }}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            size="large"
+          >
             Registrar Gasto o ingreso
           </Button>
         </Form.Item>
@@ -289,4 +314,5 @@ function FinanceFluxFormModal({
     </Modal>
   );
 }
+
 export default FinanceFluxFormModal;
