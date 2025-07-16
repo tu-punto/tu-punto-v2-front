@@ -172,8 +172,12 @@ const FinanceFluxTable = ({
       <Table
         columns={columns}
         dataSource={filteredData}
-        pagination={false}
         scroll={{ x: "max-content" }}
+        pagination={{
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20", "50"],
+          defaultPageSize: 5,
+        }}
       />
     </div>
   );
