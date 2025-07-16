@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Button, Checkbox, Popover, Tooltip, message } from 'antd';
-import { DollarOutlined } from '@ant-design/icons';
+import { useState } from "react";
+import { Button, Checkbox, Popover, Tooltip, message } from "antd";
+import { DollarOutlined } from "@ant-design/icons";
 
-import { paySellerDebtAPI } from '../../../api/seller';
+import { paySellerDebtAPI } from "../../../api/seller";
 
 interface Props {
-  seller: any;                       // SellerRow
-  onSuccess: () => void;             // para refrescar la tabla
+  seller: any; // SellerRow
+  onSuccess: () => void; // para refrescar la tabla
 }
 
 const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
@@ -17,24 +17,24 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   /** click “Pagar” */
   const handleConfirm = async () => {
     if (!checked) {
-      message.warning('Marca la casilla para confirmar el pago.');
+      message.warning("Marca la casilla para confirmar el pago.");
       return;
     }
 
     setLoading(true);
     try {
       const res = await paySellerDebtAPI(seller._id, { payAll: true });
-      if (!res?.success) throw new Error('fail');
+      if (!res?.success) throw new Error("fail");
 
-      const pdfBlob = new Blob([res.data], { type: 'application/pdf' });
+      const pdfBlob = new Blob([res.data], { type: "application/pdf" });
       const pdfUrl = window.URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, '_blank');
+      window.open(pdfUrl, "_blank");
 
-      message.success('Pago realizado con éxito y PDF generado');
+      message.success("Pago realizado con éxito y PDF generado");
       onSuccess();
     } catch (err) {
       console.error(err);
-      message.error('Error al realizar el pago');
+      message.error("Error al realizar el pago");
     } finally {
       setLoading(false);
       setVisible(false);
@@ -46,7 +46,7 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   const handleCancel = () => {
     setVisible(false);
     setChecked(false);
-    message.info('Pago cancelado');
+    message.info("Pago cancelado");
   };
 
   /* contenido del Popover */
@@ -55,14 +55,17 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       <Checkbox
         checked={checked}
         onChange={(e) => setChecked(e.target.checked)}
-        style={{ color: '#ff4d4f' }}
+        style={{ color: "#ff4d4f" }}
         className="text-mobile-sm xl:text-desktop-sm"
       >
         ¿Desea pagar las deudas existentes?
       </Checkbox>
 
       <div className="mt-2 text-right">
-        <Button onClick={handleCancel} className="mr-2 text-mobile-sm xl:text-desktop-sm">
+        <Button
+          onClick={handleCancel}
+          className="mr-2 text-mobile-sm xl:text-desktop-sm"
+        >
           Cancelar
         </Button>
         <Button
