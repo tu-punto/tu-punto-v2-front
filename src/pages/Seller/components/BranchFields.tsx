@@ -5,10 +5,12 @@ import {
   Form,
   Input,
   InputNumber,
+  Radio,
   Row,
   Select,
 } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 
 const { TextArea } = Input;
 
@@ -19,6 +21,9 @@ const BranchFields = ({
   form,
   isSeller = false,
 }: any) => {
+  const sucursales = form.getFieldValue("sucursales") || [];
+  const currentBranch = sucursales[field.name] || {};
+
   return (
     <>
       <Row gutter={[8, 8]}>
@@ -64,6 +69,11 @@ const BranchFields = ({
             name={[field.name, "fecha_ingreso"]}
             label="Fecha de ingreso"
             rules={[{ required: true, message: "Selecciona fecha de ingreso" }]}
+            initialValue={
+              currentBranch.fecha_ingreso
+                ? dayjs(currentBranch.fecha_ingreso)
+                : null
+            }
           >
             <DatePicker
               placeholder="Fecha de ingreso"
@@ -80,6 +90,11 @@ const BranchFields = ({
             {...field}
             name={[field.name, "fecha_salida"]}
             label="Fecha de salida"
+            initialValue={
+              currentBranch.fecha_salida
+                ? dayjs(currentBranch.fecha_salida)
+                : null
+            }
           >
             <DatePicker
               placeholder="Fecha de salida (opcional)"
@@ -116,6 +131,7 @@ const BranchFields = ({
               name={[field.name, k.toLowerCase()]}
               label={k.replace("_", " ")}
               rules={[{ required: true, message: "Obligatorio" }]}
+              initialValue={currentBranch[k.toLowerCase()] || 0}
             >
               <InputNumber
                 min={0}
@@ -129,13 +145,14 @@ const BranchFields = ({
         ))}
       </Row>
 
-      {/* Comentario */}
+      {/* Comentario y Activo */}
       <Row gutter={[16, 16]}>
-        <Col xs={24}>
+        <Col xs={12}>
           <Form.Item
             {...field}
             name={[field.name, "comentario"]}
             label="Comentario"
+            initialValue={currentBranch.comentario || ""}
           >
             <TextArea
               placeholder="..."
@@ -144,6 +161,22 @@ const BranchFields = ({
               maxLength={500}
               showCount
             />
+          </Form.Item>
+        </Col>
+
+        <Col xs={12}>
+          <Form.Item
+            {...field}
+            name={[field.name, "activo"]}
+            label="Activo"
+            initialValue={
+              currentBranch.activo !== undefined ? currentBranch.activo : true
+            }
+          >
+            <Radio.Group disabled={isSeller}>
+              <Radio value={true}>Sí</Radio>
+              <Radio value={false}>No</Radio>
+            </Radio.Group>
           </Form.Item>
         </Col>
       </Row>
