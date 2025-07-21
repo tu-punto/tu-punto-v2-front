@@ -60,18 +60,33 @@ const CustomTable = ({
         return dayjs(text).format("DD/MM/YYYY");
       },
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => {
+        return dayjs(a.fecha_pedido).unix() - dayjs(b.fecha_pedido).unix();
+      },
+      defaultSortOrder: 'descend' as const, 
     },
     {
       title: "Producto",
       dataIndex: "nombre_variante",
       key: "producto",
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => {
+        return a.nombre_variante.localeCompare(b.nombre_variante);
+      },
     },
     {
       title: "Sucursal",
       dataIndex: "sucursal",
       key: "sucursal",
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => {
+        return a.sucursal.localeCompare(b.sucursal);
+      },
+      filters: sucursales.map(sucursal => ({
+        text: sucursal,
+        value: sucursal,
+      })),
+      onFilter: (value: any, record: any) => record.sucursal === value,
     },
     {
       title: "Subtotal deudas",
@@ -84,6 +99,15 @@ const CustomTable = ({
           ? -record.utilidad
           : subtotalVenta - record.utilidad;
         return `Bs. ${subtotalDeudas.toFixed(2)}`;
+      },
+      sorter: (a: any, b: any) => {
+        const getSubtotalDeudas = (record: any) => {
+          const subtotalVenta = record.cantidad * record.precio_unitario;
+          return record.id_pedido.pagado_al_vendedor
+            ? -record.utilidad
+            : subtotalVenta - record.utilidad;
+        };
+        return getSubtotalDeudas(a) - getSubtotalDeudas(b);
       },
     },
     {
@@ -104,6 +128,7 @@ const CustomTable = ({
         ) : (
           `Bs. ${record.utilidad}`
         ),
+      sorter: (a: any, b: any) => (a.utilidad || 0) - (b.utilidad || 0),
     },
     {
       title: "Precio Unitario",
@@ -131,6 +156,7 @@ const CustomTable = ({
           `Bs. ${record.precio_unitario}`
         ),
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => (a.precio_unitario || 0) - (b.precio_unitario || 0),
     },
     {
       title: "Cantidad",
@@ -158,6 +184,7 @@ const CustomTable = ({
           record.cantidad
         ),
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => (a.cantidad || 0) - (b.cantidad || 0),
     },
     {
       title: "Subtotal",
@@ -168,12 +195,30 @@ const CustomTable = ({
         return `Bs. ${subtotal.toFixed(2)}`;
       },
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => {
+        const subtotalA = (a.cantidad || 0) * (a.precio_unitario || 0);
+        const subtotalB = (b.cantidad || 0) * (b.precio_unitario || 0);
+        return subtotalA - subtotalB;
+      },
     },
     {
       title: showClient ? "Cliente" : "Tipo",
       dataIndex: showClient ? "cliente" : "tipo",
       key: showClient ? "cliente" : "tipo",
       className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) => {
+        const fieldA = showClient ? a.cliente : a.tipo;
+        const fieldB = showClient ? b.cliente : b.tipo;
+        return (fieldA || '').localeCompare(fieldB || '');
+      },
+      ...(showClient ? {} : {
+        filters: [
+          { text: 'Interno', value: 'Interno' },
+          { text: 'Externo', value: 'Externo' },
+          { text: 'Online', value: 'Online' },
+        ],
+        onFilter: (value: any, record: any) => record.tipo === value,
+      }),
     },
     ...(isAdmin && allowActions
       ? [
@@ -217,6 +262,8 @@ const CustomTable = ({
               </div>
             ),
             className: "text-mobile-sm xl:text-desktop-sm",
+            width: 100,
+            fixed: 'right' as const,
           },
         ]
       : []),
@@ -256,7 +303,14 @@ const CustomTable = ({
       <Table
         columns={columns}
         dataSource={filteredData}
-        pagination={{ pageSize: 5 }}
+        pagination={{ 
+          pageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} registros`,
+        }}
+        scroll={{ x: 'max-content' }}
+        size="small"
       />
     </>
   ) : (
