@@ -10,7 +10,7 @@ interface Props {
 
 const columns = [
   { title: "Sucursal", dataIndex: "sucursalName", key: "sucursal" },
-  { title: "Alquiler", dataIndex: "alquiler", key: "alquiler", render: (v: number) => `Bs. ${v}` },
+  { title: "Almacenamiento", dataIndex: "alquiler", key: "alquiler", render: (v: number) => `Bs. ${v}` },
   { title: "Exhibición", dataIndex: "exhibicion", key: "exhibicion", render: (v: number) => `Bs. ${v}` },
   { title: "Entrega Simple", dataIndex: "entrega_simple", key: "entrega", render: (v: number) => `Bs. ${v}` },
   { title: "Delivery", dataIndex: "delivery", key: "delivery", render: (v: number) => `Bs. ${v}` },
