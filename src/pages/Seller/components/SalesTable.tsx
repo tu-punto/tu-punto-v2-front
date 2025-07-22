@@ -297,7 +297,7 @@ const CustomTable = ({
       <div style={{ textAlign: "right" }}>
         <strong className="text-mobile-sm xl:text-desktop-sm">
           Monto Total:
-        </strong>{" "}
+        </strong>
         Bs.{totalAmount.toFixed(2)}
       </div>
       <Table
