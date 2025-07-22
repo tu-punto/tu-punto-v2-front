@@ -330,6 +330,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                   prefix={<PercentageOutlined />}
                   min={0}
                   max={100}
+                  disabled={isSeller}
                   style={{ width: "100%" }}
                   placeholder="0"
                   addonAfter="%"
@@ -406,13 +407,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         <PaymentProofSection proofs={paymentProofs} sellerId={seller.key} />
 
         {/* Botones */}
-        <Form.Item>
-          <ActionButtons
-            loading={loading}
-            isSeller={isSeller}
-            onCancel={onCancel}
-          />
-        </Form.Item>
+        {!isSeller && (
+          <Form.Item>
+            <ActionButtons
+              loading={loading}
+              isSeller={isSeller}
+              onCancel={onCancel}
+            />
+          </Form.Item>
+        )}
       </Form>
     </div>
   );
