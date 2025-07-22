@@ -61,13 +61,19 @@ export const Sales = () => {
     }, [isAdmin, user?.id_vendedor]);
 
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
+
     useEffect(() => {
         if (!data || data.length === 0) {
             setFilteredBySeller([]);
             return;
         }
 
-        let filtered = data.filter(p => p.stockActual > 0);
+        const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
+
+        let filtered = data.filter((p: any) => {
+            if (p.stockActual <= 0) return false;
+            return vendedoresVigentesIds.includes(String(p.id_vendedor));
+        });
 
         if (isAdmin && selectedSellerId) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
@@ -76,14 +82,21 @@ export const Sales = () => {
         }
 
         if (searchText.trim()) {
-           const lower = searchText.trim().toLowerCase();
+            const lower = searchText.trim().toLowerCase();
             filtered = filtered.filter(p =>
                 (p.producto ?? '').toString().toLowerCase().includes(lower)
             );
         }
-
+        filtered = filtered.map((p: any) => {
+            const vendedor = sellers.find((v: any) => String(v._id) === String(p.id_vendedor));
+            return {
+                ...p,
+                vendedor: vendedor ? `${vendedor.nombre} ${vendedor.apellido}` : "Sin vendedor"
+            };
+        });
         setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText]);
+    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
+
     useEffect(() => {
         fetchSellers();
         fetchSucursal();
@@ -159,32 +172,39 @@ export const Sales = () => {
         await fetchProducts(); // <- fuerza recarga del inventario con stock actualizado
         setRefreshKey(prevKey => prevKey + 1); // para que también se actualicen las tablas dependientes
     };
-
-
     const fetchSellers = async () => {
         try {
             const response = await getSellersAPI();
-            const today = new Date();
-            const todayWithoutTime = new Date(today.setHours(0, 0, 0, 0));
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
 
-            // ¡Este sucursalId no es confiable si aún no se ha cargado!
             const sucursalId = isAdmin
                 ? localStorage.getItem("sucursalId")
                 : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
             if (!sucursalId) {
                 console.warn("Sucursal ID no disponible aún para filtrar vendedores");
-                setSellers([]); // Vacío hasta que esté listo
+                setSellers([]);
                 return;
             }
 
             const sellersVigentes = response.filter((v: any) => {
-                const fecha = v.fecha_vigencia ? new Date(v.fecha_vigencia) : null;
-                const vigente = !fecha || fecha >= todayWithoutTime;
-                const tieneSucursal = v.pago_sucursales?.some(
-                    (ps: any) => String(ps.id_sucursal) === String(sucursalId)
-                );
-                return vigente && tieneSucursal;
+                return v.pago_sucursales?.some((pago: any) => {
+                    const idSucursal = pago.id_sucursal?._id || pago.id_sucursal;
+                    const perteneceASucursal = String(idSucursal) === String(sucursalId);
+
+                    if (!perteneceASucursal) return false;
+
+                    const fechaSalida = pago.fecha_salida
+                        ? new Date(pago.fecha_salida)
+                        : v.fecha_vigencia
+                            ? new Date(v.fecha_vigencia)
+                            : null;
+
+                    if (fechaSalida) fechaSalida.setHours(0, 0, 0, 0);
+
+                    return !fechaSalida || fechaSalida >= hoy;
+                });
             });
 
             setSellers(sellersVigentes);
@@ -192,6 +212,7 @@ export const Sales = () => {
             message.error('Error al obtener los vendedores');
         }
     };
+
     const fetchSucursal = async () => {
         try {
             const response = await getSucursalsAPI()

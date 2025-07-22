@@ -140,21 +140,6 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                 >
                     <Select
                         placeholder="Selecciona una categoría"
-                        dropdownRender={(menu) => (
-                            <>
-                                {menu}
-                                <div style={{ display: "flex", padding: 8 }}>
-                                    <Input
-                                        style={{ flex: "auto" }}
-                                        value={newCategory}
-                                        onChange={(e) => setNewCategory(e.target.value)}
-                                    />
-                                    <Button type="link" onClick={createCategory} loading={loading}>
-                                        Añadir categoría
-                                    </Button>
-                                </div>
-                            </>
-                        )}
                         options={categories.map((category: any) => ({
                             value: category._id,
                             label: category.categoria,
@@ -166,7 +151,6 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                     />
                 </Form.Item>
 
-                {/* NUEVO COMPONENTE que maneja variante + subvariantes */}
                 <VariantInputs
                     combinations={combinations}
                     setCombinations={setCombinations}

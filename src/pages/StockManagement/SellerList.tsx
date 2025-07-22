@@ -5,7 +5,7 @@ import { getSellersAPI } from '../../api/seller';
 import { getGroupsAPI } from '../../api/group';
 import { getCategoriesAPI } from '../../api/category';
 
-const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
+const SellerList = ({ filterSelected, onSelectSeller, prevKey, onSellersLoaded  }: any) => {
     const [placeholder, setPlaceholder] = useState("Seleccione una opción") 
     const [groups, setGroups] = useState<any[]>([])
     const [sellers, setSellers] = useState<any[]>([]);
@@ -18,18 +18,33 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
         today.setHours(0, 0, 0, 0);
 
         const sellersResponse = await getSellersAPI();
+        //console.log("Sellers recibidos desde API:", sellersResponse);
 
         const sucursalId = localStorage.getItem("sucursalId");
 
         const vigentes = sellersResponse.filter((seller: any) => {
-            const vigencia = seller.fecha_vigencia ? new Date(seller.fecha_vigencia) : null;
-            if (vigencia) vigencia.setHours(0, 0, 0, 0);
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const sucursalId = localStorage.getItem("sucursalId");
 
-            const perteneceASucursal = seller.pago_sucursales?.some(
-                (s: any) => String(s.id_sucursal) === String(sucursalId)
-            );
+            return seller.pago_sucursales?.some((pago: any) => {
+                const idSucursal = pago.id_sucursal?._id || pago.id_sucursal; // por si viene como objeto
+                const perteneceASucursal = String(idSucursal) === String(sucursalId);
 
-            return (!vigencia || vigencia >= today) && perteneceASucursal;
+                if (!perteneceASucursal) return false;
+
+                const fechaSalida = pago.fecha_salida
+                    ? new Date(pago.fecha_salida)
+                    : seller.fecha_vigencia
+                        ? new Date(seller.fecha_vigencia)
+                        : null;
+
+                if (fechaSalida) fechaSalida.setHours(0, 0, 0, 0);
+
+                const vigente = !fechaSalida || fechaSalida >= hoy;
+
+                return vigente;
+            });
         });
         vigentes.unshift({ _id: null, name: "Todos" });
 
@@ -42,6 +57,9 @@ const SellerList = ({ filterSelected, onSelectSeller, prevKey }: any) => {
             };
         });
         setSellers(vigentesConNombre);
+        if (onSellersLoaded) {
+            onSellersLoaded(vigentesConNombre);
+        }
         setFilterList(vigentesConNombre);
 
         const groupsResponse = await getGroupsAPI();
