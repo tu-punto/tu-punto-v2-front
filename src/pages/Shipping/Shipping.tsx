@@ -2,21 +2,7 @@ import { useState } from "react";
 import ShippingTable from "./ShippingTable";
 
 const Shipping = () => {
-    const [isModalVisible, setIsModalVisible] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
-
-    const showModal = () => {
-        setIsModalVisible(true)
-    }
-
-    const handleCancel = () => {
-        setIsModalVisible(false)
-    }
-
-    const handleSuccess = () => {
-        setIsModalVisible(false)
-        setRefreshKey(prevKey => prevKey + 1)
-    }
 
     return (
         <div className="p-4">
