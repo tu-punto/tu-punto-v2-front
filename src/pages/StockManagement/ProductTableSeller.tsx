@@ -8,6 +8,7 @@ import PricePerBranchModal from "./PricePerBranchModal.tsx";
 import { getCategoryByIdAPI } from '../../api/category';
 import { getSucursalsAPI } from "../../api/sucursal";
 import { getCategoriesAPI } from "../../api/category";
+import { getSellerAPI } from '../../api/seller';
 
 
 const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSucursalId}) => {
@@ -38,99 +39,118 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
             }));
             setUpdatedProductsList(updated);
 
-            const branches = await getSucursalsAPI();
-            setBranches(branches);
+            const vendedor = await getSellerAPI(user.id_vendedor);
 
+            if (vendedor?.pago_sucursales?.length > 0) {
+                const sucursalesPagadas = vendedor.pago_sucursales.map((s: any) => ({
+                    _id: s.id_sucursal?._id || s.id_sucursal,
+                    nombre: s.sucursalName,
+                }));
+
+                setBranches(sucursalesPagadas);
+                const isInvalidSucursal = !sucursalId || !sucursalesPagadas.some(s => s._id === sucursalId);
+                if (isInvalidSucursal && sucursalesPagadas.length > 0) {
+                    setSucursalId(sucursalesPagadas[0]._id);
+                }
+            }
             const categories = await getCategoriesAPI();
             setCategories(categories);
         };
 
         if (productsList.length > 0) fetchData();
     }, [productsList]);
-
-    const groupProductsByBaseName = (products: any[]) => {
-        const groups: { [key: string]: any } = {};
+    const flatVariantList = (products: any[]) => {
+        const list: any[] = [];
 
         products.forEach((product) => {
             if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
 
-            const baseName = product.nombre_producto;
+            const sucursales = product.sucursales?.filter((s: any) => s.id_sucursal?.toString() === sucursalId) || [];
 
-            const sucursales = sucursalId === "all"
-                ? product.sucursales || []
-                : product.sucursales?.filter((s: any) => s.id_sucursal?.toString() === sucursalId) || [];
+            const variantesAgregadas: any[] = [];
 
             sucursales.forEach((sucursal: any) => {
                 if (!sucursal?.combinaciones) return;
 
-                if (!groups[baseName]) {
-                    groups[baseName] = {
-                        key: baseName,
-                        nombre_producto: baseName,
-                        children: [],
-                        totalStock: 0,
-                        nombre_categoria: product.nombre_categoria,
-                        productOriginal: product,
-                    };
-                }
-
                 sucursal.combinaciones.forEach((comb: any, index: number) => {
                     const variant = Object.entries(comb.variantes).map(([_, v]) => v).join(' / ');
+                    const nombreLower = product.nombre_producto?.toLowerCase() || '';
+                    const variantLower = variant.toLowerCase();
+
                     if (
-                        search &&
-                        !baseName.toLowerCase().includes(search.toLowerCase()) &&
-                        !variant.toLowerCase().includes(search.toLowerCase())
+                        searchText &&
+                        !nombreLower.includes(searchText.toLowerCase()) &&
+                        !variantLower.includes(searchText.toLowerCase())
                     ) return;
 
-                    groups[baseName].children.push({
+                    variantesAgregadas.push({
                         ...product,
                         variant,
                         stock: comb.stock,
                         precio: comb.precio,
                         key: `${product._id}-${sucursal.id_sucursal}-${index}`,
+                        esCabecera: false
                     });
-
-                    groups[baseName].totalStock += comb.stock;
                 });
             });
+
+            if (variantesAgregadas.length > 0) {
+                list.push({
+                    ...product,
+                    variant: null,
+                    key: `cabecera-${product._id}`,
+                    esCabecera: true
+                });
+                list.push(...variantesAgregadas);
+            }
         });
 
-        return Object.values(groups).filter((group) =>
-            group.children.some(child =>
-                child.nombre_producto.toLowerCase().includes(searchText.toLowerCase()) ||
-                child.variant?.toLowerCase().includes(searchText.toLowerCase())
-            )
-        );
+        return list;
     };
+
     const columns = [
         {
             title: "Producto",
             dataIndex: 'nombre_producto',
             key: 'nombre_producto',
-            render: (_: any, record: any) => record.variant ? `→ ${record.nombre_producto} - ${record.variant}` : record.nombre_producto
+            render: (_: any, record: any) => {
+                if (record.esCabecera) {
+                    return {
+                        children: <b style={{ fontSize: '16px' }}>{record.nombre_producto}</b>,
+                        props: {
+                            colSpan: 4, // Unifica las columnas si querés
+                            style: { backgroundColor: '#f0f2f5' }
+                        }
+                    };
+                }
+
+                return `→ ${record.nombre_producto} - ${record.variant}`;
+            }
         },
         {
             title: 'Stock actual',
             key: 'stock',
             render: (_: any, record: any) =>
-                record.variant ? (
-                    <span >{record.stock}</span>
-                ) : <span>{record.totalStock}</span>
+                record.esCabecera
+                    ? { children: null, props: { colSpan: 0 } }
+                    : <span>{record.stock}</span>
         },
         {
             title: 'Precio Unitario',
             key: 'precio',
             render: (_: any, record: any) =>
-                record.variant ? (
-                    <span >{record.precio}</span>
-                ) : <span>-</span>
+                record.esCabecera
+                    ? { children: null, props: { colSpan: 0 } }
+                    : <span>{record.precio}</span>
         },
-
         {
             title: "Categoría",
             dataIndex: 'nombre_categoria',
             key: 'nombre_categoria',
-            render: (nombre_categoria: any) => nombre_categoria || "Sin categoría"
+            render: (_: any, record: any) =>
+                record.esCabecera
+                    ? { children: null, props: { colSpan: 0 } }
+                    : record.nombre_categoria || "Sin categoría"
         },
     ];
 
@@ -143,7 +163,6 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     style={{ width: 240 }}
                     placeholder="Seleccionar sucursal"
                 >
-                    <Select.Option value="all">Todas las sucursales</Select.Option>
                     {branches.map(branch => (
                         <Select.Option key={branch._id} value={branch._id}>{branch.nombre}</Select.Option>
                     ))}
@@ -168,18 +187,12 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     allowClear
                 />
             </div>
-            {groupProductsByBaseName(updatedProductsList).map((group: any, i: number) => (
-                <div key={i}>
-                    <h2 style={{ textAlign: 'left', marginTop: 30 }}>{group.nombre_producto}</h2>
-                    <Table
-                        columns={columns}
-                        dataSource={group.children}
-                        pagination={{ pageSize: 5 }}
-                        rowKey="key"
-                    />
-                </div>
-            ))}
-
+            <Table
+                columns={columns}
+                dataSource={flatVariantList(updatedProductsList)}
+                pagination={{ pageSize: 100 }}
+                rowKey="key"
+            />
             <AddVariantModal
                 visible={variantModalOpen}
                 onCancel={() => setVariantModalOpen(false)}

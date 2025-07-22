@@ -22,9 +22,12 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
             key: 'precio',
         },
         {
-            title: <span className="text-mobile-sm xl:text-desktop-sm">Categoría</span>,
-            dataIndex: 'categoria',
-            key: 'categoria',
+            title: <span className="text-mobile-sm xl:text-desktop-sm">Vendedor</span>,
+            dataIndex: 'vendedor',
+            key: 'vendedor',
+            render: (vendedor: any, record: any) => {
+                return record.vendedor || 'Sin vendedor';
+            }
         },
     ];
 

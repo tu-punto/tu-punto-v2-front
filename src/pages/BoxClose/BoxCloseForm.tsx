@@ -29,7 +29,7 @@ interface Props {
   selectedDate?: dayjs.Dayjs | null;
 }
 
-const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = "0", selectedDate }: Props) => {
+const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_real: 0 }, selectedDate }: Props) => {
   const [coinTotals, setCoinTotals] = useState(0);
   const [billTotals, setBillTotals] = useState(0);
   const [salesSummary, setSalesSummary] = useState<IDailySummary>();
@@ -69,6 +69,24 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = "0", selectedD
       setSalesSummary({ cash: 0, bank: 0, total: 0 });
     }
   };
+  useEffect(() => {
+    const coins = form.getFieldValue("coins") || {};
+    const total = Object.entries(coins).reduce(
+        (sum, [denom, qty]) => sum + (parseFloat(denom) * (qty || 0)),
+        0
+    );
+    setCoinTotals(total);
+  }, [form.getFieldValue("coins")]);
+
+  useEffect(() => {
+    const bills = form.getFieldValue("bills") || {};
+    const total = Object.entries(bills).reduce(
+        (sum, [denom, qty]) => sum + (parseFloat(denom) * (qty || 0)),
+        0
+    );
+    setBillTotals(total);
+  }, [form.getFieldValue("bills")]);
+
 
   useEffect(() => {
     fetchSalesSummary();

@@ -24,9 +24,10 @@ interface ProductTableProps {
     setSelectedCategory: (value: string) => void;
     selectedSeller;
     onShowVariantModal?: (product: any) => void;
+    sellersVigentes: any[];
 }
 
-const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller, onShowVariantModal}: ProductTableProps) => {
+const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller, onShowVariantModal, sellersVigentes}: ProductTableProps) => {
     const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
@@ -382,7 +383,12 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             );
         });
 
+        const idsVigentes = new Set(sellersVigentes.map(v => String(v._id)));
+
         const groupedByVendedor = filteredProducts.reduce((acc, product) => {
+            const idVendedor = String(product.id_vendedor);
+            if (!idsVigentes.has(idVendedor)) return acc; // ❌ filtra vendedor no vigente
+
             const vendedor = product.vendedor || "Sin vendedor";
             if (!acc[vendedor]) acc[vendedor] = [];
             acc[vendedor].push(product);
@@ -393,7 +399,6 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             name: vendedor,
             products
         }));
-
         setTableGroup(groups);
 
 

@@ -50,6 +50,11 @@ const StockManagement = () => {
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [productosFull, setProductosFull] = useState([]);
+    const [sellersVigentes, setSellersVigentes] = useState<any[]>([]);
+    const handleSellersLoaded = (listaVigente: any[]) => {
+        setSellersVigentes(listaVigente.filter(s => s._id));
+    };
+
     useEffect(() => {
         if (!user || Object.keys(user).length === 0) return;
 
@@ -264,15 +269,17 @@ const StockManagement = () => {
     const filter = () => {
         const selectedOption = options[criteriaFilter];
         if (!selectedOption || !selectedOption.filter) return;
-        const newList = products.filter(product => selectedOption.filter(product, selectedSeller));
+
+        const vendedoresPermitidos = sellersVigentes.map(v => String(v._id)); // esto viene del paso 2
+
+        const newList = products
+            .filter(product => vendedoresPermitidos.includes(String(product.id_vendedor))) // ✅ solo vendedores vigentes
+            .filter(product => selectedOption.filter(product, selectedSeller)); // ✅ aplicar filtro actual (grupo, categoría o vendedor)
 
         setFilteredProducts(newList);
         setProductsToUpdate({});
         setStockListForConfirmModal([]);
-
     };
-
-
     const handleChangeFilter = (index: number) => {
         setCriteriaFilter(index);
     };
@@ -350,6 +357,7 @@ const StockManagement = () => {
                             <SellerList
                                 filterSelected={criteriaFilter}
                                 onSelectSeller={handleSelectSeller}
+                                onSellersLoaded={handleSellersLoaded}
                             />
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
@@ -475,6 +483,7 @@ const StockManagement = () => {
                     setSelectedCategory={setSelectedCategory}
                     selectedSeller={selectedSeller}
                     onShowVariantModal={showVariantModal}
+                    sellersVigentes={sellersVigentes}
                 />
 
             )}
