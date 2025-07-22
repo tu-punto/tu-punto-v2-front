@@ -27,7 +27,7 @@ const useProductsFlat = (externalSucursalId?: string) => {
 
             const mapped = all.map((item: any, index: number) => ({
                 key: `${item._id}-${index}`,
-                producto: `${item.nombre_producto} - ${item.variante}`,
+                producto: `${item.vendedor}: ${item.nombre_producto} - ${item.variante}`,
                 precio: item.precio,
                 stockActual: item.stock,
                 categoria: item.categoria || "Sin categoría",
@@ -37,7 +37,6 @@ const useProductsFlat = (externalSucursalId?: string) => {
                 variantes: item.variantes_obj || {},
 
             }));
-            //console.log(`🧪 Productos cargados por useProductsFlat (Sucursal: ${externalSucursalId}):`, mapped);
 
             setData(mapped);
         } catch (error) {
