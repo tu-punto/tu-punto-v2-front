@@ -258,7 +258,6 @@ function FinanceFluxTable({ refreshKey, onEdit }: any) {
           pageSize: 10,
           pageSizeOptions: ["10", "20", "50", "100"],
         }}
-        size="small"
       />
     </div>
   );
