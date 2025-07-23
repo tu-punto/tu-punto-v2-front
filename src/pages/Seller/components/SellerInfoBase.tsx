@@ -407,15 +407,13 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         <PaymentProofSection proofs={paymentProofs} sellerId={seller.key} />
 
         {/* Botones */}
-        {!isSeller && (
-          <Form.Item>
-            <ActionButtons
-              loading={loading}
-              isSeller={isSeller}
-              onCancel={onCancel}
-            />
-          </Form.Item>
-        )}
+        <Form.Item>
+          <ActionButtons
+            loading={loading}
+            isSeller={isSeller}
+            onCancel={onCancel}
+          />
+        </Form.Item>
       </Form>
     </div>
   );
