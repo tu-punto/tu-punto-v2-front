@@ -20,7 +20,7 @@ import {
 } from "../../api/financeFlux";
 import { getWorkersAPI } from "../../api/worker";
 import { getSellersAPI, registerSellerAPI } from "../../api/seller";
-import { getSucursalsAPI } from "../../api/sucursal"; 
+import { getSucursalsAPI } from "../../api/sucursal";
 
 function FinanceFluxFormModal({
   visible,
@@ -31,7 +31,7 @@ function FinanceFluxFormModal({
   const [loading, setLoading] = useState(false);
   const [workers, setWorkers] = useState([]);
   const [sellers, setSellers] = useState([]);
-  const [sucursals, setSucursals] = useState([]); 
+  const [sucursals, setSucursals] = useState([]);
   const [newSeller, setNewSeller] = useState("");
   const [form] = Form.useForm();
 
@@ -118,7 +118,7 @@ function FinanceFluxFormModal({
   useEffect(() => {
     fetchWorkers();
     fetchSellers();
-    fetchSucursals(); 
+    fetchSucursals();
   }, []);
 
   useEffect(() => {
@@ -126,14 +126,13 @@ function FinanceFluxFormModal({
       form.setFieldsValue({
         ...editingFlux,
         fecha: editingFlux.fecha ? dayjs(editingFlux.fecha) : null,
-        id_vendedor: editingFlux.id_vendedor,
+        id_vendedor: editingFlux.id_vendedor._id,
         id_trabajador: editingFlux.id_trabajador,
-        id_sucursal: editingFlux.id_sucursal, 
-        esDeuda: editingFlux.esDeuda,
+        id_sucursal: editingFlux.id_sucursal,
+        esDeuda: editingFlux.esDeuda == "SI" ? true : false,
       });
     } else {
       form.resetFields();
-      // Establecer sucursal actual como valor por defecto (opcional)
       const currentSucursal = localStorage.getItem("sucursalId");
       if (currentSucursal) {
         form.setFieldValue("id_sucursal", currentSucursal);
@@ -163,9 +162,9 @@ function FinanceFluxFormModal({
               rules={[{ required: true, message: "Este campo es obligatorio" }]}
             >
               <Radio.Group onChange={handleTipoChange}>
-                <Radio.Button value="Gasto">Gasto</Radio.Button>
-                <Radio.Button value="Ingreso">Ingreso</Radio.Button>
-                <Radio.Button value="Inversion">Inversion</Radio.Button>
+                <Radio.Button value="GASTO">Gasto</Radio.Button>
+                <Radio.Button value="INGRESO">Ingreso</Radio.Button>
+                <Radio.Button value="INVERSION">Inversion</Radio.Button>
               </Radio.Group>
             </Form.Item>
 
