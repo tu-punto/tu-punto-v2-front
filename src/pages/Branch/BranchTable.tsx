@@ -1,6 +1,8 @@
+import { useContext } from "react";
 import { Button, Table, Tooltip } from "antd";
 import { IBranch } from "../../models/branchModel";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, MessageFilled } from "@ant-design/icons";
+import { UserContext } from "../../context/userContext";
 
 interface BranchTableProps {
   refreshKey: number;
@@ -13,6 +15,8 @@ const BranchTable: React.FC<BranchTableProps> = ({
   branches,
   showEditModal,
 }) => {
+  const { user } = useContext(UserContext);
+
   const cols = [
     {
       title: "Nombre",
@@ -43,19 +47,33 @@ const BranchTable: React.FC<BranchTableProps> = ({
       key: "actions",
       width: "10%",
       className: "text-mobile-sm flex xl:text-desktop-sm",
-      render: (_: any, branch: IBranch) => (
-        <Tooltip title="Editar sucursal">
-          <Button
-            type="default"
-            onClick={(e) => {
-              e.stopPropagation();
-              showEditModal(branch);
-            }}
-            icon={<EditOutlined />}
-            className="text-mobile-sm xl:text-desktop-sm"
-          />
-        </Tooltip>
-      ),
+      render: (_: any, branch: IBranch) => {
+        if (user.role == "admin") {
+          return (
+            <Tooltip title="Editar sucursal">
+              <Button
+                type="default"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  showEditModal(branch);
+                }}
+                icon={<EditOutlined />}
+                className="text-mobile-sm xl:text-desktop-sm"
+              />
+            </Tooltip>
+          )
+        } else if (user.role == "seller") {
+          return (
+            <Tooltip title="Contactar sucursal">
+              <Button
+                type="default"
+                icon={<MessageFilled />}
+                className="text-mobile-sm xl:text-desktop-sm"
+              />
+            </Tooltip>
+          )
+        }
+      }
     },
   ];
 
