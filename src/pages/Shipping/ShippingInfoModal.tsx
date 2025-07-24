@@ -488,6 +488,20 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }
     };
 
+    const handleChatClient = () => {
+        const phoneNumber = shipping.telefono_cliente;                //TODO Revisar el formato de codigo de paises
+
+        const shippingDate = new Date(shipping.hora_entrega_real);
+        if ((""+shipping.hora_entrega_real).endsWith("Z")) {
+            shippingDate.setTime(shippingDate.getTime() + 4*60*60*1000);
+        }
+
+        const contentMsg: string = `Hola! Te escribimos de Tu Punto\nTenemos una entrega para ti a las ${shippingDate.getHours()}:${shippingDate.getMinutes()}, queríamos confirmar que estará a esa hora`;
+        const encodedMsg = encodeURIComponent(contentMsg);
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMsg}`;
+
+        window.open(whatsappUrl, '_blank');
+    }
 
     //console.log("📦 enrichedProducts:", enrichedProducts);
     const id_shipping = shipping?._id || '';
@@ -596,6 +610,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     }}
                                 />
                             </Form.Item>
+                        </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Button type="primary" onClick={handleChatClient} disabled={!shipping || !shipping.telefono_cliente}>
+                                Contactar
+                            </Button>
                         </Col>
                     </Row>
                 </Card>
