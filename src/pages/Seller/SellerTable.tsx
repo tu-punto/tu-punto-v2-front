@@ -1,6 +1,6 @@
-import { Button, Table, Tooltip, Select, Space } from "antd";
+import { Button, Table, Tooltip, Select, Space, Input } from "antd";
 import { useEffect, useState } from "react";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
@@ -8,11 +8,10 @@ import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
 import { getSellersAPI } from "../../api/seller";
-
-import { ISeller, ISucursalPago } from "../../models/sellerModels";
 import { getSalesBySellerIdAPI } from "../../api/sales";
 
-/* ---------- tipos de fila ---------- */
+import { ISeller, ISucursalPago } from "../../models/sellerModels";
+
 type SellerRow = ISeller & {
   key: string;
   deudaInt: number;
@@ -30,13 +29,13 @@ export default function SellerTable({
   const [pagoFilter, setPagoFilter] = useState("todos");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
 
+  const [searchText, setSearchText] = useState("");
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
 
-  /* ---- helpers ---- */
   const getEstadoVendedor = (fechaVigencia: string) => {
     const hoy = dayjs();
     const vigencia = dayjs(fechaVigencia, "DD/MM/YYYY");
@@ -75,13 +74,14 @@ export default function SellerTable({
     }
   };
 
-  /* ---- columnas ---- */
+  // ✅ Columnas con sorters
   const columns = [
     {
       title: "Nombre",
       dataIndex: "nombre",
       key: "nombre",
       fixed: "left" as const,
+      sorter: (a: any, b: any) => a.nombre.localeCompare(b.nombre),
     },
     {
       title: "Estado",
@@ -90,16 +90,25 @@ export default function SellerTable({
         const estado = getEstadoVendedor(row.fecha_vigencia);
         return <span style={getEstadoColor(estado)}>{estado}</span>;
       },
+      sorter: (a: any, b: any) => {
+        const estadoA = getEstadoVendedor(a.fecha_vigencia);
+        const estadoB = getEstadoVendedor(b.fecha_vigencia);
+        return estadoA.localeCompare(estadoB);
+      },
     },
     {
       title: "Pago total",
       dataIndex: "pagoTotal",
       key: "pagoTotal",
+      sorter: (a: any, b: any) => a.pagoTotalInt - b.pagoTotalInt,
     },
     {
       title: "Fecha Vigencia",
       dataIndex: "fecha_vigencia",
       key: "fecha_vigencia",
+      sorter: (a: any, b: any) => 
+        dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() - 
+        dayjs(b.fecha_vigencia, "DD/MM/YYYY").unix(),
     },
     {
       title: "Pago Mensual",
@@ -116,11 +125,16 @@ export default function SellerTable({
           {row.pago_mensual}
         </Button>
       ),
+      sorter: (a: any, b: any) => {
+        const getNumericValue = (str: string) => parseFloat(str.replace(/[Bs.\s]/g, '')) || 0;
+        return getNumericValue(a.pago_mensual) - getNumericValue(b.pago_mensual);
+      },
     },
     {
       title: "Comisión %",
       dataIndex: "comision_porcentual",
       key: "comision_porcentual",
+      sorter: (a: any, b: any) => (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
     },
     {
       title: "Acciones",
@@ -130,6 +144,8 @@ export default function SellerTable({
           <PayDebtButton seller={row} onSuccess={refresh} />
           <Tooltip title="Renovar vendedor">
             <Button
+              type="primary"
+              size="small"
               icon={<EditOutlined />}
               onClick={(e) => {
                 e.stopPropagation();
@@ -140,6 +156,8 @@ export default function SellerTable({
           </Tooltip>
         </div>
       ),
+      width: 150,
+      fixed: 'right' as const,
     },
   ];
 
@@ -161,14 +179,12 @@ export default function SellerTable({
 
       let subtotalDeuda = 0;
 
-      // Calculate subtotalDeuda based on pagado_al_vendedor
       if (sale.id_pedido.pagado_al_vendedor) {
         subtotalDeuda = -sale.utilidad;
       } else {
         subtotalDeuda = sale.cantidad * sale.precio_unitario - sale.utilidad;
       }
 
-      // Process adelanto and delivery only once per pedido
       if (!pedidosProcesados.has(sale.id_pedido._id)) {
         const adelanto = sale.id_pedido.adelanto_cliente || 0;
         const delivery = sale.id_pedido.cargo_delivery || 0;
@@ -183,7 +199,6 @@ export default function SellerTable({
     return saldoPendiente;
   };
 
-  /* ---- carga ---- */
   useEffect(() => {
     (async () => {
       const res = await getSellersAPI();
@@ -201,7 +216,6 @@ export default function SellerTable({
             0
           );
 
-          // Calculate saldoPendiente using the same logic as SellerInfoBase
           const saldoPendiente = await fetchSaldoPendiente(seller._id);
           const deuda = Number(seller.deuda) || 0;
           const pagoPendiente = saldoPendiente - deuda;
@@ -225,7 +239,6 @@ export default function SellerTable({
     })();
   }, [refreshKey]);
 
-  /* ---- helpers ---- */
   const openDrawer = (row: SellerRow) => {
     setSelected(row);
     setDrawerOpen(true);
@@ -241,13 +254,20 @@ export default function SellerTable({
   const filterSellers = (arr: SellerRow[]) => {
     let filtered = arr;
 
-    // Filtrar por estado
+    if (searchText) {
+      filtered = filtered.filter((s) =>
+        s.nombre.toLowerCase().includes(searchText.toLowerCase()) 
+      );
+    }
+
+    // Filtro por estado
     if (estadoFilter !== "todos") {
       filtered = filtered.filter(
         (s) => getEstadoVendedor(s.fecha_vigencia) === estadoFilter
       );
     }
 
+    // Filtro por pago
     if (pagoFilter !== "todos") {
       filtered = filtered.filter((s) => {
         if (pagoFilter === "con deuda") {
@@ -265,10 +285,20 @@ export default function SellerTable({
       : filtered.filter((s) => !s.emite_factura);
   };
 
-  /* ---- render ---- */
+  const filteredSellers = filterSellers(sellers);
+
   return (
     <>
       <Space direction="horizontal" size="middle" className="mb-4">
+        <Input
+          placeholder="Buscar vendedor..."
+          prefix={<SearchOutlined />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{ width: 250 }}
+          allowClear
+        />
+        
         <Select
           value={estadoFilter}
           onChange={setEstadoFilter}
@@ -294,17 +324,18 @@ export default function SellerTable({
 
       <Table
         columns={columns}
-        dataSource={filterSellers(sellers)}
+        dataSource={filteredSellers}
         pagination={{
           showSizeChanger: true,
           pageSizeOptions: ["5", "10", "20", "50"],
-          defaultPageSize: 5,
+          defaultPageSize: 10,
+          showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} registros`,
         }}
         scroll={{ x: "max-content" }}
         title={() => (
           <h2 className="text-2xl font-bold">
             Pago pendiente Bs.&nbsp;
-            {filterSellers(sellers)
+            {filteredSellers
               .reduce((t, s) => t + s.pagoTotalInt, 0)
               .toFixed(2)}
           </h2>
