@@ -211,6 +211,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         setLoading(false);
         return;
       }
+      setRefreshKey((prev) => prev + 1);
 
       /* 2) ventas */
       await updateSale(salesData);
@@ -275,7 +276,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         initialValues={{
           telefono: seller.telefono,
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
-          email: seller.mail || "",
+          mail: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
@@ -294,7 +295,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         <Card style={{ marginBottom: 24 }} className="seller-info-card">
           <Row gutter={[16, 16]}>
             <Col xs={24}>
-              <Form.Item name="email" label="Correo electrónico">
+              <Form.Item name="mail" label="Correo electrónico">
                 <Input
                   prefix={<MailOutlined />}
                   style={{ width: "100%" }}
