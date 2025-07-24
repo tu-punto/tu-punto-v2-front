@@ -17,6 +17,12 @@ const BranchTable: React.FC<BranchTableProps> = ({
 }) => {
   const { user } = useContext(UserContext);
 
+  const handleChatBranch = (branch: IBranch) => {
+    const phoneNumber = branch.telefono;
+    const whatsappUrl = `https://wa.me/${phoneNumber}`;
+    window.open(whatsappUrl, '_blank');
+  }
+
   const cols = [
     {
       title: "Nombre",
@@ -67,6 +73,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
             <Tooltip title="Contactar sucursal">
               <Button
                 type="default"
+                onClick={()=>handleChatBranch(branch)}
                 icon={<MessageFilled />}
                 className="text-mobile-sm xl:text-desktop-sm"
               />
