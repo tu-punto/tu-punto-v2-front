@@ -1,4 +1,4 @@
-import { Table, Input, Button } from 'antd';
+import { Table, Input, Button, Switch } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { updateFinanceFluxAPI } from '../../../api/financeFlux';
@@ -6,7 +6,6 @@ import { updateFinanceFluxAPI } from '../../../api/financeFlux';
 export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data: any[], setRefreshKey: (key: number) => void, isSeller: boolean }) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<any>({});
-
 
   const isEditing = (record: any) => record._id === editingKey;
 
@@ -16,7 +15,6 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
   };
 
   const handleSave = async () => {
-    console.log('Saving record:', editingKey, editingRow);
     const res = await updateFinanceFluxAPI(editingKey!, {
       ...editingRow
     })
@@ -85,6 +83,26 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
       },
     },
     {
+      title: '¿Es deuda?',
+      dataIndex: 'esDeuda',
+      key: 'esDeuda',
+      render: (val: any, record: any) => {
+        const editable = isEditing(record);
+        return editable ? (
+          <Switch
+            checked={editingRow.esDeuda !== undefined ? editingRow.esDeuda : val}
+            onChange={(checked) => handleChange('esDeuda', checked)}
+            checkedChildren="Sí"
+            unCheckedChildren="No"
+          />
+        ) : (
+            <span>
+            {val ? 'Sí' : 'No'}
+            </span>
+        );
+      },
+    },
+    {
       title: 'Acciones',
       key: 'acciones',
       render: (_: any, record: any) => {
@@ -113,7 +131,13 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
         dataSource={data}
         columns={columns}
         rowKey="_id"
-        pagination={false}
+        pagination={{
+          showSizeChanger: true,
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} de ${total} registros`,
+          pageSize: 5,
+          pageSizeOptions: ["10", "20", "50", "100"],
+        }}
         size="small"
       />
     </div>
