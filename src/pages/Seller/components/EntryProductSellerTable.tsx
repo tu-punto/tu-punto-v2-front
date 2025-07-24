@@ -26,8 +26,8 @@ const EntryProductSellerTable = ({
     },
     {
       title: "Producto",
-      dataIndex: ["producto", "nombre_producto"],
-      key: "nombre_producto",
+      dataIndex: "nombre_variante",
+      key: "nombre_variante",
       className: "text-mobile-sm xl:text-desktop-sm"
     },
     {
