@@ -54,9 +54,21 @@ function ShippingFormModal({
     }, []);
 
     const saldoACobrar = useMemo(() => {
+        if (estaPagado === "si") return 0;
+
         const deliveryAdicional = quienPaga === "comprador" ? montoCobradoDelivery : 0;
         return parseFloat((totalAmount - adelantoClienteInput + deliveryAdicional).toFixed(2));
-    }, [totalAmount, adelantoClienteInput, montoCobradoDelivery, quienPaga]);
+    }, [estaPagado, totalAmount, adelantoClienteInput, montoCobradoDelivery, quienPaga]);
+    useEffect(() => {
+        if (estaPagado === "si") {
+            setQrInput(0);
+            setEfectivoInput(0);
+            form.setFieldsValue({
+                subtotal_qr: 0,
+                subtotal_efectivo: 0,
+            });
+        }
+    }, [estaPagado]);
 
     useEffect(() => {
         if (adelantoClienteInput < 0) {
@@ -105,8 +117,8 @@ function ShippingFormModal({
 
     const handleFinish = async (values: any) => {
         //console.log(" selectedProducts:", selectedProducts);
-        if (saldoACobrar <= 0) {
-            message.error("El saldo a cobrar debe ser mayor a 0.");
+        if (saldoACobrar < 0) {
+            message.error("El saldo a cobrar no puede ser menor a 0.");
             setLoading(false);
             return;
         }

@@ -107,14 +107,15 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
 
     const saldoACobrar = useMemo(() => {
+        if (estaPagado === 'si') return 0;
+
         const deliveryAdicional = internalForm.getFieldValue("quien_paga_delivery") === "comprador"
             ? (cargoDelivery ?? 0)
             : 0;
 
         const adelanto = adelantoCliente || 0;
         return parseFloat((totalAmount - adelanto + deliveryAdicional).toFixed(2));
-    }, [totalAmount, adelantoCliente, cargoDelivery, quienPagaDelivery]);
-
+    }, [totalAmount, adelantoCliente, cargoDelivery, quienPagaDelivery, estaPagado]);
     const handleDeleteProduct = (key: any) => {
         setProducts((prev: any) => {
             const toDelete = prev.find((p: any) => p.key === key);
@@ -409,8 +410,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             }));
 
         try {
-            if (saldoACobrar <= 0) {
-                message.error("El saldo a cobrar debe ser mayor a 0.");
+            if (saldoACobrar < 0) {
+                message.error("El saldo a cobrar no puede ser negativo.");
                 setLoading(false);
                 return;
             }
