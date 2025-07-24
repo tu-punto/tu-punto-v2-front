@@ -126,7 +126,7 @@ function FinanceFluxFormModal({
       form.setFieldsValue({
         ...editingFlux,
         fecha: editingFlux.fecha ? dayjs(editingFlux.fecha) : null,
-        id_vendedor: editingFlux.id_vendedor._id,
+        id_vendedor: editingFlux.id_vendedor._id || null,
         id_trabajador: editingFlux.id_trabajador,
         id_sucursal: editingFlux.id_sucursal,
         esDeuda: editingFlux.esDeuda == "SI" ? true : false,
