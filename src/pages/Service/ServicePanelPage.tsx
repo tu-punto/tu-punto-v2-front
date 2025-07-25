@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ServiciosResumenTable from "./components/ServicesSummaryTable";
 import { getServicesSummaryAPI } from "../../api/services";
-import { getSucursalsAPI } from "../../api/sucursal";
+import { getAllSucursalsAPI } from "../../api/sucursal";
 
 export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const [summary, setSummary] = useState<any | null>(null);
@@ -11,7 +11,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   useEffect(() => {
     (async () => {
       try {
-        const { success, data, message } = await getSucursalsAPI();
+        const { success, data, message } = await getAllSucursalsAPI();
         if (success) {
           setSucursals(data.map((s: any) => s.nombre || s.name || s.sucursalName));
         } else {
