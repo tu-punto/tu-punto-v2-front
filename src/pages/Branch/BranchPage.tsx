@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { getSucursalsAPI } from "../../api/sucursal";
 import BranchTable from "./BranchTable";
 import { IBranch } from "../../models/branchModel";
 import { Button } from "antd";
 import BranchFormModal from "./BranchFormModal";
+import { UserContext } from "../../context/userContext";
 
 const BranchPage = () => {
   const [branches, setBranches] = useState<IBranch[]>();
   const [selectedBranch, setSelectedBranch] = useState<IBranch | null>(null);
   const [isFormModal, setIsFormModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  
+  const { user } = useContext(UserContext);
 
   const fetchBranches = async () => {
     try {
@@ -37,7 +41,8 @@ const BranchPage = () => {
                     Sucursales
                 </h1>
             </div>
-            <Button
+            {user.role=="admin" && (
+              <Button
                 onClick={() => {
                     setIsFormModal(true);
                     setSelectedBranch(null);
@@ -47,6 +52,7 @@ const BranchPage = () => {
             >
                 Agregar Sucursal
             </Button>
+            )}
         </div>
 
         <BranchTable

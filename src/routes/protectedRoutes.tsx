@@ -126,7 +126,7 @@ const protectedRoutes = [
       {
         path: "/branch",
         element: (
-          <RoleGuard allowedRoles={["admin"]}>
+          <RoleGuard allowedRoles={["admin","seller"]}>
             <BranchPage />
           </RoleGuard>
         ),
