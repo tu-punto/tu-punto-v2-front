@@ -95,7 +95,7 @@ const protectedRoutes = [
         path: "/servicesPage",
         element: (
           <RoleGuard allowedRoles={["admin"]}>
-            <ServicesPage />
+            <ServicesPage isFactura={false} />
           </RoleGuard>
         ),
       },

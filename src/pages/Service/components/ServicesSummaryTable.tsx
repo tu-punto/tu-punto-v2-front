@@ -16,10 +16,11 @@ type SummaryData = Record<
 
 type Props = {
   summary: SummaryData;
+  allSucursals: string[];
 };
 
-export default function ServiciosResumenTable({ summary }: Props) {
-  const sucursales = Object.keys(summary).filter((key) => key !== "TOTAL");
+export default function ServiciosResumenTable({ summary, allSucursals }: Props) {
+  const sucursales = allSucursals;
   const servicios: Servicio[] = ["Almacenamiento", "Exhibición", "Entregas Simples", "Delivery"];
 
   const rows = servicios.map((servicio) => {
@@ -60,8 +61,9 @@ export default function ServiciosResumenTable({ summary }: Props) {
       title: sucursal,
       dataIndex: sucursal,
       key: sucursal,
-      render: (val: number) =>
-        val ? <span>{val.toFixed(2)}</span> : <span>-</span>,
+      render: (val: number) => (
+        <span>{val !== 0 ? val.toFixed(2) : "-"}</span>
+      ),
     })),
     {
       title: "TOTAL",
@@ -77,7 +79,6 @@ export default function ServiciosResumenTable({ summary }: Props) {
       dataSource={rows}
       pagination={false}
       bordered
-      summary={() => null}
     />
   );
 }

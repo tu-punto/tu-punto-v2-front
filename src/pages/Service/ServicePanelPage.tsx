@@ -1,10 +1,27 @@
 import React, { useEffect, useState } from "react";
 import ServiciosResumenTable from "./components/ServicesSummaryTable";
 import { getServicesSummaryAPI } from "../../api/services";
+import { getSucursalsAPI } from "../../api/sucursal";
 
 export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const [summary, setSummary] = useState<any | null>(null);
+  const [sucursals, setSucursals] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { success, data, message } = await getSucursalsAPI();
+        if (success) {
+          setSucursals(data.map((s: any) => s.nombre || s.name || s.sucursalName));
+        } else {
+          console.error("Error al obtener sucursales:", message);
+        }
+      } catch (error) {
+        console.error("Fallo al obtener sucursales", error);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -31,8 +48,8 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
 
       {loading ? (
         <p className="text-center text-lg">Cargando resumen...</p>
-      ) : summary ? (
-        <ServiciosResumenTable summary={summary} />
+      ) : summary && sucursals.length ? (
+        <ServiciosResumenTable summary={summary} allSucursals={sucursals} />
       ) : (
         <p className="text-red-600 text-center">No se pudo cargar la información.</p>
       )}
