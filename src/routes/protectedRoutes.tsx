@@ -15,6 +15,7 @@ import CierreCajaPage from "../pages/BoxClose/DailyBoxClose";
 import BranchPage from "../pages/Branch/BranchPage";
 import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
+import ServicesPage from "../pages/Service/ServicePanelPage";
 
 const protectedRoutes = [
   {
@@ -37,7 +38,7 @@ const protectedRoutes = [
         path: "/seller",
         element: (
           <RoleGuard allowedRoles={["admin"]}>
-            <Seller isFactura={false}/>
+            <Seller isFactura={false} />
           </RoleGuard>
         ),
       },
@@ -77,20 +78,27 @@ const protectedRoutes = [
       {
         path: "/stats",
         element: (
-            <RoleGuard allowedRoles={["admin"]}>
-              <StatsPage />
-            </RoleGuard>
+          <RoleGuard allowedRoles={["admin"]}>
+            <StatsPage />
+          </RoleGuard>
         )
       },
       {
         path: "/sellerFactura",
         element: (
-            <RoleGuard allowedRoles={["admin"]}>
-              <Seller isFactura={true} />
-            </RoleGuard>
+          <RoleGuard allowedRoles={["admin"]}>
+            <Seller isFactura={true} />
+          </RoleGuard>
         ),
       },
-
+      {
+        path: "/servicesPage",
+        element: (
+          <RoleGuard allowedRoles={["admin"]}>
+            <ServicesPage isFactura={false} />
+          </RoleGuard>
+        ),
+      },
       {
         path: "/seller-info",
         element: (
@@ -134,17 +142,17 @@ const protectedRoutes = [
       {
         path: "/sales-history",
         element: (
-            <RoleGuard allowedRoles={["admin"]}>
-              <SalesHistoryPage />
-            </RoleGuard>
+          <RoleGuard allowedRoles={["admin"]}>
+            <SalesHistoryPage />
+          </RoleGuard>
         ),
       },
       {
         path: "/user",
         element: (
-            <RoleGuard allowedRoles={["admin"]}>
-              <UsersPage/>
-            </RoleGuard>
+          <RoleGuard allowedRoles={["admin"]}>
+            <UsersPage />
+          </RoleGuard>
         ),
       },
       {

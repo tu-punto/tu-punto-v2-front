@@ -38,3 +38,19 @@ export const updateSucursalAPI = async (
     return parseError(error as AxiosError);
   }
 };
+
+export const getAllSucursalsAPI = async () => {
+  try {
+    const response = await apiClient.get("/sucursal");
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    console.error("Error API getSucursals:", error);
+    return {
+      success: false,
+      message: "Fallo al obtener sucursales",
+    };
+  }
+};
