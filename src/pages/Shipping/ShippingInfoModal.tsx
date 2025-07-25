@@ -661,20 +661,20 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 </Card>
                 {/* PRODUCTOS */}
                 <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}
-                    extra={
-                        isAdmin && (
-                            <Button
-                                icon={<EditOutlined />}
-                                onClick={() => {
-                                    setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
-                                    setEditProductsModalVisible(true);
-                                }}
-                                type="link"
-                            >
-                                Editar Productos
-                            </Button>
-                        )
-                    }
+                      extra={
+                          isAdmin && (
+                              <Button
+                                  icon={<EditOutlined />}
+                                  onClick={() => {
+                                      setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
+                                      setEditProductsModalVisible(true);
+                                  }}
+                                  type="link"
+                              >
+                                  Editar Productos
+                              </Button>
+                          )
+                      }
                 >
                     <EmptySalesTable
                         products={products}
