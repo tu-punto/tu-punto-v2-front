@@ -127,7 +127,6 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
             // 3. Actualizar stock e ingresar registro de entrada
             for (const entry of stockData) {
                 const { product } = entry;
-                //console.log("📦 Procesando producto:", product);
                 const variantes = product?.variantes
                     ?? product?.variantes_obj
                     ?? product?.variantesObj
@@ -176,12 +175,7 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                 await createEntryAPI({
                         producto: productId,
                         sucursal: sucursalId,
-                        nombre_variante: variantes && Object.keys(variantes).length > 0
-                            ? Object.entries(variantes).map(([k, v]) => `${k}: ${v}`).join(" / ")
-                            : (() => {
-                                console.warn("⚠️ Variantes vacías. Saltando ingreso para", productId);
-                                return undefined; // o lanzá error si querés cortar
-                            })(),
+                        nombre_variante: `${product.nombre_producto} - ${Object.entries(variantes).map(([k, v]) => `${v}`).join(" / ")}`,
                         cantidad_ingreso: ingreso,
                         estado: "confirmado",
                         categoria: product.categoria || "Ropa",
@@ -239,17 +233,17 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
                         setLoadingPDF(true);
 
                         try {
-                            await generateIngressPDFAPI({
-                                sellerName: selectedSeller?.nombre + " " + selectedSeller?.apellido || "Sin definir",
-                                sucursalNombre: "Prado",
-                                ingresos: stockData,
-                                variantes: variantData,
-                                productos: flattenedCombinations,
-                                sucursalId
-                            });
+                            // await generateIngressPDFAPI({
+                            //     sellerName: selectedSeller?.nombre + " " + selectedSeller?.apellido || "Sin definir",
+                            //     sucursalNombre: "Prado",
+                            //     ingresos: stockData,
+                            //     variantes: variantData,
+                            //     productos: flattenedCombinations,
+                            //     sucursalId
+                            // });
                             await saveProducts();
 
-                            window.location.reload();
+                            // window.location.reload();
 
                         } catch (err) {
                             message.error("Error al generar el PDF.");
