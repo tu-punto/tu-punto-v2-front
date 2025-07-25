@@ -1,70 +1,39 @@
-
+import React from "react";
 import { Table } from "antd";
-import { ISucursalPago } from "../../Seller/SellerFormModal";
 
-const SERVICIOS_LABELS: Record<Servicio, string> = {
-  alquiler: "Almacenamiento",
-  exhibicion: "Exhibición",
-  entrega_simple: "Entregas Simples",
-  delivery: "Delivery",
-};
+type Servicio = "Almacenamiento" | "Exhibición" | "Entregas Simples" | "Delivery";
+
+type SummaryData = Record<
+  string,
+  {
+    Almacenamiento: number;
+    Exhibición: number;
+    "Entregas Simples": number;
+    Delivery: number;
+    TOTAL: number;
+  }
+>;
 
 type Props = {
-  sellers: {
-    pago_sucursales: ISucursalPago[];
-  }[];
+  summary: SummaryData;
 };
 
-export default function ServicesSummaryTable({ sellers }: Props) {
-  const dataMatrix: Record<string, Record<Servicio, number>> = {};
-  const totalBySucursal: Record<string, number> = {};
-  const totalByServicio: Record<Servicio, number> = {
-    alquiler: 0,
-    exhibicion: 0,
-    entrega_simple: 0,
-    delivery: 0,
-  };
+export default function ServiciosResumenTable({ summary }: Props) {
+  const sucursales = Object.keys(summary).filter((key) => key !== "TOTAL");
+  const servicios: Servicio[] = ["Almacenamiento", "Exhibición", "Entregas Simples", "Delivery"];
 
-  let totalGeneral = 0;
-
-  // Recorremos todos los vendedores
-  sellers.forEach((seller) => {
-    seller.pago_sucursales.forEach((pago) => {
-      const sucursal = pago.nombre_sucursal;
-
-      if (!dataMatrix[sucursal]) {
-        dataMatrix[sucursal] = {
-          alquiler: 0,
-          exhibicion: 0,
-          entrega_simple: 0,
-          delivery: 0,
-        };
-      }
-
-      (["alquiler", "exhibicion", "entrega_simple", "delivery"] as Servicio[]).forEach((serv) => {
-        const monto = Number(pago[serv]) || 0;
-        dataMatrix[sucursal][serv] += monto;
-        totalByServicio[serv] += monto;
-        totalBySucursal[sucursal] = (totalBySucursal[sucursal] || 0) + monto;
-        totalGeneral += monto;
-      });
-    });
-  });
-
-  const sucursales = Object.keys(dataMatrix);
-  const servicios = Object.keys(SERVICIOS_LABELS) as Servicio[];
-
-  const rows = servicios.map((serv) => {
+  const rows = servicios.map((servicio) => {
     const row: Record<string, any> = {
-      key: serv,
-      servicio: SERVICIOS_LABELS[serv],
+      key: servicio,
+      servicio,
     };
 
     sucursales.forEach((sucursal) => {
-      row[sucursal] = dataMatrix[sucursal]?.[serv] || 0;
+      row[sucursal] = summary[sucursal]?.[servicio] || 0;
     });
 
-    row.total = totalByServicio[serv];
+    row.total = summary.TOTAL?.[servicio] || 0;
+
     return row;
   });
 
@@ -74,10 +43,10 @@ export default function ServicesSummaryTable({ sellers }: Props) {
   };
 
   sucursales.forEach((sucursal) => {
-    totalRow[sucursal] = totalBySucursal[sucursal] || 0;
+    totalRow[sucursal] = summary[sucursal]?.TOTAL || 0;
   });
 
-  totalRow.total = totalGeneral;
+  totalRow.total = summary.TOTAL?.TOTAL || 0;
   rows.push(totalRow);
 
   const columns = [
@@ -106,12 +75,8 @@ export default function ServicesSummaryTable({ sellers }: Props) {
     <Table
       columns={columns}
       dataSource={rows}
-      pagination={{
-          showSizeChanger: true,
-          pageSizeOptions: ["5", "10", "20", "50"],
-          defaultPageSize: 10,
-          showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} registros`,
-        }}
+      pagination={false}
+      bordered
       summary={() => null}
     />
   );
