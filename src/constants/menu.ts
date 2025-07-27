@@ -60,7 +60,7 @@ export const menu = [
     path: "/branch",
     label: "Sucursales",
     icon: branchIcon,
-    roles: ["admin"],
+    roles: ["admin","seller"],
   },
   {
     path: "/sales-history",
