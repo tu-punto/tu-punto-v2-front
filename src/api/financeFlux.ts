@@ -68,3 +68,31 @@ export const getStatsAPI = async () => {
 export const paySellerDebtAPI = (fluxId: string) => {
     apiClient.patch(`/financeFlux/${fluxId}/pay`);
 }
+
+export const getFinanceFluxCategoriesAPI = async () => {
+    try {
+        const res = await apiClient.get(`/financeFlux/category`)
+        console.log("Categorias de flujo financiero:", res.data)
+        return res.data
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const registerFinanceFluxCategoryAPI = async (categoryData: any) => {
+    try {
+        const res = await apiClient.post(`/financeFlux/category`, categoryData)
+        return res.data
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const deleteFinanceFluxCategoryAPI = async (id: string) => {
+    try {
+        const res = await apiClient.delete(`/financeFlux/category/${id}`)
+        return res.data
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
