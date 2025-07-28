@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { Button, Table, Spin, Select, Input } from 'antd';
+import { Button, Table, Spin, Select, Input, Switch } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import AddVariantModal from '../Product/AddVariantModal';
@@ -13,6 +13,7 @@ import { getSellerAPI } from '../../api/seller';
 
 const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSucursalId}) => {
     const [updatedProductsList, setUpdatedProductsList] = useState<any[]>([]);
+    const [filterAvailableStock, setFilterAvailableStock] = useState(false);
     const [branches, setBranches] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const { user }: any = useContext(UserContext);
@@ -78,6 +79,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     const variantLower = variant.toLowerCase();
 
                     if (
+                        (filterAvailableStock && comb.stock <= 0) || 
                         searchText &&
                         !nombreLower.includes(searchText.toLowerCase()) &&
                         !variantLower.includes(searchText.toLowerCase())
@@ -207,6 +209,13 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     style={{ width: 300 }}
                     allowClear
                 />
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap'}}>
+                    <span>{'Ocultar productos sin stock disponible:'}</span>
+                    <Switch
+                        checked={filterAvailableStock}
+                        onChange={(check: boolean) => {setFilterAvailableStock(check)}}
+                    />
+                </div>
             </div>
             <Table
                 columns={columns}
