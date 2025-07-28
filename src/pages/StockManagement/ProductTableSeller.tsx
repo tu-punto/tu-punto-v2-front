@@ -110,6 +110,27 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
 
     const columns = [
         {
+            dataIndex: 'isAvailable',
+            key: 'isAvailable',
+            width: 40,
+            render: (_: any, record: any) => {
+                if (!record.esCabecera) {
+                    const color = record.stock > 0 ? 'bg-green-500' : 'bg-red-500';
+                    return {
+                        children: <div
+                            className={`w-4 h-4 rounded-full ${color}`}
+                        />,
+                    }
+                }
+
+                return {
+                    props: {
+                        colSpan:0
+                    }
+                }
+            }
+        },
+        {
             title: "Producto",
             dataIndex: 'nombre_producto',
             key: 'nombre_producto',
@@ -118,7 +139,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     return {
                         children: <b style={{ fontSize: '16px' }}>{record.nombre_producto}</b>,
                         props: {
-                            colSpan: 4, // Unifica las columnas si querés
+                            colSpan: 5, // Unifica las columnas si querés
                             style: { backgroundColor: '#f0f2f5' }
                         }
                     };
