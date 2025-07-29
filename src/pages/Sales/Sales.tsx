@@ -28,6 +28,7 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<string>('all');
     const { data, fetchProducts } = useProductsFlat(
         branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
     );
@@ -71,7 +72,7 @@ export const Sales = () => {
         const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
 
         let filtered = data.filter((p: any) => {
-            if (p.stockActual <= 0) return false;
+            if (p.stockActual <= 0 || selectedProduct !== 'all' && selectedProduct !== p.id_producto) return false;
             return vendedoresVigentesIds.includes(String(p.id_vendedor));
         });
 
@@ -95,7 +96,7 @@ export const Sales = () => {
             };
         });
         setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
+    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers, selectedProduct]);
 
     useEffect(() => {
         fetchSellers();
@@ -115,6 +116,27 @@ export const Sales = () => {
             setBranchIdForFetch(newSucursalId);
         }
     }, [branches, isAdmin, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
+
+    const [productOptions, setProductOptions] = useState<JSX.Element[]>([])
+    useEffect(() => {
+        if (!data || data.length === 0) return
+
+        const rawProducts = new Map<string,string>();
+        data.forEach(product => {
+            if(!rawProducts.has(product.id_producto) && product.id_vendedor == user.id_vendedor) {
+                rawProducts.set(product.id_producto, product.producto.split(" - ")[0])
+            }
+        })
+        const options: JSX.Element[] = [];
+        rawProducts.forEach((value, key) => {
+            options.push (
+                <Select.Option key={key} value={key}>
+                    {value}
+                </Select.Option>
+            )
+        })
+        setProductOptions(options)
+    },[data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -409,7 +431,16 @@ export const Sales = () => {
                                                 allowClear
                                             />
                                         )}
-
+                                        {!isAdmin && (
+                                            <Select
+                                                    value={selectedProduct}
+                                                    onChange={setSelectedProduct}
+                                                    style={{ width: 180}}
+                                            >
+                                                <Select.Option key="all" value="all">Todos los productos</Select.Option>
+                                                {productOptions}
+                                            </Select>
+                                        )}
                                         <Button
                                             type="primary"
                                             onClick={() => setProductAddModal(true)}
