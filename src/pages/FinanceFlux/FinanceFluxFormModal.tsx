@@ -123,10 +123,11 @@ function FinanceFluxFormModal({
 
   useEffect(() => {
     if (editingFlux) {
+      const sellerId = editingFlux.id_vendedor;
       form.setFieldsValue({
         ...editingFlux,
         fecha: editingFlux.fecha ? dayjs(editingFlux.fecha) : null,
-        id_vendedor: editingFlux.id_vendedor._id || null,
+        id_vendedor: sellerId ? sellerId._id : "",
         id_trabajador: editingFlux.id_trabajador,
         id_sucursal: editingFlux.id_sucursal,
         esDeuda: editingFlux.esDeuda == "SI" ? true : false,
