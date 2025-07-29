@@ -20,6 +20,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [categories, setCategories] = useState<any[]>([]);
+    const [selectedProductForList, setSelectedProductForList] = useState<string>('all');
     const [variantModalOpen, setVariantModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [stockModalOpen, setStockModalOpen] = useState(false);
@@ -64,7 +65,9 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
         const list: any[] = [];
 
         products.forEach((product) => {
-            if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
+            if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory || 
+                selectedProductForList !== 'all' && product._id !== selectedProductForList
+            ) return;
 
             const sucursales = product.sucursales?.filter((s: any) => s.id_sucursal?.toString() === sucursalId) || [];
 
@@ -199,6 +202,18 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     {categories.map(cat => (
                         <Select.Option key={cat._id} value={cat._id}>
                             {cat.categoria}
+                        </Select.Option>
+                    ))}
+                </Select>
+                <Select
+                    value={selectedProductForList}
+                    onChange={setSelectedProductForList}
+                    style={{ width: 240}}
+                >
+                    <Select.Option value="all">Todos los productos</Select.Option>
+                    {updatedProductsList.map(product => (
+                        <Select.Option value={product._id}>
+                            {product.nombre_producto}
                         </Select.Option>
                     ))}
                 </Select>
