@@ -1,4 +1,4 @@
-import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card} from 'antd';
+import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button} from 'antd';
 import { UserOutlined, PhoneOutlined, HomeOutlined} from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
@@ -9,7 +9,6 @@ import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import dayjs from 'dayjs';
-import FormItem from 'antd/es/form/FormItem';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -23,7 +22,7 @@ function ExternalSalesModal({
     const [servicePrice, setServicePrice] = useState(0);
     const [isBigPackage, setIsBigPackage] = useState(false);
     const [isDelivery, setIsDelivery] = useState(false)
-    const [isCityShipping, setIsCityShupping]  = useState(false);
+    const [isCityShipping, setIsCityShipping]  = useState(false);
     const [isPaid, setIsPaid] = useState(false);
     const [hasPriceProduct, setHasPriceProduct] = useState(false);
     const [hasShippingService, setHasShippingService] = useState(false);
@@ -31,10 +30,33 @@ function ExternalSalesModal({
     const [packageSizeX, setPackageSizeX] = useState(0);
     const [packageSizeY, setPackageSizeY] = useState(0);
     const [packageSizeZ, setPackageSizeZ] = useState(0);
+    const [saleTotalPrice, setSaleTotalPrice] = useState(0);
 
     const handleFinish = async (values: any) => {
 
-    }
+    };
+
+    const handleCancel = () => {
+        resetValues();
+        onCancel();
+    };
+
+    const resetValues = () => {
+        setPackageSizeType('pequenio');
+        setServicePrice(0);
+        setIsBigPackage(false);
+        setIsDelivery(false);
+        setIsCityShipping(false);
+        setIsPaid(false);
+        setHasPriceProduct(false);
+        setHasShippingService(false);
+        setHasBranchService(false);
+        setPackageSizeX(0);
+        setPackageSizeY(0);
+        setPackageSizeZ(0);
+        setSaleTotalPrice(0);
+        form.resetFields();
+    };
     
     useEffect(() => {
         let total = 0;
@@ -48,13 +70,14 @@ function ExternalSalesModal({
         if (hasBranchService) total+=12
         if (hasPriceProduct) total+=5
 
+        setSaleTotalPrice(total);
         form.setFieldsValue({
             total_price: total != 0 ? total.toFixed(2) : "0.00"
         })
     },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, isDelivery, isCityShipping, hasShippingService, hasBranchService, hasPriceProduct])
 
     return (
-        <Modal title="Ventas Externas" open={visible} onCancel={onCancel} width={800}>
+        <Modal title="Ventas Externas" open={visible} onCancel={handleCancel} width={800} footer={null}>
             <Form form={form} name='externalSaleForm' onFinish={handleFinish} layout='vertical'>
                 <Card title="Información del Vendedor" bordered={false}>
                     <Row gutter={16}>
@@ -187,7 +210,7 @@ function ExternalSalesModal({
                         <Col span={12}>
                             <Form.Item name="city_shipping" label='¿Se requiere envío a otra ciudad?' rules={[{required: true}]}>
                                 <Radio.Group
-                                    onChange={(e) => setIsCityShupping(e.target.value === 'si')}
+                                    onChange={(e) => setIsCityShipping(e.target.value === 'si')}
                                 >
                                     <Radio.Button value="si">Si</Radio.Button>
                                     <Radio.Button value="no">No</Radio.Button>
@@ -258,6 +281,12 @@ function ExternalSalesModal({
                         </Col>
                     </Row>
                 </Card>
+
+                <Form.Item style={{ marginTop: 16 }}>
+                    <Button type="primary" htmlType="submit">
+                        Guardar
+                    </Button>
+                </Form.Item>
             </Form>
         </Modal>
     );
