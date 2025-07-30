@@ -1,5 +1,5 @@
-import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button} from 'antd';
-import { UserOutlined, PhoneOutlined, HomeOutlined} from '@ant-design/icons';
+import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button, Select} from 'antd';
+import { UserOutlined, PhoneOutlined, HomeOutlined, CarFilled} from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
 import { updateSubvariantStockAPI } from '../../api/product';
@@ -19,11 +19,13 @@ function ExternalSalesModal({
 }: any) {
     const [form] = Form.useForm();
     const [packageSizeType, setPackageSizeType] = useState<'pequenio'|'mediano'|'grande'|'muy-grande'>();
+    const [city, setCity] = useState("");
     const [servicePrice, setServicePrice] = useState(0);
     const [isBigPackage, setIsBigPackage] = useState(false);
     const [isDelivery, setIsDelivery] = useState(false)
     const [isCityShipping, setIsCityShipping]  = useState(false);
     const [isPaid, setIsPaid] = useState(false);
+    const [isBranch, setIsBranch] =useState(false);
     const [hasPriceProduct, setHasPriceProduct] = useState(false);
     const [hasShippingService, setHasShippingService] = useState(false);
     const [hasBranchService, setHasBranchService] = useState(false);
@@ -31,6 +33,8 @@ function ExternalSalesModal({
     const [packageSizeY, setPackageSizeY] = useState(0);
     const [packageSizeZ, setPackageSizeZ] = useState(0);
     const [saleTotalPrice, setSaleTotalPrice] = useState(0);
+    const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+    const [sucursales, setSucursales] = useState<any[]>([]);
 
     const handleFinish = async (values: any) => {
 
@@ -43,11 +47,13 @@ function ExternalSalesModal({
 
     const resetValues = () => {
         setPackageSizeType('pequenio');
+        setCity("");
         setServicePrice(0);
         setIsBigPackage(false);
         setIsDelivery(false);
         setIsCityShipping(false);
         setIsPaid(false);
+        setIsBranch(false);
         setHasPriceProduct(false);
         setHasShippingService(false);
         setHasBranchService(false);
@@ -57,7 +63,19 @@ function ExternalSalesModal({
         setSaleTotalPrice(0);
         form.resetFields();
     };
+
+    const ciudades = [
+        "La Paz",
+        "Cochabamba",
+        "Santa Cruz"
+    ]
     
+    useEffect(() => {
+        getSucursalsAPI()
+      .then((data) => setSucursales(data))
+      .catch(() => console.error("No se pudieron cargar las sucursales"));
+    })
+
     useEffect(() => {
         let total = 0;
         if (packageSizeType === 'pequenio') total+=5;
@@ -219,7 +237,53 @@ function ExternalSalesModal({
                         </Col>
                     </Row>
                     {isCityShipping && (
-                        <div>TODO - ENVIO A OTRA CIUDAD(CIUDAD A LA QUE SE DESEA EL PEDIDO, Y UNA OPCION PARA ESCOGER SI QUIERE RECOGER EN UNA FLOTA [ESPACIO PARA PONER EN CUAL EN ESPECIFICO] O EN UNA DE NUESTRA SUCURSALES[ESPACIO PARA PONER EN CUAL EN ESPECIFICO])</div>
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item name="city" label='¿A qué ciudad se realiza el envío?' rules={[{required:isCityShipping}]}>
+                                    <Radio.Group
+                                        onChange={(e) => setCity(e.target.value)}
+                                    >
+                                        {ciudades.map((ciudad) => (
+                                            <Radio.Button value={ciudad}>{ciudad}</Radio.Button>
+                                        ))}
+                                    </Radio.Group>
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    )}
+                    {isCityShipping && (
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item name="sucursal-o-flota" label='¿Dónde se recogerá el producto?' rules={[{required:isCityShipping}]}>
+                                    <Radio.Group
+                                        onChange={(e) => setIsBranch(e.target.value === "sucursal")}
+                                    >
+                                        <Radio.Button value="sucursal">Sucursal</Radio.Button>
+                                        <Radio.Button value="flota">Flota</Radio.Button>
+                                    </Radio.Group>
+                                </Form.Item>
+                            </Col>
+                            {isBranch && (
+                                <Col span={12}>
+                                    <Form.Item name="sucursalID" label='¿Qué sucursal se utilizará?' rules={[{required: isBranch, message: "Seleccione una sucursal"}]}>
+                                        <Select placeholder="Sucursal">
+                                            {sucursales.map((b) => (
+                                            <Select.Option key={b._id} value={b._id}>
+                                                {b.nombre}
+                                            </Select.Option>
+                                            ))}
+                                        </Select>
+                                    </Form.Item>
+                                </Col>
+                            )}
+                            {!isBranch && (
+                                <Col span={12}>
+                                    <Form.Item name="flota" label='¿Qué flota se utilizará?' rules={[{required: !isBranch}]}>
+                                        <Input prefix={<CarFilled />} />
+                                    </Form.Item>
+                                </Col>
+                            )}
+                        </Row>
                     )}
                     <Row gutter={16}>
                         <Col span={12}>
