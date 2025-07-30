@@ -1,6 +1,6 @@
 import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card} from 'antd';
-import { UserOutlined, PhoneOutlined} from '@ant-design/icons';
-import { useState } from 'react';
+import { UserOutlined, PhoneOutlined, HomeOutlined} from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
 import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
@@ -9,6 +9,7 @@ import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import dayjs from 'dayjs';
+import FormItem from 'antd/es/form/FormItem';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -19,7 +20,14 @@ function ExternalSalesModal({
 }: any) {
     const [form] = Form.useForm();
     const [packageSizeType, setPackageSizeType] = useState<'pequenio'|'mediano'|'grande'|'muy-grande'>();
-    const [isBigPackage, setIsBigPackage] = useState(true);
+    const [servicePrice, setServicePrice] = useState(0);
+    const [isBigPackage, setIsBigPackage] = useState(false);
+    const [isDelivery, setIsDelivery] = useState(false)
+    const [isCityShipping, setIsCityShupping]  = useState(false);
+    const [isPaid, setIsPaid] = useState(false);
+    const [hasPriceProduct, setHasPriceProduct] = useState(false);
+    const [hasShippingService, setHasShippingService] = useState(false);
+    const [hasBranchService, setHasBranchService] = useState(false);
     const [packageSizeX, setPackageSizeX] = useState(0);
     const [packageSizeY, setPackageSizeY] = useState(0);
     const [packageSizeZ, setPackageSizeZ] = useState(0);
@@ -27,7 +35,23 @@ function ExternalSalesModal({
     const handleFinish = async (values: any) => {
 
     }
-    console.log(packageSizeX, packageSizeY, packageSizeZ)
+    
+    useEffect(() => {
+        let total = 0;
+        if (packageSizeType === 'pequenio') total+=5;
+        if (packageSizeType === 'mediano') total+=10;
+        if (packageSizeType === 'grande') total+=15;
+        if (packageSizeType === 'muy-grande') total+=(packageSizeX*packageSizeY*packageSizeZ*15)/(40*40*40);
+        if (isDelivery) console.log("TODO, obtener el precio del delivery")
+        if (isCityShipping) total+=12
+        if (hasShippingService) console.log("TODO, Obtener precio de la flota")
+        if (hasBranchService) total+=12
+        if (hasPriceProduct) total+=5
+
+        form.setFieldsValue({
+            total_price: total != 0 ? total.toFixed(2) : "0.00"
+        })
+    },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, isDelivery, isCityShipping, hasShippingService, hasBranchService, hasPriceProduct])
 
     return (
         <Modal title="Ventas Externas" open={visible} onCancel={onCancel} width={800}>
@@ -136,6 +160,103 @@ function ExternalSalesModal({
                             </Row>
                         </Form.Item>
                     )}
+                </Card>
+                <Card title="Servicios del Pedido" bordered={false} style={{marginTop: 16}}>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="delivery" label='¿Se requiere delivery?' rules={[{required: true}]}>
+                                <Radio.Group
+                                    onChange={(e) => setIsDelivery(e.target.value === 'si')}
+                                >
+                                    <Radio.Button value="si">Si</Radio.Button>
+                                    <Radio.Button value="no">No</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    {isDelivery && (
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item name="direccion" label="Dirección">
+                                    <Input prefix={<HomeOutlined />} />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    )}
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="city_shipping" label='¿Se requiere envío a otra ciudad?' rules={[{required: true}]}>
+                                <Radio.Group
+                                    onChange={(e) => setIsCityShupping(e.target.value === 'si')}
+                                >
+                                    <Radio.Button value="si">Si</Radio.Button>
+                                    <Radio.Button value="no">No</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    {isCityShipping && (
+                        <div>TODO - ENVIO A OTRA CIUDAD(CIUDAD A LA QUE SE DESEA EL PEDIDO, Y UNA OPCION PARA ESCOGER SI QUIERE RECOGER EN UNA FLOTA [ESPACIO PARA PONER EN CUAL EN ESPECIFICO] O EN UNA DE NUESTRA SUCURSALES[ESPACIO PARA PONER EN CUAL EN ESPECIFICO])</div>
+                    )}
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="product_treat" label='¿Cómo se debe proceder con el producto?' rules={[{required: true}]}>
+                                <Radio.Group
+                                    onChange={(e) => {
+                                        setHasPriceProduct(e.target.value !== 'no')
+                                        /*Hay que hacer más lógica aca
+                                        SI SE DEBE COBRAR O PAGAR SE HABILITAN ESTOS ESPACIOS EN LA EDICION:
+                                        -SE COBRO? ☐ (SE DEBE AÑADIR EL PRECIO A CIERRE DE CAJA DE ESE DIA)
+                                        -SE PAGO AL VENDEDOR? ☐ (SE DEBE RESTAR EL PRECIO A CIERRE DE CAJA DEL DIA)
+                                        */ 
+                                    }}
+                                >
+                                    <Radio.Button value="no">No</Radio.Button>
+                                    <Radio.Button value="cobrar">Cobrar</Radio.Button>
+                                    <Radio.Button value="pagar">Pagar</Radio.Button>
+                                    <Radio.Button value="controlar">Controlar su estado</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    {hasPriceProduct && (
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item name="service_price" label="Monto del servicio"  rules={[{required: hasPriceProduct}]}>
+                                    <InputNumber
+                                        prefix="Bs."
+                                        min={0}
+                                        value={servicePrice}
+                                        onChange={value => setServicePrice(value ?? 0)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    )}
+                </Card>
+                <Card title="Detalles de Pago" bordered={false} style={{marginTop: 16}}>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="total_price" label="Monto a cobrar">
+                                <InputNumber
+                                    prefix="Bs."
+                                    style={{width: '100%'}}
+                                    readOnly
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="product_paid" label='¿Se pagó por el servicio?' rules={[{required: true}]}>
+                                <Radio.Group
+                                    onChange={(e) => setIsPaid(e.target.value === 'si')}
+                                >
+                                    <Radio.Button value="si">Si</Radio.Button>
+                                    <Radio.Button value="no">No</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
                 </Card>
             </Form>
         </Modal>
