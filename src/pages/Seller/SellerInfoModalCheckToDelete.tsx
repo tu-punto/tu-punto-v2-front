@@ -233,8 +233,8 @@ const SellerInfoModal = ({ visible, onSuccess, onCancel, seller }: any) => {
                 <Row gutter={16}>
                     <Col span={6}>
                         <Form.Item
-                            name="alquiler"
-                            label="Almacenamiento"
+                            name="almacenamiento"
+                            label="almacenamiento"
                             initialValue={seller.alquiler}
                         >
                             <InputNumber className="w-full" prefix="Bs." min={0} readOnly={isSeller} />
