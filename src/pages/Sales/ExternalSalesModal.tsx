@@ -24,9 +24,13 @@ function ExternalSalesModal({
     const [isBigPackage, setIsBigPackage] = useState(false);
     const [isDelivery, setIsDelivery] = useState(false)
     const [isCityShipping, setIsCityShipping]  = useState(false);
+    const [isOptionPagar, setIsOptionPagar] = useState(false);
+    const [isOptionCobrar, setIsOptionCobrar] = useState(false);
+    const [isOptionControlar, setIsOptionControlar] = useState(false);
+    const [isOptionPagada, setIsOptionPagada] = useState(false);
+    const [isOptionCobrada, setIsOptionCobrada] = useState(false);
     const [isPaid, setIsPaid] = useState(false);
     const [isBranch, setIsBranch] =useState(false);
-    const [hasPriceProduct, setHasPriceProduct] = useState(false);
     const [hasShippingService, setHasShippingService] = useState(false);
     const [hasBranchService, setHasBranchService] = useState(false);
     const [packageSizeX, setPackageSizeX] = useState(0);
@@ -52,15 +56,20 @@ function ExternalSalesModal({
         setIsBigPackage(false);
         setIsDelivery(false);
         setIsCityShipping(false);
+        setIsOptionPagar(false);
+        setIsOptionCobrar(false);
+        setIsOptionControlar(false);
+        setIsOptionPagada(false);
+        setIsOptionCobrada(false);
         setIsPaid(false);
         setIsBranch(false);
-        setHasPriceProduct(false);
         setHasShippingService(false);
         setHasBranchService(false);
         setPackageSizeX(0);
         setPackageSizeY(0);
         setPackageSizeZ(0);
         setSaleTotalPrice(0);
+        setSelectedBranchId(null)
         form.resetFields();
     };
 
@@ -74,25 +83,26 @@ function ExternalSalesModal({
         getSucursalsAPI()
       .then((data) => setSucursales(data))
       .catch(() => console.error("No se pudieron cargar las sucursales"));
-    })
+    },[isBranch])
 
     useEffect(() => {
         let total = 0;
         if (packageSizeType === 'pequenio') total+=5;
-        if (packageSizeType === 'mediano') total+=10;
-        if (packageSizeType === 'grande') total+=15;
-        if (packageSizeType === 'muy-grande') total+=(packageSizeX*packageSizeY*packageSizeZ*15)/(40*40*40);
+        else if (packageSizeType === 'mediano') total+=10;
+        else if (packageSizeType === 'grande') total+=15;
+        else if (packageSizeType === 'muy-grande') total+=(packageSizeX*packageSizeY*packageSizeZ*15)/(40*40*40);
         if (isDelivery) console.log("TODO, obtener el precio del delivery")
         if (isCityShipping) total+=12
         if (hasShippingService) console.log("TODO, Obtener precio de la flota")
         if (hasBranchService) total+=12
-        if (hasPriceProduct) total+=5
+        if (isOptionPagar || isOptionCobrar || isOptionControlar) total+=5
 
         setSaleTotalPrice(total);
         form.setFieldsValue({
             total_price: total != 0 ? total.toFixed(2) : "0.00"
         })
-    },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, isDelivery, isCityShipping, hasShippingService, hasBranchService, hasPriceProduct])
+    },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, isDelivery, isCityShipping, 
+        hasShippingService, hasBranchService, isOptionPagar, isOptionCobrar, isOptionControlar])
 
     return (
         <Modal title="Ventas Externas" open={visible} onCancel={handleCancel} width={800} footer={null}>
@@ -286,16 +296,13 @@ function ExternalSalesModal({
                         </Row>
                     )}
                     <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name="product_treat" label='¿Cómo se debe proceder con el producto?' rules={[{required: true}]}>
+                        <Col span={24}>
+                            <Form.Item name="product_operation" label='¿Se debe realizar alguna operación adicional sobre el pedido?' rules={[{required: true}]}>
                                 <Radio.Group
                                     onChange={(e) => {
-                                        setHasPriceProduct(e.target.value !== 'no')
-                                        /*Hay que hacer más lógica aca
-                                        SI SE DEBE COBRAR O PAGAR SE HABILITAN ESTOS ESPACIOS EN LA EDICION:
-                                        -SE COBRO? ☐ (SE DEBE AÑADIR EL PRECIO A CIERRE DE CAJA DE ESE DIA)
-                                        -SE PAGO AL VENDEDOR? ☐ (SE DEBE RESTAR EL PRECIO A CIERRE DE CAJA DEL DIA)
-                                        */ 
+                                        setIsOptionPagar(e.target.value === "pagar");
+                                        setIsOptionCobrar(e.target.value === "cobrar");
+                                        setIsOptionControlar(e.target.value === "controlar");
                                     }}
                                 >
                                     <Radio.Button value="no">No</Radio.Button>
@@ -306,10 +313,10 @@ function ExternalSalesModal({
                             </Form.Item>
                         </Col>
                     </Row>
-                    {hasPriceProduct && (
+                    {(isOptionPagar || isOptionCobrar || isOptionControlar) && (
                         <Row gutter={16}>
                             <Col span={12}>
-                                <Form.Item name="service_price" label="Monto del servicio"  rules={[{required: hasPriceProduct}]}>
+                                <Form.Item name="service_price" label="Precio"  rules={[{required: isOptionPagar || isOptionCobrar || isOptionControlar}]}>
                                     <InputNumber
                                         prefix="Bs."
                                         min={0}
@@ -319,6 +326,30 @@ function ExternalSalesModal({
                                     />
                                 </Form.Item>
                             </Col>
+                            {isOptionPagar && ( 
+                                <Col span={12}>
+                                    <Form.Item name="price_pagar" label='¿Se pagó al vendedor?'>
+                                        <Radio.Group
+                                            onChange={(e) => setIsOptionPagada(e.target.value === 'si')}
+                                        >
+                                            <Radio.Button value="si">Si</Radio.Button>
+                                            <Radio.Button value="no">No</Radio.Button>
+                                        </Radio.Group>
+                                    </Form.Item>
+                                </Col>
+                            )}
+                            {isOptionCobrar && ( 
+                                <Col span={12}>
+                                    <Form.Item name="price_cobrar" label='¿Se cobró?'>
+                                        <Radio.Group
+                                            onChange={(e) => setIsOptionCobrada(e.target.value === 'si')}
+                                        >
+                                            <Radio.Button value="si">Si</Radio.Button>
+                                            <Radio.Button value="no">No</Radio.Button>
+                                        </Radio.Group>
+                                    </Form.Item>
+                                </Col>
+                            )}
                         </Row>
                     )}
                 </Card>
