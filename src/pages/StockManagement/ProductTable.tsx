@@ -283,7 +283,9 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                         type="number"
                         disabled={!selectedSeller}
                         title={!selectedSeller ? "Seleccione un vendedor para habilitar" : undefined}
+                        onWheel={(e) => e.currentTarget.blur()} // ⛔️ Evita que el scroll afecte el input
                     />
+
                 ) : null
         },
         {
