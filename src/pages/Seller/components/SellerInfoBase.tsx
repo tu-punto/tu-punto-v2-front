@@ -132,7 +132,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           subtotal: sale.precio_unitario * sale.cantidad,
           comision_porcentual: seller.comision_porcentual || 0,
           sucursal:
-            sucursales.find((s) => s._id === sale.id_sucursal).nombre ||
+            sucursales.find((s) => s._id === sale.id_sucursal)?.nombre ||
             "Sucursal no encontrada",
           key: `${sale.id_producto}-${sale.fecha_pedido}`,
         };
