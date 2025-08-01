@@ -1,4 +1,4 @@
-import { DatePicker, Input, message, Select, Table } from 'antd';
+import { Button, DatePicker, Input, message, Select, Table } from 'antd';
 import {useContext, useEffect, useState} from 'react';
 import { getShippingsAPI, getShippingByIdAPI  } from '../../api/shipping';
 import ShippingInfoModal from './ShippingInfoModal';
@@ -7,6 +7,7 @@ import { getSucursalsAPI } from '../../api/sucursal';
 import { getSellersAPI } from "../../api/seller";
 import {UserContext} from "../../context/userContext.tsx";
 import moment from "moment-timezone";
+import ExternalSalesModal from './ExternalSalesModal.tsx';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -22,6 +23,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isModaStatelVisible, setIsModalStateVisible] = useState(false);
+    const [isModalExternalVisible, setIsModalExternalVisible] = useState(false);
     const [selectedShipping, setSelectedShipping] = useState(null);
     const [selectedLocation, setSelectedLocation] = useState('');
     const [selectedOrigin, setSelectedOrigin] = useState('');
@@ -194,6 +196,10 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         },
     ];
 
+    const handleCancel = () => {
+        setIsModalExternalVisible(false)
+    };
+
     const handleIconClick = (order: any) => {
         if (order.estado_pedido === "Entregado") return;
         setSelectedShipping(order);
@@ -338,6 +344,15 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         }
                     }}
                 />
+                {isAdmin && (
+                    <Button
+                        type="primary"
+                        onClick={() => setIsModalExternalVisible(true)}
+                        className="text-mobile-base xl:text-desktop-sm "
+                    >
+                        Crear pedido por venta externa
+                    </Button>
+                )}
             </div>
 
             {selectedStatus === 'En Espera' && (
@@ -406,6 +421,14 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     fetchShippings();
                 }}
                 shipping={selectedShipping}
+            />
+
+            <ExternalSalesModal
+                visible={isModalExternalVisible}
+                onCancel={handleCancel}
+                onClose={() =>{
+                    setIsModalExternalVisible(false);
+                }}
             />
         </div>
     );

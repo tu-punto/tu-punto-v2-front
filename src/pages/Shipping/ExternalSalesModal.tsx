@@ -1,9 +1,7 @@
-import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button, Select} from 'antd';
+import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button, Select, message} from 'antd';
 import { UserOutlined, PhoneOutlined, HomeOutlined, CarFilled} from '@ant-design/icons';
 import { useEffect, useState } from 'react';
-import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
-import { updateSubvariantStockAPI } from '../../api/product';
-import { useWatch } from 'antd/es/form/Form';
+import { registerExternalSaleAPI } from '../../api/externalSale';
 import { getSucursalsAPI } from "../../api/sucursal";
 import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
@@ -12,15 +10,14 @@ import dayjs from 'dayjs';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-function ExternalSalesModal({
-    visible, onCancel, onSuccess, selectedProducts,
-    totalAmount, handleSales, sucursals,
-    clearSelectedProducts, isAdmin, sellers, suc
-}: any) {
+function ExternalSalesModal({visible, onCancel, onClose}: any) {
     const [form] = Form.useForm();
-    const [packageSizeType, setPackageSizeType] = useState<'pequenio'|'mediano'|'grande'|'muy-grande'>();
+    const [loading, setLoading] = useState(false);
+    const [packageSizeType, setPackageSizeType] = useState<null|'pequenio'|'mediano'|'grande'|'muy-grande'>();
     const [city, setCity] = useState("");
     const [servicePrice, setServicePrice] = useState(0);
+    const [deliveryPrice, setDeliveryPrice] = useState(0);  
+    const [shippingPrice, setShippingPrice] = useState(0);
     const [isBigPackage, setIsBigPackage] = useState(false);
     const [isDelivery, setIsDelivery] = useState(false)
     const [isCityShipping, setIsCityShipping]  = useState(false);
@@ -32,16 +29,63 @@ function ExternalSalesModal({
     const [isPaid, setIsPaid] = useState(false);
     const [isBranch, setIsBranch] =useState(false);
     const [hasShippingService, setHasShippingService] = useState(false);
-    const [hasBranchService, setHasBranchService] = useState(false);
     const [packageSizeX, setPackageSizeX] = useState(0);
     const [packageSizeY, setPackageSizeY] = useState(0);
     const [packageSizeZ, setPackageSizeZ] = useState(0);
     const [saleTotalPrice, setSaleTotalPrice] = useState(0);
-    const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [sucursales, setSucursales] = useState<any[]>([]);
 
     const handleFinish = async (values: any) => {
+        setLoading(true);
+        if(saleTotalPrice < 0) {
+            message.error("El precio total no puede ser menor a 0.");
+            setLoading(false);
+            return;
+        }
 
+        //TODO realizar operaciones en cierre de caja según los valores de isOptionPagada, isOptionCobrada, isPaid
+
+        try {
+            const vendedorNombre = values.nombre_vendedor;
+            const vendedorCelular = values.telefono_vendedor || "";
+            const compradorNombre = values.nombre_comprador;
+            const compradorCelular = values.telefono_comprador || "";
+            const fecha = values.fecha_pedido?.format("YYYY-MM-DD") || moment().tz("America/La_Paz").format("YYYY-MM-DD");
+            const direccion = values.direccion || "";
+            const ciudad = city;
+            const sucursal_id = values.sucursalID || "";
+            const flota = values.flota || "";
+            const montoServicio = values.service_price || 0;
+            const montoTotal = saleTotalPrice;
+
+            const response = await registerExternalSaleAPI({
+                vendedor: vendedorNombre,
+                telefono_vendedor: vendedorCelular,
+                comprador: compradorNombre,
+                telefono_comprador: compradorCelular,
+                fecha_pedido: fecha,
+                direccion_delivery: direccion,
+                ciudad_envio: ciudad,
+                id_sucursal: sucursal_id,
+                nombre_flota: flota,
+                precio_servicio: montoServicio,
+                precio_total: montoTotal
+            });
+
+            if (!response.success) {
+                message.error("Error registrando la venta");
+                setLoading(false);
+                return;
+            } else {
+                message.success("Venta externa registrada");
+                resetValues();
+                onClose();
+            }
+        } catch(error) {
+            console.error("Error en Modal Venta Externa: ", error);
+            message.error("Error procesando la venta");
+        }
+        setLoading(false);
     };
 
     const handleCancel = () => {
@@ -50,9 +94,11 @@ function ExternalSalesModal({
     };
 
     const resetValues = () => {
-        setPackageSizeType('pequenio');
+        setPackageSizeType(null);
         setCity("");
         setServicePrice(0);
+        setDeliveryPrice(0);
+        setShippingPrice(0);
         setIsBigPackage(false);
         setIsDelivery(false);
         setIsCityShipping(false);
@@ -64,12 +110,11 @@ function ExternalSalesModal({
         setIsPaid(false);
         setIsBranch(false);
         setHasShippingService(false);
-        setHasBranchService(false);
         setPackageSizeX(0);
         setPackageSizeY(0);
         setPackageSizeZ(0);
         setSaleTotalPrice(0);
-        setSelectedBranchId(null)
+        setLoading(false);
         form.resetFields();
     };
 
@@ -91,18 +136,18 @@ function ExternalSalesModal({
         else if (packageSizeType === 'mediano') total+=10;
         else if (packageSizeType === 'grande') total+=15;
         else if (packageSizeType === 'muy-grande') total+=(packageSizeX*packageSizeY*packageSizeZ*15)/(40*40*40);
-        if (isDelivery) console.log("TODO, obtener el precio del delivery")
-        if (isCityShipping) total+=12
-        if (hasShippingService) console.log("TODO, Obtener precio de la flota")
-        if (hasBranchService) total+=12
-        if (isOptionPagar || isOptionCobrar || isOptionControlar) total+=5
+        if (isDelivery) total+=deliveryPrice;
+        if (isCityShipping) total+=12;
+        if (hasShippingService) total+=shippingPrice;
+        if (isBranch) total+=12;
+        if (isOptionPagar || isOptionCobrar || isOptionControlar) total+=5;
 
         setSaleTotalPrice(total);
         form.setFieldsValue({
             total_price: total != 0 ? total.toFixed(2) : "0.00"
         })
-    },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, isDelivery, isCityShipping, 
-        hasShippingService, hasBranchService, isOptionPagar, isOptionCobrar, isOptionControlar])
+    },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, deliveryPrice, shippingPrice, isDelivery, isCityShipping, 
+        hasShippingService, isBranch, isOptionPagar, isOptionCobrar, isOptionControlar])
 
     return (
         <Modal title="Ventas Externas" open={visible} onCancel={handleCancel} width={800} footer={null}>
@@ -232,6 +277,17 @@ function ExternalSalesModal({
                                     <Input prefix={<HomeOutlined />} />
                                 </Form.Item>
                             </Col>
+                            <Col span={12}>
+                                <Form.Item name="delivery_price" label="Precio"  rules={[{required: isDelivery}]}>
+                                    <InputNumber
+                                        prefix="Bs."
+                                        min={0}
+                                        value={deliveryPrice}
+                                        onChange={value => setDeliveryPrice(value ?? 0)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </Form.Item>
+                            </Col>
                         </Row>
                     )}
                     <Row gutter={16}>
@@ -254,7 +310,7 @@ function ExternalSalesModal({
                                         onChange={(e) => setCity(e.target.value)}
                                     >
                                         {ciudades.map((ciudad) => (
-                                            <Radio.Button value={ciudad}>{ciudad}</Radio.Button>
+                                            <Radio.Button value={ciudad} key={ciudad}>{ciudad}</Radio.Button>
                                         ))}
                                     </Radio.Group>
                                 </Form.Item>
@@ -266,7 +322,10 @@ function ExternalSalesModal({
                             <Col span={12}>
                                 <Form.Item name="sucursal-o-flota" label='¿Dónde se recogerá el producto?' rules={[{required:isCityShipping}]}>
                                     <Radio.Group
-                                        onChange={(e) => setIsBranch(e.target.value === "sucursal")}
+                                        onChange={(e) => {
+                                            setIsBranch(e.target.value === "sucursal");
+                                            setHasShippingService(e.target.value === "flota")
+                                        }}
                                     >
                                         <Radio.Button value="sucursal">Sucursal</Radio.Button>
                                         <Radio.Button value="flota">Flota</Radio.Button>
@@ -286,13 +345,28 @@ function ExternalSalesModal({
                                     </Form.Item>
                                 </Col>
                             )}
-                            {!isBranch && (
+                            {hasShippingService && (
                                 <Col span={12}>
                                     <Form.Item name="flota" label='¿Qué flota se utilizará?' rules={[{required: !isBranch}]}>
                                         <Input prefix={<CarFilled />} />
                                     </Form.Item>
                                 </Col>
                             )}
+                        </Row>
+                    )}
+                    {hasShippingService && (
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item name="ship_price" label="Precio de la flota"  rules={[{required: hasShippingService}]}>
+                                    <InputNumber
+                                        prefix="Bs."
+                                        min={0}
+                                        value={shippingPrice}
+                                        onChange={value => setShippingPrice(value ?? 0)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </Form.Item>
+                            </Col>
                         </Row>
                     )}
                     <Row gutter={16}>
@@ -378,7 +452,7 @@ function ExternalSalesModal({
                 </Card>
 
                 <Form.Item style={{ marginTop: 16 }}>
-                    <Button type="primary" htmlType="submit">
+                    <Button type="primary" htmlType="submit" loading={loading}>
                         Guardar
                     </Button>
                 </Form.Item>
