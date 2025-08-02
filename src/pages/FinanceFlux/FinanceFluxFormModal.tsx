@@ -11,7 +11,7 @@ import {
   Row,
   Select,
 } from "antd";
-import { CommentOutlined, NotificationOutlined } from "@ant-design/icons";
+import { CommentOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import {
@@ -21,6 +21,7 @@ import {
 import { getWorkersAPI } from "../../api/worker";
 import { getSellersAPI, registerSellerAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
 
 function FinanceFluxFormModal({
   visible,
@@ -33,12 +34,20 @@ function FinanceFluxFormModal({
   const [sellers, setSellers] = useState([]);
   const [sucursals, setSucursals] = useState([]);
   const [newSeller, setNewSeller] = useState("");
+  const [newFluxCategory, setNewFluxCategory] = useState("");
   const [form] = Form.useForm();
+
+  const fluxCategories = useFinanceFluxCategoryStore(
+    (state) => state.fluxCategories
+  );
+
+  const createFluxCategory = useFinanceFluxCategoryStore(
+    (state) => state.createFluxCategory
+  );
 
   const handleFinish = async (financeFluxData: any) => {
     setLoading(true);
 
-    // Usar la sucursal seleccionada en el form o la del localStorage como fallback
     const sucursalId =
       financeFluxData.id_sucursal || localStorage.getItem("sucursalId");
 
@@ -174,7 +183,40 @@ function FinanceFluxFormModal({
               label="Categoria"
               rules={[{ required: true, message: "Este campo es obligatorio" }]}
             >
-              <Input prefix={<NotificationOutlined />} />
+              <Select
+                allowClear
+                showSearch
+                placeholder="Selecciona una categoría"
+                options={fluxCategories.map((fluxCategory) => ({
+                  value: fluxCategory._id,
+                  label: fluxCategory.nombre,
+                }))}
+                filterOption={(input, option: any) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+                dropdownRender={(menu) => (
+                  <>
+                    {menu}
+                    <div style={{ display: "flex", padding: 8 }}>
+                      <Input
+                        style={{ flex: "auto" }}
+                        value={newFluxCategory}
+                        onChange={(e) => setNewFluxCategory(e.target.value)}
+                      />
+                      <Button
+                        type="link"
+                        onClick={async () => {
+                          await createFluxCategory({ nombre: newFluxCategory });
+                          setNewFluxCategory("");
+                        }}
+                        loading={loading}
+                      >
+                        Añadir categoría
+                      </Button>
+                    </div>
+                  </>
+                )}
+              />
             </Form.Item>
 
             <Form.Item
