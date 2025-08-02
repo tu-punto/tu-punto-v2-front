@@ -188,7 +188,7 @@ function FinanceFluxFormModal({
                 showSearch
                 placeholder="Selecciona una categoría"
                 options={fluxCategories.map((fluxCategory) => ({
-                  value: fluxCategory._id,
+                  value: fluxCategory.nombre,
                   label: fluxCategory.nombre,
                 }))}
                 filterOption={(input, option: any) =>
