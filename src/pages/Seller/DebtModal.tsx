@@ -96,6 +96,7 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
         fecha_vigencia: values.fecha_vigencia.toISOString(),
         pago_sucursales: values.sucursales.map((formSucursal: any) => ({
           ...formSucursal,
+          alquiler: formSucursal.almacenamiento,
           sucursalName: sucursalOptions.find((optionSucursal) => 
             optionSucursal._id=== formSucursal.id_sucursal
           )?.nombre 
