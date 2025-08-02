@@ -204,7 +204,10 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       /* 1) seller */
       const resSeller = await updateSellerAPI(seller.key, {
         ...formValues,
-        pago_sucursales: formValues.sucursales,
+        pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
+          ...sucursal,
+          alquiler: sucursal.almacenamiento
+        })),
       });
       if (!resSeller?.success) {
         message.error("Error al editar vendedor");
