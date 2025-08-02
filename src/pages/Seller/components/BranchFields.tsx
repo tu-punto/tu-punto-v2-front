@@ -23,7 +23,16 @@ const BranchFields = ({
 }: any) => {
   const sucursales = form.getFieldValue("sucursales") || [];
   const currentBranch = sucursales[field.name] || {};
-  currentBranch.almacenamiento = currentBranch.alquiler
+  currentBranch.almacenamiento = currentBranch.alquiler;
+  const handleActivoChange = (e: any) => {
+    const isActive = e.target.value;
+
+    if (!isActive) {
+      form.setFieldValue(["sucursales", field.name, "fecha_salida"], dayjs());
+    } else {
+      form.setFieldValue(["sucursales", field.name, "fecha_salida"], null);
+    }
+  };
 
   return (
     <>
@@ -73,7 +82,7 @@ const BranchFields = ({
             initialValue={
               currentBranch.fecha_ingreso
                 ? dayjs(currentBranch.fecha_ingreso)
-                : null
+                : dayjs()
             }
           >
             <DatePicker
@@ -125,25 +134,27 @@ const BranchFields = ({
       </Row>
 
       <Row gutter={[16, 16]}>
-        {["Almacenamiento", "Exhibicion", "Delivery", "Entrega_simple"].map((k) => (
-          <Col xs={12} sm={6} md={6} key={k}>
-            <Form.Item
-              {...field}
-              name={[field.name, k.toLowerCase()]}
-              label={k.replace("_", " ")}
-              rules={[{ required: true, message: "Obligatorio" }]}
-              initialValue={currentBranch[k.toLowerCase()] || 0}
-            >
-              <InputNumber
-                min={0}
-                placeholder="0"
-                className="w-full"
-                disabled={isSeller}
-                addonBefore="Bs."
-              />
-            </Form.Item>
-          </Col>
-        ))}
+        {["Almacenamiento", "Exhibicion", "Delivery", "Entrega_simple"].map(
+          (k) => (
+            <Col xs={12} sm={6} md={6} key={k}>
+              <Form.Item
+                {...field}
+                name={[field.name, k.toLowerCase()]}
+                label={k.replace("_", " ")}
+                rules={[{ required: true, message: "Obligatorio" }]}
+                initialValue={currentBranch[k.toLowerCase()] || 0}
+              >
+                <InputNumber
+                  min={0}
+                  placeholder="0"
+                  className="w-full"
+                  disabled={isSeller}
+                  addonBefore="Bs."
+                />
+              </Form.Item>
+            </Col>
+          )
+        )}
       </Row>
 
       {/* Comentario y Activo */}
@@ -174,7 +185,7 @@ const BranchFields = ({
               currentBranch.activo !== undefined ? currentBranch.activo : true
             }
           >
-            <Radio.Group disabled={isSeller}>
+            <Radio.Group onChange={handleActivoChange} disabled={isSeller}>
               <Radio value={true}>Sí</Radio>
               <Radio value={false}>No</Radio>
             </Radio.Group>
