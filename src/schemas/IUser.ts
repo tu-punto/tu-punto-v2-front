@@ -3,5 +3,4 @@ export interface IUser {
     role: "admin" | "seller";
     sucursalId?: string;
     email: string;
-    // …otros campos
 }
