@@ -1,4 +1,4 @@
-import { DatePicker, Input, message, Select, Table } from 'antd';
+import { Button, DatePicker, Input, message, Select, Table } from 'antd';
 import {useContext, useEffect, useState} from 'react';
 import { getShippingsAPI, getShippingByIdAPI  } from '../../api/shipping';
 import ShippingInfoModal from './ShippingInfoModal';
@@ -193,6 +193,10 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             key: 'cliente',
         },
     ];
+
+    const handleCancel = () => {
+        setIsModalExternalVisible(false)
+    };
 
     const handleIconClick = (order: any) => {
         if (order.estado_pedido === "Entregado") return;
