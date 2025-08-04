@@ -39,29 +39,23 @@ const BoxCloseView = ({ boxClose }: Props) => {
         id_efectivo_diario,
     } = boxClose;
 
-    const monedas = Object.entries(id_efectivo_diario)
-        .filter(([k]) => k.startsWith("corte_") && parseFloat(k.split("_")[1]) < 10)
-        .map(([k, v], i) => {
-            const corte = k.replace("corte_", "").replace("_", ".");
-            return {
-                key: i,
-                corte,
-                cantidad: v,
-                total: parseFloat(corte) * v,
-            };
-        });
+    const monedas = (boxClose.efectivo_diario || [])
+        .filter(item => item.corte < 10)
+        .map((item, index) => ({
+            key: index,
+            corte: item.corte,
+            cantidad: item.cantidad,
+            total: item.corte * item.cantidad,
+        }));
 
-    const billetes = Object.entries(id_efectivo_diario)
-        .filter(([k]) => k.startsWith("corte_") && parseFloat(k.split("_")[1]) >= 10)
-        .map(([k, v], i) => {
-            const corte = k.replace("corte_", "").replace("_", ".");
-            return {
-                key: i,
-                corte,
-                cantidad: v,
-                total: parseFloat(corte) * v,
-            };
-        });
+    const billetes = (boxClose.efectivo_diario || [])
+        .filter(item => item.corte >= 10)
+        .map((item, index) => ({
+            key: index,
+            corte: item.corte,
+            cantidad: item.cantidad,
+            total: item.corte * item.cantidad,
+        }));
 
     const columns = [
         {
