@@ -9,17 +9,15 @@ import {
   Row,
   Col,
   message,
+  Select,
+
 } from "antd";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { IBoxClose } from "../../models/boxClose";
 import { getDailySummary, IDailySummary } from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI } from "../../api/boxClose";
-import {
-  registerDailyEffectiveAPI,
-  updateDailyEffectiveAPI,
-} from "../../api/dailyEffective";
-
+import { getAdminsAPI } from "../../api/user";
 const { Title } = Typography;
 
 interface Props {
@@ -34,26 +32,23 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
   const [billTotals, setBillTotals] = useState(0);
   const [salesSummary, setSalesSummary] = useState<IDailySummary>();
   const [form] = Form.useForm<IBoxClose>();
-
+  const coins = Form.useWatch("coins", form) || {};
+  const bills = Form.useWatch("bills", form) || {};
+  const [admins, setAdmins] = useState<{ _id: string; name: string }[]>([]);
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      const data = await getAdminsAPI();
+      if (data) setAdmins(data);
+    };
+    fetchAdmins();
+  }, []);
   const fetchSalesSummary = async () => {
     try {
       const summary = await getDailySummary(selectedDate?.toISOString());
       setSalesSummary(summary || { cash: 0, bank: 0, total: 0 });
       const efectivoInicial = parseFloat(lastClosingBalance.efectivo_real) || 0;
       const cambiosExternos = form.getFieldValue("cambios_externos") || 0;
-      const efectivoEsperado =
-          efectivoInicial + (summary?.cash || 0) + cambiosExternos;
-
-      useEffect(() => {
-        const efectivoInicial = form.getFieldValue("efectivo_inicial") || 0;
-        const ventas = form.getFieldValue("ventas_efectivo") || 0;
-        const cambios = form.getFieldValue("cambios_externos") || 0;
-        form.setFieldValue("efectivo_esperado", (efectivoInicial + ventas + cambios).toFixed(2));
-      }, [
-        form.getFieldValue("efectivo_inicial"),
-        form.getFieldValue("ventas_efectivo"),
-        form.getFieldValue("cambios_externos"),
-      ]);
+      const efectivoEsperado = efectivoInicial + (summary?.cash || 0) + cambiosExternos;
 
       form.setFieldsValue({
         efectivo_inicial: efectivoInicial,
@@ -62,31 +57,37 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
         ventas_qr: summary?.bank || 0,
         efectivo_esperado: efectivoEsperado,
         bancario_esperado: summary?.bank,
-
       });
     } catch (error) {
       console.error("Error while fetching sales summary", error);
       setSalesSummary({ cash: 0, bank: 0, total: 0 });
     }
   };
+
+  const efectivoInicial = Form.useWatch("efectivo_inicial", form) || 0;
+  const ventas = Form.useWatch("ventas_efectivo", form) || 0;
+  const cambios = Form.useWatch("cambios_externos", form) || 0;
+
   useEffect(() => {
-    const coins = form.getFieldValue("coins") || {};
+    const esperado = efectivoInicial + ventas + cambios;
+    form.setFieldValue("efectivo_esperado", esperado.toFixed(2));
+  }, [efectivoInicial, ventas, cambios]);
+
+  useEffect(() => {
     const total = Object.entries(coins).reduce(
         (sum, [denom, qty]) => sum + (parseFloat(denom) * (qty || 0)),
         0
     );
     setCoinTotals(total);
-  }, [form.getFieldValue("coins")]);
+  }, [coins]);
 
   useEffect(() => {
-    const bills = form.getFieldValue("bills") || {};
     const total = Object.entries(bills).reduce(
         (sum, [denom, qty]) => sum + (parseFloat(denom) * (qty || 0)),
         0
     );
     setBillTotals(total);
-  }, [form.getFieldValue("bills")]);
-
+  }, [bills]);
 
   useEffect(() => {
     fetchSalesSummary();
@@ -101,42 +102,32 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
 
   const handleSubmit = async (values: any) => {
     try {
-      const dailyEffectiveValues: Record<string, number> = {};
-
-      Object.keys(coinDenominations).forEach((denomination) => {
-        dailyEffectiveValues[`corte_${denomination.replace(".", "_")}`] =
-            values.coins?.[denomination] || 0;
-      });
-
-      Object.keys(billDenominations).forEach((denomination) => {
-        dailyEffectiveValues[`corte_${denomination.replace(".", "_")}`] =
-            values.bills?.[denomination] || 0;
-      });
-
-      dailyEffectiveValues["total_coins"] = coinTotals;
-      dailyEffectiveValues["total_bills"] = billTotals;
-
       const { coins, bills, ...boxCloseValues } = values;
-      const resDailyEffective = await registerDailyEffectiveAPI(dailyEffectiveValues);
-      const dailyEffectiveID = resDailyEffective.newDailyEffective.id_efectivo_diario;
+
+      const efectivo_diario = [
+        ...Object.entries(coins).map(([denom, qty]) => ({
+          corte: parseFloat(denom),
+          cantidad: qty || 0,
+        })),
+        ...Object.entries(bills).map(([denom, qty]) => ({
+          corte: parseFloat(denom),
+          cantidad: qty || 0,
+        })),
+      ];
 
       const newBoxClose = {
         ...boxCloseValues,
-        cambios_externos: values.cambios_externos || 0, // NUEVO CAMPO
-        id_efectivo_diario: dailyEffectiveID,
+        responsable: {
+          id: values.responsable.value,
+          nombre: values.responsable.label,
+        },
+        cambios_externos: values.cambios_externos || 0,
         ingresos_efectivo: values.ventas_efectivo,
         ventas_efectivo: salesSummary?.cash,
         id_sucursal: localStorage.getItem("sucursalId"),
+        efectivo_diario,
       };
-      const boxCloseRes = await registerBoxCloseAPI(newBoxClose);
-      const boxCloseID = boxCloseRes.newBoxClose.id_cierre_caja;
-
-      const dailyEffectiveValuesWithBoxClose = {
-        ...dailyEffectiveValues,
-        id_cierre_caja: boxCloseID,
-      };
-
-      await updateDailyEffectiveAPI(dailyEffectiveID, dailyEffectiveValuesWithBoxClose);
+      await registerBoxCloseAPI(newBoxClose);
 
       message.success("Proceso completado con éxito.");
       onSuccess();
@@ -145,7 +136,6 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
       message.error("Error al intentar registrar el cierre de caja.");
     }
   };
-
   const coinDenominations = {
     "0.1": "10 ctvs.",
     "0.2": "20 ctvs.",
@@ -170,10 +160,20 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
             <Col span={12}>
               <Form.Item
                   label="Responsable"
-                  name="responsible"
+                  name="responsable"
                   rules={[{ required: true, message: "Campo requerido" }]}
               >
-                <Input />
+                <Select
+                    placeholder="Selecciona un responsable"
+                    labelInValue
+                    onChange={(option) => {
+                      form.setFieldValue("responsable", option); // <- ¡simplemente esto!
+                    }}
+                    options={admins.map((admin) => ({
+                      label: admin.name,
+                      value: admin._id,
+                    }))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -241,13 +241,7 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
                     min={0}
                     prefix="Bs. "
                     className="w-full"
-                    onChange={(value) => {
-                      const efectivoInicial = form.getFieldValue("efectivo_inicial") || 0;
-                      const ingresos = form.getFieldValue("ventas_efectivo") || 0;
-                      const extra = value || 0;
-                      const esperado = efectivoInicial + ingresos + extra;
-                      form.setFieldValue("efectivo_esperado", esperado.toFixed(2));
-                    }}
+
                 />
               </Form.Item>
             </Col>
@@ -442,7 +436,6 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
           <Title level={5}>Observaciones</Title>
           <Form.Item
               name="observaciones"
-              rules={[{ required: true, message: "Campo requerido" }]}
           >
             <Input.TextArea rows={4} />
           </Form.Item>

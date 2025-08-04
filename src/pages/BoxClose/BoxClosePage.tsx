@@ -21,8 +21,6 @@ import {
 } from "@ant-design/icons";
 import { getBoxClosesAPI } from "../../api/boxClose";
 import { IBoxClose } from "../../models/boxClose";
-import { IDailyEffective } from "../../models/dailyEffective";
-import { getDailyEffectivesAPI } from "../../api/dailyEffective";
 import BoxCloseForm from "./BoxCloseForm";
 import BoxCloseView from "./BoxCloseView";
 
@@ -40,22 +38,29 @@ const BoxClosePage = () => {
   const [selectedReconciliation, setSelectedReconciliation] = useState<IBoxClose | null>(null);
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(dayjs());
 
-
   const fetchBoxClosings = async () => {
     setLoading(true);
     try {
       const boxCloses = await getBoxClosesAPI();
-      const dailyEffective: IDailyEffective[] = await getDailyEffectivesAPI();
+
       const formattedData = boxCloses.map((boxClose: IBoxClose) => {
-        const currDailyEffective = dailyEffective.find(
-            (daily) => boxClose.id_efectivo_diario._id === daily._id
-        )
+        const efectivo = boxClose.efectivo_diario || [];
+
+        const total_coins = efectivo
+            .filter((item) => item.corte < 10)
+            .reduce((sum, item) => sum + item.corte * item.cantidad, 0);
+
+        const total_bills = efectivo
+            .filter((item) => item.corte >= 10)
+            .reduce((sum, item) => sum + item.corte * item.cantidad, 0);
+
         return {
           ...boxClose,
-          total_coins: currDailyEffective?.total_coins || 0,
-          total_bills: currDailyEffective?.total_bills || 0,
+          total_coins,
+          total_bills,
         };
       });
+
       setBoxClosings(formattedData);
     } catch (error) {
       console.error("Error fetching boxClosings:", error);

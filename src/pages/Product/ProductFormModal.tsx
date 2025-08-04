@@ -157,7 +157,12 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                 />
 
                 <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={loading}>
+                    <Button
+                        type="primary"
+                        htmlType="submit"
+                        loading={loading}
+                        disabled={combinations.length === 0}
+                    >
                         Registrar Producto
                     </Button>
                 </Form.Item>

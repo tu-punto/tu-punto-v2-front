@@ -90,10 +90,9 @@ const VariantInputs = ({
         };
 
         const result: any[] = [];
-        if (variants.every(v => v.subvariants.length && v.name)) {
+        if (variants.length > 0 && variants.every(v => v.subvariants.length && v.name)) {
             generateCombinations(0, [], result);
         }
-
         const normalizedReadOnly = readOnlyCombinations.map(combo => {
             const key = Object.entries(combo)
                 .filter(([k]) => k.startsWith('varName'))
