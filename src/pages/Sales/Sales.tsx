@@ -84,9 +84,20 @@ export const Sales = () => {
 
         if (searchText.trim()) {
             const lower = searchText.trim().toLowerCase();
-            filtered = filtered.filter(p =>
-                (p.producto ?? '').toString().toLowerCase().includes(lower)
-            );
+            const words = lower.split(" ");
+            const specialChars = /[!@#$%^&*?:{}|<>]/
+
+            const filterWords = (p: any, words: string[]) => {
+                let match = true;
+                for (const word of words) {
+                    if (!match) return false;
+                    if (specialChars.test(word)) continue;
+                    match = match && (p.producto ?? '').toString().toLowerCase().includes(word);
+                }
+                return match;
+            };
+
+            filtered = filtered.filter(p => filterWords(p, words));
         }
         filtered = filtered.map((p: any) => {
             const vendedor = sellers.find((v: any) => String(v._id) === String(p.id_vendedor));

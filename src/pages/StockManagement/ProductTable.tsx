@@ -208,8 +208,15 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
             const baseName = product.nombre_producto;
 
-            const nombreMatch = baseName?.toLowerCase().includes(searchText.toLowerCase());
-            const varianteMatch = product.variant?.toLowerCase().includes(searchText.toLowerCase());
+            const searchWords = searchText.split(" ");
+            const specialChars = /[!@#$%^&*?:{}|<>]/
+            let nombreMatch = true;
+            let varianteMatch = true;
+            for (const word of searchWords) {
+                if (specialChars.test(word)) continue
+                nombreMatch = nombreMatch && baseName?.toLowerCase().includes(word.toLowerCase());
+                varianteMatch = varianteMatch && product.variant?.toLowerCase().includes(word.toLowerCase());
+            }
 
             if (searchText && !nombreMatch && !varianteMatch) return;
 
