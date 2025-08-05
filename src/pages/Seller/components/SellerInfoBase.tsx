@@ -258,7 +258,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     return acc + subtotalDeuda;
   }, 0);
 
-  const deuda = Number(seller.deuda) || 0;
+  const deuda = sellerDebts.reduce((acc, debt) => {
+    if (debt.esDeuda) {
+      return acc + debt.monto;
+    }
+    return acc;
+  }, 0);
   const pagoPendiente = saldoPendiente - deuda;
 
   /* ─────────── render ─────────── */
