@@ -489,14 +489,15 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     };
 
     const handleChatClient = () => {
-        const phoneNumber = shipping.telefono_cliente;                //TODO Revisar el formato de codigo de paises
+        const phoneNumber = shipping.telefono_cliente;
 
         const shippingDate = new Date(shipping.hora_entrega_real);
         if ((""+shipping.hora_entrega_real).endsWith("Z")) {
             shippingDate.setTime(shippingDate.getTime() + 4*60*60*1000);
         }
 
-        const contentMsg: string = `Hola! Te escribimos de Tu Punto\nTenemos una entrega para ti a las ${shippingDate.getHours()}:${shippingDate.getMinutes()}, queríamos confirmar que estará a esa hora`;
+        const fixedMinutes = shippingDate.getMinutes() < 10 ? `0${shippingDate.getMinutes()}` : shippingDate.getMinutes();
+        const contentMsg: string = `Hola! Te escribimos de Tu Punto\nTenemos una entrega para ti a las ${shippingDate.getHours()}:${fixedMinutes}, queríamos confirmar que estará a esa hora`;
         const encodedMsg = encodeURIComponent(contentMsg);
         const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMsg}`;
 
