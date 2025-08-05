@@ -18,7 +18,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const [externalSalesData, setExternalSalesData] = useState([]);
     const [filteredSalesData, setFilteredSalesData] = useState([]);
     const [isModalExternalVisible, setIsModalExternalVisible] = useState(false);
-    const [isFilterActive, setIsFilterActive] = useState(false);
+    const [isShippingStatusFilterActive, setIsShippingStatusFilterActive] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [shippingStatus, setShippingStatus] = useState<null | 'Por sucursal' | 'Por flota' | 'Sin envío'>();
 
@@ -32,6 +32,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                 (a: any, b: any) => new Date(b.fecha_pedido).getTime() - new Date(a.fecha_pedido).getTime()
             );
             setExternalSalesData(sortedData);
+            setFilteredSalesData(sortedData);
         } catch (error) {
             console.error("Error fetching external sales data:", error);
         }
@@ -110,29 +111,26 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
         setIsModalExternalVisible(false)
     };
 
-    useEffect(() => {
-        setIsFilterActive(
-            shippingStatus === "Por sucursal" ||
-            shippingStatus === "Por flota" ||
-            shippingStatus === "Sin envío"
+    const updateFilteredSalesData = () => {
+        setFilteredSalesData(externalSalesData.filter(row => isRowOnFilter(row)));
+    }
+
+    const isRowOnFilter = (fila: any) => {
+        return (
+            isRowOnShippingStatusFilter(fila)
         )
-    }, [shippingStatus])
+    }
+
+    const isRowOnShippingStatusFilter = (fila: any) => {
+        return !isShippingStatusFilterActive || (isShippingStatusFilterActive && (
+            (shippingStatus === "Por sucursal" && fila.sucursal) ||
+            (shippingStatus === "Por flota" && fila.nombre_flota && fila.nombre_flota.trim().length > 0) ||
+            (shippingStatus === "Sin envío" && !fila.sucursal && !(fila.nombre_flota.trim().length > 0))
+        ))
+    }
 
     useEffect(() => {
-        if (shippingStatus === "Por sucursal") {
-            setFilteredSalesData(externalSalesData.filter(
-                item => 'sucursal' in item
-            ))
-        } else if (shippingStatus === "Por flota") {
-            setFilteredSalesData(externalSalesData.filter(
-                item => item.nombre_flota && item.nombre_flota.trim().length > 0 
-            ))
-        } else if (shippingStatus === "Sin envío") {
-            setFilteredSalesData(externalSalesData.filter(
-                item => !('sucursal' in item) && 
-                !(item.nombre_flota && item.nombre_flota.trim().length > 0)
-            ))
-        }
+        updateFilteredSalesData();
     }, [shippingStatus]);
 
     useEffect(() => {
@@ -158,7 +156,10 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                     placeholder="Filtrar por método de envío"
                     value={shippingStatus}
                     allowClear
-                    onChange={(value) => setShippingStatus(value)}
+                    onChange={(value) => {
+                        setShippingStatus(value)
+                        setIsShippingStatusFilterActive(value != null);
+                    }}
                 >
                     <Option value="Por sucursal">En sucursal</Option>
                     <Option value="Por flota">Por flota</Option>
@@ -167,23 +168,12 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
             </div>
             <h2 className='text-mobile-sm xl:text-desktop-3xl my-4'>Ventas externas</h2>
 
-            {isFilterActive && (
-                <Table
-                    columns={columns}
-                    dataSource={filteredSalesData}
-                    pagination={false}
-                    scroll={{ x: "max-content" }}
-                />
-            )}
-            {!isFilterActive && (
-                <Table
-                    columns={columns}
-                    dataSource={externalSalesData}
-                    pagination={false}
-                    scroll={{ x: "max-content" }}
-                />
-            )}
-
+            <Table
+                columns={columns}
+                dataSource={filteredSalesData}
+                pagination={false}
+                scroll={{ x: "max-content" }}
+            />
 
             <ExternalSalesModal
                 visible={isModalExternalVisible}
