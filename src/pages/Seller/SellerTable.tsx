@@ -7,7 +7,7 @@ import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellersAPI } from "../../api/seller";
+import { getSellerDebtsAPI, getSellersAPI } from "../../api/seller";
 import { getSalesBySellerIdAPI } from "../../api/sales";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
@@ -106,8 +106,8 @@ export default function SellerTable({
       title: "Fecha Vigencia",
       dataIndex: "fecha_vigencia",
       key: "fecha_vigencia",
-      sorter: (a: any, b: any) => 
-        dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() - 
+      sorter: (a: any, b: any) =>
+        dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() -
         dayjs(b.fecha_vigencia, "DD/MM/YYYY").unix(),
     },
     {
@@ -126,15 +126,19 @@ export default function SellerTable({
         </Button>
       ),
       sorter: (a: any, b: any) => {
-        const getNumericValue = (str: string) => parseFloat(str.replace(/[Bs.\s]/g, '')) || 0;
-        return getNumericValue(a.pago_mensual) - getNumericValue(b.pago_mensual);
+        const getNumericValue = (str: string) =>
+          parseFloat(str.replace(/[Bs.\s]/g, "")) || 0;
+        return (
+          getNumericValue(a.pago_mensual) - getNumericValue(b.pago_mensual)
+        );
       },
     },
     {
       title: "Comisión %",
       dataIndex: "comision_porcentual",
       key: "comision_porcentual",
-      sorter: (a: any, b: any) => (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
+      sorter: (a: any, b: any) =>
+        (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
     },
     {
       title: "Acciones",
@@ -157,47 +161,9 @@ export default function SellerTable({
         </div>
       ),
       width: 150,
-      fixed: 'right' as const,
+      fixed: "right" as const,
     },
   ];
-
-  const fetchSaldoPendiente = async (sellerId: string) => {
-    const sales = await getSalesBySellerIdAPI(sellerId);
-    if (!sales.length) {
-      return 0;
-    }
-
-    const pedidosProcesados = new Set();
-
-    const saldoPendiente = sales.reduce((acc: number, sale: any) => {
-      if (
-        sale.deposito_realizado ||
-        sale.id_pedido.estado_pedido === "En Espera"
-      ) {
-        return acc;
-      }
-
-      let subtotalDeuda = 0;
-
-      if (sale.id_pedido.pagado_al_vendedor) {
-        subtotalDeuda = -sale.utilidad;
-      } else {
-        subtotalDeuda = sale.cantidad * sale.precio_unitario - sale.utilidad;
-      }
-
-      if (!pedidosProcesados.has(sale.id_pedido._id)) {
-        const adelanto = sale.id_pedido.adelanto_cliente || 0;
-        const delivery = sale.id_pedido.cargo_delivery || 0;
-
-        subtotalDeuda -= adelanto + delivery;
-        pedidosProcesados.add(sale.id_pedido._id);
-      }
-
-      return acc + subtotalDeuda;
-    }, 0);
-
-    return saldoPendiente;
-  };
 
   useEffect(() => {
     (async () => {
@@ -216,8 +182,8 @@ export default function SellerTable({
             0
           );
 
-          const saldoPendiente = await fetchSaldoPendiente(seller._id);
-          const deuda = Number(seller.deuda) || 0;
+          const saldoPendiente = seller.saldo_pendiente
+          const deuda = seller.deuda
           const pagoPendiente = saldoPendiente - deuda;
 
           return {
@@ -256,7 +222,7 @@ export default function SellerTable({
 
     if (searchText) {
       filtered = filtered.filter((s) =>
-        s.nombre.toLowerCase().includes(searchText.toLowerCase()) 
+        s.nombre.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
@@ -298,7 +264,7 @@ export default function SellerTable({
           style={{ width: 250 }}
           allowClear
         />
-        
+
         <Select
           value={estadoFilter}
           onChange={setEstadoFilter}
@@ -329,15 +295,14 @@ export default function SellerTable({
           showSizeChanger: true,
           pageSizeOptions: ["5", "10", "20", "50"],
           defaultPageSize: 10,
-          showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} registros`,
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} de ${total} registros`,
         }}
         scroll={{ x: "max-content" }}
         title={() => (
           <h2 className="text-2xl font-bold">
             Pago pendiente Bs.&nbsp;
-            {filteredSellers
-              .reduce((t, s) => t + s.pagoTotalInt, 0)
-              .toFixed(2)}
+            {filteredSellers.reduce((t, s) => t + s.pagoTotalInt, 0).toFixed(2)}
           </h2>
         )}
         onRow={(r) => ({
