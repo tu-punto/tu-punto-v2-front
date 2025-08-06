@@ -235,46 +235,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
-  /* ─────────── valores para Stats ─────────── */
-  const pedidosProcesados = new Set();
-
-  const saldoPendiente = salesData.reduce((acc, sale) => {
-    if (sale.deposito_realizado) return acc;
-
-    let subtotalDeuda = 0;
-
-    if (sale.id_pedido.pagado_al_vendedor) {
-      subtotalDeuda = -sale.utilidad;
-    } else {
-      subtotalDeuda = sale.subtotal - sale.utilidad;
-    }
-
-    if (!pedidosProcesados.has(sale.id_pedido._id)) {
-      subtotalDeuda -=
-        sale.id_pedido.adelanto_cliente + sale.id_pedido.cargo_delivery;
-      pedidosProcesados.add(sale.id_pedido._id);
-    }
-
-    return acc + subtotalDeuda;
-  }, 0);
-
-  const deuda = sellerDebts.reduce((acc, debt) => {
-    if (debt.esDeuda) {
-      return acc + debt.monto;
-    }
-    return acc;
-  }, 0);
-  const pagoPendiente = saldoPendiente - deuda;
-
   /* ─────────── render ─────────── */
   return (
     <div>
       <SellerHeader name={seller.nombre} />
 
       <StatsCards
-        pagoPendiente={pagoPendiente}
-        deuda={deuda}
-        saldoPendiente={saldoPendiente}
+        pagoPendiente={seller.pago_pendiente}
+        deuda={seller.deuda}
+        saldoPendiente={seller.saldo_pendiente}
       />
 
       <Form
