@@ -18,7 +18,6 @@ const SellerInfoPageWrapper = () => {
                 const date = new Date(sellerData.fecha);
 
                 // Sumar alquiler, exhibición y delivery desde todas las sucursales
-                console.log("seller Info: ",sellerData)
                 const totalAlquiler = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.alquiler || 0), 0);
                 const totalExhibicion = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.exhibicion || 0), 0);
                 const totalDelivery = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.delivery || 0), 0);
@@ -44,6 +43,7 @@ const SellerInfoPageWrapper = () => {
                     adelanto_servicio: sellerData.adelanto_servicio || 0,
                     marca: sellerData.marca,
                     pago_sucursales: sellerData.pago_sucursales || [], 
+                    ...sellerData,
                 };
 
                 setSeller(sellerWithKey);
