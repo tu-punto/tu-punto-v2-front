@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Buffer } from 'buffer';
 import { getShippingGuidesAPI, getShippingGuidesBySellerAPI } from "../../api/shippingGuide";
-import { Button, Card, Col, message, Modal, Row, Table } from "antd";
-import { FileImageOutlined } from '@ant-design/icons';
+import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
+import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import moment from "moment-timezone";
 
-const ShippingGuideTable = ({ refreshKey, user }: { refreshKey: number, user: any }) => {
+const ShippingGuideTable = (
+    { refreshKey, user, isFilterBySeller, id_vendedor }:
+        { refreshKey: number, user: any, isFilterBySeller: boolean, id_vendedor: string }) => {
     const [guidesList, setGuidesList] = useState([]);
     const [imageUrl, setImageUrl] = useState<string | null>();
     const [imageDesc, setImageDesc] = useState<string | null>();
@@ -15,7 +17,7 @@ const ShippingGuideTable = ({ refreshKey, user }: { refreshKey: number, user: an
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
     useEffect(() => {
-        if (isAdmin) {
+        if (!isFilterBySeller) {
             fetchAllGuides();
         } else {
             fetchGuidesBySeller();
@@ -36,7 +38,7 @@ const ShippingGuideTable = ({ refreshKey, user }: { refreshKey: number, user: an
     }
     const fetchGuidesBySeller = async () => {
         try {
-            const apiData = await getShippingGuidesBySellerAPI(user.id_vendedor);
+            const apiData = await getShippingGuidesBySellerAPI(id_vendedor);
             const sortedData = apiData.sort(
                 (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
             );
@@ -60,6 +62,10 @@ const ShippingGuideTable = ({ refreshKey, user }: { refreshKey: number, user: an
         }
     }
 
+    const handleCheckShipping = (record: any) => {
+        //TODO - Relación con pedidos?
+    }
+
     const columns = [
         {
             title: 'Fecha de creación',
@@ -68,8 +74,8 @@ const ShippingGuideTable = ({ refreshKey, user }: { refreshKey: number, user: an
             width: 200,
             render: (text: string) => moment.parseZone(text).format("DD/MM/YYYY"),
             sorter: (a: any, b: any) =>
-                moment.parseZone(a.fecha_pedido).valueOf() -
-                moment.parseZone(b.fecha_pedido).valueOf(),
+                moment.parseZone(a.fecha_subida).valueOf() -
+                moment.parseZone(b.fecha_subida).valueOf(),
             sortOrder,
             onHeaderCell: () => ({
                 onClick: () => {
@@ -96,9 +102,23 @@ const ShippingGuideTable = ({ refreshKey, user }: { refreshKey: number, user: an
             render: (_: any, record: any) => {
                 return (
                     <>
-                        <Button onClick={() => { handleShowImage(record) }}>
-                            <FileImageOutlined />Ver foto
-                        </Button>
+                        {record.imagen && (
+                            <Tooltip title="Ver foto">
+                                <Button
+                                    size="small"
+                                    icon={<FileImageOutlined />}
+                                    onClick={() => { handleShowImage(record) }}
+                                />
+                            </Tooltip>
+                        )}
+                        {isAdmin && (
+                            <Tooltip title="Confirmar entrega">
+                                <Button 
+                                    size="small"
+                                    icon={<CheckCircleOutlined />}
+                                    onClick={() => { handleCheckShipping(record) }}/>
+                            </Tooltip>
+                        )}
                     </>
                 )
             }

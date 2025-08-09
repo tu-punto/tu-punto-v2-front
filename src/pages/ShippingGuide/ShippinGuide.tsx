@@ -38,6 +38,8 @@ const ShippingGuide = () => {
                 <ShippingGuideTable
                     refreshKey={refreshKey}
                     user={user}
+                    isFilterBySeller
+                    id_vendedor={user.id_vendedor}
                 />
             </div>
             
