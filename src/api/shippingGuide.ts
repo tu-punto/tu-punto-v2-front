@@ -14,6 +14,19 @@ const getShippingGuidesAPI = async () => {
     }
 }
 
+const getShippingGuidesBySellerAPI = async(sellerID: string) => {
+    try {
+        const res = await apiClient.get(`/shippingGuide/seller/${sellerID}`);
+        return res.data;
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return {success: false, ...err.response.data};
+        }
+        return {success: false}
+    }
+}
+
 const registerShippingGuideAPI = async (formData: any) => {
     try {
         const res = await apiClientNoJSON.post("/shippingGuide/upload", formData);
@@ -29,5 +42,6 @@ const registerShippingGuideAPI = async (formData: any) => {
 
 export {
     getShippingGuidesAPI,
+    getShippingGuidesBySellerAPI,
     registerShippingGuideAPI,
 }

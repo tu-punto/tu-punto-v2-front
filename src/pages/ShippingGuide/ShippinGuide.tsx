@@ -2,12 +2,20 @@ import { useContext, useState } from "react";
 import { UserContext } from "../../context/userContext.tsx";
 import { Button } from 'antd';
 import UploadGuideModal from "./UploadGuideModal.tsx";
+import ShippingGuideTable from "./ShippingGuideTable.tsx";
 
 const ShippingGuide = () => {
     const [isUploadGuideModalView, setIsUploadGuideModalView] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0)
 
     const { user } = useContext(UserContext);
     const isAdmin = user?.role?.toLowerCase() === 'admin';
+
+    const handleFinish = () => {
+        setRefreshKey(prevKey => prevKey + 1);
+        setIsUploadGuideModalView(false); 
+        console.log("key",refreshKey)
+    };
 
     return (
         <div className="p-4">
@@ -20,16 +28,23 @@ const ShippingGuide = () => {
                 </div>
             </div>
             {!isAdmin && (
-                <Button 
+                <Button
                     type="primary"
-                    onClick={() => {setIsUploadGuideModalView(true)}}>
+                    onClick={() => { setIsUploadGuideModalView(true) }}>
                     Subir nueva guía
                 </Button>
             )}
-            <UploadGuideModal 
-                visible={isUploadGuideModalView} 
-                onCancel={() => {setIsUploadGuideModalView(false)}}
-                onFinish={() => {console.log("TODO actualiza la tabla")}}
+            <div className="px-5 py-4">
+                <ShippingGuideTable
+                    refreshKey={refreshKey}
+                    user={user}
+                />
+            </div>
+            
+            <UploadGuideModal
+                visible={isUploadGuideModalView}
+                onCancel={() => { setIsUploadGuideModalView(false) }}
+                onFinish={handleFinish}
             />
         </div>
     );
