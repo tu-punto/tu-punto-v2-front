@@ -43,7 +43,7 @@ const SellerInfoPageWrapper = () => {
                     adelanto_servicio: sellerData.adelanto_servicio || 0,
                     marca: sellerData.marca,
                     pago_sucursales: sellerData.pago_sucursales || [], 
-                    //...sellerData,
+                    ...sellerData,
                 };
 
                 setSeller(sellerWithKey);
