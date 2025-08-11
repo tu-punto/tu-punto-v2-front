@@ -40,8 +40,22 @@ const registerShippingGuideAPI = async (formData: any) => {
     }
 } 
 
+const markAsDelivered = async (shippingGuideID: string) => {
+    try {
+        await apiClient.put(`/shippingGuide/mark-deliver/${shippingGuideID}`)
+        return {success: true}
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return {success: false, ...err.response.data};
+        }
+        return {success: false}
+    }
+}
+
 export {
     getShippingGuidesAPI,
     getShippingGuidesBySellerAPI,
     registerShippingGuideAPI,
+    markAsDelivered,
 }

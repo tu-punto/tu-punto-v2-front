@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Buffer } from 'buffer';
-import { getShippingGuidesAPI, getShippingGuidesBySellerAPI } from "../../api/shippingGuide";
+import { getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
 import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
 import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import moment from "moment-timezone";
@@ -51,7 +51,6 @@ const ShippingGuideTable = (
 
     const handleShowImage = (record: any) => {
         if (record.imagen) {
-            console.log(record)
             const imageData = record.imagen.data;
             const buffer = Buffer.from(imageData);
             const blob = new Blob([buffer], { type: record.tipoArchivo });
@@ -62,16 +61,44 @@ const ShippingGuideTable = (
         }
     }
 
-    const handleCheckShipping = (record: any) => {
-        //TODO - Relación con pedidos?
+    const handleCheckShipping = async (record: any) => {
+        if (record.isRecogido) {
+            message.info("Esta guía ya fue marcada como recogida")
+            return
+        }
+        try {
+            const res = await markAsDelivered(record._id);
+            if (res.success) {
+                message.success("El estado de la guía se ha actualizado correctamente")
+            } else {
+                message.error("Error al actualizar el estado de la guía")
+            }
+        } catch (error) {
+            console.error("Erorr al actualizar el estado entregado de Guía de Envío: ",error)
+            message.error("Error al actualizar el estado de la guía")
+        }
     }
 
     const columns = [
         {
+            title: '¿Recogido?',
+            dataIndex: 'isRecogido',
+            key:'isRecogido',
+            width: 100,
+            render: (_: any, record: any) => {
+                const color = record.isRecogido ? 'bg-green-500' : 'bg-red-500';
+                return {
+                    children: <div
+                        className={`w-4 h-4 rounded-full ${color}`}
+                    />,
+                }
+            }
+        },
+        {
             title: 'Fecha de creación',
             dataIndex: 'fecha_subida',
             key: 'fecha_subida',
-            width: 200,
+            width: 180,
             render: (text: string) => moment.parseZone(text).format("DD/MM/YYYY"),
             sorter: (a: any, b: any) =>
                 moment.parseZone(a.fecha_subida).valueOf() -
