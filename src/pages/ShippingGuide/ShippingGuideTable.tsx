@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Buffer } from 'buffer';
-import { getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
+import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
 import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
 import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import moment from "moment-timezone";
 
 const ShippingGuideTable = (
-    { refreshKey, user, isFilterBySeller, id_vendedor }:
-        { refreshKey: number, user: any, isFilterBySeller: boolean, id_vendedor: string }) => {
+    { refreshKey, user, isFilterBySeller, isFilterByBranch,  search_id }:
+        { refreshKey: number, user: any, isFilterBySeller?: boolean, isFilterByBranch?: boolean, search_id: string }) => {
     const [guidesList, setGuidesList] = useState([]);
     const [imageUrl, setImageUrl] = useState<string | null>();
     const [imageDesc, setImageDesc] = useState<string | null>();
@@ -17,10 +17,12 @@ const ShippingGuideTable = (
     const isAdmin = user?.role?.toLowerCase() === 'admin';
 
     useEffect(() => {
-        if (!isFilterBySeller) {
+        if (!isFilterBySeller && !isFilterByBranch) {
             fetchAllGuides();
-        } else {
+        } else if (isFilterBySeller) {
             fetchGuidesBySeller();
+        } else if (isFilterByBranch) {
+            fetchGuidesByBranch();
         }
     }, [refreshKey])
 
@@ -38,7 +40,7 @@ const ShippingGuideTable = (
     }
     const fetchGuidesBySeller = async () => {
         try {
-            const apiData = await getShippingGuidesBySellerAPI(id_vendedor);
+            const apiData = await getShippingGuidesBySellerAPI(search_id);
             const sortedData = apiData.sort(
                 (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
             );
@@ -48,6 +50,19 @@ const ShippingGuideTable = (
             message.error("Error al cargar Guías de Envío")
         }
     };
+
+    const fetchGuidesByBranch = async () => {
+        try {
+            const apiData = await getShippingByBranchAPI(search_id);
+            const sortedData = apiData.sort(
+                (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
+            );
+            setGuidesList(sortedData)
+        } catch (error) {
+            console.error("Error al obtener Guías de Envío por vendedor: ", error)
+            message.error("Error al cargar Guías de Envío")
+        }
+    }
 
     const handleShowImage = (record: any) => {
         if (record.imagen) {
