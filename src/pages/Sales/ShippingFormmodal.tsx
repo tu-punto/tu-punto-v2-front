@@ -6,6 +6,8 @@ import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
 import { getSucursalsAPI } from "../../api/sucursal";
+import { COUNTRY_CODES } from '../../constants/countryCodes';
+import ReactCountryFlag from "react-country-flag";
 import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -29,6 +31,7 @@ function ShippingFormModal({
     const [isDeliveryPlaceInput, setIsDeliveryPlaceInput] = useState(false);
     const [montoCobradoDelivery, setMontoCobradoDelivery] = useState<number>(0);
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
+    const [codigoCelular, setCodigoCelular] = useState<number | null>()
     const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [form] = Form.useForm();
@@ -141,6 +144,7 @@ function ShippingFormModal({
 
             const response = await registerShippingAPI({
                 ...values,
+                telefono_cliente: (codigoCelular) ? codigoCelular + values.telefono_cliente : "",
                 fecha_pedido: fechaPedido,
                 hora_entrega_acordada: horaEntregaAcordada,
                 hora_entrega_real: horaEntregaReal,
@@ -296,8 +300,36 @@ function ShippingFormModal({
                                 <Input prefix={<UserOutlined />} />
                             </Form.Item>
                         </Col>
-                        <Col span={18}>
-                            <Form.Item name="telefono_cliente" label="Celular" >
+                    </Row>
+                    <Row gutter={16}>
+                        <Col span={6}>
+                            <Form.Item name="celular_cliente" label="Celular">
+                                <Select
+                                    placeholder="Código celular"
+                                    allowClear
+                                    value={codigoCelular}
+                                    onChange={(value) => setCodigoCelular(value)}
+                                >
+                                    {COUNTRY_CODES.map((codigo) => (
+                                        <Select.Option key={codigo.code} value={codigo.code} >
+                                            <ReactCountryFlag
+                                                countryCode={codigo.flag}
+                                                svg
+                                                style={{
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    marginRight: '8px',
+                                                }}
+                                                aria-label={codigo.name}
+                                            />
+                                            {codigo.name}
+                                        </Select.Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="telefono_cliente" label>
                                 <Input
                                     prefix={<PhoneOutlined />}
                                     onKeyDown={(e) => {
