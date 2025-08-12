@@ -16,6 +16,7 @@ import BranchPage from "../pages/Branch/BranchPage";
 import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
+import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
 
 const protectedRoutes = [
   {
@@ -154,6 +155,14 @@ const protectedRoutes = [
             <UsersPage />
           </RoleGuard>
         ),
+      },
+      {
+        path: "/shipping-guide",
+        element: (
+          <RoleGuard allowedRoles={["seller"]}>
+            <ShippingGuide/>
+          </RoleGuard>
+        )
       },
       {
         path: "*",
