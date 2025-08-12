@@ -1,14 +1,56 @@
-import { Card, Col, Form, Modal, Row, Input, Upload, Button, message, DatePicker } from "antd";
-import { useContext, useState } from "react";
+import { Card, Col, Form, Modal, Row, Input, Upload, Button, message, DatePicker, Select } from "antd";
+import { useContext, useEffect, useState } from "react";
 import { UserContext } from "../../context/userContext.tsx";
 import { MessageOutlined, UploadOutlined } from '@ant-design/icons';
 import { registerShippingGuideAPI } from "../../api/shippingGuide.ts";
+import { getSellerAPI } from "../../api/seller";
 import moment from 'moment';
+import { IBranch } from "../../models/branchModel.ts";
+import { getSucursalsAPI } from "../../api/sucursal.ts";
 
 function UploadGuideModal({ visible, onCancel, onFinish }: any) {
+    const [selectedBranch, setSelectedBranch] = useState<string>("");
+    const [branchs, setBranchs] = useState<IBranch[]>();
     const [form] = Form.useForm();
     const { user } = useContext(UserContext);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        fetchBranchs();
+    })
+
+    const fetchBranchs = async () => {
+        const branches = await getSucursalsAPI();
+        const sellerData = await getSellerAPI(user.id_vendedor);
+        const branchData = sellerData.pago_sucursales;
+        
+        const activeBranchIDs: Set<number> = new Set();
+        const sellerFinalDate = new Date(sellerData.fecha_vigencia);
+        branchData.forEach((branch: IBranch) => {
+            if (isActiveSellerBranch(branch, sellerFinalDate)) {
+                activeBranchIDs.add(branch.id_sucursal);
+            }
+        });
+
+        const filteredBranches: IBranch[] = [];
+        branches.forEach((branch: IBranch) => {
+            if (activeBranchIDs.has(branch._id)) {
+                filteredBranches.push(branch);
+            }
+        })
+        setBranchs(filteredBranches)
+    }
+
+    const isActiveSellerBranch = (branch: any, finalDate: Date) => {
+        const actualDate = new Date();
+        let branchFinalDate: Date;
+        if (branch.fecha_salida) {
+            branchFinalDate = new Date(branch.fecha_salida);
+        } else {
+            branchFinalDate = finalDate;
+        }
+        return branchFinalDate > actualDate
+    }
 
     const handleUploadChange = (info: any) => {
         if (info.file.status === 'done') {
@@ -21,12 +63,14 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
     const handleFinish = async (values: any) => {
         setLoading(true);
         try {
+            const sucursal = selectedBranch;
             const vendedor_id = user.id_vendedor;
             const descripcion = values.description;
             const imagen = values.image && values.image[0] ? values.image[0].originFileObj : null;
 
             const formData = new FormData();
             formData.append('vendedor', vendedor_id);
+            formData.append('sucursal', sucursal);
             formData.append('descripcion', descripcion);
             if (imagen) {
                 formData.append('imagen', imagen);
@@ -69,6 +113,21 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
                                     disabled={true}
                                     defaultValue={moment()}
                                 />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name='sucursal' label='Sucursal' rules={[{ required: true }]}>
+                                <Select
+                                    placeholder="Seleccione una sucursal"
+                                    value={selectedBranch}
+                                    onChange={(value) => setSelectedBranch(value)}
+                                >
+                                    {branchs?.map((b: any) => (
+                                        <Select.Option key={b._id} value={b._id}>
+                                            {b.nombre}
+                                        </Select.Option>
+                                    ))}
+                                </Select>
                             </Form.Item>
                         </Col>
                     </Row>
