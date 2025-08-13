@@ -43,7 +43,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
         cleanStockData();
         cleanSalesData();
         cleanEntryData();
-    }, [rowRecord,visible])
+    }, [rowRecord, visible])
 
     const fetchBranches = async () => {
         try {
@@ -87,10 +87,15 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
         const branches = rowRecord.sucursales;
         branches.forEach((branch: any) => {
             branch.combinaciones.forEach((b: any) => {
-                if (b.variantes["Variante 1"] == rowRecord.variant) {
-                    const nombre_sucursal = branchMap.get(branch.id_sucursal) || "";
-                    const stock = b.stock;
-                    cleanData.push({ nombre_sucursal, stock })
+                const varianteKeys = Object.keys(b.variantes);
+                if (varianteKeys.length > 0) {
+                    const varianteKey = varianteKeys[0];
+                    const varianteValue = b.variantes[varianteKey]; 
+                    if (varianteValue === rowRecord.variant) {
+                        const nombre_sucursal = branchMap.get(branch.id_sucursal) || "";
+                        const stock = b.stock;
+                        cleanData.push({ nombre_sucursal, stock });
+                    }
                 }
             })
         });
