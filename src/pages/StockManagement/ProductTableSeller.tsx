@@ -9,6 +9,7 @@ import { getCategoryByIdAPI } from '../../api/category';
 import { getSucursalsAPI } from "../../api/sucursal";
 import { getCategoriesAPI } from "../../api/category";
 import { getSellerAPI } from '../../api/seller';
+import VariantInfoModal from './VariantInfoModal.tsx';
 
 
 const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSucursalId}) => {
@@ -27,6 +28,8 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
     const [priceModalOpen, setPriceModalOpen] = useState(false);
     const [selectedVariantName, setSelectedVariantName] = useState("");
     const [selectedProductModal, setSelectedProductModal] = useState<any>(null);
+    const [showProductInfoModal, setShowProductInfoModal] = useState(false);
+    const [selectedRecord, setSelectedRecord] = useState<any>();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -180,6 +183,13 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
         },
     ];
 
+    const handleRowClick = (record: any) => {
+        if (!record.esCabecera) {
+            setSelectedRecord(record);
+            setShowProductInfoModal(true);
+        }
+    }
+
     return (
         <Spin spinning={updatedProductsList.length === 0} tip="Cargando productos...">
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -237,6 +247,9 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                 dataSource={flatVariantList(updatedProductsList)}
                 pagination={{ pageSize: 100 }}
                 rowKey="key"
+                onRow={(record) => ({
+                    onClick: () => handleRowClick(record), 
+                })}
             />
             <AddVariantModal
                 visible={variantModalOpen}
@@ -259,6 +272,11 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                 onClose={() => setPriceModalOpen(false)}
                 variantName={selectedVariantName}
                 producto={selectedProductModal}
+            />
+            <VariantInfoModal
+                visible={showProductInfoModal}
+                onClose={()=> setShowProductInfoModal(false)}
+                rowRecord={selectedRecord}
             />
         </Spin>
     );
