@@ -4,6 +4,7 @@ import { UserContext } from '../../context/userContext';
 import { getSucursalsAPI } from '../../api/sucursal';
 import { getProductsEntryAmount } from '../../api/entry';
 import moment from 'moment-timezone';
+import { getSalesBySellerIdAPI } from '../../api/sales';
 
 const VariantInfoModal = ({ visible, onClose, rowRecord }: {
     visible: boolean;
@@ -17,11 +18,12 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
     const [salesData, setSalesData] = useState<any[]>();
     const [entryData, setEntryData] = useState<any[]>();
     const [branchMap, setBranchMap] = useState<Map<string, string>>(new Map);
-    const [entrySet, setEntrySet] = useState<Set<string>>(new Set);
+    const [sellRawData, setSellRawData] = useState<any[]>();
     const [entryRawData, setEntryRawData] = useState<any[]>();
 
     useEffect(() => {
         fetchBranches();
+        fetchSells();
         fetchEntries();
     }, [rowRecord])
 
@@ -29,7 +31,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
         if (!rowRecord) return;
 
         if (rowRecord.ingreso) {
-            setEntrySet(new Set(rowRecord.ingreso));
+
         }
         if (rowRecord.nombre_producto) {
             setProductName(rowRecord.nombre_producto);
@@ -41,7 +43,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
         cleanStockData();
         cleanSalesData();
         cleanEntryData();
-    }, [rowRecord, entrySet])
+    }, [rowRecord,visible])
 
     const fetchBranches = async () => {
         try {
@@ -56,6 +58,17 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
         } catch (error) {
             console.error("Error al obtener sucursales", error)
             message.error("Error al obtener sucursales.")
+        }
+    }
+
+    const fetchSells = async () => {
+        try {
+            const sellData = await getSalesBySellerIdAPI(user.id_vendedor);
+            if (!sellData) return
+            setSellRawData(sellData);
+        } catch (error) {
+            console.error("Error al obtener ventas:", error)
+            message.error("Error al obtener ventas.")
         }
     }
 
@@ -85,13 +98,26 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
     }
 
     const cleanSalesData = () => {
-
+        const cleanData: {
+            fecha: Date, producto: string, sucursal: string,
+            precio: number, cantidad: number, subtotal: number
+        }[] = [];
+        sellRawData?.forEach((sell: any) => {
+            if (sell.id_producto == rowRecord._id) {
+                const fecha = sell.fecha_pedido;
+                const producto = sell.nombre_variante;
+                const sucursal = branchMap.get(sell.id_sucursal) || "";
+                const precio = sell.precio_unitario;
+                const cantidad = sell.cantidad;
+                const subtotal = sell.id_pedido.subtotal_efectivo + sell.id_pedido.subtotal_qr;
+                cleanData.push({ fecha, producto, sucursal, precio, cantidad, subtotal });
+            }
+        })
+        setSalesData(cleanData);
     }
 
     const cleanEntryData = async () => {
-        if (entrySet.size == 0) {
-            console.log("ya ni le muevas pa")
-        }
+        const entrySet = new Set(rowRecord.ingreso);
         const cleanData: { fecha: Date, sucursal: string, producto: string, cantidad: number }[] = [];
         entryRawData?.forEach((entry: any) => {
             if (entrySet.has(entry._id)) {
@@ -122,6 +148,8 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
             title: 'Fecha',
             key: 'fecha',
             dataIndex: 'fecha',
+            render: (text: string) =>
+                moment.parseZone(text).format("DD/MM/YYYY"),
         },
         {
             title: 'Producto',
@@ -182,6 +210,9 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
     const resetFields = () => {
         setProductName(null);
         setVariantName(null);
+        setStockData([]);
+        setSalesData([]);
+        setEntryData([]);
     }
 
     return (
