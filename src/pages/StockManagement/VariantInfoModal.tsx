@@ -29,10 +29,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: {
 
     useEffect(() => {
         if (!rowRecord) return;
-
-        if (rowRecord.ingreso) {
-
-        }
+        
         if (rowRecord.nombre_producto) {
             setProductName(rowRecord.nombre_producto);
         }
