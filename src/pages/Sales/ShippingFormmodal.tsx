@@ -366,7 +366,10 @@ function ShippingFormModal({
                             />
                         </div>
                         <Col span={12}>
-                            <Form.Item name="hora_entrega_acordada" label="Hora Entrega">
+                            <Form.Item 
+                                name="hora_entrega_acordada" 
+                                label={isRangeHour? "Inicio del Rango Horario":"Hora de Entrega"}
+                            >
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>

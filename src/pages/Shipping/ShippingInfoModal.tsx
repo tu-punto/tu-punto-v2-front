@@ -201,6 +201,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const rawFecha = shipping.hora_entrega_acordada;
         const originalHoraEntregaUTC = rawFecha ? dayjs.utc(rawFecha) : null;
 
+        const fechaRango = shipping.hora_entrega_rango_final
+        const originalHoraRangoUTC = fechaRango ? dayjs.utc(fechaRango) : null;
+
         setIsRangeHour(shipping.hora_entrega_rango_final)
 
         //console.log("🟢 UTC:", dayjs.utc(shipping.hora_entrega_acordada).format());
@@ -215,7 +218,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             hora_entrega_acordada: originalHoraEntregaUTC
                 ? dayjs(originalHoraEntregaUTC.format("HH:mm:ss"), "HH:mm:ss")
                 : null,
-            hora_entrega_rango_final: shipping.hora_entrega_rango_final ? dayjs.utc(shipping.hora_entrega_rango_final, "HH:mm:ss") : null,
+            hora_entrega_rango_final: originalHoraRangoUTC
+                ? dayjs(originalHoraRangoUTC.format("HH:mm:ss"), "HH:mm:ss")
+                : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
             quien_paga_delivery: quienPagaDeVenta,
@@ -442,6 +447,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
             const fechaHoraEntregaAcordada = `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`;
 
+            const horaRango = values.hora_entrega_rango_final && dayjs.isDayjs(values.hora_entrega_rango_final)
+                ? values.hora_entrega_rango_final.format("HH:mm:ss")
+                : moment().format("HH:mm:ss");
+
+            const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
+
             let horaEntregaReal = values.estado_pedido === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
                 : fechaHoraEntregaAcordada;
@@ -453,18 +464,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,                
                 pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
-                //hora_entrega_rango_final: horaEntregaRangoFinal,
+                hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: values.esta_pagado,
                 adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
                 quien_paga_delivery: values.quien_paga_delivery,
             };
             if (values.quien_paga_delivery === "tupunto") {
                 updateShippingInfo.cargo_delivery = 0;
-            }
-            if (values.hora_entrega_rango_final) {
-                //const hora = values.hora_entrega_rango_final.format("HH:mm:ss");
-                const hora = `${fechaEntrega.format("YYYY-MM-DD")} ${values.hora_entrega_rango_final.format("HH:mm:ss")}`;
-                updateShippingInfo.hora_entrega_rango_final = hora
             }
 
             // Forzar subtotales según el tipo de pago
@@ -661,7 +667,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         <Col span={12}>
                             <Form.Item 
                                 name="hora_entrega_acordada" 
-                                label={isRangeHour? "Inicio del Rango Horario":"Hora de Entrega Específica"}
+                                label={
+                                    isRangeHour && shipping?.estado_pedido !== "Entregado" 
+                                    ? "Inicio del Rango Horario"
+                                    : "Hora de Entrega"}
                             >
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
