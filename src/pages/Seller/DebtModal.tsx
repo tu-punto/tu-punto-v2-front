@@ -147,6 +147,13 @@ export default function DebtModal({
       width={850}
     >
       <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Form.Item name="isDebt" label="¿Es deuda?">
+          <Radio.Group>
+            <Radio.Button value={true}>SI</Radio.Button>
+            <Radio.Button value={false}>NO</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
+
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
