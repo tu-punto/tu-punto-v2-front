@@ -28,7 +28,7 @@ const MaintenancePage = () => (
             </h1>
             <p className="text-lg text-gray-600 mb-6">
                 Estamos trabajando para mejorar tu experiencia.<br />
-                Volvemos a las <strong>05:00 AM</strong>.
+                Volvemos a las <strong>10:00 AM</strong>.
             </p>
             <div className="text-base text-gray-400">
                 Gracias por tu paciencia 💙
