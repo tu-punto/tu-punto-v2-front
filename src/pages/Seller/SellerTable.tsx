@@ -1,6 +1,10 @@
 import { Button, Table, Tooltip, Select, Space, Input, Modal } from "antd";
 import { useEffect, useState, useContext } from "react";
-import { EditOutlined, SearchOutlined, FileDoneOutlined } from "@ant-design/icons";
+import {
+  EditOutlined,
+  SearchOutlined,
+  FileDoneOutlined,
+} from "@ant-design/icons";
 import { UserContext } from "../../context/userContext.tsx";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
@@ -168,7 +172,9 @@ export default function SellerTable({
               type="primary"
               size="small"
               icon={<FileDoneOutlined />}
-              onClick={() => {handleGuideView(row._id)}}
+              onClick={() => {
+                handleGuideView(row._id);
+              }}
             />
           </Tooltip>
         </div>
@@ -185,18 +191,20 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-          const mensual = seller.pago_sucursales.reduce(
-            (t: number, p: ISucursalPago) =>
-              t +
-              Number(p.alquiler) +
-              Number(p.exhibicion) +
-              Number(p.delivery) +
-              Number(p.entrega_simple),
-            0
-          );
+          const mensual = seller.pago_sucursales
+            .filter((p) => p.activo)
+            .reduce(
+              (t: number, p: ISucursalPago) =>
+                t +
+                Number(p.alquiler) +
+                Number(p.exhibicion) +
+                Number(p.delivery) +
+                Number(p.entrega_simple),
+              0
+            );
 
-          const saldoPendiente = seller.saldo_pendiente
-          const deuda = seller.deuda
+          const saldoPendiente = seller.saldo_pendiente;
+          const deuda = seller.deuda;
           const pagoPendiente = saldoPendiente - deuda;
 
           return {
@@ -268,8 +276,8 @@ export default function SellerTable({
 
   const handleGuideView = (id: string) => {
     setSellerID(id);
-    setViewModalGuides(true)
-  }
+    setViewModalGuides(true);
+  };
 
   return (
     <>
@@ -360,16 +368,17 @@ export default function SellerTable({
         </>
       )}
       {viewModalGuides && (
-        <Modal 
-          title='Guías de Envío'
-          footer={false} 
+        <Modal
+          title="Guías de Envío"
+          footer={false}
           open={viewModalGuides}
           width={1000}
           onCancel={() => {
             setViewModalGuides(false);
             setSellerID("");
             closeAll();
-          }}>
+          }}
+        >
           <ShippingGuideTable
             refreshKey={refreshKey}
             user={user}

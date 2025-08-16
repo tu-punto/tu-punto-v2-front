@@ -50,10 +50,12 @@ export default function DebtModal({
           const id = p.id_sucursal?.$oid || p.id_sucursal;
           const sucursal = sucursales.find((s) => s._id === id);
           return {
+            ...p,
             id_sucursal: id,
             sucursalName:
               sucursal?.nombre || p.sucursalName || "Sucursal sin nombre",
             alquiler: p.alquiler,
+            almacenamiento: p.alquiler,
             exhibicion: p.exhibicion,
             delivery: p.delivery,
             entrega_simple: p.entrega_simple,
