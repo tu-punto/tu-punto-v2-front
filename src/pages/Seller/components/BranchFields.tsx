@@ -23,7 +23,6 @@ const BranchFields = ({
 }: any) => {
   const sucursales = form.getFieldValue("sucursales") || [];
   const currentBranch = sucursales[field.name] || {};
-  currentBranch.almacenamiento = currentBranch.alquiler;
   const handleActivoChange = (e: any) => {
     const isActive = e.target.value;
 
