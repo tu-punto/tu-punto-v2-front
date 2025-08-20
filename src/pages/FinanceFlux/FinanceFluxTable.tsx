@@ -166,7 +166,7 @@ function FinanceFluxTable({ refreshKey, onEdit }: any) {
     },
     {
       title: "Founder",
-      dataIndex: "encargado",
+      dataIndex: "founder",
       key: "finance_flux_worker",
       className: "text-mobile-sm xl:text-desktop-sm",
       sorter: (a: any, b: any) => a.encargado.localeCompare(b.encargado),
