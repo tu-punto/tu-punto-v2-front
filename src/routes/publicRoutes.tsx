@@ -2,6 +2,7 @@ import { Navigate } from "react-router-dom";
 import ErrorPage from "../pages/ErrorPage";
 import AdminLoginPage from "../pages/Login/AdminLoginPage";
 import SellerLoginPage from "../pages/Login/SellerLoginPage";
+import FindShipping from "../pages/Shipping/FindShipping";
 
 const publicRoutes = [
   {
@@ -19,6 +20,10 @@ const publicRoutes = [
   {
     path: "/",
     element: <Navigate to="/login-admin" replace />,
+  },
+  {
+    path: "/find-shipping",
+    element: <FindShipping />,
   },
 ];
 

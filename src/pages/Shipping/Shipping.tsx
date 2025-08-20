@@ -1,8 +1,11 @@
 import { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../context/userContext.tsx";
-import { Switch } from 'antd';
+import { Switch, Button } from 'antd';
+
 import ShippingTable from "./ShippingTable";
 import ExternalSalesTable from "./ExternalSalesTable.tsx";
+
 
 const Shipping = () => {
     const [refreshKey, setRefreshKey] = useState(0)
@@ -10,6 +13,7 @@ const Shipping = () => {
 
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const navigate = useNavigate();
 
     return (
         <div className="p-4">
@@ -20,6 +24,13 @@ const Shipping = () => {
                         Pedidos
                     </h1>
                 </div>
+                <Button
+                    type="primary"
+                    className="text-mobile-sm xl:text-desktop-sm "
+                    onClick={() => navigate('/find-shipping')}
+                >
+                    Buscar Pedido
+                </Button>
             </div>
 
             {isAdmin && (
