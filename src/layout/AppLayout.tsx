@@ -5,6 +5,7 @@ import Header from "./Header/Header";
 import { Outlet } from "react-router-dom";
 import HeaderXS from "./Header/HeaderXS";
 import Sider from "antd/es/layout/Sider";
+import BottomMenu from "./MobileMenu/BottomMenu";
 
 const { Content } = Layout;
 
@@ -53,7 +54,7 @@ const AppLayout = () => {
         <Content className="flex flex-col bg-white p-6">
           <Outlet />
         </Content>
-
+        {isMobile && <BottomMenu />}
       </Layout>
     </Layout>
   );
