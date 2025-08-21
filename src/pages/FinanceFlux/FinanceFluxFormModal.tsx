@@ -317,7 +317,7 @@ function FinanceFluxFormModal({
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              name="id_trabajador"
+              name="founder"
               label="Founder"
               rules={[
                 ({ getFieldValue }) => ({
@@ -335,10 +335,14 @@ function FinanceFluxFormModal({
               <Select
                 placeholder="Selecciona un Founder"
                 allowClear
-                options={workers.map((worker: any) => ({
-                  value: worker._id,
-                  label: worker.nombre,
-                }))}
+                options={[
+                  { value: "Sebas", label: "Sebas" },
+                  { value: "Diego", label: "Diego" },
+                  { value: "Elian", label: "Elian" },
+                  { value: "Giorgio", label: "Giorgio" },
+                  { value: "Mayuki", label: "Mayuki" },
+                  { value: "Eddy Choque", label: "Eddy Choque" },
+                ]}
                 showSearch
                 filterOption={(input, option: any) =>
                   option.label.toLowerCase().includes(input.toLowerCase())
