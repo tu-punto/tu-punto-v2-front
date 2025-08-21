@@ -258,6 +258,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
+                alquiler: sucursal.almacenamiento,
                 fecha_ingreso: sucursal.fecha_ingreso
                   ? dayjs(sucursal.fecha_ingreso)
                   : null,
