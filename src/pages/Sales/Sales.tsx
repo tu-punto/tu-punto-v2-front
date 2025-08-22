@@ -1,5 +1,6 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
 import { getSellerAPI, getSellersAPI } from "../../api/seller";
@@ -11,9 +12,11 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
+import { QRScanner } from "./QRScanner";
 
 
 export const Sales = () => {
+    const navigate = useNavigate();
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role === 'admin';
     //console.log ("🚀 user en Sales:", user);
@@ -121,22 +124,22 @@ export const Sales = () => {
     useEffect(() => {
         if (!data || data.length === 0) return
 
-        const rawProducts = new Map<string,string>();
+        const rawProducts = new Map<string, string>();
         data.forEach(product => {
-            if(!rawProducts.has(product.id_producto) && product.id_vendedor == user.id_vendedor) {
+            if (!rawProducts.has(product.id_producto) && product.id_vendedor == user.id_vendedor) {
                 rawProducts.set(product.id_producto, product.producto.split(" - ")[0])
             }
         })
         const options: JSX.Element[] = [];
         rawProducts.forEach((value, key) => {
-            options.push (
+            options.push(
                 <Select.Option key={key} value={key}>
                     {value}
                 </Select.Option>
             )
         })
         setProductOptions(options)
-    },[data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
+    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -433,9 +436,9 @@ export const Sales = () => {
                                         )}
                                         {!isAdmin && (
                                             <Select
-                                                    value={selectedProduct}
-                                                    onChange={setSelectedProduct}
-                                                    style={{ width: 180}}
+                                                value={selectedProduct}
+                                                onChange={setSelectedProduct}
+                                                style={{ width: 180 }}
                                             >
                                                 <Select.Option key="all" value="all">Todos los productos</Select.Option>
                                                 {productOptions}
@@ -504,6 +507,15 @@ export const Sales = () => {
                                         <Button onClick={showShippingModal} type="primary">
                                             Realizar Entrega
                                         </Button>
+                                        {isAdmin && (
+                                            <Button
+                                                type="primary"
+                                                className="text-mobile-sm xl:text-desktop-sm "
+                                                onClick={() => navigate('/add-product')}
+                                            >
+                                                Agregar por QR
+                                            </Button>
+                                        )}
                                     </Space>
                                 </Col>
                             </Row>
@@ -533,7 +545,7 @@ export const Sales = () => {
                         : { _id: user?.id_vendedor, nombre: user?.nombre_vendedor?.split(" ")[0] || "", apellido: user?.nombre_vendedor?.split(" ")[1] || "" }
                 }
                 sellers={sellers}
-                sucursalId={fallbackSucursalId}            />
+                sucursalId={fallbackSucursalId} />
             <SalesFormModal
                 visible={modalType === "sales"}
                 onCancel={handleCancel}
