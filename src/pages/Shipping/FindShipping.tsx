@@ -2,17 +2,21 @@ import { useState, useEffect, useRef } from 'react';
 import jsQR from 'jsqr';
 
 import { getShippingQRByIdAPI } from "../../api/qr";
+import ShippingInfoModal from "./ShippingInfoModal";
+import { Button } from 'antd';
 
 function QrScanner() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const scanInterval = useRef(null);
   const [hasCamera, setHasCamera] = useState(false);
   const [stream, setStream] = useState(null);
   const [qrResult, setQrResult] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [pedidoData, setPedidoData] = useState(null);
   const [pedidoError, setPedidoError] = useState('');
-  const scanInterval = useRef(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedShipping, setSelectedShipping] = useState(null);
 
   useEffect(() => {
     const checkCamera = async () => {
@@ -91,7 +95,6 @@ function QrScanner() {
     const code = jsQR(imageData.data, imageData.width, imageData.height);
 
     const handlePedidoRequest = async (qrUrl) => {
-
       setPedidoData(null);
       setPedidoError('');
       try {
@@ -104,6 +107,8 @@ function QrScanner() {
         }
         const res = await getShippingQRByIdAPI(idPedido);
         setPedidoData(res);
+        setSelectedShipping(res); // o res.data si tu backend responde así
+        setModalVisible(true);
       } catch (err) {
         setPedidoError('No se pudo obtener el pedido: ' + (err?.response?.data?.message || err.message));
       }
@@ -127,9 +132,8 @@ function QrScanner() {
   }, [stream]);
 
   return (
-    <div className="qr-scanner">
-   
-      <div className="camera-container">
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 bg-[url('/background-login.png')] bg-cover bg-center">
+      <div className="w-full max-w-md p-4 space-y-4 bg-white rounded-lg shadow-lg">
         <video
           ref={videoRef}
           autoPlay
@@ -137,29 +141,23 @@ function QrScanner() {
           className="camera-view"
         />
         {isScanning && <div className="scanning-overlay">Escaneando...</div>}
-      </div>
-      <button onClick={startScanning} className="btn btn-scan">
-        Escanear QR
-      </button>
+        <Button onClick={startScanning} type="primary"
+          className="text-mobile-sm xl:text-desktop-sm ">
+          Escanear QR
+        </Button>
 
-      {qrResult && (
-        <div className="result">
-          <h3>Resultado del escaneo:</h3>
-          <p className="qr-content">{qrResult}</p>
-          {pedidoData && (
-            <div className="pedido-data">
-              <h4>Datos del pedido:</h4>
-              <pre style={{ background: '#f5f5f5', padding: '10px', borderRadius: '6px', overflowX: 'auto' }}>
-                {JSON.stringify(pedidoData.data || pedidoData, null, 2)}
-              </pre>
-            </div>
-          )}
-          {pedidoError && (
-            <div className="pedido-error" style={{ color: 'red' }}>{pedidoError}</div>
-          )}
-        </div>
-      )}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+        {qrResult && (
+          <div className="result">
+            <ShippingInfoModal
+              visible={modalVisible}
+              onClose={() => setModalVisible(false)}
+              shipping={selectedShipping}
+              isAdmin={true}
+            />
+          </div>
+        )}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+      </div>
     </div>
   );
 }
