@@ -16,6 +16,7 @@ import BranchPage from "../pages/Branch/BranchPage";
 import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
+import FindShipping from "../pages/Shipping/FindShipping";
 
 const protectedRoutes = [
   {
@@ -56,6 +57,14 @@ const protectedRoutes = [
         element: (
           <RoleGuard allowedRoles={["admin", "seller"]}>
             <Shipping />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/find-shipping",
+        element: (
+          <RoleGuard allowedRoles={["admin"]}>
+            <FindShipping />
           </RoleGuard>
         ),
       },
@@ -134,7 +143,7 @@ const protectedRoutes = [
       {
         path: "/branch",
         element: (
-          <RoleGuard allowedRoles={["admin","seller"]}>
+          <RoleGuard allowedRoles={["admin", "seller"]}>
             <BranchPage />
           </RoleGuard>
         ),
