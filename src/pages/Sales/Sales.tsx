@@ -12,8 +12,6 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
-import { QRScanner } from "./QRScanner";
-
 
 export const Sales = () => {
     const navigate = useNavigate();

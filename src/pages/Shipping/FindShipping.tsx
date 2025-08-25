@@ -5,7 +5,7 @@ import { getShippingQRByIdAPI } from "../../api/qr";
 import ShippingInfoModal from "./ShippingInfoModal";
 import { Button } from 'antd';
 
-function QrScanner() {
+function FindShipping() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const scanInterval = useRef(null);
@@ -162,4 +162,4 @@ function QrScanner() {
   );
 }
 
-export default QrScanner;
+export default FindShipping;
