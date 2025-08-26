@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { Button } from 'antd';
+import { Button, Col } from 'antd';
 
 import { getProductQRByIdAPI } from "../../api/qr";
 
@@ -84,7 +84,7 @@ function QRScanner({ onProductScanned }: QRScannerProps) {
       }
       const res = await getProductQRByIdAPI(idProducto);
       if (onProductScanned && res && res.product) {
-        onProductScanned(res.product); 
+        onProductScanned(res.product);
       }
     } catch (err) {
       console.error("Error al obtener el producto por QR:", err);
@@ -94,19 +94,34 @@ function QRScanner({ onProductScanned }: QRScannerProps) {
   };
 
   return (
-
-    <div className="w-full max-w-md p-4 space-y-4 bg-white rounded-lg shadow-lg">
-      <video ref={videoRef} autoPlay playsInline className="camera-view" />
-      <Button onClick={startScanning} type="primary">
-        Escanear QR
-      </Button>
-      <Button onClick={stopScanning} type="primary">
-        Detener Escanear
-      </Button>
+    <div
+      style={{
+        width: '60%',
+        padding: 16,
+        background: '#fff',
+        borderRadius: 8,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        margin: '0 auto'
+      }}
+    >
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }}
+        className="camera-view"
+      />
+      <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'center' }}>
+        <Button onClick={startScanning} type="primary">
+          Escanear QR
+        </Button>
+        <Button onClick={stopScanning} type="primary">
+          Detener Escanear
+        </Button>
+      </div>
       {isScanning && <div className="scanning-overlay">Escaneando...</div>}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
-
   );
 }
 

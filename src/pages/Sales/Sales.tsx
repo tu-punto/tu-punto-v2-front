@@ -534,36 +534,36 @@ export const Sales = () => {
             />
           </Card>
           {showQRScanner && (
-            <QRScanner
-              onProductScanned={(product) => {
-                const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
-                const comision = Number(vendedor?.comision_porcentual || 0);
+            <div style={{ paddingTop: 24 }}>
+              <QRScanner
+                onProductScanned={(product) => {
+                  const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
+                  const comision = Number(vendedor?.comision_porcentual || 0);
 
-                // Extraer nombre y precio
-                const nombre = product.nombre_producto || product.producto || "Producto sin nombre";
-                // Busca el precio y stock en la sucursal seleccionada
-                const sucursal = product.sucursales?.[0];
-                const combinacion = sucursal?.combinaciones?.[0];
-                const precio = combinacion?.precio || 0;
-                const stock = combinacion?.stock || 0;
+                  const nombre = product.nombre_producto || product.producto || "Producto sin nombre";
+                  const sucursal = product.sucursales?.[0];
+                  const combinacion = sucursal?.combinaciones?.[0];
+                  const precio = combinacion?.precio || 0;
+                  const stock = combinacion?.stock || 0;
 
-                const cantidad = 1;
-                const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+                  const cantidad = 1;
+                  const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
 
-                handleAddProduct({
-                  ...product,
-                  key: product._id + "-" + Date.now(), // clave única para la tabla
-                  producto: nombre,
-                  cantidad,
-                  precio_unitario: precio,
-                  utilidad,
-                  stockActual: stock,
-                  esTemporal: false, // o true si quieres marcarlo como temporal
-                });
+                  handleAddProduct({
+                    ...product,
+                    key: product._id + "-" + Date.now(),
+                    producto: nombre,
+                    cantidad,
+                    precio_unitario: precio,
+                    utilidad,
+                    stockActual: stock,
+                    esTemporal: false,
+                  });
 
-                message.success("Producto agregado al carrito por QR");
-              }}
-            />
+                  message.success("Producto agregado al carrito por QR");
+                }}
+              />
+            </div>
           )}
         </Col>
       </Row>
