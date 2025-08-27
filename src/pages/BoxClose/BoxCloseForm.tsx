@@ -10,7 +10,7 @@ import {
   Col,
   message,
   Select,
-
+  Modal
 } from "antd";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -19,6 +19,16 @@ import { getDailySummary, IDailySummary } from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
 const { Title } = Typography;
+type Metodo = "efectivo" | "qr";
+type TipoOperacion = "delivery" | "gasto_profit" | "pago_cliente";
+
+interface OperacionAdicional {
+  tipo: TipoOperacion;
+  descripcion: string;
+  cliente?: string;
+  metodo: Metodo;
+  monto: number;
+}
 
 interface Props {
   onSuccess: () => void;
@@ -35,6 +45,43 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
   const coins = Form.useWatch("coins", form) || {};
   const bills = Form.useWatch("bills", form) || {};
   const [admins, setAdmins] = useState<{ _id: string; name: string }[]>([]);
+  const [operations, setOperations] = useState<OperacionAdicional[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [operationForm] = Form.useForm();
+  function recalcExpectedAndDiffs(ops: OperacionAdicional[]) {
+    const iniEf   = Number(form.getFieldValue("efectivo_inicial") || 0);
+    const ventasE = Number(form.getFieldValue("ventas_efectivo")   || 0);
+
+    const iniQr   = Number(form.getFieldValue("bancario_inicial")  || 0);
+    const ventasQ = Number(form.getFieldValue("ventas_qr")         || 0);
+
+    // deltas por método, según tipo
+    let deltaEf = 0;
+    let deltaQr = 0;
+    let cambiosExternos = 0; // visible en el UI si quieres mantenerlo
+
+    for (const o of ops) {
+      const sign = o.tipo === "gasto_profit" ? -1 : 1; // gasto -> resta, delivery/pago_cliente -> suma
+      if (o.metodo === "efectivo") deltaEf += sign * o.monto;
+      else                         deltaQr += sign * o.monto;
+
+      cambiosExternos += sign * o.monto; // agregas como resumen visible
+    }
+
+    const efectivoEsperado = iniEf + ventasE + cambiosExternos + deltaEf;
+    const bancarioEsperado = iniQr + ventasQ + deltaQr;
+
+    form.setFieldValue("cambios_externos", Number(cambiosExternos.toFixed(2)));
+    form.setFieldValue("efectivo_esperado", Number(efectivoEsperado.toFixed(2)));
+    form.setFieldValue("bancario_esperado", Number(bancarioEsperado.toFixed(2)));
+
+    // actualizar diferencias contra los reales actuales
+    const efectivoReal  = Number(form.getFieldValue("efectivo_real")  || 0);
+    const bancarioReal  = Number(form.getFieldValue("bancario_real")  || 0);
+
+    form.setFieldValue("diferencia_efectivo", Number((efectivoReal - efectivoEsperado).toFixed(2)));
+    form.setFieldValue("diferencia_bancario", Number((bancarioReal - bancarioEsperado).toFixed(2)));
+  }
   useEffect(() => {
     const fetchAdmins = async () => {
       const data = await getAdminsAPI();
@@ -58,6 +105,7 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
         efectivo_esperado: efectivoEsperado,
         bancario_esperado: summary?.bank,
       });
+      recalcExpectedAndDiffs(operations);
     } catch (error) {
       console.error("Error while fetching sales summary", error);
       setSalesSummary({ cash: 0, bank: 0, total: 0 });
@@ -88,17 +136,67 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
     );
     setBillTotals(total);
   }, [bills]);
+  useEffect(() => {
+    const efectivoReal = coinTotals + billTotals;
+    form.setFieldValue("efectivo_real", Number(efectivoReal.toFixed(2)));
+    recalcExpectedAndDiffs(operations);
+  }, [coinTotals, billTotals]);
+  useEffect(() => {
+    recalcExpectedAndDiffs(operations);
+  }, [Form.useWatch("bancario_real", form)]);
+  useEffect(() => {
+    recalcExpectedAndDiffs(operations);
+  }, [Form.useWatch("efectivo_inicial", form), Form.useWatch("ventas_efectivo", form),
+    Form.useWatch("bancario_inicial", form), Form.useWatch("ventas_qr", form)]);
 
   useEffect(() => {
     fetchSalesSummary();
   }, []);
 
   useEffect(() => {
-    const esperado = form.getFieldValue("efectivo_esperado") || 0;
-    const real = coinTotals + billTotals;
-    form.setFieldValue("efectivo_real", real.toFixed(2));
-    form.setFieldValue("diferencia_efectivo", (real - esperado).toFixed(2));
-  }, [coinTotals, billTotals]);
+    const efectivoEsperado = form.getFieldValue("efectivo_esperado") || 0;
+    const efectivoReal = coinTotals + billTotals;
+    const bancarioEsperado = form.getFieldValue("bancario_esperado") || 0;
+    const bancarioReal = form.getFieldValue("bancario_real") || 0;
+
+    form.setFieldValue("efectivo_real", efectivoReal.toFixed(2));
+    form.setFieldValue("diferencia_efectivo", (efectivoReal - efectivoEsperado).toFixed(2));
+    form.setFieldValue("diferencia_bancario", (bancarioReal - bancarioEsperado).toFixed(2));
+  }, [coinTotals, billTotals, Form.useWatch("bancario_real", form), Form.useWatch("bancario_esperado", form)]);
+
+  const openOperationModal = () => {
+    setModalVisible(true);
+  };
+
+  const closeOperationModal = () => {
+    setModalVisible(false);
+    operationForm.resetFields();
+  };
+
+  const handleAddOperation = async () => {
+    try {
+      const newOp = await operationForm.validateFields();
+      const op: OperacionAdicional = {
+        ...newOp,
+        monto: Math.abs(Number(newOp.monto || 0)), // siempre positivo
+      };
+
+      const updatedOperations = [...operations, op];
+      setOperations(updatedOperations);
+
+      // recalcular campos derivados
+      recalcExpectedAndDiffs(updatedOperations);
+
+      closeOperationModal();
+    } catch (err) {
+      console.error("Error al añadir operación:", err);
+    }
+  };
+  const handleDeleteOperation = (index: number) => {
+    const updated = operations.filter((_, i) => i !== index);
+    setOperations(updated);
+    recalcExpectedAndDiffs(updated);
+  };
 
   const handleSubmit = async (values: any) => {
     try {
@@ -121,12 +219,16 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
           id: values.responsable.value,
           nombre: values.responsable.label,
         },
-        cambios_externos: values.cambios_externos || 0,
-        ingresos_efectivo: values.ventas_efectivo,
-        ventas_efectivo: salesSummary?.cash,
+        cambios_externos: form.getFieldValue("cambios_externos") || 0,
+        ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
+        ventas_efectivo: salesSummary?.cash ?? 0,
+        ventas_qr:       salesSummary?.bank ?? 0,
         id_sucursal: localStorage.getItem("sucursalId"),
         efectivo_diario,
+        operaciones_adicionales: operations,
       };
+
+
       await registerBoxCloseAPI(newBoxClose);
 
       message.success("Proceso completado con éxito.");
@@ -153,7 +255,80 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
   };
 
   return (
-      <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
+      <>
+        <Button onClick={openOperationModal}>Añadir operación adicional</Button>
+        {operations.length > 0 && (
+            <Table
+                dataSource={operations}
+                columns={[
+                  { title: "Tipo", dataIndex: "tipo", key: "tipo" },
+                  { title: "Método", dataIndex: "metodo", key: "metodo" },
+                  { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v) => v || "-" },
+                  { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
+                  { title: "Monto", dataIndex: "monto", key: "monto", render: (monto) => `Bs. ${Number(monto).toFixed(2)}` },
+                  {
+                    title: "Acciones",
+                    key: "acciones",
+                    render: (_, __, index) => (
+                        <Button danger size="small" onClick={() => handleDeleteOperation(index)}>
+                          Eliminar
+                        </Button>
+                    )
+                  }
+                ]}
+                rowKey={(_, i) => i!.toString()}
+                pagination={false}
+                size="small"
+                style={{ marginTop: 16 }}
+            />
+        )}
+        <Modal
+            title="Nueva operación"
+            open={modalVisible}
+            onOk={handleAddOperation}
+            onCancel={closeOperationModal}
+        >
+          <Form form={operationForm} layout="vertical">
+            <Form.Item name="tipo" label="Tipo" rules={[{ required: true }]}>
+              <Select
+                  options={[
+                    { value: "delivery",     label: "Delivery (Entrada)" },
+                    { value: "gasto_profit", label: "Gasto Profit (Salida)" },
+                    { value: "pago_cliente", label: "Pago de Cliente (Entrada)" },
+                  ]}
+              />
+            </Form.Item>
+
+            <Form.Item name="metodo" label="Método" rules={[{ required: true }]}>
+              <Select
+                  options={[
+                    { value: "efectivo", label: "Efectivo" },
+                    { value: "qr",       label: "QR/Bancario" },
+                  ]}
+              />
+            </Form.Item>
+
+            <Form.Item shouldUpdate noStyle>
+              {() => {
+                const t = operationForm.getFieldValue("tipo");
+                return t === "pago_cliente" ? (
+                    <Form.Item name="cliente" label="Cliente" rules={[{ required: true }]}>
+                      <Input />
+                    </Form.Item>
+                ) : null;
+              }}
+            </Form.Item>
+
+            <Form.Item name="descripcion" label="Descripción" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+
+            <Form.Item name="monto" label="Monto" rules={[{ required: true }]}>
+              <InputNumber min={0} className="w-full" />
+            </Form.Item>
+          </Form>
+        </Modal>
+        <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
         <Card>
           <Title level={5}>Información General</Title>
           <Row gutter={16}>
@@ -448,6 +623,7 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
           </Button>
         </div>
       </Form>
+      </>
   );
 };
 

@@ -43,19 +43,20 @@ const BoxClosePage = () => {
     try {
       const boxCloses = await getBoxClosesAPI();
 
-      const formattedData = boxCloses.map((boxClose: IBoxClose) => {
+      const formattedData = boxCloses.map((boxClose: IBoxClose | any) => {
         const efectivo = boxClose.efectivo_diario || [];
 
         const total_coins = efectivo
-            .filter((item) => item.corte < 10)
-            .reduce((sum, item) => sum + item.corte * item.cantidad, 0);
+            .filter((item: any) => item.corte < 10)
+            .reduce((sum: number, item: any) => sum + item.corte * item.cantidad, 0);
 
         const total_bills = efectivo
-            .filter((item) => item.corte >= 10)
-            .reduce((sum, item) => sum + item.corte * item.cantidad, 0);
+            .filter((item: any) => item.corte >= 10)
+            .reduce((sum: number, item: any) => sum + item.corte * item.cantidad, 0);
 
         return {
           ...boxClose,
+          responsible: boxClose.responsable?.nombre ?? "", // <- clave
           total_coins,
           total_bills,
         };
