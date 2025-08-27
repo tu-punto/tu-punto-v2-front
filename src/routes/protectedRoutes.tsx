@@ -17,7 +17,6 @@ import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
 import FindShipping from "../pages/Shipping/FindShipping";
-import QrScanner from "../pages/Shipping/FindShipping";
 
 const protectedRoutes = [
   {
@@ -66,14 +65,6 @@ const protectedRoutes = [
         element: (
           <RoleGuard allowedRoles={["admin"]}>
             <FindShipping />
-          </RoleGuard>
-        ),
-      },
-      {
-        path: "/add-product",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <QrScanner />
           </RoleGuard>
         ),
       },
