@@ -24,7 +24,6 @@ import {
   updateEntry,
   deleteEntryProductsAPI,
 } from "../../../api/entry";
-import { getPaymentProofsBySellerIdAPI } from "../../../api/paymentProof";
 import {
   getSalesBySellerIdAPI,
   updateSale,
@@ -32,7 +31,7 @@ import {
   deleteSaleByIdAPI,
   updateSaleByIdAPI,
 } from "../../../api/sales";
-import { getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
+import { getPaymentProofsBySellerIdAPI, getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
 
