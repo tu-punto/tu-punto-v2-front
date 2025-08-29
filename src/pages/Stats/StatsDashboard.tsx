@@ -21,6 +21,7 @@ import { DATE_TAGS } from "../../constants/fluxes";
 import { getFilteredStats } from "../../helpers/financeFluxesHelpers";
 import dayjs from "dayjs";
 import StatisticCard from "../../components/StatisticCard";
+import { getFinancialSummaryAPI } from "../../api/financeFlux";
 
 const StatisticsDashboard = () => {
   const [stats, setStats] = useState<any>();
@@ -66,6 +67,17 @@ const StatisticsDashboard = () => {
       setCustomDateRange([]);
     }
   };
+
+  const [summary, setSummary] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
+
+  useEffect(() => {
+    setLoadingSummary(true);
+    getFinancialSummaryAPI()
+      .then(setSummary)
+      .finally(() => setLoadingSummary(false));
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -176,12 +188,52 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
+              <Spin spinning={loadingSummary}>
                 <StatisticCard
                   title="UTILIDAD"
-                  value={stats?.utility || 0}
+                  value={summary?.utilidad ?? 0}
                   prefix={<RiseOutlined />}
                   color="#28a745"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="INVERSIÓN"
+                  value={summary?.inversiones ?? 0}
+                  prefix={<RiseOutlined />}
+                  color="#007bff"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="CAJA"
+                  value={summary?.caja ?? 0}
+                  prefix={<DollarOutlined />}
+                  color="#faad14"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="Comisión"
+                  value={summary?.comision ?? 0}
+                  prefix={<RiseOutlined />}
+                  color="#6f42c1"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="Mercadería Vendida"
+                  value={summary?.mercaderiaVendida ?? 0}
+                  prefix={<ShoppingCartOutlined />}
+                  color="#dc3545"
                 />
               </Spin>
             </Col>
@@ -194,7 +246,7 @@ const StatisticsDashboard = () => {
             Estadísticas de Delivery
           </Typography.Title>
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={12} md={8}>
               <Spin spinning={loading.deliveryIncome} tip="Cargando...">
                 <StatisticCard
                   title="INGRESOS DELIVERY SUELTOS"
@@ -204,13 +256,23 @@ const StatisticsDashboard = () => {
                 />
               </Spin>
             </Col>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={12} md={8}>
               <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
                 <StatisticCard
                   title="COSTOS DELIVERY"
                   value={stats?.deliveryExpenses}
                   prefix={<CarOutlined />}
                   color="#6f42c1"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="BALANCE DELIVERY"
+                  value={summary?.balanceDelivery ?? 0}
+                  prefix={<CarOutlined />}
+                  color="#20c997"
                 />
               </Spin>
             </Col>
