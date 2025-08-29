@@ -68,3 +68,8 @@ export const getStatsAPI = async () => {
 export const paySellerDebtAPI = (fluxId: string) => {
     apiClient.patch(`/financeFlux/${fluxId}/pay`);
 }
+
+export const getFinancialSummaryAPI = async () => {
+  const res = await apiClient.get("/financeFlux/financial-summary");
+  return res.data;
+};
