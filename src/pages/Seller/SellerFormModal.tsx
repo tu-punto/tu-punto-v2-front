@@ -68,21 +68,26 @@ export default function SellerFormModal({
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
-            // 2· mapear payload para backend
+      // 2· mapear payload para backend
       const payload = {
         ...values,
         saldo_pendiente: 0,
         fecha_vigencia: dayjs(values.fecha_vigencia).toISOString(),
         pago_sucursales: values.sucursales.map((s: any) => ({
           id_sucursal: s.id_sucursal,
-          sucursalName: sucursalOptions.find((opt) => opt._id === s.id_sucursal)?.nombre || "",
-          alquiler: s.alquiler ?? 0,
+          sucursalName:
+            sucursalOptions.find((opt) => opt._id === s.id_sucursal)?.nombre ||
+            "",
+          alquiler: s.almacenamiento ?? 0,
           exhibicion: s.exhibicion ?? 0,
           delivery: s.delivery ?? 0,
           entrega_simple: s.entrega_simple ?? 0,
-          fecha_ingreso: s.fecha_ingreso ? s.fecha_ingreso.toISOString() : new Date().toISOString(),
+          fecha_ingreso: s.fecha_ingreso
+            ? s.fecha_ingreso.toISOString()
+            : new Date().toISOString(),
           fecha_salida: s.fecha_salida ? s.fecha_salida.toISOString() : null,
           comentario: s.comentario || "",
+          activo: s.activo,
         })),
         esDeuda: true, // alta siempre entra como deuda
       };
@@ -201,7 +206,12 @@ export default function SellerFormModal({
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item label="Comisión porcentual" name="comision_porcentual">
-              <InputNumber min={0} max={100} formatter={(v) => `${v}%`} className="w-full" />
+              <InputNumber
+                min={0}
+                max={100}
+                formatter={(v) => `${v}%`}
+                className="w-full"
+              />
             </Form.Item>
           </Col>
         </Row>
