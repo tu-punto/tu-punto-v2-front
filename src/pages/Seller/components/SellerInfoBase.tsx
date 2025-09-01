@@ -206,7 +206,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         ...formValues,
         pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
           ...sucursal,
-          alquiler: sucursal.almacenamiento
+          alquiler: sucursal.almacenamiento,
         })),
       });
       if (!resSeller?.success) {
@@ -258,7 +258,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
-                alquiler: sucursal.almacenamiento,
+                almacenamiento: sucursal.alquiler,
                 fecha_ingreso: sucursal.fecha_ingreso
                   ? dayjs(sucursal.fecha_ingreso)
                   : null,
