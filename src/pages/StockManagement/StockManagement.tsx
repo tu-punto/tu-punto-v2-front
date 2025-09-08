@@ -1,21 +1,21 @@
-import React, { useContext, useEffect, useState } from 'react';
-import {Row, Col, message} from 'antd';
+import { useContext, useEffect, useState } from 'react';
+import { Row, Col, message } from 'antd';
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
-import { getFlatProductListAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
-import { Button, Input, Select, Spin } from 'antd';
-import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { getFlatProductListAPI } from '../../api/product';
+import { Button, Input, Select } from 'antd';
+//import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 //import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
-import { getGroupByIdAPI, getGroupsAPI } from '../../api/group';
+import { getGroupsAPI } from '../../api/group';
 import { getSellersAPI } from '../../api/seller';
 import { getCategoriesAPI } from '../../api/category';
 import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
-import { createProductsFromGroup } from '../../services/createProducts';
-import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
+//import { createProductsFromGroup } from '../../services/createProducts';
+import { saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempStock, clearTempVariants, reconstructProductFromFlat } from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
 //test
 const StockManagement = () => {
@@ -66,23 +66,14 @@ const StockManagement = () => {
             if (stored) setSucursalId(stored);
         }
     }, [user]);
-    const fetchFullProducts = async () => {
-        const fullData = await getProductsAPI();
-        setProductosFull(fullData);
-    };
 
     useEffect(() => {
-        if (isConfirmModalVisible) {
-            fetchFullProducts();
-        }
-    }, [isConfirmModalVisible]);
-
-    useEffect(() => {
+        // Solo ejecuta fetchData si sucursalId tiene un valor válido
+        if (!sucursalId || sucursalId === "") return;
         fetchData();
     }, [sucursalId]);
 
     const fetchData = async () => {
-
         try {
             const sellersResponse = await getSellersAPI();
             const categoriesResponse = await getCategoriesAPI();
@@ -91,41 +82,37 @@ const StockManagement = () => {
             let productsResponse = [];
 
             if (isSeller) {
-                // VENDEDOR → usa getProductsAPI() y filtra
-                const allProducts = await getProductsAPI();
-
-                const filtered = allProducts.filter(p =>
-                    p.id_vendedor?.toString() === user.id_vendedor &&
-                    (sucursalId === "all" || p.sucursales?.some(s => s.id_sucursal?.toString() === sucursalId))
+                // Solo productos del vendedor y sucursal seleccionada
+                // Si sucursalId es "all", puedes traer todos, si no, filtra por sucursal
+                const flatProducts = await getFlatProductListAPI(sucursalId === "all" ? undefined : sucursalId);
+                const filtered = flatProducts.filter(p =>
+                    p.id_vendedor?.toString() === user.id_vendedor
                 );
-
                 productsResponse = filtered;
 
                 // Extraer sucursales del vendedor desde sus productos
                 const sucursalesMap = new Map();
                 filtered.forEach(prod => {
-                    (prod.sucursales || []).forEach(suc => {
-                        if (suc?.id_sucursal) {
-                            sucursalesMap.set(suc.id_sucursal, {
-                                id_sucursal: suc.id_sucursal,
-                                nombre: suc.nombre || suc.id_sucursal
-                            });
-                        }
-                    });
+                    if (prod.sucursalId) {
+                        sucursalesMap.set(prod.sucursalId, {
+                            id_sucursal: prod.sucursalId,
+                            nombre: prod.nombre_sucursal || prod.sucursalId
+                        });
+                    }
                 });
                 setSellerSucursales(Array.from(sucursalesMap.values()));
             } else {
-                const idToUse = localStorage.getItem("sucursalId");
-                if (!idToUse || idToUse.length !== 24) {
-                    console.warn("❌ ID de sucursal inválido o ausente:", idToUse);
-                    message.error("Sucursal no seleccionada o inválida.");
+                // Admin: siempre filtra por sucursal seleccionada
+                const idToUse = sucursalId === "all" || !sucursalId ? null : sucursalId;
+                console.log("idToUse", idToUse);
+
+                if (!idToUse) {
+                    // No muestres error, simplemente no hagas nada
                     setProducts([]);
                     return;
                 }
-
                 productsResponse = await getFlatProductListAPI(idToUse);
             }
-
 
             setSellers(sellersResponse);
             setCategories(categoriesResponse);
@@ -142,8 +129,6 @@ const StockManagement = () => {
         clearTempStock();
         clearTempProducts();
         clearTempVariants();
-        fetchData();
-        fetchFullProducts(); // ← cargamos el listado completo al inicio
     }, []);
 
     useEffect(() => {
@@ -237,10 +222,10 @@ const StockManagement = () => {
         closeModal();
     };
 
-    const showModal = (product: any) => {
-        setSelectedProduct(product);
-        setInfoModalVisible(true);
-    };
+    // const showModal = (product: any) => {
+    //     setSelectedProduct(product);
+    //     setInfoModalVisible(true);
+    // };
 
     const closeModal = () => {
         setSelectedProduct(null);
@@ -280,32 +265,32 @@ const StockManagement = () => {
         setProductsToUpdate({});
         setStockListForConfirmModal([]);
     };
-    const handleChangeFilter = (index: number) => {
-        setCriteriaFilter(index);
-    };
+    // const handleChangeFilter = (index: number) => {
+    //     setCriteriaFilter(index);
+    // };
 
-    const handleChangeGroup = (index: number) => {
-        setCriteriaGroup(index);
-    };
+    // const handleChangeGroup = (index: number) => {
+    //     setCriteriaGroup(index);
+    // };
 
-    const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
-        const newProduct = {
-            productData,
-            combinations,
-            selectedFeatures,
-            features,
-            isNew: true // Marcar como nuevo
-        };
+    // const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
+    //     const newProduct = {
+    //         productData,
+    //         combinations,
+    //         selectedFeatures,
+    //         features,
+    //         isNew: true // Marcar como nuevo
+    //     };
 
-        // Guardar en localStorage
-        const stored = JSON.parse(localStorage.getItem("newProducts") || "[]");
-        localStorage.setItem("newProducts", JSON.stringify([...stored, newProduct]));
+    //     // Guardar en localStorage
+    //     const stored = JSON.parse(localStorage.getItem("newProducts") || "[]");
+    //     localStorage.setItem("newProducts", JSON.stringify([...stored, newProduct]));
 
-        // Actualizar estado para UI
-        setNewProducts(prev => [...prev, newProduct]);
-        setProductFormVisible(false);
-    };
-    const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
+    //     // Actualizar estado para UI
+    //     setNewProducts(prev => [...prev, newProduct]);
+    //     setProductFormVisible(false);
+    // };
+    // const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
 
     const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
 
