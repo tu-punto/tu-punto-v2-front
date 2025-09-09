@@ -20,6 +20,7 @@ import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
 import moment from "moment-timezone";
+import {updateProductsByShippingAPI} from "../../api/sales.ts";
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
@@ -417,12 +418,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             }
             const quienPagaActual = internalForm.getFieldValue("quien_paga_delivery");
             const updatedExisting = existingProducts.map((p: any) => ({
-                _id: p.id_venta, // importante para identificar la venta en el backend
+                _id: p.id_venta,
                 quien_paga_delivery: quienPagaActual,
             }));
             //console.log("Updated existing products:", updatedExisting);
             if (updatedExisting.length > 0) {
-                //await updateProductsByShippingAPI(shipping._id, updatedExisting);
+                await updateProductsByShippingAPI(shipping._id, updatedExisting);
             }
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
