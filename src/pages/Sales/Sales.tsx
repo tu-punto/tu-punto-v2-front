@@ -16,6 +16,7 @@ import useProductsFlat from "../../hooks/useProductsFlat.tsx";
 export const Sales = () => {
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role === 'admin';
+    const isOperator = user?.role === 'operator';
     //console.log ("🚀 user en Sales:", user);
 
     const [modalType, setModalType] = useState<'sales' | 'shipping' | null>(null);
@@ -36,7 +37,7 @@ export const Sales = () => {
     const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
     useEffect(() => {
         const fetchSellerAndSetSucursales = async () => {
-            if (isAdmin || !user?.id_vendedor) return;
+            if (isAdmin || isOperator || !user?.id_vendedor) return;
 
             try {
                 const vendedor = await getSellerAPI(user.id_vendedor);
@@ -59,7 +60,7 @@ export const Sales = () => {
         };
 
         fetchSellerAndSetSucursales();
-    }, [isAdmin, user?.id_vendedor]);
+    }, [isAdmin, isOperator, user?.id_vendedor]);
 
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
 
@@ -76,9 +77,9 @@ export const Sales = () => {
             return vendedoresVigentesIds.includes(String(p.id_vendedor));
         });
 
-        if (isAdmin && selectedSellerId) {
+        if ((isAdmin || isOperator) && selectedSellerId) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
-        } else if (!isAdmin) {
+        } else if (!isAdmin || !isOperator) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
         }
 
@@ -107,26 +108,26 @@ export const Sales = () => {
             };
         });
         setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers, selectedProduct]);
+    }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
 
     useEffect(() => {
         fetchSellers();
         fetchSucursal();
     }, []);
     useEffect(() => {
-        if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+        if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
             setSelectedBranchId(branches[0]._id);
         }
-    }, [branches, isAdmin, selectedBranchId]);
+    }, [branches, isAdmin, isOperator, selectedBranchId]);
     useEffect(() => {
-        const newSucursalId = isAdmin
+        const newSucursalId = (isAdmin || isOperator)
             ? localStorage.getItem("sucursalId")
             : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
         if (newSucursalId && newSucursalId !== branchIdForFetch) {
             setBranchIdForFetch(newSucursalId);
         }
-    }, [branches, isAdmin, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
+    }, [branches, isAdmin, isOperator, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
 
     const [productOptions, setProductOptions] = useState<JSX.Element[]>([])
     useEffect(() => {
@@ -147,7 +148,7 @@ export const Sales = () => {
             )
         })
         setProductOptions(options)
-    },[data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
+    },[data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers]);
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -211,7 +212,7 @@ export const Sales = () => {
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
 
-            const sucursalId = isAdmin
+            const sucursalId = (isAdmin || isOperator)
                 ? localStorage.getItem("sucursalId")
                 : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -250,7 +251,7 @@ export const Sales = () => {
         try {
             const response = await getSucursalsAPI()
             setBranches(response)
-            if (isAdmin) {
+            if (isAdmin || isOperator) {
                 const sucursalIdLogin = localStorage.getItem("sucursalId");
                 if (sucursalIdLogin) {
                     setSelectedBranchId(sucursalIdLogin);
@@ -263,12 +264,12 @@ export const Sales = () => {
     }
 
     useEffect(() => {
-        if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+        if ((!isAdmin && !isOperator)&& branches.length > 0 && !selectedBranchId) {
             setSelectedBranchId(branches[0]._id);
         }
-    }, [branches, isAdmin, selectedBranchId]);
+    }, [branches, isAdmin, isOperator, selectedBranchId]);
 
-    const fallbackSucursalId = isAdmin
+    const fallbackSucursalId = isAdmin || isOperator
         ? localStorage.getItem('sucursalId')
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -432,7 +433,7 @@ export const Sales = () => {
                                             style={{ width: 200 }}
                                             allowClear
                                         />
-                                        {!isAdmin && (
+                                        {!isAdmin && !isOperator && (
                                             <Select
                                                 placeholder="Sucursal"
                                                 value={selectedBranchId}
@@ -442,7 +443,7 @@ export const Sales = () => {
                                                 allowClear
                                             />
                                         )}
-                                        {!isAdmin && (
+                                        {!isAdmin && !isOperator && (
                                             <Select
                                                     value={selectedProduct}
                                                     onChange={setSelectedProduct}
@@ -459,7 +460,7 @@ export const Sales = () => {
                                         >
                                             Añadir nuevo producto
                                         </Button>
-                                        {isAdmin && (
+                                        {isAdmin || isOperator && (
                                             <Select
                                                 placeholder="Selecciona un vendedor"
                                                 options={sellers.map((vendedor: any) => ({
@@ -503,7 +504,7 @@ export const Sales = () => {
 
                                 <Col>
                                     <Space wrap>
-                                        {isAdmin && (
+                                        {isAdmin || isOperator && (
                                             <Button
                                                 onClick={showSalesModal}
                                                 type="primary"
@@ -528,7 +529,7 @@ export const Sales = () => {
                             onUpdateTotalAmount={updateTotalAmount}
                             key={refreshKey}
                             sellers={sellers}
-                            isAdmin={isAdmin}
+                            isAdmin={isAdmin || isOperator}
                         />
                     </Card>
                 </Col>
@@ -539,7 +540,7 @@ export const Sales = () => {
                 onSuccess={handleSuccessProductModal}
                 onAddProduct={handleAddProduct}
                 selectedSeller={
-                    isAdmin
+                    isAdmin || isOperator 
                         ? sellers.find((s: any) => s._id === selectedSellerId) || null
                         : { _id: user?.id_vendedor, nombre: user?.nombre_vendedor?.split(" ")[0] || "", apellido: user?.nombre_vendedor?.split(" ")[1] || "" }
                 }
@@ -570,7 +571,7 @@ export const Sales = () => {
                 sucursals={branches}
                 //handleDebt={updateSellerDebt}
                 clearSelectedProducts={() => setSelectedProducts([])}
-                isAdmin={isAdmin}
+                isAdmin={isAdmin || isOperator}
                 sellers={sellers}
                 suc={fallbackSucursalId}
             />
