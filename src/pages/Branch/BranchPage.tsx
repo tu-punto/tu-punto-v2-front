@@ -12,8 +12,9 @@ const BranchPage = () => {
   const [isFormModal, setIsFormModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  
   const { user } = useContext(UserContext);
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const isOperator = user?.role.toLowerCase() === 'operator';
 
   const fetchBranches = async () => {
     try {
@@ -24,38 +25,38 @@ const BranchPage = () => {
     }
   };
 
-    const showEditModal = (branch: IBranch) => {
-        setSelectedBranch(branch);
-        setIsFormModal(true);
-    };
-    useEffect(() => {
+  const showEditModal = (branch: IBranch) => {
+    setSelectedBranch(branch);
+    setIsFormModal(true);
+  };
+  useEffect(() => {
     fetchBranches();
   }, [refreshKey]);
 
   return (
     <div className="p-4">
-        <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-                <img src="/branches-icon.png" alt="Sucursales" className="w-8 h-8" />
-                <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-                    Sucursales
-                </h1>
-            </div>
-            {user.role=="admin" && (
-              <Button
-                onClick={() => {
-                    setIsFormModal(true);
-                    setSelectedBranch(null);
-                }}
-                type="primary"
-                className="text-mobile-sm xl:text-desktop-sm"
-            >
-                Agregar Sucursal
-            </Button>
-            )}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+          <img src="/branches-icon.png" alt="Sucursales" className="w-8 h-8" />
+          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+            Sucursales
+          </h1>
         </div>
+        {isAdmin || isOperator && (
+          <Button
+            onClick={() => {
+              setIsFormModal(true);
+              setSelectedBranch(null);
+            }}
+            type="primary"
+            className="text-mobile-sm xl:text-desktop-sm"
+          >
+            Agregar Sucursal
+          </Button>
+        )}
+      </div>
 
-        <BranchTable
+      <BranchTable
         refreshKey={refreshKey}
         branches={branches || []}
         showEditModal={showEditModal}
