@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from 'react';
 import { Row, Col, message } from 'antd';
+import { useQuery } from "@tanstack/react-query";
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
@@ -21,7 +22,7 @@ import ProductTableSeller from "./ProductTableSeller.tsx";
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
-    const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
+    const [stockListForConfirmModal, setStockListForConfirmModal] = useState<any[]>([]);
     const [resetSignal, setResetSignal] = useState(false);
     const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -43,10 +44,8 @@ const StockManagement = () => {
     const [newVariants, setNewVariants] = useState<any[]>([]);
     const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
 
-    const [products, setProducts] = useState<any[]>([]);
     const [sellers, setSellers] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
-    const [groups, setGroups] = useState<any[]>([]);
+
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [productosFull, setProductosFull] = useState([]);
@@ -55,15 +54,61 @@ const StockManagement = () => {
         setSellersVigentes(listaVigente.filter(s => s._id));
     };
 
+    const getFilteredProducts = () => {
+        if (
+            !productsQuery ||
+            !groups ||
+            !categories ||
+            !options ||
+            options.length === 0 ||
+            sellersVigentes.length === 0
+        ) return [];
+        const selectedOption = options[criteriaFilter];
+        if (!selectedOption || !selectedOption.filter) return [];
+
+        const vendedoresPermitidos = sellersVigentes.map(v => String(v._id));
+        return productsQuery
+            .filter((product: any) => vendedoresPermitidos.includes(String(product.id_vendedor)))
+            .filter((product: any) => selectedOption.filter(product, selectedSeller));
+    };
+
+    const { data: groups = [], isLoading: loadingGroups } = useQuery({
+        queryKey: ["groups"],
+        queryFn: getGroupsAPI,
+        staleTime: 1000 * 60 * 5
+    });
+
+    const { data: categories = [], isLoading: loadingCategories } = useQuery({
+        queryKey: ["categories"],
+        queryFn: getCategoriesAPI,
+        staleTime: 1000 * 60 * 5
+    });
+
+    const { data: productsQuery = [], isLoading: loadingProducts, refetch } = useQuery({
+        queryKey: ["products", sucursalId, isSeller ? user.id_vendedor : null],
+        queryFn: () =>
+            getFlatProductListAPI(sucursalId).then((flatProducts) =>
+                isSeller
+                    ? flatProducts.filter((p: any) => p.id_vendedor?.toString() === user.id_vendedor)
+                    : flatProducts
+            ),
+        enabled: !!sucursalId && sucursalId !== "" && sucursalId !== "all",
+        staleTime: 1000 * 60 * 5,
+    });
     useEffect(() => {
         if (!user || Object.keys(user).length === 0) return;
 
-
         if (isSeller) {
-            setSucursalId("all");
+            setSucursalId(user.sucursales?.[0]?._id || "");
         } else {
             const stored = localStorage.getItem("sucursalId");
-            if (stored) setSucursalId(stored);
+            if (stored) {
+                setSucursalId(stored);
+            } else if (user.sucursales?.length) {
+                setSucursalId(user.sucursales[0]._id);
+            } else if (user.sucursales && user.sucursales.length === 0) {
+                setSucursalId("");
+            }
         }
     }, [user]);
 
@@ -76,49 +121,9 @@ const StockManagement = () => {
     const fetchData = async () => {
         try {
             const sellersResponse = await getSellersAPI();
-            const categoriesResponse = await getCategoriesAPI();
-            const groupsResponse = await getGroupsAPI();
-
-            let productsResponse = [];
-
-            if (isSeller) {
-                // Solo productos del vendedor y sucursal seleccionada
-                // Si sucursalId es "all", puedes traer todos, si no, filtra por sucursal
-                const flatProducts = await getFlatProductListAPI(sucursalId === "all" ? undefined : sucursalId);
-                const filtered = flatProducts.filter(p =>
-                    p.id_vendedor?.toString() === user.id_vendedor
-                );
-                productsResponse = filtered;
-
-                // Extraer sucursales del vendedor desde sus productos
-                const sucursalesMap = new Map();
-                filtered.forEach(prod => {
-                    if (prod.sucursalId) {
-                        sucursalesMap.set(prod.sucursalId, {
-                            id_sucursal: prod.sucursalId,
-                            nombre: prod.nombre_sucursal || prod.sucursalId
-                        });
-                    }
-                });
-                setSellerSucursales(Array.from(sucursalesMap.values()));
-            } else {
-                // Admin: siempre filtra por sucursal seleccionada
-                const idToUse = sucursalId === "all" || !sucursalId ? null : sucursalId;
-                console.log("idToUse", idToUse);
-
-                if (!idToUse) {
-                    // No muestres error, simplemente no hagas nada
-                    setProducts([]);
-                    return;
-                }
-                productsResponse = await getFlatProductListAPI(idToUse);
-            }
 
             setSellers(sellersResponse);
-            setCategories(categoriesResponse);
-            setGroups(groupsResponse);
-            setProducts(productsResponse);
-            setFilteredProducts(productsResponse);
+            // NO: setProducts ni setFilteredProducts aquí
         } catch (error) {
             console.error("Error al cargar los datos:", error);
             message.error("Ocurrió un error al cargar los datos.");
@@ -131,9 +136,9 @@ const StockManagement = () => {
         clearTempVariants();
     }, []);
 
-    useEffect(() => {
-        filter();
-    }, [selectedSeller]);
+    // useEffect(() => {
+    //     filter();
+    // }, [productsQuery, groups, categories, selectedSeller, options, criteriaFilter]);
 
     useEffect(() => {
         fetchData();
@@ -145,15 +150,15 @@ const StockManagement = () => {
                 option: 'Categoria',
                 filter: filterByCategoria,
                 group: categories,
-                groupFunction: (category, products) =>
-                    products.filter((product) => product.id_categoria == category._id)
+                groupFunction: (category: any, productsQuery: any[]) =>
+                    productsQuery.filter((productsQuery) => productsQuery.id_categoria == category._id)
             },
             {
                 option: 'Grupo',
                 filter: filterByGroup,
                 group: groups,
-                groupFunction: (group, products) =>
-                    products.filter((product) => product.groupId == group._id)
+                groupFunction: (group: any, productsQuery: any[]) =>
+                    productsQuery.filter((productsQuery) => productsQuery.groupId == group._id)
             }
         ];
 
@@ -162,19 +167,17 @@ const StockManagement = () => {
                 option: 'Vendedor',
                 filter: filterBySeller,
                 group: sellers,
-                groupFunction: (seller, products) =>
-                    products.filter((product) => product.id_vendedor == seller._id)
+                groupFunction: (seller, productsQuery) =>
+                    productsQuery.filter((product) => product.id_vendedor == seller._id)
             });
         }
 
         setOptions(newOptions);
-
-        // NUEVO: aplicar filtro por defecto cuando se cargan
-        setTimeout(() => filter(), 100);
     }, [sellers, categories, groups]);
+
     const finalProductList = isSeller
-        ? products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
-        : filteredProducts;
+        ? (productsQuery || []).filter((product: any) => product.id_vendedor?.toString() === user.id_vendedor)
+        : filteredProducts || [];
 
     //console.log("Productos originales:", products);
     //console.log("🧪 Productos filtrados:", finalProductList);
@@ -202,8 +205,7 @@ const StockManagement = () => {
     };
 
     const closeConfirmProduct = async () => {
-        await fetchData();
-        setFilteredProducts(products);
+        await refetch();
         clearTempProducts();
         clearTempVariants();
         setProductsToUpdate({});
@@ -216,7 +218,6 @@ const StockManagement = () => {
     };
 
     const succesAddVariant = async (newVariant) => {
-        setProducts([...products, newVariant.product]);
         setFilteredProducts([...filteredProducts, newVariant.product]);
         setNewVariants([...newVariants, newVariant]);
         closeModal();
@@ -252,19 +253,24 @@ const StockManagement = () => {
     };
 
     const filter = () => {
+        if (!productsQuery || !groups || !categories || sellersVigentes.length === 0) return;
         const selectedOption = options[criteriaFilter];
         if (!selectedOption || !selectedOption.filter) return;
 
-        const vendedoresPermitidos = sellersVigentes.map(v => String(v._id)); // esto viene del paso 2
-
-        const newList = products
-            .filter(product => vendedoresPermitidos.includes(String(product.id_vendedor))) // ✅ solo vendedores vigentes
-            .filter(product => selectedOption.filter(product, selectedSeller)); // ✅ aplicar filtro actual (grupo, categoría o vendedor)
+        const vendedoresPermitidos = sellersVigentes.map(v => String(v._id));
+        const newList = productsQuery
+            .filter((product: any) => vendedoresPermitidos.includes(String(product.id_vendedor)))
+            .filter((product: any) => selectedOption.filter(product, selectedSeller));
 
         setFilteredProducts(newList);
         setProductsToUpdate({});
         setStockListForConfirmModal([]);
     };
+    useEffect(() => {
+        if (sellers.length > 0) {
+            setSellersVigentes(sellers.filter(s => s._id));
+        }
+    }, [sellers]);
     // const handleChangeFilter = (index: number) => {
     //     setCriteriaFilter(index);
     // };
@@ -294,11 +300,16 @@ const StockManagement = () => {
 
     const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
 
-    const handleMoveSuccess = () => {
-        fetchData();
-        setIsMoveModalVisible(false);
-    };
-
+    if (
+        loadingGroups ||
+        loadingCategories ||
+        loadingProducts ||
+        !options ||
+        options.length === 0 ||
+        sellersVigentes.length === 0
+    ) {
+        return <div>Cargando datos...</div>;
+    }
     return (
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -451,15 +462,15 @@ const StockManagement = () => {
             {isSeller ? (
                 <ProductTableSeller
                     productsList={finalProductList}
-                    onUpdateProducts={fetchData}
+                    onUpdateProducts={refetch}
                     sucursalId={sucursalId}
                     setSucursalId={setSucursalId}
                 />
             ) : (
                 <ProductTable
-                    productsList={finalProductList}
+                    productsList={getFilteredProducts()}
                     groupList={options[criteriaFilter]?.group || []}
-                    onUpdateProducts={fetchData}
+                    onUpdateProducts={async () => { await refetch(); }}
                     setStockListForConfirmModal={setStockListForConfirmModal}
                     resetSignal={resetSignal}
                     searchText={searchText}
@@ -486,8 +497,8 @@ const StockManagement = () => {
                     visible={isProductFormVisible}
                     onCancel={() => setProductFormVisible(false)}
                     onSuccess={async () => {
-                        await fetchData(); // Recarga productos desde backend
-                        setProductFormVisible(false); // Cierra modal
+                        await refetch(); // Refresca productos
+                        setProductFormVisible(false);
                     }}
                     selectedSeller={sellers.find(s => s._id === selectedSeller)}
                 />
@@ -524,8 +535,11 @@ const StockManagement = () => {
                 <MoveProductsModal
                     visible={isMoveModalVisible}
                     onClose={() => setIsMoveModalVisible(false)}
-                    onSuccess={handleMoveSuccess}
-                    products={products}
+                    onSuccess={async () => {
+                        await refetch();
+                        setIsMoveModalVisible(false);
+                    }}
+                    products={productsQuery || []}
                 />
             )}
         </div>
