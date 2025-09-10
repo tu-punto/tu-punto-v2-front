@@ -1,4 +1,4 @@
-import { Modal, Form, Input, InputNumber, Button, Radio, Col, Row, DatePicker, TimePicker, Card, message, Select } from 'antd';
+import { Modal, Form, Input, InputNumber, Button, Radio, Col, Row, DatePicker, TimePicker, Card, message, Select, Switch } from 'antd';
 import { UserOutlined, PhoneOutlined, CommentOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import {useEffect, useMemo, useState} from 'react';
 import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
@@ -38,6 +38,7 @@ function ShippingFormModal({
     const [showWarning, setShowWarning] = useState(false);
     const [quienPaga, setQuienPaga] = useState<string | null>(null);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
+    const [isRangeHour, setIsRangeHour] = useState(false);
     const [allSucursals, setAllSucursals] = useState([]);
     const sucursalId = localStorage.getItem('sucursalId');
     const sucursalLogueada = allSucursals.find((s: any) => s._id === sucursalId);
@@ -351,11 +352,34 @@ function ShippingFormModal({
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        <div style={{ margin:8 }}>
+                            <span style={{ marginRight:8 }}>
+                                - ¿Acordar entrega en un rango de horas?
+                            </span>
+                            <Switch
+                                checked={isRangeHour}
+                                onChange={(checked) => { setIsRangeHour(checked); }}
+                                unCheckedChildren="Hora específica"
+                                checkedChildren="Rango de horas"
+                            />
+                        </div>
                         <Col span={12}>
-                            <Form.Item name="hora_entrega_acordada" label="Hora Entrega">
+                            <Form.Item 
+                                name="hora_entrega_acordada" 
+                                label={isRangeHour? "Inicio del Rango Horario":"Hora de Entrega"}
+                            >
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
+                        {isRangeHour && (
+                            <Col span={12}>
+                                <Form.Item name="hora_entrega_rango_final" label="Fin del Rango Horario">
+                                    <TimePicker format='HH:mm' style={{ width: '100%' }} />
+                                </Form.Item>
+                            </Col>
+                        )}
                     </Row>
                     <Row gutter={16}>
                         <Col span={24}>
