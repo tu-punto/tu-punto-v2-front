@@ -383,7 +383,7 @@ export default function SellerTable({
             refreshKey={refreshKey}
             user={user}
             isFilterBySeller
-            id_vendedor={sellerID}
+            search_id={sellerID}
           />
         </Modal>
       )}
