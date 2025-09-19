@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Modal, Button, message, Table, Form, Tag, InputNumber } from 'antd';
+import { useEffect, useState, useMemo  } from 'react';
+import { Modal, Button, message, Table, Form, Tag, InputNumber, Radio, Card, Row, Col, Input } from 'antd';
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import EditProductsModal from '../Shipping/EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
@@ -15,27 +15,96 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [internalForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [deletedProducts, setDeletedProducts] = useState<string[]>([]);
+  const [tipoPago, setTipoPago] = useState<string | null>(null);
+  const [qrInput, setQrInput] = useState<number>(0);
+  const [efectivoInput, setEfectivoInput] = useState<number>(0);
+  const [showWarning, setShowWarning] = useState(false);
+  const [estaPagado, setEstaPagado] = useState<string | null>(null);
+  const [adelantoVisible, setAdelantoVisible] = useState(false);
+  const [adelantoCliente, setAdelantoCliente] = useState<number>(0);
+
+  const normalizarTipoPago = (valor: string): string | null => {
+    const mapping: Record<string, string> = {
+      'transferencia o qr': '1',
+      'efectivo': '2',
+      'pagado al dueño': '3',
+      'efectivo + qr': '4',
+      '1': '1',
+      '2': '2',
+      '3': '3',
+      '4': '4',
+    };
+
+    const clave = valor.trim().toLowerCase();
+    return mapping[clave] || null;
+  };
 
   const montoTotal = products.reduce(
     (acc, item) => acc + (item.precio_unitario || 0) * (item.cantidad || 0),
     0
   );
+
+  const saldoACobrar = useMemo(() => {
+    if (estaPagado === 'si') return 0;
+    return parseFloat((montoTotal - adelantoCliente).toFixed(2));
+  }, [montoTotal, adelantoCliente, estaPagado]);
+
   const pedidoFecha = shipping?.fecha_pedido
     ? dayjs(shipping.fecha_pedido).add(4, "hour").format("DD/MM/YYYY")
     : "";
+  
   const hoy = dayjs().add(4, "hour").format("DD/MM/YYYY");
   const esHoy = pedidoFecha === hoy;
+
   useEffect(() => {
     if (!visible || !shipping) return;
+    
     const ventasNormales = (shipping.venta || []).map((p: any) => ({
       ...p,
       id_venta: p._id ?? null,
       key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
       producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
     }));
+    
     setProducts(ventasNormales);
-    setOriginalProducts(JSON.parse(JSON.stringify(ventasNormales))); // Backup profundo
+    setOriginalProducts(JSON.parse(JSON.stringify(ventasNormales)));
+
+    // Inicializar estado de pago
+    const pagoEstado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
+    setEstaPagado(pagoEstado);
+    setAdelantoVisible(pagoEstado === "adelanto");
+    setAdelantoCliente(shipping.adelanto_cliente || 0);
+
+    // Inicializar tipo de pago
+    if (shipping?.tipo_de_pago) {
+      const tipoPagoId = normalizarTipoPago(shipping.tipo_de_pago);
+      setTipoPago(tipoPagoId);
+    }
   }, [visible, shipping]);
+
+  useEffect(() => {
+    const monto = saldoACobrar || 0;
+    const suma = (qrInput || 0) + (efectivoInput || 0);
+    if (tipoPago === '4') {
+      setShowWarning(suma !== monto);
+    } else {
+      setShowWarning(false);
+    }
+  }, [qrInput, efectivoInput, tipoPago, saldoACobrar]);
+
+  useEffect(() => {
+    if (tipoPago === '1') {
+      setQrInput(saldoACobrar);
+      setEfectivoInput(0);
+    } else if (tipoPago === '2' || tipoPago === '3') {
+      setQrInput(0);
+      setEfectivoInput(saldoACobrar);
+    } else if (tipoPago === '4') {
+      const mitad = parseFloat((saldoACobrar / 2).toFixed(2));
+      setQrInput(mitad);
+      setEfectivoInput(saldoACobrar - mitad);
+    }
+  }, [tipoPago, saldoACobrar]);
 
   // Función para comparar variantes
   const objetosIguales = (a: any, b: any) => {
@@ -131,7 +200,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const handleSave = async () => {
     setLoading(true);
     try {
-      // 1. Actualizar el pedido en el backend
+      // Preparar datos para actualizar
       const updateData = {
         ...shipping,
         venta: products.map(p => ({
@@ -142,7 +211,12 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           utilidad: p.utilidad,
           nombre_variante: p.nombre_variante || p.producto,
           variantes: p.variantes
-        }))
+        })),
+        tipo_de_pago: tipoPago,
+        esta_pagado: estaPagado,
+        adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
+        subtotal_qr: tipoPago === '1' || tipoPago === '4' ? qrInput : 0,
+        subtotal_efectivo: tipoPago === '2' || tipoPago === '4' ? efectivoInput : 0,
       };
 
       const res = await updateShippingAPI(updateData, shipping._id);
@@ -151,10 +225,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         throw new Error("Error al actualizar el pedido");
       }
 
-      // 2. Actualizar el stock
+      // Actualizar el stock si hay cambios en productos
       const sucursalId = localStorage.getItem('sucursalId');
-
-      // Crear mapa de productos originales para comparación
       const originalMap = new Map();
       originalProducts.forEach(p => {
         originalMap.set(p.key, p);
@@ -383,6 +455,160 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         isAdmin={isAdmin}
       />
 
+      {/* SECCIÓN DE TIPO DE PAGO - Similar a ShippingInfoModal */}
+      {isAdmin && (
+        <Card title="Detalles del Pago" bordered={false} style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span>Monto total:</span>
+            <span style={{ fontWeight: 'bold' }}>Bs. {montoTotal.toFixed(2)}</span>
+          </div>
+
+          {/* ¿Está ya pagado? */}
+          <Row gutter={16}>
+            <Col span={24}>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ display: 'block', marginBottom: 8 }}>¿Está ya pagado?</span>
+                <Radio.Group
+                  value={estaPagado}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setEstaPagado(value);
+                    setAdelantoVisible(value === 'adelanto');
+                    if (value !== 'adelanto') {
+                      setAdelantoCliente(0);
+                    }
+                    if (value === 'si') {
+                      setTipoPago("3");
+                    }
+                  }}
+                >
+                  <Radio.Button value="si">Sí</Radio.Button>
+                  <Radio.Button value="no">No</Radio.Button>
+                  <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
+                </Radio.Group>
+              </div>
+            </Col>
+          </Row>
+
+          {adelantoVisible && (
+            <Row gutter={16}>
+              <Col span={24}>
+                <div style={{ marginBottom: 16 }}>
+                  <span style={{ display: 'block', marginBottom: 8 }}>Monto del adelanto</span>
+                  <InputNumber
+                    prefix="Bs."
+                    min={0}
+                    value={adelantoCliente}
+                    onChange={(val) => setAdelantoCliente(val || 0)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </Col>
+            </Row>
+          )}
+
+          {/* Saldo a cobrar */}
+          <Row gutter={16}>
+            <Col span={24}>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ display: 'block', marginBottom: 8 }}>Saldo a Cobrar</span>
+                <Input
+                  prefix="Bs."
+                  readOnly
+                  value={saldoACobrar.toFixed(2)}
+                  style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                />
+              </div>
+            </Col>
+          </Row>
+
+          {/* Tipo de pago */}
+          <Row gutter={16}>
+            <Col span={24}>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ display: 'block', marginBottom: 8 }}>Tipo de pago</span>
+                <Radio.Group
+                  value={tipoPago}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTipoPago(value);
+                  }}
+                  disabled={estaPagado === "si"}
+                >
+                  <Radio.Button value="1">Transferencia o QR</Radio.Button>
+                  <Radio.Button value="2">Efectivo</Radio.Button>
+                  <Radio.Button value="3">Pagado al dueño</Radio.Button>
+                  <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                </Radio.Group>
+              </div>
+            </Col>
+          </Row>
+
+          {["1", "2"].includes(tipoPago || "") && (
+            <Row gutter={16}>
+              <Col span={24}>
+                <div style={{ marginBottom: 16 }}>
+                  <span style={{ display: 'block', marginBottom: 8 }}>
+                    {tipoPago === "1" ? "Subtotal QR" : "Subtotal Efectivo"}
+                  </span>
+                  <InputNumber
+                    prefix="Bs."
+                    value={saldoACobrar}
+                    readOnly
+                    style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                  />
+                </div>
+              </Col>
+            </Row>
+          )}
+
+          {tipoPago === "4" && (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div style={{ marginBottom: 16 }}>
+                    <span style={{ display: 'block', marginBottom: 8 }}>Subtotal QR</span>
+                    <InputNumber
+                      prefix="Bs."
+                      min={0.01}
+                      max={saldoACobrar - 0.01}
+                      value={qrInput}
+                      onChange={(val) => {
+                        const qr = val ?? 0;
+                        const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
+                        setQrInput(qr);
+                        setEfectivoInput(efectivo);
+                      }}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div style={{ marginBottom: 16 }}>
+                    <span style={{ display: 'block', marginBottom: 8 }}>Subtotal Efectivo</span>
+                    <InputNumber
+                      prefix="Bs."
+                      value={efectivoInput}
+                      readOnly
+                      style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                    />
+                  </div>
+                </Col>
+              </Row>
+              {showWarning && (
+                <Row gutter={16}>
+                  <Col span={24}>
+                    <div style={{ color: 'red', fontWeight: 'bold' }}>
+                      La suma de QR + Efectivo debe ser igual al saldo a cobrar.
+                    </div>
+                  </Col>
+                </Row>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+
       {isAdmin && (
         <div style={{ marginTop: 24, textAlign: 'right' }}>
           <Button style={{ marginRight: 8 }} onClick={handleCancelChanges}>
@@ -393,6 +619,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           </Button>
         </div>
       )}
+      
       <EditProductsModal
         visible={editProductsModalVisible}
         onCancel={() => setEditProductsModalVisible(false)}
