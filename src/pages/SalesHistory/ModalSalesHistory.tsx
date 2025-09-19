@@ -5,13 +5,18 @@ import EditProductsModal from '../Shipping/EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { deleteShippingAPI } from '../../api/shipping';
 import { updateSubvariantStockAPI } from '../../api/product';
+import dayjs from "dayjs";
 
 const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [originalProducts, setOriginalProducts] = useState<any[]>([]);
   const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
   const { rawProducts: data } = useRawProducts();
-
+  const pedidoFecha = shipping?.fecha_pedido
+    ? dayjs(shipping.fecha_pedido).add(4, "hour").format("DD/MM/YYYY")
+    : "";
+  const hoy = dayjs().add(4, "hour").format("DD/MM/YYYY");
+  const esHoy = pedidoFecha === hoy;
   useEffect(() => {
     if (!visible || !shipping) return;
     const ventasNormales = (shipping.venta || []).map((p: any) => ({
@@ -102,6 +107,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
             danger
             shape="circle"
             icon={<DeleteOutlined />}
+            disabled={!esHoy || !shipping?.fecha_pedido}
             onClick={() => {
               Modal.confirm({
                 title: "¿Desea eliminar esta entrega?",
@@ -160,6 +166,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
           <Button
             icon={<EditOutlined />}
+            disabled={!esHoy || !shipping?.fecha_pedido}
             onClick={() => {
               setOriginalProducts(JSON.parse(JSON.stringify(products)));
               setEditProductsModalVisible(true);
