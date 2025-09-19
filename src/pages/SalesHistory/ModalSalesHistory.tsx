@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Button, message, Table, Form } from 'antd';
+import { Modal, Button, message, Table, Form, Tag, InputNumber } from 'antd';
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import EditProductsModal from '../Shipping/EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
@@ -14,6 +14,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const { rawProducts: data } = useRawProducts();
   const [internalForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [deletedProducts, setDeletedProducts] = useState<string[]>([]);
+
   const montoTotal = products.reduce(
     (acc, item) => acc + (item.precio_unitario || 0) * (item.cantidad || 0),
     0
@@ -27,30 +29,17 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     if (!visible || !shipping) return;
     const ventasNormales = (shipping.venta || []).map((p: any) => ({
       ...p,
+      id_venta: p._id ?? null,
       key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
       producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
     }));
     setProducts(ventasNormales);
+    setOriginalProducts(JSON.parse(JSON.stringify(ventasNormales))); // Backup profundo
   }, [visible, shipping]);
-
-  const EmptySalesTable = ({ products, monto = 0, ...props }) => {
-    // ...existing code...
-    return (
-      <div style={{ textAlign: "center", padding: 32 }}>
-        <p>No hay productos en esta venta.</p>
-        <p>Monto total: <b>Bs {monto}</b></p>
-      </div>
-    );
-  };
-
-  const handleCancelChanges = () => {
-    internalForm.resetFields();
-    setProducts(originalProducts);
-    onClose();
-  };
 
   // Función para comparar variantes
   const objetosIguales = (a: any, b: any) => {
+    if (!a || !b) return false;
     const aOrdenado = JSON.stringify(Object.fromEntries(Object.entries(a).sort()));
     const bOrdenado = JSON.stringify(Object.fromEntries(Object.entries(b).sort()));
     return aOrdenado === bOrdenado;
@@ -68,6 +57,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     if (!data || !Array.isArray(data) || data.length === 0) return;
 
     for (const prod of productos) {
+      if (prod.esTemporal) continue;
+
       const id = prod.id_producto || prod.producto;
       const nombreVariante = prod.nombre_variante;
       if (!nombreVariante || !id) continue;
@@ -75,7 +66,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       const productoCompleto = data.find((p: any) =>
         String(p._id || p.id_producto) === String(id)
       );
-      if (!productoCompleto?.sucursales?.length) continue;
+      if (!productoCompleto) continue;
 
       const sucursalData = productoCompleto.sucursales?.find((s: any) =>
         String(s.id_sucursal) === String(sucursalId)
@@ -114,76 +105,192 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
 
   const id_shipping = shipping?._id || '';
 
+  const handleDeleteProduct = (key: any) => {
+    const toDelete = products.find((p: any) => p.key === key);
+    if (toDelete?.id_venta) {
+      setDeletedProducts((prevDels) => [...prevDels, toDelete.id_venta]);
+    }
+    setProducts((prev: any) => prev.filter((p: any) => p.key !== key));
+  };
+
+  const handleValueChange = (key: string, field: string, value: any) => {
+    setProducts((prev: any[]) =>
+      prev.map((p) => {
+        if (p.key !== key) return p;
+        return { ...p, [field]: value };
+      })
+    );
+  };
+
+  const handleCancelChanges = () => {
+    setProducts(originalProducts);
+    setDeletedProducts([]);
+    onClose();
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
-      // 1. Actualiza el pedido en el backend
-      await updateShippingAPI({
+      // 1. Actualizar el pedido en el backend
+      const updateData = {
         ...shipping,
-        venta: products, // productos editados
-      }, shipping._id);
+        venta: products.map(p => ({
+          _id: p.id_venta,
+          id_producto: p.id_producto,
+          cantidad: p.cantidad,
+          precio_unitario: p.precio_unitario,
+          utilidad: p.utilidad,
+          nombre_variante: p.nombre_variante || p.producto,
+          variantes: p.variantes
+        }))
+      };
 
-      // 2. Actualiza el stock según la diferencia de cantidades
+      const res = await updateShippingAPI(updateData, shipping._id);
+
+      if (!res.success) {
+        throw new Error("Error al actualizar el pedido");
+      }
+
+      // 2. Actualizar el stock
       const sucursalId = localStorage.getItem('sucursalId');
-      for (const prod of products) {
-        const id = prod.id_producto || prod.producto;
-        const nombreVariante = prod.nombre_variante;
-        if (!nombreVariante || !id) continue;
 
-        const productoCompleto = data.find((p: any) =>
-          String(p._id || p.id_producto) === String(id)
-        );
-        if (!productoCompleto?.sucursales?.length) continue;
+      // Crear mapa de productos originales para comparación
+      const originalMap = new Map();
+      originalProducts.forEach(p => {
+        originalMap.set(p.key, p);
+      });
 
-        const sucursalData = productoCompleto.sucursales?.find((s: any) =>
-          String(s.id_sucursal) === String(sucursalId)
-        );
-        if (!sucursalData?.combinaciones?.length) continue;
+      // Procesar cambios en el stock
+      for (const currentProduct of products) {
+        const originalProduct = originalMap.get(currentProduct.key);
 
-        let variantes = prod.variantes;
-        const nombreBase = productoCompleto.nombre_producto;
-        const target = nombreVariante?.normalize("NFD").toLowerCase();
+        if (!originalProduct) {
+          // Producto nuevo - restar stock
+          await updateProductStock(currentProduct, -currentProduct.cantidad, sucursalId);
+        } else if (currentProduct.cantidad !== originalProduct.cantidad) {
+          // Cantidad modificada - ajustar stock
+          const diferencia = originalProduct.cantidad - currentProduct.cantidad;
+          await updateProductStock(currentProduct, diferencia, sucursalId);
+        }
+      }
 
-        const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
-          const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
-          return nombreCombinacion === target;
-        });
-
-        if (!combinacionExacta) continue;
-        variantes = combinacionExacta.variantes;
-
-        const combinacion = sucursalData.combinaciones.find((c: any) => objetosIguales(c.variantes, variantes));
-        if (!combinacion) continue;
-
-        // Busca el producto original para calcular la diferencia
-        const original = originalProducts.find((op: any) =>
-          op.id_producto === prod.id_producto &&
-          objetosIguales(op.variantes, variantes)
-        );
-        const cantidadOriginal = original ? Number(original.cantidad || 0) : 0;
-        const cantidadNueva = Number(prod.cantidad || 0);
-        const diferencia = cantidadNueva - cantidadOriginal;
-
-        // El nuevo stock es el stock actual menos la diferencia
-        const nuevoStock = (combinacion.stock ?? 0) - diferencia;
-
-        await updateSubvariantStockAPI({
-          productId: id,
-          sucursalId,
-          variantes,
-          stock: nuevoStock,
-        });
+      // Procesar productos eliminados
+      for (const deletedId of deletedProducts) {
+        const deletedProduct = originalProducts.find(p => p.id_venta === deletedId);
+        if (deletedProduct) {
+          await updateProductStock(deletedProduct, deletedProduct.cantidad, sucursalId);
+        }
       }
 
       message.success("Pedido y stock actualizados con éxito");
-      onSave(); // refresca la vista principal
+      onSave();
       onClose();
     } catch (error) {
+      console.error("Error al guardar:", error);
       message.error("Ocurrió un error al guardar los cambios");
     } finally {
       setLoading(false);
     }
   };
+
+  const updateProductStock = async (product: any, cantidadCambio: number, sucursalId: string) => {
+    if (!product.id_producto || product.esTemporal) return;
+
+    const productoCompleto = data.find((p: any) =>
+      String(p._id || p.id_producto) === String(product.id_producto)
+    );
+
+    if (!productoCompleto) return;
+
+    const sucursalData = productoCompleto.sucursales?.find((s: any) =>
+      String(s.id_sucursal) === String(sucursalId)
+    );
+
+    if (!sucursalData?.combinaciones?.length) return;
+
+    let variantes = product.variantes;
+    const nombreBase = productoCompleto.nombre_producto;
+    const target = (product.nombre_variante || product.producto)?.normalize("NFD").toLowerCase();
+
+    // Encontrar la combinación exacta
+    const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
+      const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
+      return nombreCombinacion === target;
+    });
+
+    if (!combinacionExacta) return;
+
+    variantes = combinacionExacta.variantes;
+    const combinacion = sucursalData.combinaciones.find((c: any) =>
+      objetosIguales(c.variantes, variantes)
+    );
+
+    if (!combinacion) return;
+
+    const nuevoStock = (combinacion.stock || 0) + cantidadCambio;
+
+    try {
+      await updateSubvariantStockAPI({
+        productId: product.id_producto,
+        sucursalId,
+        variantes,
+        stock: nuevoStock
+      });
+    } catch (err) {
+      console.error("Error al actualizar stock:", err);
+      throw err;
+    }
+  };
+
+  const EmptySalesTable = ({ products, monto = 0, handleValueChange, isAdmin }: any) => {
+    if (products.length === 0) {
+      return (
+        <div style={{ textAlign: "center", padding: 32 }}>
+          <p>No hay productos en esta venta.</p>
+          <p>Monto total: <b>Bs {monto.toFixed(2)}</b></p>
+        </div>
+      );
+    }
+
+    return (
+      <Table
+        dataSource={products}
+        pagination={false}
+        rowKey="key"
+        columns={[
+          {
+            title: "Producto",
+            dataIndex: "nombre_variante",
+            key: "nombre_variante",
+            render: (text, record) => (
+              <div>
+                {text}
+                {record.esTemporal && <Tag color="orange" style={{ marginLeft: 8 }}>Temporal</Tag>}
+              </div>
+            )
+          },
+          {
+            title: "Cantidad",
+            dataIndex: "cantidad",
+            key: "cantidad",
+            render: (value) => value
+          },
+          {
+            title: "Precio Unitario",
+            dataIndex: "precio_unitario",
+            key: "precio_unitario",
+            render: (value) => `Bs ${value}`
+          },
+          {
+            title: "Subtotal",
+            key: "subtotal",
+            render: (_, record) => `Bs ${(record.cantidad * record.precio_unitario).toFixed(2)}`,
+          }
+        ]}
+      />
+    );
+  };
+
   return (
     <Modal
       title="Detalles de Venta"
@@ -258,9 +365,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
           <Button
             icon={<EditOutlined />}
-            disabled={!esHoy || !shipping?.fecha_pedido}
             onClick={() => {
-              setOriginalProducts(JSON.parse(JSON.stringify(products)));
               setEditProductsModalVisible(true);
             }}
             type="link"
@@ -269,44 +374,15 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           </Button>
         </div>
       )}
-      {products.length === 0 ? (
-        <EmptySalesTable
-          products={[]}
-          monto={montoTotal}
-          sellers={[]}
-          isAdmin={isAdmin}
-          onUpdateTotalAmount={() => { }}
-        />
-      ) : (
-        <Table
-          dataSource={products}
-          rowKey={(record) => record.key || record.id_producto || record._id}
-          pagination={false}
-          columns={[
-            {
-              title: "Producto",
-              dataIndex: "nombre_variante",
-              key: "nombre_variante",
-            },
-            {
-              title: "Cantidad",
-              dataIndex: "cantidad",
-              key: "cantidad",
-            },
-            {
-              title: "Precio Unitario",
-              dataIndex: "precio_unitario",
-              key: "precio_unitario",
-              render: (value) => `Bs ${value}`,
-            },
-            {
-              title: "Subtotal",
-              key: "subtotal",
-              render: (_, record) => `Bs ${record.cantidad * record.precio_unitario}`,
-            },
-          ]}
-        />
-      )}
+
+      <EmptySalesTable
+        products={products}
+        monto={montoTotal}
+        onDeleteProduct={isAdmin ? handleDeleteProduct : undefined}
+        handleValueChange={isAdmin ? handleValueChange : undefined}
+        isAdmin={isAdmin}
+      />
+
       {isAdmin && (
         <div style={{ marginTop: 24, textAlign: 'right' }}>
           <Button style={{ marginRight: 8 }} onClick={handleCancelChanges}>
@@ -320,7 +396,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       <EditProductsModal
         visible={editProductsModalVisible}
         onCancel={() => setEditProductsModalVisible(false)}
-        products={products as any[]}
+        products={products}
         setProducts={setProducts}
         allProducts={data ? data.flatMap((p: any) => {
           const sucursalId = localStorage.getItem("sucursalId");
@@ -337,14 +413,14 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
             sucursalId,
           }));
         }) : []}
-        sellers={[]} // Si tienes vendedores, pásalos aquí
+        sellers={[]}
         isAdmin={isAdmin}
         shippingId={id_shipping}
         sucursalId={localStorage.getItem("sucursalId")}
-        onSave={async () => {
+        onSave={() => {
           setEditProductsModalVisible(false);
           message.success("Cambios guardados");
-          onSave(); // Esto refresca el historial
+          onSave();
         }}
       />
     </Modal>
