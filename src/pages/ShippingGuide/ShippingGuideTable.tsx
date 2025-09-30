@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Buffer } from 'buffer';
 import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
 import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
 import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { getSignedURL } from "../../helpers/s3Helper";
 import moment from "moment-timezone";
 
 const ShippingGuideTable = (
-    { refreshKey, user, isFilterBySeller, isFilterByBranch,  search_id }:
+    { refreshKey, user, isFilterBySeller, isFilterByBranch, search_id }:
         { refreshKey: number, user: any, isFilterBySeller?: boolean, isFilterByBranch?: boolean, search_id: string }) => {
     const [guidesList, setGuidesList] = useState([]);
     const [imageUrl, setImageUrl] = useState<string | null>();
@@ -64,13 +64,10 @@ const ShippingGuideTable = (
         }
     }
 
-    const handleShowImage = (record: any) => {
-        if (record.imagen) {
-            const imageData = record.imagen.data;
-            const buffer = Buffer.from(imageData);
-            const blob = new Blob([buffer], { type: record.tipoArchivo });
-            const url = URL.createObjectURL(blob);
-            setImageUrl(url);
+    const handleShowImage = async (record: any) => {
+        if (record.imagen_key) {
+            const image_url = await getSignedURL(record.imagen_key);
+            setImageUrl(image_url);
             setIsImageVisible(true);
             setImageDesc(record.descripcion)
         }
@@ -89,7 +86,7 @@ const ShippingGuideTable = (
                 message.error("Error al actualizar el estado de la guía")
             }
         } catch (error) {
-            console.error("Erorr al actualizar el estado entregado de Guía de Envío: ",error)
+            console.error("Erorr al actualizar el estado entregado de Guía de Envío: ", error)
             message.error("Error al actualizar el estado de la guía")
         }
     }
@@ -98,7 +95,7 @@ const ShippingGuideTable = (
         {
             title: '¿Recogido?',
             dataIndex: 'isRecogido',
-            key:'isRecogido',
+            key: 'isRecogido',
             width: 100,
             render: (_: any, record: any) => {
                 const color = record.isRecogido ? 'bg-green-500' : 'bg-red-500';
@@ -139,12 +136,12 @@ const ShippingGuideTable = (
         },
         {
             title: 'Acciones',
-            dataIndex: 'imagen',
-            key: 'imagen',
+            dataIndex: 'imagen_key',
+            key: 'imagen_key',
             render: (_: any, record: any) => {
                 return (
                     <>
-                        {record.imagen && (
+                        {record.imagen_key && (
                             <Tooltip title="Ver foto">
                                 <Button
                                     size="small"
@@ -155,10 +152,10 @@ const ShippingGuideTable = (
                         )}
                         {isAdmin && (
                             <Tooltip title="Confirmar entrega">
-                                <Button 
+                                <Button
                                     size="small"
                                     icon={<CheckCircleOutlined />}
-                                    onClick={() => { handleCheckShipping(record) }}/>
+                                    onClick={() => { handleCheckShipping(record) }} />
                             </Tooltip>
                         )}
                     </>
