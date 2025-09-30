@@ -39,29 +39,23 @@ const BoxCloseView = ({ boxClose }: Props) => {
         id_efectivo_diario,
     } = boxClose;
 
-    const monedas = Object.entries(id_efectivo_diario)
-        .filter(([k]) => k.startsWith("corte_") && parseFloat(k.split("_")[1]) < 10)
-        .map(([k, v], i) => {
-            const corte = k.replace("corte_", "").replace("_", ".");
-            return {
-                key: i,
-                corte,
-                cantidad: v,
-                total: parseFloat(corte) * v,
-            };
-        });
+    const monedas = (boxClose.efectivo_diario || [])
+        .filter(item => item.corte < 10)
+        .map((item, index) => ({
+            key: index,
+            corte: item.corte,
+            cantidad: item.cantidad,
+            total: item.corte * item.cantidad,
+        }));
 
-    const billetes = Object.entries(id_efectivo_diario)
-        .filter(([k]) => k.startsWith("corte_") && parseFloat(k.split("_")[1]) >= 10)
-        .map(([k, v], i) => {
-            const corte = k.replace("corte_", "").replace("_", ".");
-            return {
-                key: i,
-                corte,
-                cantidad: v,
-                total: parseFloat(corte) * v,
-            };
-        });
+    const billetes = (boxClose.efectivo_diario || [])
+        .filter(item => item.corte >= 10)
+        .map((item, index) => ({
+            key: index,
+            corte: item.corte,
+            cantidad: item.cantidad,
+            total: item.corte * item.cantidad,
+        }));
 
     const columns = [
         {
@@ -104,7 +98,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                     <Input value={dayjs(boxClose.created_at).format("DD/MM/YYYY")} readOnly />
                                 </Form.Item>
                                 <Form.Item label="Responsable del cierre">
-                                    <Input value={responsible} readOnly />
+                                    <Input value={boxClose?.responsable?.nombre || ""} readOnly />
                                 </Form.Item>
                             </Form>
                         </Card>
@@ -225,7 +219,21 @@ const BoxCloseView = ({ boxClose }: Props) => {
                         </Card>
                     </Col>
                 </Row>
-
+                <Card className="mt-4">
+                    <Title level={5}>Operaciones adicionales</Title>
+                    <Table
+                        dataSource={(boxClose.operaciones_adicionales || []).map((op: any, idx: number) => ({ ...op, key: idx }))}
+                        columns={[
+                            { title: "Tipo", dataIndex: "tipo", key: "tipo" },
+                            { title: "Método", dataIndex: "metodo", key: "metodo" },
+                            { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v: any) => v || "-" },
+                            { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
+                            { title: "Monto", dataIndex: "monto", key: "monto", render: (v: any) => `Bs. ${Number(v || 0).toFixed(2)}` },
+                        ]}
+                        pagination={false}
+                        size="small"
+                    />
+                </Card>
                 <Card className="mt-4">
                     <Title level={5}>Observaciones</Title>
                     <Input.TextArea value={observaciones} readOnly rows={3} />

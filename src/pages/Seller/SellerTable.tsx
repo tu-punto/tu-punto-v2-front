@@ -1,16 +1,22 @@
-import { Button, Table, Tooltip, Select, Space, Input } from "antd";
-import { useEffect, useState } from "react";
-import { EditOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Table, Tooltip, Select, Space, Input, Modal } from "antd";
+import { useEffect, useState, useContext } from "react";
+import {
+  EditOutlined,
+  SearchOutlined,
+  FileDoneOutlined,
+} from "@ant-design/icons";
+import { UserContext } from "../../context/userContext.tsx";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellersAPI } from "../../api/seller";
+import { getSellerDebtsAPI, getSellersAPI } from "../../api/seller";
 import { getSalesBySellerIdAPI } from "../../api/sales";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
+import ShippingGuideTable from "../ShippingGuide/ShippingGuideTable";
 
 type SellerRow = ISeller & {
   key: string;
@@ -28,6 +34,8 @@ export default function SellerTable({
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
+  const [viewModalGuides, setViewModalGuides] = useState(false);
+  const [sellerID, setSellerID] = useState<string>("");
 
   const [searchText, setSearchText] = useState("");
   const [debtModal, setDebtModal] = useState(false);
@@ -35,6 +43,7 @@ export default function SellerTable({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
+  const { user } = useContext(UserContext);
 
   const getEstadoVendedor = (fechaVigencia: string) => {
     const hoy = dayjs();
@@ -106,8 +115,8 @@ export default function SellerTable({
       title: "Fecha Vigencia",
       dataIndex: "fecha_vigencia",
       key: "fecha_vigencia",
-      sorter: (a: any, b: any) => 
-        dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() - 
+      sorter: (a: any, b: any) =>
+        dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() -
         dayjs(b.fecha_vigencia, "DD/MM/YYYY").unix(),
     },
     {
@@ -126,15 +135,19 @@ export default function SellerTable({
         </Button>
       ),
       sorter: (a: any, b: any) => {
-        const getNumericValue = (str: string) => parseFloat(str.replace(/[Bs.\s]/g, '')) || 0;
-        return getNumericValue(a.pago_mensual) - getNumericValue(b.pago_mensual);
+        const getNumericValue = (str: string) =>
+          parseFloat(str.replace(/[Bs.\s]/g, "")) || 0;
+        return (
+          getNumericValue(a.pago_mensual) - getNumericValue(b.pago_mensual)
+        );
       },
     },
     {
       title: "Comisión %",
       dataIndex: "comision_porcentual",
       key: "comision_porcentual",
-      sorter: (a: any, b: any) => (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
+      sorter: (a: any, b: any) =>
+        (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
     },
     {
       title: "Acciones",
@@ -154,50 +167,22 @@ export default function SellerTable({
               }}
             />
           </Tooltip>
+          <Tooltip title="Ver guías de envío">
+            <Button
+              type="primary"
+              size="small"
+              icon={<FileDoneOutlined />}
+              onClick={() => {
+                handleGuideView(row._id);
+              }}
+            />
+          </Tooltip>
         </div>
       ),
       width: 150,
-      fixed: 'right' as const,
+      fixed: "right" as const,
     },
   ];
-
-  const fetchSaldoPendiente = async (sellerId: string) => {
-    const sales = await getSalesBySellerIdAPI(sellerId);
-    if (!sales.length) {
-      return 0;
-    }
-
-    const pedidosProcesados = new Set();
-
-    const saldoPendiente = sales.reduce((acc: number, sale: any) => {
-      if (
-        sale.deposito_realizado ||
-        sale.id_pedido.estado_pedido === "En Espera"
-      ) {
-        return acc;
-      }
-
-      let subtotalDeuda = 0;
-
-      if (sale.id_pedido.pagado_al_vendedor) {
-        subtotalDeuda = -sale.utilidad;
-      } else {
-        subtotalDeuda = sale.cantidad * sale.precio_unitario - sale.utilidad;
-      }
-
-      if (!pedidosProcesados.has(sale.id_pedido._id)) {
-        const adelanto = sale.id_pedido.adelanto_cliente || 0;
-        const delivery = sale.id_pedido.cargo_delivery || 0;
-
-        subtotalDeuda -= adelanto + delivery;
-        pedidosProcesados.add(sale.id_pedido._id);
-      }
-
-      return acc + subtotalDeuda;
-    }, 0);
-
-    return saldoPendiente;
-  };
 
   useEffect(() => {
     (async () => {
@@ -206,18 +191,20 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-          const mensual = seller.pago_sucursales.reduce(
-            (t: number, p: ISucursalPago) =>
-              t +
-              Number(p.alquiler) +
-              Number(p.exhibicion) +
-              Number(p.delivery) +
-              Number(p.entrega_simple),
-            0
-          );
+          const mensual = seller.pago_sucursales
+            .filter((p) => p.activo)
+            .reduce(
+              (t: number, p: ISucursalPago) =>
+                t +
+                Number(p.alquiler) +
+                Number(p.exhibicion) +
+                Number(p.delivery) +
+                Number(p.entrega_simple),
+              0
+            );
 
-          const saldoPendiente = await fetchSaldoPendiente(seller._id);
-          const deuda = Number(seller.deuda) || 0;
+          const saldoPendiente = seller.saldo_pendiente;
+          const deuda = seller.deuda;
           const pagoPendiente = saldoPendiente - deuda;
 
           return {
@@ -256,7 +243,7 @@ export default function SellerTable({
 
     if (searchText) {
       filtered = filtered.filter((s) =>
-        s.nombre.toLowerCase().includes(searchText.toLowerCase()) 
+        s.nombre.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
@@ -287,6 +274,11 @@ export default function SellerTable({
 
   const filteredSellers = filterSellers(sellers);
 
+  const handleGuideView = (id: string) => {
+    setSellerID(id);
+    setViewModalGuides(true);
+  };
+
   return (
     <>
       <Space direction="horizontal" size="middle" className="mb-4">
@@ -298,7 +290,7 @@ export default function SellerTable({
           style={{ width: 250 }}
           allowClear
         />
-        
+
         <Select
           value={estadoFilter}
           onChange={setEstadoFilter}
@@ -329,15 +321,14 @@ export default function SellerTable({
           showSizeChanger: true,
           pageSizeOptions: ["5", "10", "20", "50"],
           defaultPageSize: 10,
-          showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} registros`,
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} de ${total} registros`,
         }}
         scroll={{ x: "max-content" }}
         title={() => (
           <h2 className="text-2xl font-bold">
             Pago pendiente Bs.&nbsp;
-            {filteredSellers
-              .reduce((t, s) => t + s.pagoTotalInt, 0)
-              .toFixed(2)}
+            {filteredSellers.reduce((t, s) => t + s.pagoTotalInt, 0).toFixed(2)}
           </h2>
         )}
         onRow={(r) => ({
@@ -360,7 +351,7 @@ export default function SellerTable({
             }}
           />
           <SellerInfoModalTry
-            visible={infoModal && !debtModal}
+            visible={infoModal && !debtModal && !viewModalGuides}
             seller={selected}
             onCancel={closeAll}
             onSuccess={() => {
@@ -375,6 +366,26 @@ export default function SellerTable({
             sucursales={selected.pago_sucursales}
           />
         </>
+      )}
+      {viewModalGuides && (
+        <Modal
+          title="Guías de Envío"
+          footer={false}
+          open={viewModalGuides}
+          width={1000}
+          onCancel={() => {
+            setViewModalGuides(false);
+            setSellerID("");
+            closeAll();
+          }}
+        >
+          <ShippingGuideTable
+            refreshKey={refreshKey}
+            user={user}
+            isFilterBySeller
+            id_vendedor={sellerID}
+          />
+        </Modal>
       )}
     </>
   );

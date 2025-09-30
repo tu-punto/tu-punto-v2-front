@@ -17,7 +17,7 @@ import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
 import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
-
+//test
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';

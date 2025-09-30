@@ -20,6 +20,7 @@ import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
 import moment from "moment-timezone";
+import {updateProductsByShippingAPI} from "../../api/sales.ts";
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
@@ -417,12 +418,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             }
             const quienPagaActual = internalForm.getFieldValue("quien_paga_delivery");
             const updatedExisting = existingProducts.map((p: any) => ({
-                _id: p.id_venta, // importante para identificar la venta en el backend
+                _id: p.id_venta,
                 quien_paga_delivery: quienPagaActual,
             }));
             //console.log("Updated existing products:", updatedExisting);
             if (updatedExisting.length > 0) {
-                //await updateProductsByShippingAPI(shipping._id, updatedExisting);
+                await updateProductsByShippingAPI(shipping._id, updatedExisting);
             }
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
@@ -489,6 +490,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }
     };
 
+    const handleChatClient = () => {
+        const phoneNumber = shipping.telefono_cliente;
+
+        const shippingDate = new Date(shipping.hora_entrega_real);
+        if ((""+shipping.hora_entrega_real).endsWith("Z")) {
+            shippingDate.setTime(shippingDate.getTime() + 4*60*60*1000);
+        }
+
+        const fixedMinutes = shippingDate.getMinutes() < 10 ? `0${shippingDate.getMinutes()}` : shippingDate.getMinutes();
+        const contentMsg: string = `Hola! Te escribimos de Tu Punto\nTenemos una entrega para ti a las ${shippingDate.getHours()}:${fixedMinutes}, queríamos confirmar que estará a esa hora`;
+        const encodedMsg = encodeURIComponent(contentMsg);
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMsg}`;
+
+        window.open(whatsappUrl, '_blank');
+    }
 
     //console.log("📦 enrichedProducts:", enrichedProducts);
     const id_shipping = shipping?._id || '';
@@ -597,6 +613,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     }}
                                 />
                             </Form.Item>
+                        </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Button type="primary" onClick={handleChatClient} disabled={!shipping || !shipping.telefono_cliente}>
+                                Contactar
+                            </Button>
                         </Col>
                     </Row>
                 </Card>

@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
+import { UserContext } from "../../context/userContext.tsx";
+import { Switch } from 'antd';
 import ShippingTable from "./ShippingTable";
+import ExternalSalesTable from "./ExternalSalesTable.tsx";
 
 const Shipping = () => {
     const [refreshKey, setRefreshKey] = useState(0)
+    const [isExternalSalesMode, setIsExternalSalesMode] = useState(false);
+
+    const { user }: any = useContext(UserContext);
+    const isAdmin = user?.role?.toLowerCase() === 'admin';
 
     return (
         <div className="p-4">
@@ -15,7 +22,23 @@ const Shipping = () => {
                 </div>
             </div>
 
-            <ShippingTable refreshKey={refreshKey} />
+            {isAdmin && (
+                <div className="px-5 py-4">
+                    <Switch
+                        checked={isExternalSalesMode}
+                        onChange={(checked: boolean) => { setIsExternalSalesMode(checked) }}
+                        checkedChildren="Ventas externas" 
+                        unCheckedChildren="Ventas internas"
+                    />
+                </div>
+            )}
+            {!isExternalSalesMode && (
+                <ShippingTable refreshKey={refreshKey} />
+            )}
+            {isExternalSalesMode && (
+                <ExternalSalesTable refreshKey={refreshKey} />
+            )}
+
         </div>
     );
 };

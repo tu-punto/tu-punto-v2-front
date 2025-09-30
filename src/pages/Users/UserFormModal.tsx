@@ -1,5 +1,5 @@
-import { Modal, Form, Input, Select } from "antd";
-import { useEffect } from "react";
+import { Modal, Form, Input, Select, Checkbox } from "antd";
+import { useEffect, useState } from "react";
 
 interface UserFormModalProps {
   visible: boolean;
@@ -15,6 +15,7 @@ const UserFormModal = ({
   editingUser,
 }: UserFormModalProps) => {
   const [form] = Form.useForm();
+  const [changePassword, setChangePassword] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -23,23 +24,40 @@ const UserFormModal = ({
           email: editingUser.email,
           role: editingUser.role,
         });
+        setChangePassword(false);
       } else {
         form.resetFields();
+        setChangePassword(false);
       }
     }
   }, [visible, editingUser, form]);
 
   const handleSubmit = async (values: any) => {
-    const success = await onSubmit(values);
+    const submitData = { ...values };
+    if (editingUser && !changePassword) {
+      delete submitData.password;
+      delete submitData.confirmPassword;
+    }
+
+    const success = await onSubmit(submitData);
     if (success) {
       form.resetFields();
+      setChangePassword(false);
       onCancel();
     }
   };
 
   const handleCancel = () => {
     form.resetFields();
+    setChangePassword(false);
     onCancel();
+  };
+
+  const handleChangePasswordToggle = (checked: boolean) => {
+    setChangePassword(checked);
+    if (!checked) {
+      form.setFieldsValue({ password: "", confirmPassword: "" });
+    }
   };
 
   return (
@@ -64,19 +82,6 @@ const UserFormModal = ({
           <Input size="large" />
         </Form.Item>
 
-        {!editingUser && (
-          <Form.Item
-            name="password"
-            label="Contraseña"
-            rules={[
-              { required: true, message: "Contraseña requerida" },
-              { min: 6, message: "Mínimo 6 caracteres" },
-            ]}
-          >
-            <Input.Password size="large" />
-          </Form.Item>
-        )}
-
         <Form.Item
           name="role"
           label="Rol"
@@ -87,6 +92,58 @@ const UserFormModal = ({
             <Select.Option value="seller">Vendedor</Select.Option>
           </Select>
         </Form.Item>
+
+        {/* Checkbox para cambiar contraseña en modo edición */}
+        {editingUser && (
+          <Form.Item>
+            <Checkbox
+              checked={changePassword}
+              onChange={(e) => handleChangePasswordToggle(e.target.checked)}
+            >
+              Cambiar contraseña
+            </Checkbox>
+          </Form.Item>
+        )}
+
+        {/* Campos de contraseña */}
+        {(!editingUser || changePassword) && (
+          <>
+            <Form.Item
+              name="password"
+              label="Contraseña"
+              rules={[
+                { required: true, message: "Contraseña requerida" },
+                { min: 6, message: "Mínimo 6 caracteres" },
+              ]}
+            >
+              <Input.Password
+                size="large"
+                placeholder={editingUser ? "Nueva contraseña" : "Contraseña"}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="confirmPassword"
+              label="Confirmar contraseña"
+              dependencies={["password"]}
+              rules={[
+                { required: true, message: "Confirma la contraseña" },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue("password") === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error("Las contraseñas no coinciden")
+                    );
+                  },
+                }),
+              ]}
+            >
+              <Input.Password size="large" placeholder="Confirmar contraseña" />
+            </Form.Item>
+          </>
+        )}
       </Form>
     </Modal>
   );

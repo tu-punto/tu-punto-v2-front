@@ -15,7 +15,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   <div className="flex flex-col xl:flex-row justify-between mb-4">
     <StatCard
       title="PAGO PENDIENTE"
-      value={`Bs. ${pagoPendiente}`}
+      value={`Bs. ${Number(pagoPendiente).toFixed(2)}`}
       color="#007bff"
     />
     <StatCard
@@ -25,7 +25,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
     />
     <StatCard
       title="Saldo Pendiente"
-      value={`Bs. ${saldoPendiente}`}
+      value={`Bs. ${Number(saldoPendiente).toFixed(2)}`}
       color="#1976d2"
     />
   </div>

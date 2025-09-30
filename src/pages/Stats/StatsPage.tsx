@@ -1,6 +1,7 @@
 import StatisticsDashboard from "./StatsDashboard";
-import SidebarNavButton  from "../../components/SidebarNavButton";
+import SidebarNavButton from "../../components/SidebarNavButton";
 import sellerIcon from "../../assets/sellersIcon.svg";
+import servicesIcon from "../../assets/services.png";
 
 import { useState } from "react";
 
@@ -20,7 +21,7 @@ const StatsPage = () => {
         <SidebarNavButton 
           to="/servicesPage"
           description="Desglose de servicios"
-          icon={sellerIcon}
+          icon={servicesIcon} 
           isOpen={isOpen}
         />
       </div>

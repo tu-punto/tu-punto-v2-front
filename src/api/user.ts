@@ -11,7 +11,14 @@ export const checkLoginAPI = async (userData: any) => {
     parseError(error as AxiosError);
   }
 };
-
+export const getAdminsAPI = async () => {
+  try {
+    const res = await apiClient.get("/user/admins");
+    return res.data;
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
 export const getUserByCookieAPI = async () => {
   try {
     const res = await apiClient.get("/user/info");

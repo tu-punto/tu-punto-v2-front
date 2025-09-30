@@ -24,7 +24,6 @@ import {
   updateEntry,
   deleteEntryProductsAPI,
 } from "../../../api/entry";
-import { getPaymentProofsBySellerIdAPI } from "../../../api/paymentProof";
 import {
   getSalesBySellerIdAPI,
   updateSale,
@@ -32,7 +31,7 @@ import {
   deleteSaleByIdAPI,
   updateSaleByIdAPI,
 } from "../../../api/sales";
-import { getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
+import { getPaymentProofsBySellerIdAPI, getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
 
@@ -132,7 +131,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           subtotal: sale.precio_unitario * sale.cantidad,
           comision_porcentual: seller.comision_porcentual || 0,
           sucursal:
-            sucursales.find((s) => s._id === sale.id_sucursal).nombre ||
+            sucursales.find((s) => s._id === sale.id_sucursal)?.nombre ||
             "Sucursal no encontrada",
           key: `${sale.id_producto}-${sale.fecha_pedido}`,
         };
@@ -204,7 +203,10 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       /* 1) seller */
       const resSeller = await updateSellerAPI(seller.key, {
         ...formValues,
-        pago_sucursales: formValues.sucursales,
+        pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
+          ...sucursal,
+          alquiler: sucursal.almacenamiento,
+        })),
       });
       if (!resSeller?.success) {
         message.error("Error al editar vendedor");
@@ -232,41 +234,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
-  /* ─────────── valores para Stats ─────────── */
-  const pedidosProcesados = new Set();
-
-  const saldoPendiente = salesData.reduce((acc, sale) => {
-    if (sale.deposito_realizado) return acc;
-
-    let subtotalDeuda = 0;
-
-    if (sale.id_pedido.pagado_al_vendedor) {
-      subtotalDeuda = -sale.utilidad;
-    } else {
-      subtotalDeuda = sale.subtotal - sale.utilidad;
-    }
-
-    if (!pedidosProcesados.has(sale.id_pedido._id)) {
-      subtotalDeuda -=
-        sale.id_pedido.adelanto_cliente + sale.id_pedido.cargo_delivery;
-      pedidosProcesados.add(sale.id_pedido._id);
-    }
-
-    return acc + subtotalDeuda;
-  }, 0);
-
-  const deuda = Number(seller.deuda) || 0;
-  const pagoPendiente = saldoPendiente - deuda;
-
   /* ─────────── render ─────────── */
   return (
     <div>
       <SellerHeader name={seller.nombre} />
 
       <StatsCards
-        pagoPendiente={pagoPendiente}
-        deuda={deuda}
-        saldoPendiente={saldoPendiente}
+        pagoPendiente={seller.pago_pendiente}
+        deuda={seller.deuda}
+        saldoPendiente={seller.saldo_pendiente}
       />
 
       <Form
@@ -281,6 +257,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
+                almacenamiento: sucursal.alquiler,
                 fecha_ingreso: sucursal.fecha_ingreso
                   ? dayjs(sucursal.fecha_ingreso)
                   : null,

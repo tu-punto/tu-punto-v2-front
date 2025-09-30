@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { Button, Table, Spin, Select, Input } from 'antd';
+import { Button, Table, Spin, Select, Input, Switch } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import AddVariantModal from '../Product/AddVariantModal';
@@ -13,12 +13,14 @@ import { getSellerAPI } from '../../api/seller';
 
 const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSucursalId}) => {
     const [updatedProductsList, setUpdatedProductsList] = useState<any[]>([]);
+    const [filterAvailableStock, setFilterAvailableStock] = useState(false);
     const [branches, setBranches] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const { user }: any = useContext(UserContext);
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [categories, setCategories] = useState<any[]>([]);
+    const [selectedProductForList, setSelectedProductForList] = useState<string>('all');
     const [variantModalOpen, setVariantModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [stockModalOpen, setStockModalOpen] = useState(false);
@@ -63,7 +65,9 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
         const list: any[] = [];
 
         products.forEach((product) => {
-            if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
+            if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory || 
+                selectedProductForList !== 'all' && product._id !== selectedProductForList
+            ) return;
 
             const sucursales = product.sucursales?.filter((s: any) => s.id_sucursal?.toString() === sucursalId) || [];
 
@@ -78,6 +82,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     const variantLower = variant.toLowerCase();
 
                     if (
+                        (filterAvailableStock && comb.stock <= 0) || 
                         searchText &&
                         !nombreLower.includes(searchText.toLowerCase()) &&
                         !variantLower.includes(searchText.toLowerCase())
@@ -110,6 +115,27 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
 
     const columns = [
         {
+            dataIndex: 'isAvailable',
+            key: 'isAvailable',
+            width: 40,
+            render: (_: any, record: any) => {
+                if (!record.esCabecera) {
+                    const color = record.stock > 0 ? 'bg-green-500' : 'bg-red-500';
+                    return {
+                        children: <div
+                            className={`w-4 h-4 rounded-full ${color}`}
+                        />,
+                    }
+                }
+
+                return {
+                    props: {
+                        colSpan:0
+                    }
+                }
+            }
+        },
+        {
             title: "Producto",
             dataIndex: 'nombre_producto',
             key: 'nombre_producto',
@@ -118,7 +144,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     return {
                         children: <b style={{ fontSize: '16px' }}>{record.nombre_producto}</b>,
                         props: {
-                            colSpan: 4, // Unifica las columnas si querés
+                            colSpan: 5, // Unifica las columnas si querés
                             style: { backgroundColor: '#f0f2f5' }
                         }
                     };
@@ -179,6 +205,18 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                         </Select.Option>
                     ))}
                 </Select>
+                <Select
+                    value={selectedProductForList}
+                    onChange={setSelectedProductForList}
+                    style={{ width: 240}}
+                >
+                    <Select.Option value="all">Todos los productos</Select.Option>
+                    {updatedProductsList.map(product => (
+                        <Select.Option value={product._id}>
+                            {product.nombre_producto}
+                        </Select.Option>
+                    ))}
+                </Select>
                 <Input
                     placeholder="Buscar producto o variante..."
                     value={searchText}
@@ -186,6 +224,13 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
                     style={{ width: 300 }}
                     allowClear
                 />
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap'}}>
+                    <span>{'Ocultar productos sin stock disponible:'}</span>
+                    <Switch
+                        checked={filterAvailableStock}
+                        onChange={(check: boolean) => {setFilterAvailableStock(check)}}
+                    />
+                </div>
             </div>
             <Table
                 columns={columns}

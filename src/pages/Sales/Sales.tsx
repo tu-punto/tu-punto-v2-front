@@ -1,4 +1,4 @@
-import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
+import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -28,11 +28,13 @@ export const Sales = () => {
     const [branches, setBranches] = useState([] as any[]);
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<string>('all');
     const { data, fetchProducts } = useProductsFlat(
         branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
     );
     const [searchText, setSearchText] = useState("");
     const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
+    const [cartLoading, setCartLoading] = useState(false);
     useEffect(() => {
         const fetchSellerAndSetSucursales = async () => {
             if (isAdmin || !user?.id_vendedor) return;
@@ -71,7 +73,7 @@ export const Sales = () => {
         const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
 
         let filtered = data.filter((p: any) => {
-            if (p.stockActual <= 0) return false;
+            if (p.stockActual <= 0 || selectedProduct !== 'all' && selectedProduct !== p.id_producto) return false;
             return vendedoresVigentesIds.includes(String(p.id_vendedor));
         });
 
@@ -83,9 +85,20 @@ export const Sales = () => {
 
         if (searchText.trim()) {
             const lower = searchText.trim().toLowerCase();
-            filtered = filtered.filter(p =>
-                (p.producto ?? '').toString().toLowerCase().includes(lower)
-            );
+            const words = lower.split(" ");
+            const specialChars = /[!@#$%^&*?:{}|<>]/
+
+            const filterWords = (p: any, words: string[]) => {
+                let match = true;
+                for (const word of words) {
+                    if (!match) return false;
+                    if (specialChars.test(word)) continue;
+                    match = match && (p.producto ?? '').toString().toLowerCase().includes(word);
+                }
+                return match;
+            };
+
+            filtered = filtered.filter(p => filterWords(p, words));
         }
         filtered = filtered.map((p: any) => {
             const vendedor = sellers.find((v: any) => String(v._id) === String(p.id_vendedor));
@@ -95,7 +108,7 @@ export const Sales = () => {
             };
         });
         setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
+    }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers, selectedProduct]);
 
     useEffect(() => {
         fetchSellers();
@@ -114,7 +127,28 @@ export const Sales = () => {
         if (newSucursalId && newSucursalId !== branchIdForFetch) {
             setBranchIdForFetch(newSucursalId);
         }
-    }, [branches, isAdmin, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
+    }, [branches, isAdmin, selectedBranchId]); // sacá branchIdForFetch del array de dependencias
+
+    const [productOptions, setProductOptions] = useState<JSX.Element[]>([])
+    useEffect(() => {
+        if (!data || data.length === 0) return
+
+        const rawProducts = new Map<string,string>();
+        data.forEach(product => {
+            if(!rawProducts.has(product.id_producto) && product.id_vendedor == user.id_vendedor) {
+                rawProducts.set(product.id_producto, product.producto.split(" - ")[0])
+            }
+        })
+        const options: JSX.Element[] = [];
+        rawProducts.forEach((value, key) => {
+            options.push (
+                <Select.Option key={key} value={key}>
+                    {value}
+                </Select.Option>
+            )
+        })
+        setProductOptions(options)
+    },[data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
 
     //console.log(" Productos desde useProductsFlat:", data);
     const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -241,7 +275,14 @@ export const Sales = () => {
 
     useEffect(() => {
         if (!branchIdForFetch || branchIdForFetch === "undefined") return;
-        fetchProducts();
+
+        const p = fetchProducts();
+        if (p && typeof p.finally === "function") {
+            p.finally(() => setCartLoading(false)); // ✅ apaga spinner cuando termina
+        } else {
+            // fallback por si acaso
+            setCartLoading(false);
+        }
     }, [branchIdForFetch]);
 
     useEffect(() => {
@@ -403,13 +444,32 @@ export const Sales = () => {
                                             <Select
                                                 placeholder="Sucursal"
                                                 value={selectedBranchId}
-                                                onChange={(value) => setSelectedBranchId(value)}
+                                                onChange={(value) => {
+                                                    // 🔥 mostrar spinner de carrito YA
+                                                    setCartLoading(true);
+                                                    // 🔥 vaciar carrito al toque (sin esperar efectos)
+                                                    setSelectedProducts([]);
+                                                    setTotalAmount(0);
+                                                    // forzar rerender del carrito si quieres (opcional):
+                                                    // setRefreshKey(prev => prev + 1);
+
+                                                    setSelectedBranchId(value); // esto gatilla el fetch por tus efectos existentes
+                                                }}
                                                 options={sucursalesPagadas}
                                                 style={{ minWidth: 180 }}
                                                 allowClear
                                             />
                                         )}
-
+                                        {!isAdmin && (
+                                            <Select
+                                                    value={selectedProduct}
+                                                    onChange={setSelectedProduct}
+                                                    style={{ width: 180}}
+                                            >
+                                                <Select.Option key="all" value="all">Todos los productos</Select.Option>
+                                                {productOptions}
+                                            </Select>
+                                        )}
                                         <Button
                                             type="primary"
                                             onClick={() => setProductAddModal(true)}
@@ -479,15 +539,17 @@ export const Sales = () => {
                         }
                         bordered={false}
                     >
-                        <EmptySalesTable
-                            products={selectedProducts}
-                            onDeleteProduct={handleDeleteProduct}
-                            handleValueChange={handleEnhancedValueChange}
-                            onUpdateTotalAmount={updateTotalAmount}
-                            key={refreshKey}
-                            sellers={sellers}
-                            isAdmin={isAdmin}
-                        />
+                        <Spin spinning={cartLoading} tip="Cargando carrito...">
+                            <EmptySalesTable
+                                products={selectedProducts}
+                                onDeleteProduct={handleDeleteProduct}
+                                handleValueChange={handleEnhancedValueChange}
+                                onUpdateTotalAmount={updateTotalAmount}
+                                key={refreshKey}
+                                sellers={sellers}
+                                isAdmin={isAdmin}
+                            />
+                        </Spin>
                     </Card>
                 </Col>
             </Row>

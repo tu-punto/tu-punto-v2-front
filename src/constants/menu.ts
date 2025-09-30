@@ -33,7 +33,7 @@ export const menu = [
   },
   {
     path: "/shop",
-    label: "Comprar",
+    label: "Vender",
     icon: cartIcon,
     roles: ["seller"],
   },
@@ -73,5 +73,11 @@ export const menu = [
     label: "Usuarios",
     icon: sellerIcon,
     roles: ["admin"],
+  },
+  {
+    path: "/shipping-guide",
+    label: "Guías de Envío",
+    icon: shippingIcon,
+    roles: ["seller"]
   }
 ];

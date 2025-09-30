@@ -1,12 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import FinanceFluxTable from "./FinanceFluxTable"
 import FinanceFluxFormModal from "./FinanceFluxFormModal";
 import { Button } from "antd";
+import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
 
 const FinanceFlux = () => {
     const [isModalVisible, setIsModalVisible] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const [editingFlux, setEditingFlux] = useState(null);
+    const fetchFluxCategory = useFinanceFluxCategoryStore(
+    (state) => state.fetchFluxCategory
+    );
+
+    useEffect(() => {
+        fetchFluxCategory();
+    }, []);
 
     const handleEdit = (flux: any) => {
         setEditingFlux(flux);
