@@ -1,5 +1,5 @@
 import { DatePicker, Input, message, Select, Table } from 'antd';
-import { useContext, useEffect, useState, useMemo } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { getShippingsAPI, getShippingByIdAPI } from '../../api/shipping';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
@@ -29,6 +29,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("");
+    const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
     const isAdmin = user?.role?.toLowerCase() === 'admin';
     const isVendedor = user?.role?.toLowerCase() === 'vendedor';
     //console.log("Usuario:", user);
@@ -147,7 +148,11 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     )
                 );
 
-            return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor;
+            // Nuevo filtro por cliente
+            const matchesCliente = !searchCliente ||
+                pedido.cliente?.toLowerCase().includes(searchCliente.toLowerCase());
+
+            return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor && matchesCliente;
         });
     };
     useEffect(() => {
@@ -317,7 +322,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     useEffect(() => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [esperaData, entregadoData, selectedLocation, selectedOrigin, dateRange, selectedVendedor]);
+    }, [esperaData, entregadoData, selectedLocation, selectedOrigin, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -349,6 +354,14 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     </Select>
                 )}
 
+                <Input
+                    style={{ width: 200, margin: 8 }}
+                    placeholder="Buscar cliente..."
+                    value={searchCliente}
+                    onChange={(e) => setSearchCliente(e.target.value)}
+                    allowClear
+                />
+                
                 <Select
                     style={{ width: 200, margin: 8 }}
                     placeholder="Estado del pedido"
