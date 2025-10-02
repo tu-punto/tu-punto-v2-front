@@ -1,6 +1,6 @@
 import { Input } from "antd";
 import "./Header.css";
-import logoImg from "../../../public/logo.png";
+import logoImg from "../../../public/logo-no-letter-dark-bg.png";
 
 const { Search } = Input;
 
