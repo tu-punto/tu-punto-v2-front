@@ -1,11 +1,11 @@
-import { Button, DatePicker, Input, message, Select, Table } from 'antd';
-import {useContext, useEffect, useState} from 'react';
-import { getShippingsAPI, getShippingByIdAPI  } from '../../api/shipping';
+import { DatePicker, Input, message, Select, Table } from 'antd';
+import { useContext, useEffect, useState, useMemo } from 'react';
+import { getShippingsAPI, getShippingByIdAPI } from '../../api/shipping';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
 import { getSucursalsAPI } from '../../api/sucursal';
 import { getSellersAPI } from "../../api/seller";
-import {UserContext} from "../../context/userContext.tsx";
+import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
@@ -28,11 +28,14 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [otherLocation, setOtherLocation] = useState('');
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
-    const [selectedVendedor, setSelectedVendedor] = useState("Todos");
+    const [selectedVendedor, setSelectedVendedor] = useState("");
     const isAdmin = user?.role?.toLowerCase() === 'admin';
     const isVendedor = user?.role?.toLowerCase() === 'vendedor';
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
+    const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
+
+    const [isMobile, setIsMobile] = useState(false);
 
     const fetchShippings = async () => {
         try {
@@ -51,6 +54,59 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     };
     const toSimpleDate = (d: Date | null) =>
         d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+
+    const getVendedoresConEntregas = () => {
+        const vendedoresConEntregasSet = new Set();
+
+        // Obtener vendedores de pedidos en espera
+        esperaData.forEach((pedido: any) => {
+            // Buscar en las ventas del pedido
+            (pedido.venta || []).forEach((venta: any) => {
+                if (venta.vendedor) {
+                    // Si vendedor es un objeto, usar su _id; si es string, usarlo directamente
+                    const vendedorId = typeof venta.vendedor === 'object'
+                        ? venta.vendedor._id
+                        : venta.vendedor;
+                    vendedoresConEntregasSet.add(vendedorId);
+                }
+            });
+
+            // Buscar en productos temporales si existen
+            (pedido.productos_temporales || []).forEach((producto: any) => {
+                if (producto.id_vendedor) {
+                    vendedoresConEntregasSet.add(producto.id_vendedor);
+                }
+            });
+        });
+
+        // Obtener vendedores de pedidos entregados
+        entregadoData.forEach((pedido: any) => {
+            // Buscar en las ventas del pedido
+            (pedido.venta || []).forEach((venta: any) => {
+                if (venta.vendedor) {
+                    // Si vendedor es un objeto, usar su _id; si es string, usarlo directamente
+                    const vendedorId = typeof venta.vendedor === 'object'
+                        ? venta.vendedor._id
+                        : venta.vendedor;
+                    vendedoresConEntregasSet.add(vendedorId);
+                }
+            });
+
+            // Buscar en productos temporales si existen
+            (pedido.productos_temporales || []).forEach((producto: any) => {
+                if (producto.id_vendedor) {
+                    vendedoresConEntregasSet.add(producto.id_vendedor);
+                }
+            });
+        });
+
+        // Filtrar vendedores que están en los datos de entregas
+        const resultado = vendedores.filter(vendedor =>
+            vendedoresConEntregasSet.has(vendedor._id)
+        );
+
+        return resultado;
+    };
 
     const filterByLocationAndDate = (data: any) => {
         const nombreSucursalToIdMap = new Map(
@@ -71,22 +127,25 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     ? toSimpleDate(new Date(pedido.hora_entrega_acordada)) >= toSimpleDate(dateRange[0]) &&
                     toSimpleDate(new Date(pedido.hora_entrega_acordada)) <= toSimpleDate(dateRange[1])
                     : true;
+            // Lógica actualizada para el filtro de vendedor
             const matchesVendedor = isAdmin
-                ? (selectedVendedor === "Todos" || pedido.venta?.some((v: any) =>
-                    v.vendedor?._id === selectedVendedor ||
-                    v.id_vendedor === selectedVendedor
-                ))
+                ? (selectedVendedor === "Todos" || !selectedVendedor || // Si es "Todos" o vacío, mostrar todos
+                    pedido.venta?.some((v: any) => {
+                        const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
+                        return vendedorId === selectedVendedor || v.id_vendedor === selectedVendedor;
+                    }) ||
+                    pedido.productos_temporales?.some((p: any) =>
+                        p.id_vendedor === selectedVendedor
+                    ))
                 : (
-                    pedido.venta?.some((v: any) =>
-                        v.id_vendedor === user?.id_vendedor ||
-                        v.vendedor?._id === user?.id_vendedor ||
-                        v.vendedor === user?.id_vendedor
-                    ) ||
+                    pedido.venta?.some((v: any) => {
+                        const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
+                        return v.id_vendedor === user?.id_vendedor || vendedorId === user?.id_vendedor;
+                    }) ||
                     pedido.productos_temporales?.some((p: any) =>
                         p.id_vendedor === user?.id_vendedor
                     )
                 );
-
 
             return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor;
         });
@@ -96,6 +155,13 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             setSelectedVendedor(user.id_vendedor);
         }
     }, [isVendedor, user]);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 640);
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const columns = [
         {/*{
@@ -181,8 +247,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     <>
                         {vendedorArray.slice(0, 2).join(', ')}{' '}
                         <span style={{ color: '#1890ff', cursor: 'pointer' }} title={vendedorArray.join(', ')}>
-                    +{vendedorArray.length - 2} más
-                </span>
+                            +{vendedorArray.length - 2} más
+                        </span>
                     </>
                 );
             }
@@ -194,27 +260,27 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         },
     ];
 
-    const handleCancel = () => {
-        setIsModalExternalVisible(false)
-    };
+    // const handleCancel = () => {
+    //     setIsModalExternalVisible(false)
+    // };
 
-    const handleIconClick = (order: any) => {
-        if (order.estado_pedido === "Entregado") return;
-        setSelectedShipping(order);
-        setIsModalStateVisible(true);
-    };
+    // const handleIconClick = (order: any) => {
+    //     if (order.estado_pedido === "Entregado") return;
+    //     setSelectedShipping(order);
+    //     setIsModalStateVisible(true);
+    // };
 
-    const handleRowClick = async (record: any) => {
-        try {
-            const shipping = await getShippingByIdAPI(record._id); // ✅ este endpoint debe devolver solo UN pedido
-            console.log("📦 Pedido individual para el modal:", shipping);
-            setSelectedShipping(shipping);
-            setIsModalVisible(true);
-        } catch (error) {
-            console.error("Error al obtener pedido por ID:", error);
-            message.error("Error al cargar el pedido");
-        }
-    };
+    // const handleRowClick = async (record: any) => {
+    //     try {
+    //         const shipping = await getShippingByIdAPI(record._id); // ✅ este endpoint debe devolver solo UN pedido
+    //         console.log("📦 Pedido individual para el modal:", shipping);
+    //         setSelectedShipping(shipping);
+    //         setIsModalVisible(true);
+    //     } catch (error) {
+    //         console.error("Error al obtener pedido por ID:", error);
+    //         message.error("Error al cargar el pedido");
+    //     }
+    // };
     const fetchSucursal = async () => {
         try {
             const response = await getSucursalsAPI();
@@ -266,25 +332,25 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     //console.log("Rol", user?.role?.toLowerCase());
     return (
         <div>
-            <div style={{ marginBottom: 16 }}>
+            <div className="flex justify-center flex-wrap gap-2 mb-4">
                 {isAdmin && (
                     <Select
-                        placeholder="Filtrar por vendedor"
-                        style={{ width: 200, marginBottom: 16 }}
-                        value={selectedVendedor}
-                        onChange={(value) => setSelectedVendedor(value)}
+                        style={{ width: 200, margin: 8 }}
+                        placeholder="Vendedores"
+                        value={selectedVendedor || undefined}
+                        onChange={(value) => setSelectedVendedor(value || "")}
+                        allowClear
                     >
-                        <Select.Option value="Todos">Todos</Select.Option>
-                        {vendedores.map((v: any) => (
-                            <Select.Option key={v._id} value={v._id}>
-                                {v.nombre} {v.apellido}
-                            </Select.Option>
+                        {getVendedoresConEntregas().map((vendedor: any) => (
+                            <Option key={vendedor._id} value={vendedor._id}>
+                                {vendedor.nombre} {vendedor.apellido}
+                            </Option>
                         ))}
                     </Select>
                 )}
 
                 <Select
-                    className="mt-2 w-full xl:w-1/5"
+                    style={{ width: 200, margin: 8 }}
                     placeholder="Estado del pedido"
                     value={selectedStatus}
                     onChange={(value) => setSelectedStatus(value)}
@@ -293,8 +359,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     <Option value="entregado">Entregado</Option>
                 </Select>
                 <Select
-                    className="mr-2 w-2/3 xl:w-1/5"
                     placeholder="Sucursal de Origen"
+                    style={{ width: 200, margin: 8 }}
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
                     allowClear={!isAdmin}
@@ -307,7 +373,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     ))}
                 </Select>
                 <Select
-                    className="mr-2 w-2/3 xl:w-1/5"
+                    style={{ width: 200, margin: 8 }}
                     placeholder="Sucursal De Destino"
                     onChange={(value) => {
                         setSelectedLocation(value || '');
@@ -326,27 +392,59 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 </Select>
                 {selectedLocation === 'other' && (
                     <Input
-                        className="mt-2 w-2/3 xl:w-1/5"
+                        style={{ width: 200, marginBottom: 16 }}
                         placeholder="Especificar otro lugar"
                         value={otherLocation}
                         onChange={(e) => setOtherLocation(e.target.value)}
                     />
                 )}
-                <RangePicker
-                    className="mt-2 w-full xl:w-1/5"
-                    onChange={(dates) => {
-                        if (dates && dates[0] && dates[1]) {
-                            setDateRange([dates[0].toDate(), dates[1].toDate()]);
-                        } else {
-                            setDateRange([null, null]);
-                        }
-                    }}
-                />
+                {isMobile ? (
+                    <>
+                        <DatePicker
+                            placeholder="Start date"
+                            open={openPicker === 'start'}
+                            value={dateRange[0] ? moment(dateRange[0]) : null}
+                            onFocus={() => setOpenPicker('start')}
+                            onBlur={() => setOpenPicker(null)}
+                            onChange={date => {
+                                setDateRange([date ? date.toDate() : null, dateRange[1]]);
+                                setOpenPicker(null);
+                            }}
+                        />
+                        <DatePicker
+                            placeholder="End date"
+                            open={openPicker === 'end'}
+                            value={dateRange[1] ? moment(dateRange[1]) : null}
+                            onFocus={() => setOpenPicker('end')}
+                            onBlur={() => setOpenPicker(null)}
+                            onChange={date => {
+                                setDateRange([dateRange[0], date ? date.toDate() : null]);
+                                setOpenPicker(null);
+                            }}
+                        />
+                    </>
+                ) : (
+                    <RangePicker
+                        className="mt-2"
+                        style={{ width: 240, margin: 8 }}
+                        value={[
+                            dateRange[0] ? moment(dateRange[0]) : null,
+                            dateRange[1] ? moment(dateRange[1]) : null,
+                        ]}
+                        onChange={(dates) => {
+                            if (dates && dates[0] && dates[1]) {
+                                setDateRange([dates[0].toDate(), dates[1].toDate()]);
+                            } else {
+                                setDateRange([null, null]);
+                            }
+                        }}
+                    />
+                )}
             </div>
 
             {selectedStatus === 'En Espera' && (
                 <>
-                    <h2 className="text-mobile-sm xl:text-desktop-3xl">En Espera</h2>
+                    <h2 className="text-mobile-sm xl:text-desktop-3xl text-center mb-4 font-bold">En Espera</h2>
                     <Table
                         columns={columns}
                         dataSource={filteredEsperaData}
@@ -366,7 +464,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
 
             {selectedStatus === 'entregado' && (
                 <>
-                    <h2 className="text-mobile-sm xl:text-desktop-3xl">Entregado</h2>
+                    <h2 className="text-mobile-sm xl:text-desktop-3xl text-center mb-4 font-bold">Entregado</h2>
                     <Table
                         columns={columns}
                         dataSource={filteredEntregadoData}
@@ -380,14 +478,13 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                                 setIsModalVisible(true);
                             },
                         })}
-
                     />
                 </>
             )}
 
             <ShippingInfoModal
                 visible={isModalVisible && !isModaStatelVisible}
-                shipping={selectedShipping }
+                shipping={selectedShipping}
                 sucursals={sucursal} // <-- esta línea es clave
                 onClose={() => setIsModalVisible(false)}
                 onSave={() => {
