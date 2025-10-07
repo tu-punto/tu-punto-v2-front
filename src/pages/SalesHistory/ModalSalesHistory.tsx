@@ -343,7 +343,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       return (
         <div style={{ textAlign: "center", padding: 32 }}>
           <p>No hay productos en esta venta.</p>
-          <p>Monto total: <b>Bs {monto.toFixed(2)}</b></p>
         </div>
       );
     }
@@ -482,10 +481,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       {/* SECCIÓN DE TIPO DE PAGO - Similar a ShippingInfoModal */}
       {isAdmin && (
         <Card title="Detalles del Pago" bordered={false} style={{ marginTop: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <span>Monto total:</span>
-            <span style={{ fontWeight: 'bold' }}>Bs. {montoTotal.toFixed(2)}</span>
-          </div>
 
           {/* ¿Está ya pagado? */}
           <Row gutter={16}>
