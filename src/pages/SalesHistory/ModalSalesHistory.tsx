@@ -225,7 +225,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     try {
       // Preparar datos para actualizar
       const updateData = {
-        ...shipping,
         venta: products.map(p => ({
           _id: p.id_venta,
           id_producto: p.id_producto,
@@ -236,8 +235,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           variantes: p.variantes
         })),
         tipo_de_pago: tipoPago,
-        esta_pagado: estaPagado,
-        adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
         subtotal_qr: tipoPago === '1' || tipoPago === '4' ? qrInput : 0,
         subtotal_efectivo: tipoPago === '2' || tipoPago === '4' ? efectivoInput : 0,
       };
