@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo  } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Modal, Button, message, Table, Form, Tag, InputNumber, Radio, Card, Row, Col, Input } from 'antd';
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import EditProductsModal from '../Shipping/EditProductsModal';
@@ -22,6 +22,30 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [estaPagado, setEstaPagado] = useState<string | null>(null);
   const [adelantoVisible, setAdelantoVisible] = useState(false);
   const [adelantoCliente, setAdelantoCliente] = useState<number>(0);
+
+  const enrichedProducts = useMemo(() => {
+    const sucursalId = localStorage.getItem("sucursalId");
+    if (!data) return [];
+
+    return data.flatMap((p: any) => {
+      const sucursal = p.sucursales?.find((s: any) => String(s.id_sucursal) === String(sucursalId));
+      if (!sucursal) return [];
+
+      return sucursal.combinaciones.map((combo: any, index: number) => {
+        const varianteNombre = Object.values(combo.variantes || {}).join(" / ");
+        return {
+          ...p,
+          key: `${p._id}-${index}`,
+          producto: `${p.nombre_producto} - ${varianteNombre}`,
+          nombre_variante: `${p.nombre_producto} - ${varianteNombre}`,
+          precio: combo.precio,
+          stockActual: combo.stock,
+          variantes: combo.variantes,
+          sucursalId,
+        };
+      });
+    });
+  }, [data]);
 
   const normalizarTipoPago = (valor: string): string | null => {
     const mapping: Record<string, string> = {
@@ -52,20 +76,20 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const pedidoFecha = shipping?.fecha_pedido
     ? dayjs(shipping.fecha_pedido).add(4, "hour").format("DD/MM/YYYY")
     : "";
-  
+
   const hoy = dayjs().add(4, "hour").format("DD/MM/YYYY");
   const esHoy = pedidoFecha === hoy;
 
   useEffect(() => {
     if (!visible || !shipping) return;
-    
+
     const ventasNormales = (shipping.venta || []).map((p: any) => ({
       ...p,
       id_venta: p._id ?? null,
       key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
       producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
     }));
-    
+
     setProducts(ventasNormales);
     setOriginalProducts(JSON.parse(JSON.stringify(ventasNormales)));
 
@@ -619,31 +643,18 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           </Button>
         </div>
       )}
-      
+
       <EditProductsModal
         visible={editProductsModalVisible}
         onCancel={() => setEditProductsModalVisible(false)}
-        products={products}
+        products={products as any[]}
         setProducts={setProducts}
-        allProducts={data ? data.flatMap((p: any) => {
-          const sucursalId = localStorage.getItem("sucursalId");
-          const sucursal = p.sucursales?.find((s: any) => String(s.id_sucursal) === String(sucursalId));
-          if (!sucursal) return [];
-          return sucursal.combinaciones.map((combo: any, index: number) => ({
-            ...p,
-            key: `${p._id}-${index}`,
-            producto: `${p.nombre_producto} - ${Object.values(combo.variantes || {}).join(" / ")}`,
-            nombre_variante: `${p.nombre_producto} - ${Object.values(combo.variantes || {}).join(" / ")}`,
-            precio: combo.precio,
-            stockActual: combo.stock,
-            variantes: combo.variantes,
-            sucursalId,
-          }));
-        }) : []}
+        allProducts={enrichedProducts} // Ahora enrichedProducts está definido
         sellers={[]}
         isAdmin={isAdmin}
         shippingId={id_shipping}
         sucursalId={localStorage.getItem("sucursalId")}
+        allowAddProducts={false} // NO permitir agregar productos en historial
         onSave={() => {
           setEditProductsModalVisible(false);
           message.success("Cambios guardados");
