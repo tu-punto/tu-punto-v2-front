@@ -12,7 +12,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [originalProducts, setOriginalProducts] = useState<any[]>([]);
   const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
   const { rawProducts: data } = useRawProducts();
-  const [internalForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [deletedProducts, setDeletedProducts] = useState<string[]>([]);
   const [tipoPago, setTipoPago] = useState<string | null>(null);
@@ -481,33 +480,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       {/* SECCIÓN DE TIPO DE PAGO - Similar a ShippingInfoModal */}
       {isAdmin && (
         <Card title="Detalles del Pago" bordered={false} style={{ marginTop: 16 }}>
-
-          {/* ¿Está ya pagado? */}
-          <Row gutter={16}>
-            <Col span={24}>
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ display: 'block', marginBottom: 8 }}>¿Está ya pagado?</span>
-                <Radio.Group
-                  value={estaPagado}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setEstaPagado(value);
-                    setAdelantoVisible(value === 'adelanto');
-                    if (value !== 'adelanto') {
-                      setAdelantoCliente(0);
-                    }
-                    if (value === 'si') {
-                      setTipoPago("3");
-                    }
-                  }}
-                >
-                  <Radio.Button value="si">Sí</Radio.Button>
-                  <Radio.Button value="no">No</Radio.Button>
-                  <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
-                </Radio.Group>
-              </div>
-            </Col>
-          </Row>
 
           {adelantoVisible && (
             <Row gutter={16}>
