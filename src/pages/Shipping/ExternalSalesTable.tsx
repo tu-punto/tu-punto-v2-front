@@ -1,4 +1,4 @@
-import { Button, Select, Table, Typography } from 'antd';
+import { Button, Input, Select, Table, Typography } from 'antd';
 import { EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
 import { useContext, useEffect, useState } from 'react';
 import { getExternalSalesAPI } from '../../api/externalSale.ts'
@@ -11,6 +11,7 @@ const { Option } = Select;
 const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const [externalSalesData, setExternalSalesData] = useState([]);
     const [filteredSalesData, setFilteredSalesData] = useState([]);
+    const [searchText, setSearchText] = useState("");
     const [isModalExternalVisible, setIsModalExternalVisible] = useState(false);
     const [isShippingStatusFilterActive, setIsShippingStatusFilterActive] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
@@ -113,11 +114,33 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const isRowOnFilter = (fila: any) => {
         return (
             isRowOnShippingStatusFilter(fila) &&
-            isRowOnDeliveredFilter(fila)
+            isRowOnDeliveredFilter(fila) &&
+            isRowOnWordFilter(fila)
         )
     }
 
-    const isRowOnDeliveredFilter = (fila:any) => {
+    const isRowOnWordFilter = (fila: any) => {
+        if (searchText.trim().length <= 0) return true
+
+        const lower = searchText.trim().toLowerCase();
+        const words = lower.split(" ");
+        const specialChars = /[!@#$%^&*?:{}|<>]/
+
+        const filterWords = (text: any, words: string[]) => {
+            let match = true;
+            for (const word of words) {
+                if (!match) return false;
+                if (specialChars.test(word)) continue;
+                match = match && text.toString().toLowerCase().includes(word);
+            }
+            return match;
+        };
+
+        const fullText = `${fila.comprador} ${fila.vendedor}`.toLowerCase()
+        return filterWords(fullText, words)
+    }
+
+    const isRowOnDeliveredFilter = (fila: any) => {
         return (deliveredStatus == 'entregado' && fila.delivered) ||
             (deliveredStatus == 'espera' && !fila.delivered)
     }
@@ -132,7 +155,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
 
     useEffect(() => {
         updateFilteredSalesData();
-    }, [shippingStatus, deliveredStatus]);
+    }, [shippingStatus, deliveredStatus, searchText]);
 
     useEffect(() => {
         fetchExternalSales();
@@ -152,8 +175,15 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                 )}
             </div>
             <div style={{ marginBottom: 16 }}>
+                <Input.Search
+                    className="mt-2 w-full xl:w-1/5 m-2"
+                    placeholder="Buscar por nombres"
+                    onChange={(e) => setSearchText(e.target.value)}
+                    style={{ width: 200 }}
+                    allowClear
+                />
                 <Select
-                    className="mt-2 w-full xl:w-1/5"
+                    className="mt-2 w-full xl:w-1/5 m-2"
                     value={deliveredStatus}
                     onChange={(value) => {
                         setDeliveredStatus(value)
@@ -163,7 +193,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                     <Option value="entregado">Entregados</Option>
                 </Select>
                 <Select
-                    className="mt-2 w-full xl:w-1/5"
+                    className="mt-2 w-full xl:w-1/5 m-2"
                     placeholder="Filtrar por método de envío"
                     value={shippingStatus}
                     allowClear
