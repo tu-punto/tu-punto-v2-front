@@ -1,7 +1,7 @@
 import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button, Select, message} from 'antd';
 import { UserOutlined, PhoneOutlined, HomeOutlined, CarFilled} from '@ant-design/icons';
 import { useEffect, useState } from 'react';
-import { registerExternalSaleAPI } from '../../api/externalSale';
+import { registerExternalSaleAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import { getSucursalsAPI } from "../../api/sucursal";
 import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
@@ -10,7 +10,14 @@ import dayjs from 'dayjs';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-function ExternalSalesModal({visible, onCancel, onClose}: any) {
+interface ExternalSalesModalProps {
+    visible: boolean, 
+    onCancel: () => void, 
+    onClose: () => void, 
+    externalSale?: any
+}
+
+function ExternalSalesModal({visible, onCancel, onClose, externalSale}: ExternalSalesModalProps) {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [packageSizeType, setPackageSizeType] = useState<null|'pequenio'|'mediano'|'grande'|'muy-grande'>();
@@ -44,8 +51,6 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
             return;
         }
 
-        //TODO realizar operaciones en cierre de caja según los valores de isOptionPagada, isOptionCobrada, isPaid
-
         try {
             const vendedorNombre = values.nombre_vendedor;
             const vendedorCelular = values.telefono_vendedor || "";
@@ -59,7 +64,7 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
             const montoServicio = values.service_price || 0;
             const montoTotal = saleTotalPrice;
 
-            const response = await registerExternalSaleAPI({
+            const saleData = {
                 vendedor: vendedorNombre,
                 telefono_vendedor: vendedorCelular,
                 comprador: compradorNombre,
@@ -72,14 +77,18 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
                 precio_servicio: montoServicio,
                 precio_total: montoTotal,
                 delivered: isDelivered
-            });
+            };
+
+            const response = externalSale 
+                ? await updateExternalSaleAPI(externalSale._id, saleData)
+                : await registerExternalSaleAPI(saleData);
 
             if (!response.success) {
-                message.error("Error registrando la venta");
+                message.error(externalSale ? "Error actualizando la venta" : "Error registrando la venta");
                 setLoading(false);
                 return;
             } else {
-                message.success("Venta externa registrada");
+                message.success(externalSale ? "Venta externa actualizada" : "Venta externa registrada");
                 resetValues();
                 onClose();
             }
@@ -151,8 +160,51 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
     },[packageSizeType, packageSizeX, packageSizeY, packageSizeZ, deliveryPrice, shippingPrice, isDelivery, isCityShipping, 
         hasShippingService, isBranch, isOptionPagar, isOptionCobrar, isOptionControlar])
 
+    useEffect(() => {
+        if (externalSale) {
+            form.setFieldsValue({
+                nombre_vendedor: externalSale.vendedor,
+                telefono_vendedor: externalSale.telefono_vendedor,
+                nombre_comprador: externalSale.comprador,
+                telefono_comprador: externalSale.telefono_comprador,
+                fecha_pedido: externalSale.fecha_pedido ? dayjs(externalSale.fecha_pedido) : undefined,
+                direccion: externalSale.direccion_delivery,
+                sucursalID: externalSale.id_sucursal,
+                flota: externalSale.nombre_flota,
+                service_price: externalSale.precio_servicio,
+                total_price: externalSale.precio_total
+            });
+
+            setIsDelivered(externalSale.delivered);
+            setCity(externalSale.ciudad_envio);
+            setServicePrice(externalSale.precio_servicio || 0);
+            setSaleTotalPrice(externalSale.precio_total || 0);
+            
+            if (externalSale.direccion_delivery) {
+                setIsDelivery(true);
+                setDeliveryPrice(externalSale.precio_delivery || 0);
+            }
+
+            if (externalSale.ciudad_envio) {
+                setIsCityShipping(true);
+                if (externalSale.id_sucursal) {
+                    setIsBranch(true);
+                } else if (externalSale.nombre_flota) {
+                    setHasShippingService(true);
+                    setShippingPrice(externalSale.precio_envio || 0);
+                }
+            }
+        }
+    }, [externalSale, form]);
+
     return (
-        <Modal title="Ventas Externas" open={visible} onCancel={handleCancel} width={800} footer={null}>
+        <Modal 
+            title={externalSale ? "Editar Venta Externa" : "Crear Venta Externa"} 
+            open={visible} 
+            onCancel={handleCancel} 
+            width={800} 
+            footer={null}
+        >
             <Form form={form} name='externalSaleForm' onFinish={handleFinish} layout='vertical'>
                 <Card title="Información del Vendedor" bordered={false}>
                     <Row gutter={16}>

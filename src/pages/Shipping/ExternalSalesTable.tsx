@@ -1,6 +1,6 @@
-import { Button, Input, Select, Table, Typography } from 'antd';
-import { EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
-import { useContext, useEffect, useState } from 'react';
+import { Button, Input, Select, Table, Tooltip, Typography } from 'antd';
+import Icon, { EditOutlined, EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { getExternalSalesAPI } from '../../api/externalSale.ts'
 import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
@@ -12,6 +12,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const [externalSalesData, setExternalSalesData] = useState([]);
     const [filteredSalesData, setFilteredSalesData] = useState([]);
     const [searchText, setSearchText] = useState("");
+    const [selectedExternal, setSelectedExternal] = useState<any>()
     const [isModalExternalVisible, setIsModalExternalVisible] = useState(false);
     const [isShippingStatusFilterActive, setIsShippingStatusFilterActive] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
@@ -100,12 +101,54 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                     return 'No requiere envío'
                 }
             }
+        },
+        {
+            title: 'Acciones',
+            key: 'actions',
+            render: (_:any, record: any) => {
+                return (
+                    <>
+                        <Tooltip title="Editar venta externa">
+                            <Button 
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                    setSelectedExternal(record)
+                                    setIsModalExternalVisible(true)
+                                }}
+                            />
+                        </Tooltip>
+                    </>
+                )
+            }
         }
     ];
 
     const handleCancel = () => {
         setIsModalExternalVisible(false)
     };
+
+    const externalModal = useMemo(() => {
+        return selectedExternal ? (
+            <ExternalSalesModal
+                visible={isModalExternalVisible}
+                onCancel={handleCancel}
+                onClose={() => {
+                    setIsModalExternalVisible(false);
+                    fetchExternalSales();
+                }}
+                externalSale={selectedExternal}
+            />
+        ) : ( 
+            <ExternalSalesModal
+                visible={isModalExternalVisible}
+                onCancel={handleCancel}
+                onClose={() => {
+                    setIsModalExternalVisible(false);
+                    fetchExternalSales();
+                }}
+            />
+        )
+    }, [selectedExternal, isModalExternalVisible])
 
     const updateFilteredSalesData = () => {
         setFilteredSalesData(externalSalesData.filter(row => isRowOnFilter(row)));
@@ -216,14 +259,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                 scroll={{ x: "max-content" }}
             />
 
-            <ExternalSalesModal
-                visible={isModalExternalVisible}
-                onCancel={handleCancel}
-                onClose={() => {
-                    setIsModalExternalVisible(false);
-                    fetchExternalSales();
-                }}
-            />
+            {externalModal}
         </div>
     );
 };
