@@ -15,6 +15,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const [isShippingStatusFilterActive, setIsShippingStatusFilterActive] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [shippingStatus, setShippingStatus] = useState<null | 'Por sucursal' | 'Por flota' | 'Sin envío'>();
+    const [deliveredStatus, setDeliveredStatus] = useState<'espera' | 'entregado'>('espera');
 
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role?.toLowerCase() === 'admin';
@@ -111,8 +112,14 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
 
     const isRowOnFilter = (fila: any) => {
         return (
-            isRowOnShippingStatusFilter(fila)
+            isRowOnShippingStatusFilter(fila) &&
+            isRowOnDeliveredFilter(fila)
         )
+    }
+
+    const isRowOnDeliveredFilter = (fila:any) => {
+        return (deliveredStatus == 'entregado' && fila.delivered) ||
+            (deliveredStatus == 'espera' && !fila.delivered)
     }
 
     const isRowOnShippingStatusFilter = (fila: any) => {
@@ -125,7 +132,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
 
     useEffect(() => {
         updateFilteredSalesData();
-    }, [shippingStatus]);
+    }, [shippingStatus, deliveredStatus]);
 
     useEffect(() => {
         fetchExternalSales();
@@ -144,7 +151,17 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                     </Button>
                 )}
             </div>
-            <div>
+            <div style={{ marginBottom: 16 }}>
+                <Select
+                    className="mt-2 w-full xl:w-1/5"
+                    value={deliveredStatus}
+                    onChange={(value) => {
+                        setDeliveredStatus(value)
+                    }}
+                >
+                    <Option value="espera">En espera</Option>
+                    <Option value="entregado">Entregados</Option>
+                </Select>
                 <Select
                     className="mt-2 w-full xl:w-1/5"
                     placeholder="Filtrar por método de envío"
