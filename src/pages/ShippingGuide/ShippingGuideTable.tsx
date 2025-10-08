@@ -107,6 +107,15 @@ const ShippingGuideTable = (
             }
         },
         {
+            title: 'Vendedor',
+            dataIndex: 'vendedor',
+            key: 'vendedor',
+            render: (_: any, record: any) => {
+                const vendedor = record.vendedor
+                return `${vendedor.nombre} ${vendedor.apellido}`
+            }
+        },
+        {
             title: 'Fecha de creación',
             dataIndex: 'fecha_subida',
             key: 'fecha_subida',

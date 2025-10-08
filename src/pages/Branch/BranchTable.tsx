@@ -76,7 +76,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
     }else {
       setTableColumns(cols)
     }
-  });
+  },[user]);
 
 
   const cols = [
