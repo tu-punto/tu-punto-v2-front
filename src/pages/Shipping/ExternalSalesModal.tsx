@@ -20,6 +20,7 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
     const [shippingPrice, setShippingPrice] = useState(0);
     const [isBigPackage, setIsBigPackage] = useState(false);
     const [isDelivery, setIsDelivery] = useState(false)
+    const [isDelivered, setIsDelivered] = useState(false)
     const [isCityShipping, setIsCityShipping]  = useState(false);
     const [isOptionPagar, setIsOptionPagar] = useState(false);
     const [isOptionCobrar, setIsOptionCobrar] = useState(false);
@@ -69,7 +70,8 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
                 id_sucursal: sucursal_id,
                 nombre_flota: flota,
                 precio_servicio: montoServicio,
-                precio_total: montoTotal
+                precio_total: montoTotal,
+                delivered: isDelivered
             });
 
             if (!response.success) {
@@ -256,6 +258,18 @@ function ExternalSalesModal({visible, onCancel, onClose}: any) {
                             </Row>
                         </Form.Item>
                     )}
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name='delivered' label='¿El pedido ya fue entregado?'>
+                                <Radio.Group
+                                    onChange={(e) => setIsDelivered(e.target.value === 'si')}
+                                >
+                                    <Radio.Button value="si">Si</Radio.Button>
+                                    <Radio.Button value="no">No</Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
                 </Card>
                 <Card title="Servicios del Pedido" bordered={false} style={{marginTop: 16}}>
                     <Row gutter={16}>

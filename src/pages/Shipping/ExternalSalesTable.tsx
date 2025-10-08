@@ -1,17 +1,11 @@
-import { Button, DatePicker, Input, message, Select, Table, Typography } from 'antd';
+import { Button, Select, Table, Typography } from 'antd';
 import { EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
 import { useContext, useEffect, useState } from 'react';
 import { getExternalSalesAPI } from '../../api/externalSale.ts'
-import ShippingInfoModal from './ShippingInfoModal';
-import ShippingStateModal from './ShippingStateModal';
-import { getSucursalsAPI } from '../../api/sucursal';
-import { getSellersAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 import ExternalSalesModal from './ExternalSalesModal.tsx';
-import { render } from '@react-pdf/renderer';
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
