@@ -5,6 +5,7 @@ import EditProductsModal from '../Shipping/EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { deleteShippingAPI, updateShippingAPI } from '../../api/shipping';
 import { updateSubvariantStockAPI } from '../../api/product';
+import { getSellersAPI } from '../../api/seller.ts';
 import dayjs from "dayjs";
 
 const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any) => {
@@ -12,6 +13,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [originalProducts, setOriginalProducts] = useState<any[]>([]);
   const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
   const { rawProducts: data } = useRawProducts();
+  const [internalForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [deletedProducts, setDeletedProducts] = useState<string[]>([]);
   const [tipoPago, setTipoPago] = useState<string | null>(null);
@@ -21,30 +23,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [estaPagado, setEstaPagado] = useState<string | null>(null);
   const [adelantoVisible, setAdelantoVisible] = useState(false);
   const [adelantoCliente, setAdelantoCliente] = useState<number>(0);
-
-  const enrichedProducts = useMemo(() => {
-    const sucursalId = localStorage.getItem("sucursalId");
-    if (!data) return [];
-
-    return data.flatMap((p: any) => {
-      const sucursal = p.sucursales?.find((s: any) => String(s.id_sucursal) === String(sucursalId));
-      if (!sucursal) return [];
-
-      return sucursal.combinaciones.map((combo: any, index: number) => {
-        const varianteNombre = Object.values(combo.variantes || {}).join(" / ");
-        return {
-          ...p,
-          key: `${p._id}-${index}`,
-          producto: `${p.nombre_producto} - ${varianteNombre}`,
-          nombre_variante: `${p.nombre_producto} - ${varianteNombre}`,
-          precio: combo.precio,
-          stockActual: combo.stock,
-          variantes: combo.variantes,
-          sucursalId,
-        };
-      });
-    });
-  }, [data]);
+  const [sellers, setSellers] = useState([]);
 
   const normalizarTipoPago = (valor: string): string | null => {
     const mapping: Record<string, string> = {
@@ -104,6 +83,27 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       setTipoPago(tipoPagoId);
     }
   }, [visible, shipping]);
+
+  useEffect(() => {
+    const fetchSellers = async () => {
+      try {
+        const response = await getSellersAPI();
+        const hoy = new Date().setHours(0, 0, 0, 0);
+
+        const vigentes = response.filter((v: any) => {
+          if (!v.fecha_vigencia) return true;
+          const fecha = new Date(v.fecha_vigencia).getTime();
+          return fecha >= hoy;
+        });
+
+        setSellers(vigentes);
+        console.log("Sellers cargados en ModalSalesHistory:", vigentes);
+      } catch (error) {
+        console.error("Error al cargar vendedores:", error);
+      }
+    };
+    fetchSellers();
+  }, []);
 
   useEffect(() => {
     const monto = saldoACobrar || 0;
@@ -195,6 +195,31 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     }
   };
 
+  const enrichedProducts = useMemo(() => {
+    const sucursalId = localStorage.getItem("sucursalId");
+    if (!data) return [];
+
+    return data.flatMap((p: any) => {
+      const sucursal = p.sucursales?.find((s: any) => String(s.id_sucursal) === String(sucursalId));
+      if (!sucursal) return [];
+
+      return sucursal.combinaciones.map((combo: any, index: number) => {
+        const varianteNombre = Object.values(combo.variantes || {}).join(" / ");
+        return {
+          ...p,
+          key: `${p._id}-${index}`,
+          producto: `${p.nombre_producto} - ${varianteNombre}`,
+          nombre_variante: `${p.nombre_producto} - ${varianteNombre}`,
+          precio: combo.precio,
+          stockActual: combo.stock,
+          variantes: combo.variantes,
+          sucursalId,
+          id_vendedor: p.id_vendedor, // Asegurar que esté disponible
+        };
+      });
+    });
+  }, [data]);
+
   const id_shipping = shipping?._id || '';
 
   const handleDeleteProduct = (key: any) => {
@@ -209,7 +234,36 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     setProducts((prev: any[]) =>
       prev.map((p) => {
         if (p.key !== key) return p;
-        return { ...p, [field]: value };
+
+        const updated = { ...p, [field]: value };
+
+        // Recalcular utilidad cuando cambia cantidad o precio_unitario
+        if (field === 'cantidad' || field === 'precio_unitario') {
+          // Buscar el vendedor por diferentes campos posibles
+          const vendedorId = p.id_vendedor || p.vendedor?._id || p.vendedor;
+          const vendedor = sellers.find((v: any) => v._id === vendedorId);
+
+          if (vendedor) {
+            const comision = Number(vendedor.comision_porcentual || 0);
+            const cantidad = Number(updated.cantidad || 0);
+            const precio = Number(updated.precio_unitario || 0);
+            const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            updated.utilidad = utilidadCalculada;
+
+            console.log("Recalculando utilidad:", {
+              vendedor: vendedor.nombre,
+              comision,
+              cantidad,
+              precio,
+              utilidadCalculada
+            });
+          } else {
+            console.warn("No se encontró vendedor para:", vendedorId);
+            updated.utilidad = 0;
+          }
+        }
+
+        return updated;
       })
     );
   };
@@ -225,6 +279,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     try {
       // Preparar datos para actualizar
       const updateData = {
+        ...shipping,
         venta: products.map(p => ({
           _id: p.id_venta,
           id_producto: p.id_producto,
@@ -235,6 +290,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           variantes: p.variantes
         })),
         tipo_de_pago: tipoPago,
+        esta_pagado: estaPagado,
+        adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
         subtotal_qr: tipoPago === '1' || tipoPago === '4' ? qrInput : 0,
         subtotal_efectivo: tipoPago === '2' || tipoPago === '4' ? efectivoInput : 0,
       };
@@ -334,50 +391,84 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     }
   };
 
-  const EmptySalesTable = ({ products, monto = 0, handleValueChange, isAdmin }: any) => {
+  const EmptySalesTable = ({ products, monto = 0, isAdmin }: any) => {
     if (products.length === 0) {
       return (
         <div style={{ textAlign: "center", padding: 32 }}>
           <p>No hay productos en esta venta.</p>
+          <p>Monto total: <b>Bs {monto.toFixed(2)}</b></p>
         </div>
       );
     }
+
+    const columns = [
+      {
+        title: "Producto",
+        dataIndex: "nombre_variante",
+        key: "nombre_variante",
+        render: (text: any, record: any) => (
+          <div>
+            {text}
+            {record.esTemporal && <Tag color="orange" style={{ marginLeft: 8 }}>Temporal</Tag>}
+          </div>
+        )
+      },
+      {
+        title: "Cantidad",
+        dataIndex: "cantidad",
+        key: "cantidad",
+        render: (value: any, record: any) => {
+          if (isAdmin) {
+            return (
+              <InputNumber
+                min={1}
+                value={value}
+                onChange={(newValue) => handleValueChange(record.key, 'cantidad', newValue)}
+                style={{ width: '100%' }}
+              />
+            );
+          }
+          return value;
+        }
+      },
+      {
+        title: "Precio Unitario",
+        dataIndex: "precio_unitario",
+        key: "precio_unitario",
+        render: (value: any, record: any) => {
+          if (isAdmin) {
+            return (
+              <InputNumber
+                prefix="Bs."
+                min={0}
+                value={value}
+                onChange={(newValue) => handleValueChange(record.key, 'precio_unitario', newValue)}
+                style={{ width: '100%' }}
+              />
+            );
+          }
+          return `Bs ${value}`;
+        }
+      },
+      {
+        title: "Utilidad",
+        dataIndex: "utilidad",
+        key: "utilidad",
+        render: (value: any) => `Bs ${(value || 0).toFixed(2)}`
+      },
+      {
+        title: "Subtotal",
+        key: "subtotal",
+        render: (_, record: any) => `Bs ${(record.cantidad * record.precio_unitario).toFixed(2)}`,
+      }
+    ];
 
     return (
       <Table
         dataSource={products}
         pagination={false}
         rowKey="key"
-        columns={[
-          {
-            title: "Producto",
-            dataIndex: "nombre_variante",
-            key: "nombre_variante",
-            render: (text, record) => (
-              <div>
-                {text}
-                {record.esTemporal && <Tag color="orange" style={{ marginLeft: 8 }}>Temporal</Tag>}
-              </div>
-            )
-          },
-          {
-            title: "Cantidad",
-            dataIndex: "cantidad",
-            key: "cantidad",
-            render: (value) => value
-          },
-          {
-            title: "Precio Unitario",
-            dataIndex: "precio_unitario",
-            key: "precio_unitario",
-            render: (value) => `Bs ${value}`
-          },
-          {
-            title: "Subtotal",
-            key: "subtotal",
-            render: (_, record) => `Bs ${(record.cantidad * record.precio_unitario).toFixed(2)}`,
-          }
-        ]}
+        columns={columns}
       />
     );
   };
@@ -477,6 +568,37 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       {/* SECCIÓN DE TIPO DE PAGO - Similar a ShippingInfoModal */}
       {isAdmin && (
         <Card title="Detalles del Pago" bordered={false} style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span>Monto total:</span>
+            <span style={{ fontWeight: 'bold' }}>Bs. {montoTotal.toFixed(2)}</span>
+          </div>
+
+          {/* ¿Está ya pagado? */}
+          <Row gutter={16}>
+            <Col span={24}>
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ display: 'block', marginBottom: 8 }}>¿Está ya pagado?</span>
+                <Radio.Group
+                  value={estaPagado}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setEstaPagado(value);
+                    setAdelantoVisible(value === 'adelanto');
+                    if (value !== 'adelanto') {
+                      setAdelantoCliente(0);
+                    }
+                    if (value === 'si') {
+                      setTipoPago("3");
+                    }
+                  }}
+                >
+                  <Radio.Button value="si">Sí</Radio.Button>
+                  <Radio.Button value="no">No</Radio.Button>
+                  <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
+                </Radio.Group>
+              </div>
+            </Col>
+          </Row>
 
           {adelantoVisible && (
             <Row gutter={16}>
@@ -611,14 +733,14 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       <EditProductsModal
         visible={editProductsModalVisible}
         onCancel={() => setEditProductsModalVisible(false)}
-        products={products as any[]}
+        products={products}
         setProducts={setProducts}
-        allProducts={enrichedProducts} // Ahora enrichedProducts está definido
-        sellers={[]}
+        allProducts={enrichedProducts}
+        sellers={sellers} 
         isAdmin={isAdmin}
         shippingId={id_shipping}
         sucursalId={localStorage.getItem("sucursalId")}
-        allowAddProducts={false} // NO permitir agregar productos en historial
+        allowAddProducts={false}
         onSave={() => {
           setEditProductsModalVisible(false);
           message.success("Cambios guardados");
