@@ -38,6 +38,8 @@ const StatisticsDashboard = () => {
   });
 
   const fetchStats = async (filter: string = DATE_TAGS.ALL_TIME) => {
+    const [startDate, endDate] = getDateRangeFromFilter(filter, customDateRange);
+
     setLoading({
       income: true,
       expenses: true,
@@ -47,9 +49,9 @@ const StatisticsDashboard = () => {
     });
     try {
       const statsInfo = await getFilteredStats(filter, customDateRange);
+      const summaryInfo = await getFinancialSummaryAPI({ startDate: startDate ?? undefined, endDate: endDate ?? undefined });
       setStats(statsInfo);
-    } catch (error) {
-      console.error(error);
+      setSummary(summaryInfo);
     } finally {
       setLoading({
         income: false,
@@ -71,13 +73,41 @@ const StatisticsDashboard = () => {
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
 
+  const getDateRangeFromFilter = (filter: string, dateRange: any = []) => {
+    let startDate: string | null = null;
+    let endDate: string | null = new Date().toISOString();
+
+    switch (filter) {
+      case DATE_TAGS.LAST_7_DAYS:
+        startDate = dayjs().subtract(7, "day").toISOString();
+        break;
+      case DATE_TAGS.LAST_30_DAYS:
+        startDate = dayjs().subtract(30, "day").toISOString();
+        break;
+      case DATE_TAGS.LAST_90_DAYS:
+        startDate = dayjs().subtract(90, "day").toISOString();
+        break;
+      case DATE_TAGS.CUSTOM:
+        [startDate, endDate] = dateRange.map((d: any) => d.toISOString());
+        break;
+      case DATE_TAGS.ALL_TIME:
+        startDate = null;
+        break;
+    }
+
+    return [startDate, endDate];
+  };
 
   useEffect(() => {
+    const [startDate, endDate] = getDateRangeFromFilter(selectedTag || DATE_TAGS.ALL_TIME, customDateRange);
     setLoadingSummary(true);
-    getFinancialSummaryAPI()
+    getFinancialSummaryAPI({ 
+      startDate: startDate ?? undefined, 
+      endDate: endDate ?? undefined 
+    })
       .then(setSummary)
       .finally(() => setLoadingSummary(false));
-  }, []);
+  }, [selectedTag, customDateRange]);
 
   useEffect(() => {
     fetchStats();
