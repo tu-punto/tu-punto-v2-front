@@ -55,8 +55,14 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     ? dayjs(shipping.fecha_pedido).add(4, "hour").format("DD/MM/YYYY")
     : "";
 
+  const fechaEntrega = shipping?.hora_entrega_acordada
+    ? dayjs(shipping.hora_entrega_acordada).add(4, "hour").format("DD/MM/YYYY")
+    : "";
+
   const hoy = dayjs().add(4, "hour").format("DD/MM/YYYY");
   const esHoy = pedidoFecha === hoy;
+
+  const puedeEditar = fechaEntrega === hoy || shipping?.estado_pedido === "En Espera";
 
   useEffect(() => {
     if (!visible || !shipping) return;
@@ -488,7 +494,12 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
             danger
             shape="circle"
             icon={<DeleteOutlined />}
-            disabled={!esHoy || !shipping?.fecha_pedido}
+            disabled={!puedeEditar || !shipping?.hora_entrega_acordada} // Usar puedeEditar
+            title={
+              !puedeEditar
+                ? "Solo se puede eliminar el día de la entrega o si está en espera"
+                : "Eliminar entrega"
+            }
             onClick={() => {
               Modal.confirm({
                 title: "¿Desea eliminar esta entrega?",
@@ -543,7 +554,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           />
         </div>
       )}
-      {isAdmin && (
+      {isAdmin && puedeEditar && ( // Solo mostrar botón editar si puede editar
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
           <Button
             icon={<EditOutlined />}
@@ -560,13 +571,13 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       <EmptySalesTable
         products={products}
         monto={montoTotal}
-        onDeleteProduct={isAdmin ? handleDeleteProduct : undefined}
-        handleValueChange={isAdmin ? handleValueChange : undefined}
-        isAdmin={isAdmin}
+        onDeleteProduct={isAdmin && puedeEditar ? handleDeleteProduct : undefined}
+        handleValueChange={isAdmin && puedeEditar ? handleValueChange : undefined}
+        isAdmin={isAdmin && puedeEditar}
       />
 
       {/* SECCIÓN DE TIPO DE PAGO - Similar a ShippingInfoModal */}
-      {isAdmin && (
+      {isAdmin && puedeEditar && (
         <Card title="Detalles del Pago" bordered={false} style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <span>Monto total:</span>
@@ -719,7 +730,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         </Card>
       )}
 
-      {isAdmin && (
+      {isAdmin && puedeEditar && (
         <div style={{ marginTop: 24, textAlign: 'right' }}>
           <Button style={{ marginRight: 8 }} onClick={handleCancelChanges}>
             Cancelar
@@ -730,23 +741,25 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         </div>
       )}
 
-      <EditProductsModal
-        visible={editProductsModalVisible}
-        onCancel={() => setEditProductsModalVisible(false)}
-        products={products}
-        setProducts={setProducts}
-        allProducts={enrichedProducts}
-        sellers={sellers} 
-        isAdmin={isAdmin}
-        shippingId={id_shipping}
-        sucursalId={localStorage.getItem("sucursalId")}
-        allowAddProducts={false}
-        onSave={() => {
-          setEditProductsModalVisible(false);
-          message.success("Cambios guardados");
-          onSave();
-        }}
-      />
+      {puedeEditar && (
+        <EditProductsModal
+          visible={editProductsModalVisible}
+          onCancel={() => setEditProductsModalVisible(false)}
+          products={products}
+          setProducts={setProducts}
+          allProducts={enrichedProducts}
+          sellers={sellers}
+          isAdmin={isAdmin}
+          shippingId={id_shipping}
+          sucursalId={localStorage.getItem("sucursalId")}
+          allowAddProducts={false}
+          onSave={() => {
+            setEditProductsModalVisible(false);
+            message.success("Cambios guardados");
+            onSave();
+          }}
+        />
+      )}
     </Modal>
   );
 };
