@@ -1,22 +1,18 @@
-import { Button, Table, Tooltip, Select, Space, Input, Modal } from "antd";
-import { useEffect, useState, useContext } from "react";
+import { Button, Table, Tooltip, Select, Space, Input } from "antd";
+import { useEffect, useState } from "react";
 import {
   EditOutlined,
   SearchOutlined,
-  FileDoneOutlined,
 } from "@ant-design/icons";
-import { UserContext } from "../../context/userContext.tsx";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellerDebtsAPI, getSellersAPI } from "../../api/seller";
-import { getSalesBySellerIdAPI } from "../../api/sales";
+import { getSellersAPI } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
-import ShippingGuideTable from "../ShippingGuide/ShippingGuideTable";
 
 type SellerRow = ISeller & {
   key: string;
@@ -34,8 +30,6 @@ export default function SellerTable({
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
-  const [viewModalGuides, setViewModalGuides] = useState(false);
-  const [sellerID, setSellerID] = useState<string>("");
 
   const [searchText, setSearchText] = useState("");
   const [debtModal, setDebtModal] = useState(false);
@@ -43,7 +37,6 @@ export default function SellerTable({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
-  const { user } = useContext(UserContext);
 
   const getEstadoVendedor = (fechaVigencia: string) => {
     const hoy = dayjs();
@@ -167,16 +160,6 @@ export default function SellerTable({
               }}
             />
           </Tooltip>
-          <Tooltip title="Ver guías de envío">
-            <Button
-              type="primary"
-              size="small"
-              icon={<FileDoneOutlined />}
-              onClick={() => {
-                handleGuideView(row._id);
-              }}
-            />
-          </Tooltip>
         </div>
       ),
       width: 150,
@@ -274,11 +257,6 @@ export default function SellerTable({
 
   const filteredSellers = filterSellers(sellers);
 
-  const handleGuideView = (id: string) => {
-    setSellerID(id);
-    setViewModalGuides(true);
-  };
-
   return (
     <>
       <Space direction="horizontal" size="middle" className="mb-4">
@@ -351,7 +329,7 @@ export default function SellerTable({
             }}
           />
           <SellerInfoModalTry
-            visible={infoModal && !debtModal && !viewModalGuides}
+            visible={infoModal && !debtModal}
             seller={selected}
             onCancel={closeAll}
             onSuccess={() => {
@@ -366,26 +344,6 @@ export default function SellerTable({
             sucursales={selected.pago_sucursales}
           />
         </>
-      )}
-      {viewModalGuides && (
-        <Modal
-          title="Guías de Envío"
-          footer={false}
-          open={viewModalGuides}
-          width={1000}
-          onCancel={() => {
-            setViewModalGuides(false);
-            setSellerID("");
-            closeAll();
-          }}
-        >
-          <ShippingGuideTable
-            refreshKey={refreshKey}
-            user={user}
-            isFilterBySeller
-            search_id={sellerID}
-          />
-        </Modal>
       )}
     </>
   );
