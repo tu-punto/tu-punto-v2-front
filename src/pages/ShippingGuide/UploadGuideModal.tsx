@@ -79,11 +79,11 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
             const response = await registerShippingGuideAPI(formData);
 
             if (!response.success) {
-                message.error("Error registrando la venta");
+                message.error("Error registrando la guia");
                 setLoading(false);
                 return;
             } else {
-                message.success("Venta externa registrada");
+                message.success("Guia de envío registrada");
                 onCancel();
             }
         } catch (error) {
