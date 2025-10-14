@@ -1,9 +1,6 @@
 import { Button, Table, Tooltip, Select, Space, Input } from "antd";
 import { useEffect, useState } from "react";
-import {
-  EditOutlined,
-  SearchOutlined,
-} from "@ant-design/icons";
+import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
@@ -143,6 +140,17 @@ export default function SellerTable({
         (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
     },
     {
+      title: "Emite factura?",
+      dataIndex: "emite_factura",
+      key: "emite_factura",
+      render: (tieneFactura: boolean) => (tieneFactura ? "Sí" : "No"),
+      sorter: (a: any, b: any) => {
+        const valorA = a.emite_factura ? 1 : 0;
+        const valorB = b.emite_factura ? 1 : 0;
+        return valorA - valorB;
+      },
+    },
+    {
       title: "Acciones",
       key: "acciones",
       render: (_: any, row: SellerRow) => (
@@ -249,10 +257,7 @@ export default function SellerTable({
       });
     }
 
-    // Filtrar por factura
-    return isFactura
-      ? filtered.filter((s) => s.emite_factura)
-      : filtered.filter((s) => !s.emite_factura);
+    return filtered;
   };
 
   const filteredSellers = filterSellers(sellers);
