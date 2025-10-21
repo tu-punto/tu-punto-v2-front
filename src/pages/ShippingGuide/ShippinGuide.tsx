@@ -39,7 +39,7 @@ const ShippingGuide = () => {
                     refreshKey={refreshKey}
                     user={user}
                     isFilterBySeller
-                    id_vendedor={user.id_vendedor}
+                    search_id={user.id_vendedor}
                 />
             </div>
             

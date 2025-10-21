@@ -1,9 +1,10 @@
 import { useContext, useEffect, useState } from "react";
-import { Button, Table, Tooltip } from "antd";
+import { Button, Modal, Table, Tooltip } from "antd";
 import { IBranch } from "../../models/branchModel";
-import { EditOutlined, WhatsAppOutlined } from "@ant-design/icons";
+import { EditOutlined, WhatsAppOutlined, FileDoneOutlined  } from "@ant-design/icons";
 import { UserContext } from "../../context/userContext";
 import { getSellerAPI } from "../../api/seller";
+import ShippingGuideTable from "../ShippingGuide/ShippingGuideTable";
 
 interface BranchTableProps {
   refreshKey: number;
@@ -19,6 +20,8 @@ const BranchTable: React.FC<BranchTableProps> = ({
   const { user } = useContext(UserContext);
   const isAdmin = user?.role?.toLowerCase() === 'admin';
   const isOperator = user?.role.toLowerCase() === 'operator';
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState<IBranch>();
   const [filteredBranches, setFilteredBranches] = useState<IBranch[]>(branches);
   const [tableColumns, setTableColumns] = useState<any>([]);
 
@@ -75,7 +78,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
     }else {
       setTableColumns(cols)
     }
-  });
+  },[user]);
 
 
   const cols = [
@@ -112,17 +115,30 @@ const BranchTable: React.FC<BranchTableProps> = ({
       width: "10%",
       className: "text-mobile-sm xl:text-desktop-sm",
       render: (_: any, branch: IBranch) => (
-        <Tooltip title="Editar sucursal">
-          <Button
-            type="default"
-            onClick={(e) => {
-              e.stopPropagation();
-              showEditModal(branch);
-            }}
-            icon={<EditOutlined />}
-            className="text-mobile-sm xl:text-desktop-sm"
-          />
-        </Tooltip>
+        <>
+          <Tooltip title="Editar sucursal">
+            <Button
+              type="default"
+              onClick={(e) => {
+                e.stopPropagation();
+                showEditModal(branch);
+              }}
+              icon={<EditOutlined />}
+              className="text-mobile-sm xl:text-desktop-sm"
+            />
+          </Tooltip>
+          <Tooltip title="Mostrar Guías de Envío">
+            <Button
+              type="default"
+              onClick={() => {
+                setSelectedBranch(branch);
+                setShowGuideModal(true);
+              }}
+              icon={<FileDoneOutlined  />}
+              className="text-mobile-sm xl:text-desktop-sm"
+            />
+          </Tooltip>
+        </>
       )
     }
   ];
@@ -150,13 +166,32 @@ const BranchTable: React.FC<BranchTableProps> = ({
   ];
 
   return (
-    <Table
-      key={refreshKey}
-      columns={tableColumns}
-      dataSource={filteredBranches}
-      pagination={{ pageSize: 10 }}
-      scroll={{ x: "max-content" }}
-    />
+    <>
+      <Table
+        key={refreshKey}
+        columns={tableColumns}
+        dataSource={filteredBranches}
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: "max-content" }}
+      />
+      {showGuideModal && (
+        <Modal 
+          title='Guías de Envío'
+          footer={false} 
+          open={showGuideModal}
+          width={1000}
+          onCancel={() => {
+            setShowGuideModal(false);
+          }}>
+          <ShippingGuideTable
+            refreshKey={refreshKey}
+            user={user}
+            isFilterByBranch
+            search_id={selectedBranch?._id || ""}
+          />
+        </Modal>
+      )}
+    </>
   );
 };
 

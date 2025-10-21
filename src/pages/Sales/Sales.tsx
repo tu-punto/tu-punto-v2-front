@@ -1,4 +1,4 @@
-import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
+import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -35,6 +35,7 @@ export const Sales = () => {
     );
     const [searchText, setSearchText] = useState("");
     const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
+    const [cartLoading, setCartLoading] = useState(false);
     useEffect(() => {
         const fetchSellerAndSetSucursales = async () => {
             if (isAdmin || isOperator || !user?.id_vendedor) return;
@@ -275,7 +276,14 @@ export const Sales = () => {
 
     useEffect(() => {
         if (!branchIdForFetch || branchIdForFetch === "undefined") return;
-        fetchProducts();
+
+        const p = fetchProducts();
+        if (p && typeof p.finally === "function") {
+            p.finally(() => setCartLoading(false)); // ✅ apaga spinner cuando termina
+        } else {
+            // fallback por si acaso
+            setCartLoading(false);
+        }
     }, [branchIdForFetch]);
 
     useEffect(() => {
@@ -437,7 +445,17 @@ export const Sales = () => {
                                             <Select
                                                 placeholder="Sucursal"
                                                 value={selectedBranchId}
-                                                onChange={(value) => setSelectedBranchId(value)}
+                                                onChange={(value) => {
+                                                    // 🔥 mostrar spinner de carrito YA
+                                                    setCartLoading(true);
+                                                    // 🔥 vaciar carrito al toque (sin esperar efectos)
+                                                    setSelectedProducts([]);
+                                                    setTotalAmount(0);
+                                                    // forzar rerender del carrito si quieres (opcional):
+                                                    // setRefreshKey(prev => prev + 1);
+
+                                                    setSelectedBranchId(value); // esto gatilla el fetch por tus efectos existentes
+                                                }}
                                                 options={sucursalesPagadas}
                                                 style={{ minWidth: 180 }}
                                                 allowClear
@@ -522,15 +540,17 @@ export const Sales = () => {
                         }
                         bordered={false}
                     >
-                        <EmptySalesTable
-                            products={selectedProducts}
-                            onDeleteProduct={handleDeleteProduct}
-                            handleValueChange={handleEnhancedValueChange}
-                            onUpdateTotalAmount={updateTotalAmount}
-                            key={refreshKey}
-                            sellers={sellers}
-                            isAdmin={isAdmin || isOperator}
-                        />
+                        <Spin spinning={cartLoading} tip="Cargando carrito...">
+                            <EmptySalesTable
+                                products={selectedProducts}
+                                onDeleteProduct={handleDeleteProduct}
+                                handleValueChange={handleEnhancedValueChange}
+                                onUpdateTotalAmount={updateTotalAmount}
+                                key={refreshKey}
+                                sellers={sellers}
+                                isAdmin={isAdmin || isOperator}
+                            />
+                        </Spin>
                     </Card>
                 </Col>
             </Row>

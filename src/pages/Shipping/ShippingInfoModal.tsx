@@ -2,7 +2,7 @@ import TempProductModal from './TempProductModal';
 import { useEffect, useState, useMemo } from 'react';
 import {
     Modal, Card, Button, Form, Input, DatePicker, Row, Col, TimePicker,
-    Radio, Select, InputNumber, message
+    Radio, Select, InputNumber, message, Switch
 } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -20,6 +20,7 @@ import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
 import moment from "moment-timezone";
+import { updateProductsByShippingAPI } from "../../api/sales.ts";
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
@@ -38,6 +39,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [estadoInicialPedido, setEstadoInicialPedido] = useState<string | null>(null);
+    const [isRangeHour, setIsRangeHour] = useState(false);
     const [qrInput, setQrInput] = useState<number>(0);
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [showWarning, setShowWarning] = useState(false);
@@ -162,6 +164,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             internalForm.setFieldsValue({
                 fecha_entrega: ahora,
                 hora_entrega_acordada: ahora,
+                hora_entrega_rango_final: ahora
             });
         }
     }, [estadoPedidoForm, estadoInicialPedido]);
@@ -199,6 +202,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const rawFecha = shipping.hora_entrega_acordada;
         const originalHoraEntregaUTC = rawFecha ? dayjs.utc(rawFecha) : null;
 
+        const fechaRango = shipping.hora_entrega_rango_final
+        const originalHoraRangoUTC = fechaRango ? dayjs.utc(fechaRango) : null;
+
+        setIsRangeHour(shipping.hora_entrega_rango_final)
+
         //console.log("🟢 UTC:", dayjs.utc(shipping.hora_entrega_acordada).format());
         //console.log("🟡 Local:", dayjs.utc(shipping.hora_entrega_acordada).local().format());
 
@@ -210,6 +218,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             fecha_entrega: originalHoraEntregaUTC ? dayjs(originalHoraEntregaUTC.format("YYYY-MM-DD"), "YYYY-MM-DD") : null,
             hora_entrega_acordada: originalHoraEntregaUTC
                 ? dayjs(originalHoraEntregaUTC.format("HH:mm:ss"), "HH:mm:ss")
+                : null,
+            hora_entrega_rango_final: originalHoraRangoUTC
+                ? dayjs(originalHoraRangoUTC.format("HH:mm:ss"), "HH:mm:ss")
                 : null,
             observaciones: shipping.observaciones,
             estado_pedido: shipping.estado_pedido,
@@ -417,12 +428,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             }
             const quienPagaActual = internalForm.getFieldValue("quien_paga_delivery");
             const updatedExisting = existingProducts.map((p: any) => ({
-                _id: p.id_venta, // importante para identificar la venta en el backend
+                _id: p.id_venta,
                 quien_paga_delivery: quienPagaActual,
             }));
             //console.log("Updated existing products:", updatedExisting);
             if (updatedExisting.length > 0) {
-                //await updateProductsByShippingAPI(shipping._id, updatedExisting);
+                await updateProductsByShippingAPI(shipping._id, updatedExisting);
             }
             //if (formattedNewProducts.length > 0) await registerSalesAPI(formattedNewProducts);
             //if (existingProducts.length > 0) await updateProductsByShippingAPI(shipping._id, existingProducts);
@@ -437,6 +448,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
             const fechaHoraEntregaAcordada = `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`;
 
+            const horaRango = values.hora_entrega_rango_final && dayjs.isDayjs(values.hora_entrega_rango_final)
+                ? values.hora_entrega_rango_final.format("HH:mm:ss")
+                : moment().format("HH:mm:ss");
+
+            const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
+
             let horaEntregaReal = values.estado_pedido === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
                 : fechaHoraEntregaAcordada;
@@ -446,7 +463,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
-                hora_entrega_acordada: fechaHoraEntregaAcordada,                pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
+                hora_entrega_acordada: fechaHoraEntregaAcordada,                
+                pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
+                hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: values.esta_pagado,
                 adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
                 quien_paga_delivery: values.quien_paga_delivery,
@@ -475,7 +494,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     break;
             }
 
-            //console.log("📤 Datos enviados al backend:", updateShippingInfo);
+            console.log("📤 Datos enviados al backend:", updateShippingInfo);
 
             await updateShippingAPI(updateShippingInfo, shipping._id);
             message.success("Pedido actualizado con éxito");
@@ -493,8 +512,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const phoneNumber = shipping.telefono_cliente;
 
         const shippingDate = new Date(shipping.hora_entrega_real);
-        if ((""+shipping.hora_entrega_real).endsWith("Z")) {
-            shippingDate.setTime(shippingDate.getTime() + 4*60*60*1000);
+        if (("" + shipping.hora_entrega_real).endsWith("Z")) {
+            shippingDate.setTime(shippingDate.getTime() + 4 * 60 * 60 * 1000);
         }
 
         const fixedMinutes = shippingDate.getMinutes() < 10 ? `0${shippingDate.getMinutes()}` : shippingDate.getMinutes();
@@ -630,11 +649,40 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
+                    </Row>
+                    <Row gutter={16}>
+                        {shipping?.estado_pedido !== "Entregado" && (
+                            <div style={{ margin:8 }}>
+                            <span style={{ marginRight:8 }}>
+                                - ¿Acordar entrega en un rango de horas?
+                            </span>
+                            <Switch
+                                checked={isRangeHour}
+                                disabled={shipping?.estado_pedido === "Entregado"}
+                                onChange={(checked) => { setIsRangeHour(checked); }}
+                                unCheckedChildren="Hora específica"
+                                checkedChildren="Rango de horas"
+                            />
+                        </div>
+                        )}
                         <Col span={12}>
-                            <Form.Item name="hora_entrega_acordada" label="Hora Entrega">
+                            <Form.Item 
+                                name="hora_entrega_acordada" 
+                                label={
+                                    isRangeHour && shipping?.estado_pedido !== "Entregado" 
+                                    ? "Inicio del Rango Horario"
+                                    : "Hora de Entrega"}
+                            >
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
+                        {isRangeHour && shipping?.estado_pedido !== "Entregado" && (
+                            <Col span={12}>
+                                <Form.Item name="hora_entrega_rango_final" label="Fin del Rango Horario">
+                                    <TimePicker format='HH:mm' style={{ width: '100%' }} />
+                                </Form.Item>
+                            </Col>
+                        )}
                     </Row>
                     <Row gutter={16}>
                         <Col span={24}>
@@ -683,20 +731,20 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 </Card>
                 {/* PRODUCTOS */}
                 <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}
-                      extra={
-                          isAdmin && (
-                              <Button
-                                  icon={<EditOutlined />}
-                                  onClick={() => {
-                                      setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
-                                      setEditProductsModalVisible(true);
-                                  }}
-                                  type="link"
-                              >
-                                  Editar Productos
-                              </Button>
-                          )
-                      }
+                    extra={
+                        isAdmin && (
+                            <Button
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                    setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
+                                    setEditProductsModalVisible(true);
+                                }}
+                                type="link"
+                            >
+                                Editar Productos
+                            </Button>
+                        )
+                    }
                 >
                     <EmptySalesTable
                         products={products}
@@ -993,9 +1041,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 isAdmin={isAdmin}
                 shippingId={id_shipping}
                 sucursalId={localStorage.getItem("sucursalId")}
+                allowAddProducts={true} // Explícitamente permitir agregar productos
                 onSave={() => {
-                    setEditProductsModalVisible(false); // cerrar modal hijo
-                    message.success("Cambios guardados"); // opcional
+                    setEditProductsModalVisible(false);
+                    message.success("Cambios guardados");
                 }}
             />
         </Modal>

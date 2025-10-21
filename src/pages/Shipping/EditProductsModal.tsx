@@ -10,7 +10,7 @@ import {
     registerSalesToShippingAPI
 } from '../../api/shipping';
 
-import {registerProductAPI, updateSubvariantStockAPI} from "../../api/product.ts";
+import { registerProductAPI, updateSubvariantStockAPI } from "../../api/product.ts";
 interface EditProductsModalProps {
     visible: boolean;
     onCancel: () => void;
@@ -22,21 +22,22 @@ interface EditProductsModalProps {
     shippingId: string;
     sucursalId: string | null;
     onSave: () => void;
-
+    allowAddProducts?: boolean;
 }
 
 const EditProductsModal = ({
-                               visible,
-                               onCancel,
-                               products,
-                               setProducts,
-                               allProducts,
-                               sellers,
-                               isAdmin,
-                               shippingId,
-                               sucursalId,
-                               onSave
-                           }: EditProductsModalProps) => {
+    visible,
+    onCancel,
+    products,
+    setProducts,
+    allProducts,
+    sellers,
+    isAdmin,
+    shippingId,
+    sucursalId,
+    onSave,
+    allowAddProducts = true // Por defecto true para mantener funcionalidad existente
+}: EditProductsModalProps) => {
 
     const [localProducts, setLocalProducts] = useState<any[]>([]);
     const [searchKey, setSearchKey] = useState<string | null>(null);
@@ -201,7 +202,7 @@ const EditProductsModal = ({
         }
     };
 
-// 🔧 SUMAR stock (para eliminados o reducción de cantidad)
+    // 🔧 SUMAR stock (para eliminados o reducción de cantidad)
     const sumarStock = async (productos: any[]) => {
         if (!sucursalId) return;
 
@@ -357,7 +358,7 @@ const EditProductsModal = ({
                 });
             }
 
-// ⚙️ 2. Registrar los nuevos normales + temporales preparados
+            // ⚙️ 2. Registrar los nuevos normales + temporales preparados
             // ⚙️ 2. Registrar los nuevos normales + temporales preparados
             const nuevosTodos = [
                 ...normales,
@@ -432,7 +433,7 @@ const EditProductsModal = ({
                 await restarStock(aRestar);
             }
 
-// Stock por reducciones
+            // Stock por reducciones
             if (disminuyeron.length > 0) {
                 const aSumar = disminuyeron.map(p => {
                     const original = originalesMap.get(p.key) || {};
@@ -507,67 +508,72 @@ const EditProductsModal = ({
                 </Button>
             ]}
         >
-            <div style={{ marginBottom: 16 }}>
-                <Button
-                    style={{ marginBottom: 12 }}
-                    type="dashed"
-                    onClick={() => setTempProductModalVisible(true)}
-                >
-                    Agregar Producto Temporal
-                </Button>
+            {/* Solo mostrar estos controles si allowAddProducts es true */}
+            {allowAddProducts && (
+                <div style={{ marginBottom: 16 }}>
+                    <Button
+                        style={{ marginBottom: 12 }}
+                        type="dashed"
+                        onClick={() => setTempProductModalVisible(true)}
+                    >
+                        Agregar Producto Temporal
+                    </Button>
 
-                <Select
-                    showSearch
-                    value={searchKey}
-                    placeholder="Buscar y añadir producto"
-                    onChange={handleSelectProduct}
-                    options={filteredOptions}
-                    style={{ width: '100%' }}
-                    allowClear
-                    filterOption={(input, option) =>
-                        (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-                    }
-                />
-            </div>
+                    <Select
+                        showSearch
+                        value={searchKey}
+                        placeholder="Buscar y añadir producto"
+                        onChange={handleSelectProduct}
+                        options={filteredOptions}
+                        style={{ width: '100%' }}
+                        allowClear
+                        filterOption={(input, option) =>
+                            (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+                        }
+                    />
+                </div>
+            )}
 
             <EmptySalesTable
                 products={localProducts}
                 onDeleteProduct={handleDeleteProduct}
                 handleValueChange={handleValueChange}
-                onUpdateTotalAmount={() => {}} // opcional
+                onUpdateTotalAmount={() => { }} // opcional
                 sellers={sellers}
                 isAdmin={isAdmin}
             />
-            <ProductSellerViewModal
-                visible={tempProductModalVisible}
-                onCancel={() => setTempProductModalVisible(false)}
-                onSuccess={() => setTempProductModalVisible(false)}
-                onAddProduct={(tempProduct: any) => {
-                    const vendedor = sellers.find((v: any) => v._id === tempProduct.id_vendedor);
-                    const comision = vendedor?.comision_porcentual || 0;
-                    const precio = tempProduct.precio_unitario || tempProduct.precio || 0;
-                    const cantidad = tempProduct.cantidad || 1;
 
-                    const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            {/* Solo mostrar ProductSellerViewModal si allowAddProducts es true */}
+            {allowAddProducts && (
+                <ProductSellerViewModal
+                    visible={tempProductModalVisible}
+                    onCancel={() => setTempProductModalVisible(false)}
+                    onSuccess={() => setTempProductModalVisible(false)}
+                    onAddProduct={(tempProduct: any) => {
+                        const vendedor = sellers.find((v: any) => v._id === tempProduct.id_vendedor);
+                        const comision = vendedor?.comision_porcentual || 0;
+                        const precio = tempProduct.precio_unitario || tempProduct.precio || 0;
+                        const cantidad = tempProduct.cantidad || 1;
 
-                    setLocalProducts(prev => [
-                        ...prev,
-                        {
-                            ...tempProduct,
-                            id_producto: tempProduct._id,
-                            cantidad,
-                            precio_unitario: precio,
-                            utilidad,
-                            esTemporal: true
-                        }
-                    ]);
-                }}
+                        const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
 
-                selectedSeller={null} // Esto indica que fue abierto desde edición
-                openFromEditProductsModal={true} // 💡 importante para el siguiente punto
-                sellers={sellers}
-            />
-
+                        setLocalProducts(prev => [
+                            ...prev,
+                            {
+                                ...tempProduct,
+                                id_producto: tempProduct._id,
+                                cantidad,
+                                precio_unitario: precio,
+                                utilidad,
+                                esTemporal: true
+                            }
+                        ]);
+                    }}
+                    selectedSeller={null}
+                    openFromEditProductsModal={true}
+                    sellers={sellers}
+                />
+            )}
         </Modal>
     );
 };

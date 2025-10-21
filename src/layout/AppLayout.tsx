@@ -5,57 +5,74 @@ import Header from "./Header/Header";
 import { Outlet } from "react-router-dom";
 import HeaderXS from "./Header/HeaderXS";
 import Sider from "antd/es/layout/Sider";
+import BottomMenu from "./MobileMenu/BottomMenu";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const { Content } = Layout;
 
 const AppLayout = () => {
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const [isOpen, setIsOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
-  const toggleSidebar = () => {
-    setIsOpen((prev) => !prev);
-  };
+  const toggleSidebar = () => setIsOpen(prev => !prev);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      if (!isMobile) setIsOpen(false);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    if (!isMobile) setIsOpen(false);
   }, [isMobile]);
 
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [isMobile, isOpen]);
+
   return (
-    <Layout className="flex min-h-screen w-full">
-      {!isMobile ? (
-        <Sider trigger={null} collapsible collapsed={!isOpen}>
-          <Sidebar
-            isOpen={isOpen}
-            toggleSidebar={toggleSidebar}
-            isMobile={isMobile}
-          />
-        </Sider>
-      ) : (
-        isOpen && (
-          <div className="absolute z-50">
-            <Sidebar
-              isOpen={isOpen}
-              toggleSidebar={toggleSidebar}
-              isMobile={isMobile}
-            />
-          </div>
-        )
-      )}
+      <Layout className="flex min-h-screen w-full">
+        {!isMobile && (
+            <Sider trigger={null} collapsible collapsed={!isOpen} width={240}>
+              <Sidebar
+                  isOpen={isOpen}
+                  toggleSidebar={toggleSidebar}
+                  isMobile={false}
+              />
+            </Sider>
+        )}
 
-      <Layout>
-        {isMobile ? <HeaderXS toggleSidebar={toggleSidebar} /> : <Header />}
-        <Content className="flex flex-col bg-white p-6">
-          <Outlet />
-        </Content>
+        <Layout>
+          {isMobile ? <HeaderXS toggleSidebar={toggleSidebar} /> : <Header />}
+          {isMobile && (
+              <>
+                <button
+                    aria-label="Cerrar menú"
+                    onClick={() => setIsOpen(false)}
+                    className={`fixed inset-0 z-40 bg-black/30 transition-opacity ${
+                        isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                    }`}
+                />
+                <div
+                    className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85%] bg-white shadow-xl transform transition-transform ${
+                        isOpen ? "translate-x-0" : "-translate-x-full"
+                    }`}
+                >
+                  <Sidebar
+                      isOpen={isOpen}
+                      toggleSidebar={toggleSidebar}
+                      isMobile={true}
+                  />
+                </div>
+              </>
+          )}
+          <Content className={`flex flex-col bg-white p-6 ${isMobile ? "pb-28" : ""}`}>
+            <Outlet />
+          </Content>
 
+          {isMobile && <BottomMenu />}
+        </Layout>
       </Layout>
-    </Layout>
   );
 };
 
