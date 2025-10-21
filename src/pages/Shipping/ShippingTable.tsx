@@ -31,6 +31,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [selectedVendedor, setSelectedVendedor] = useState("Todos");
     const isAdmin = user?.role?.toLowerCase() === 'admin';
     const isVendedor = user?.role?.toLowerCase() === 'vendedor';
+    const isOperator = user?.role.toLowerCase() === 'operator';
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
 
@@ -71,7 +72,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     ? toSimpleDate(new Date(pedido.hora_entrega_acordada)) >= toSimpleDate(dateRange[0]) &&
                     toSimpleDate(new Date(pedido.hora_entrega_acordada)) <= toSimpleDate(dateRange[1])
                     : true;
-            const matchesVendedor = isAdmin
+            const matchesVendedor = isAdmin || isOperator
                 ? (selectedVendedor === "Todos" || pedido.venta?.some((v: any) =>
                     v.vendedor?._id === selectedVendedor ||
                     v.id_vendedor === selectedVendedor
@@ -220,7 +221,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             const response = await getSucursalsAPI();
             setSucursal(response);
 
-            if (isAdmin) {
+            if (isAdmin || isOperator) {
                 const sucursalId = localStorage.getItem("sucursalId");
                 if (sucursalId) {
                     const sucursalActual = response.find((s: any) =>
@@ -267,7 +268,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     return (
         <div>
             <div style={{ marginBottom: 16 }}>
-                {isAdmin && (
+                {isAdmin || isOperator && (
                     <Select
                         placeholder="Filtrar por vendedor"
                         style={{ width: 200, marginBottom: 16 }}
@@ -297,8 +298,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     placeholder="Sucursal de Origen"
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
-                    allowClear={!isAdmin}
-                    disabled={isAdmin} // ← Bloquea si es admin
+                    allowClear={!isAdmin && !isOperator}
+                    disabled={isAdmin || isOperator} // ← Bloquea si es admin
                 >
                     {sucursal.map((suc: any) => (
                         <Option key={suc.id_sucursal} value={suc.nombre}>

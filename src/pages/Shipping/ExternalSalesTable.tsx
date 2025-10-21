@@ -21,6 +21,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
 
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isOperator = user?.role.toLowerCase() === 'operator';
 
     const fetchExternalSales = async () => {
         try {
@@ -207,7 +208,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     return (
         <div>
             <div style={{ marginBottom: 16 }}>
-                {isAdmin && (
+                {isAdmin || isOperator && (
                     <Button
                         type="primary"
                         onClick={() => setIsModalExternalVisible(true)}
