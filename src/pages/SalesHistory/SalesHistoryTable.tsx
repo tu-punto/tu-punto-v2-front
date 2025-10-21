@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Table, DatePicker, message, Tag, Modal } from "antd";
+import { Table, DatePicker, message, Tag } from "antd";
 import dayjs from "dayjs";
 import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
 import { getShippingByIdAPI } from "../../api/shipping";
-import EmptySalesTable from "../Sales/EmptySalesTable.tsx"; // asegúrate de importar
+import ModalSalesHistory from "./ModalSalesHistory";
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
@@ -190,14 +190,14 @@ const SalesHistoryTable = () => {
                     <div className="min-w-[180px]">
                         <span className="text-gray-500">Total efectivo:</span>{" "}
                         <span className="text-green-600 whitespace-nowrap">
-                        Bs. {totales.efectivo.toFixed(2)}
-                      </span>
+                            Bs. {totales.efectivo.toFixed(2)}
+                        </span>
                     </div>
                     <div className="min-w-[180px]">
                         <span className="text-gray-500">Total QR:</span>{" "}
                         <span className="text-blue-600 whitespace-nowrap">
-                        Bs. {totales.qr.toFixed(2)}
-                      </span>
+                            Bs. {totales.qr.toFixed(2)}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -216,23 +216,13 @@ const SalesHistoryTable = () => {
                     onClick: () => handleRowClick(record),
                 })}
             />
-            <Modal
-                open={isModalOpen}
-                onCancel={() => setIsModalOpen(false)}
-                footer={null}
-                title="Detalle de la Venta"
-                width={1000}
-            >
-                <EmptySalesTable
-                    products={modalProducts}
-                    onDeleteProduct={undefined}
-                    onUpdateTotalAmount={() => {}}
-                    handleValueChange={() => {}}
-                    sellers={[]}
-                    isAdmin={true}
-                    readonly={true}
-                />
-            </Modal>
+            <ModalSalesHistory
+                visible={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                shipping={selectedSale}
+                onSave={fetchSales}
+                isAdmin={true}
+            />
         </>
     );
 };

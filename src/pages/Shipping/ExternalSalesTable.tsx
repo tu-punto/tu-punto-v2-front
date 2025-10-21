@@ -1,29 +1,27 @@
-import { Button, DatePicker, Input, message, Select, Table, Typography } from 'antd';
-import { EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
-import { useContext, useEffect, useState } from 'react';
+import { Button, Input, Select, Table, Tooltip, Typography } from 'antd';
+import Icon, { EditOutlined, EnvironmentOutlined, HomeOutlined } from '@ant-design/icons';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { getExternalSalesAPI } from '../../api/externalSale.ts'
-import ShippingInfoModal from './ShippingInfoModal';
-import ShippingStateModal from './ShippingStateModal';
-import { getSucursalsAPI } from '../../api/sucursal';
-import { getSellersAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 import ExternalSalesModal from './ExternalSalesModal.tsx';
-import { render } from '@react-pdf/renderer';
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const [externalSalesData, setExternalSalesData] = useState([]);
     const [filteredSalesData, setFilteredSalesData] = useState([]);
+    const [searchText, setSearchText] = useState("");
+    const [selectedExternal, setSelectedExternal] = useState<any>()
     const [isModalExternalVisible, setIsModalExternalVisible] = useState(false);
     const [isShippingStatusFilterActive, setIsShippingStatusFilterActive] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [shippingStatus, setShippingStatus] = useState<null | 'Por sucursal' | 'Por flota' | 'Sin envío'>();
+    const [deliveredStatus, setDeliveredStatus] = useState<'espera' | 'entregado'>('espera');
 
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isOperator = user?.role.toLowerCase() === 'operator';
 
     const fetchExternalSales = async () => {
         try {
@@ -104,6 +102,25 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                     return 'No requiere envío'
                 }
             }
+        },
+        {
+            title: 'Acciones',
+            key: 'actions',
+            render: (_:any, record: any) => {
+                return (
+                    <>
+                        <Tooltip title="Editar venta externa">
+                            <Button 
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                    setSelectedExternal(record)
+                                    setIsModalExternalVisible(true)
+                                }}
+                            />
+                        </Tooltip>
+                    </>
+                )
+            }
         }
     ];
 
@@ -111,14 +128,65 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
         setIsModalExternalVisible(false)
     };
 
+    const externalModal = useMemo(() => {
+        return selectedExternal ? (
+            <ExternalSalesModal
+                visible={isModalExternalVisible}
+                onCancel={handleCancel}
+                onClose={() => {
+                    setIsModalExternalVisible(false);
+                    fetchExternalSales();
+                }}
+                externalSale={selectedExternal}
+            />
+        ) : ( 
+            <ExternalSalesModal
+                visible={isModalExternalVisible}
+                onCancel={handleCancel}
+                onClose={() => {
+                    setIsModalExternalVisible(false);
+                    fetchExternalSales();
+                }}
+            />
+        )
+    }, [selectedExternal, isModalExternalVisible])
+
     const updateFilteredSalesData = () => {
         setFilteredSalesData(externalSalesData.filter(row => isRowOnFilter(row)));
     }
 
     const isRowOnFilter = (fila: any) => {
         return (
-            isRowOnShippingStatusFilter(fila)
+            isRowOnShippingStatusFilter(fila) &&
+            isRowOnDeliveredFilter(fila) &&
+            isRowOnWordFilter(fila)
         )
+    }
+
+    const isRowOnWordFilter = (fila: any) => {
+        if (searchText.trim().length <= 0) return true
+
+        const lower = searchText.trim().toLowerCase();
+        const words = lower.split(" ");
+        const specialChars = /[!@#$%^&*?:{}|<>]/
+
+        const filterWords = (text: any, words: string[]) => {
+            let match = true;
+            for (const word of words) {
+                if (!match) return false;
+                if (specialChars.test(word)) continue;
+                match = match && text.toString().toLowerCase().includes(word);
+            }
+            return match;
+        };
+
+        const fullText = `${fila.comprador} ${fila.vendedor}`.toLowerCase()
+        return filterWords(fullText, words)
+    }
+
+    const isRowOnDeliveredFilter = (fila: any) => {
+        return (deliveredStatus == 'entregado' && fila.delivered) ||
+            (deliveredStatus == 'espera' && !fila.delivered)
     }
 
     const isRowOnShippingStatusFilter = (fila: any) => {
@@ -131,7 +199,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
 
     useEffect(() => {
         updateFilteredSalesData();
-    }, [shippingStatus]);
+    }, [shippingStatus, deliveredStatus, searchText]);
 
     useEffect(() => {
         fetchExternalSales();
@@ -140,7 +208,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     return (
         <div>
             <div style={{ marginBottom: 16 }}>
-                {isAdmin && (
+                {isAdmin || isOperator && (
                     <Button
                         type="primary"
                         onClick={() => setIsModalExternalVisible(true)}
@@ -150,9 +218,26 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                     </Button>
                 )}
             </div>
-            <div>
+            <div style={{ marginBottom: 16 }}>
+                <Input.Search
+                    className="mt-2 w-full xl:w-1/5 m-2"
+                    placeholder="Buscar por nombres"
+                    onChange={(e) => setSearchText(e.target.value)}
+                    style={{ width: 200 }}
+                    allowClear
+                />
                 <Select
-                    className="mt-2 w-full xl:w-1/5"
+                    className="mt-2 w-full xl:w-1/5 m-2"
+                    value={deliveredStatus}
+                    onChange={(value) => {
+                        setDeliveredStatus(value)
+                    }}
+                >
+                    <Option value="espera">En espera</Option>
+                    <Option value="entregado">Entregados</Option>
+                </Select>
+                <Select
+                    className="mt-2 w-full xl:w-1/5 m-2"
                     placeholder="Filtrar por método de envío"
                     value={shippingStatus}
                     allowClear
@@ -175,14 +260,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
                 scroll={{ x: "max-content" }}
             />
 
-            <ExternalSalesModal
-                visible={isModalExternalVisible}
-                onCancel={handleCancel}
-                onClose={() => {
-                    setIsModalExternalVisible(false);
-                    fetchExternalSales();
-                }}
-            />
+            {externalModal}
         </div>
     );
 };

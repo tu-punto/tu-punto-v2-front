@@ -10,6 +10,7 @@ const Shipping = () => {
 
     const { user }: any = useContext(UserContext);
     const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isOperator = user?.role.toLowerCase() === 'operator';
 
     return (
         <div className="p-4">
@@ -22,7 +23,7 @@ const Shipping = () => {
                 </div>
             </div>
 
-            {isAdmin && (
+            {isAdmin || isOperator && (
                 <div className="px-5 py-4">
                     <Switch
                         checked={isExternalSalesMode}

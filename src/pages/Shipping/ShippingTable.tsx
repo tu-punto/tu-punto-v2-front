@@ -32,6 +32,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
     const isAdmin = user?.role?.toLowerCase() === 'admin';
     const isVendedor = user?.role?.toLowerCase() === 'vendedor';
+    const isOperator = user?.role.toLowerCase() === 'operator';
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
@@ -129,7 +130,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     toSimpleDate(new Date(pedido.hora_entrega_acordada)) <= toSimpleDate(dateRange[1])
                     : true;
             // Lógica actualizada para el filtro de vendedor
-            const matchesVendedor = isAdmin
+            const matchesVendedor = isAdmin || isOperator
                 ? (selectedVendedor === "Todos" || !selectedVendedor || // Si es "Todos" o vacío, mostrar todos
                     pedido.venta?.some((v: any) => {
                         const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
@@ -291,7 +292,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             const response = await getSucursalsAPI();
             setSucursal(response);
 
-            if (isAdmin) {
+            if (isAdmin || isOperator) {
                 const sucursalId = localStorage.getItem("sucursalId");
                 if (sucursalId) {
                     const sucursalActual = response.find((s: any) =>
@@ -338,7 +339,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     return (
         <div>
             <div className="flex justify-center flex-wrap gap-2 mb-4">
-                {isAdmin && (
+                {isAdmin || isOperator && (
                     <Select
                         style={{ width: 200, margin: 8 }}
                         placeholder="Vendedores"
@@ -376,8 +377,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     style={{ width: 200, margin: 8 }}
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
-                    allowClear={!isAdmin}
-                    disabled={isAdmin} // ← Bloquea si es admin
+                    allowClear={!isAdmin && !isOperator}
+                    disabled={isAdmin || isOperator} // ← Bloquea si es admin
                 >
                     {sucursal.map((suc: any) => (
                         <Option key={suc.id_sucursal} value={suc.nombre}>

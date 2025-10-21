@@ -21,6 +21,7 @@ import { DATE_TAGS } from "../../constants/fluxes";
 import { getFilteredStats } from "../../helpers/financeFluxesHelpers";
 import dayjs from "dayjs";
 import StatisticCard from "../../components/StatisticCard";
+import { getFinancialSummaryAPI } from "../../api/financeFlux";
 
 const StatisticsDashboard = () => {
   const [stats, setStats] = useState<any>();
@@ -28,13 +29,35 @@ const StatisticsDashboard = () => {
     DATE_TAGS.LAST_30_DAYS
   );
   const [customDateRange, setCustomDateRange] = useState<any>([]);
+  const [loading, setLoading] = useState({
+    income: true,
+    expenses: true,
+    utility: true,
+    deliveryIncome: true,
+    deliveryExpenses: true,
+  });
 
   const fetchStats = async (filter: string = DATE_TAGS.ALL_TIME) => {
+    setLoading({
+      income: true,
+      expenses: true,
+      utility: true,
+      deliveryIncome: true,
+      deliveryExpenses: true,
+    });
     try {
       const statsInfo = await getFilteredStats(filter, customDateRange);
       setStats(statsInfo);
     } catch (error) {
       console.error(error);
+    } finally {
+      setLoading({
+        income: false,
+        expenses: false,
+        utility: false,
+        deliveryIncome: false,
+        deliveryExpenses: false,
+      });
     }
   };
 
@@ -44,6 +67,17 @@ const StatisticsDashboard = () => {
       setCustomDateRange([]);
     }
   };
+
+  const [summary, setSummary] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
+
+  useEffect(() => {
+    setLoadingSummary(true);
+    getFinancialSummaryAPI()
+      .then(setSummary)
+      .finally(() => setLoadingSummary(false));
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -80,11 +114,10 @@ const StatisticsDashboard = () => {
                 key={key}
                 checked={selectedTag === value}
                 onChange={() => onTagClick(value)}
-                className={`px-4 py-2 border rounded transition-all ${
-                  selectedTag === value
-                    ? "border-blue-500 bg-blue-50 !text-blue-600"
-                    : "border-gray-200 hover:border-blue-400"
-                }`}
+                className={`px-4 py-2 border rounded transition-all ${selectedTag === value
+                  ? "border-blue-500 bg-blue-50 !text-blue-600"
+                  : "border-gray-200 hover:border-blue-400"
+                  }`}
               >
                 {espTags[index]}
               </Tag.CheckableTag>
@@ -113,13 +146,13 @@ const StatisticsDashboard = () => {
               />
               {customDateRange?.length === 2 && (
                 <div className="flex justify-center w-full">
-                <Alert
-                  message={`Rango seleccionado: ${dayjs(
-                    customDateRange[0]
-                  ).format("DD-MM-YYYY")} - ${dayjs(customDateRange[1]).format(
-                    "DD-MM-YYYY"
-                  )}`}
-                  type="info"
+                  <Alert
+                    message={`Rango seleccionado: ${dayjs(
+                      customDateRange[0]
+                    ).format("DD-MM-YYYY")} - ${dayjs(customDateRange[1]).format(
+                      "DD-MM-YYYY"
+                    )}`}
+                    type="info"
                     showIcon
                   />
                 </div>
@@ -135,28 +168,74 @@ const StatisticsDashboard = () => {
           </Typography.Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
-              <StatisticCard
-                title="INGRESOS"
-                value={stats!.income || 0}
-                prefix={<DollarOutlined />}
-                color="#20c997"
-              />
+              <Spin spinning={loading.income} tip="Cargando...">
+                <StatisticCard
+                  title="INGRESOS"
+                  value={stats?.income || 0}
+                  prefix={<DollarOutlined />}
+                  color="#20c997"
+                />
+              </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <StatisticCard
-                title="GASTOS"
-                value={stats!.expenses || 0}
-                prefix={<ShoppingCartOutlined />}
-                color="#dc3545"
-              />
+              <Spin spinning={loading.expenses} tip="Cargando...">
+                <StatisticCard
+                  title="GASTOS"
+                  value={stats?.expenses || 0}
+                  prefix={<ShoppingCartOutlined />}
+                  color="#dc3545"
+                />
+              </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <StatisticCard
-                title="UTILIDAD"
-                value={stats!.utility || 0}
-                prefix={<RiseOutlined />}
-                color="#28a745"
-              />
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="UTILIDAD"
+                  value={summary?.utilidad ?? 0}
+                  prefix={<RiseOutlined />}
+                  color="#28a745"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="INVERSIÓN"
+                  value={summary?.inversiones ?? 0}
+                  prefix={<RiseOutlined />}
+                  color="#007bff"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="CAJA"
+                  value={summary?.caja ?? 0}
+                  prefix={<DollarOutlined />}
+                  color="#faad14"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="Comisión"
+                  value={summary?.comision ?? 0}
+                  prefix={<RiseOutlined />}
+                  color="#6f42c1"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="Mercadería Vendida"
+                  value={summary?.mercaderiaVendida ?? 0}
+                  prefix={<ShoppingCartOutlined />}
+                  color="#dc3545"
+                />
+              </Spin>
             </Col>
           </Row>
         </div>
@@ -167,21 +246,35 @@ const StatisticsDashboard = () => {
             Estadísticas de Delivery
           </Typography.Title>
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12}>
-              <StatisticCard
-                title="INGRESOS DELIVERY SUELTOS"
-                value={stats.deliveryIncome}
-                prefix={<DollarOutlined />}
-                color="#007bff"
-              />
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loading.deliveryIncome} tip="Cargando...">
+                <StatisticCard
+                  title="INGRESOS DELIVERY SUELTOS"
+                  value={stats?.deliveryIncome}
+                  prefix={<DollarOutlined />}
+                  color="#007bff"
+                />
+              </Spin>
             </Col>
-            <Col xs={24} sm={12}>
-              <StatisticCard
-                title="COSTOS DELIVERY"
-                value={stats.deliveryExpenses}
-                prefix={<CarOutlined />}
-                color="#6f42c1"
-              />
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
+                <StatisticCard
+                  title="COSTOS DELIVERY"
+                  value={stats?.deliveryExpenses}
+                  prefix={<CarOutlined />}
+                  color="#6f42c1"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loadingSummary}>
+                <StatisticCard
+                  title="BALANCE DELIVERY"
+                  value={summary?.balanceDelivery ?? 0}
+                  prefix={<CarOutlined />}
+                  color="#20c997"
+                />
+              </Spin>
             </Col>
           </Row>
         </div>
