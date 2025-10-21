@@ -48,14 +48,16 @@ function FinanceFluxFormModal({
   const handleFinish = async (financeFluxData: any) => {
     setLoading(true);
 
-    const sucursalId =
-      financeFluxData.id_sucursal || localStorage.getItem("sucursalId");
-
     const payload = {
       ...financeFluxData,
-      id_sucursal: sucursalId,
       fecha: financeFluxData.fecha?.toDate()?.toISOString(),
     };
+    if (payload.id_vendedor === "") {
+      delete payload.id_vendedor;
+    }
+    if (payload.id_sucursal === "") {
+      delete payload.id_sucursal;
+    }
 
     try {
       const response = editingFlux
@@ -75,6 +77,9 @@ function FinanceFluxFormModal({
     } catch (error) {
       message.error("Error al guardar el flujo financiero");
     } finally {
+      if (!editingFlux) {
+        form.resetFields();
+      }
       setLoading(false);
     }
   };
@@ -133,12 +138,13 @@ function FinanceFluxFormModal({
   useEffect(() => {
     if (editingFlux) {
       const sellerId = editingFlux.id_vendedor;
+      const sucursalId = editingFlux.id_sucursal;
       form.setFieldsValue({
         ...editingFlux,
         fecha: editingFlux.fecha ? dayjs(editingFlux.fecha) : null,
         id_vendedor: sellerId ? sellerId._id : "",
         id_trabajador: editingFlux.id_trabajador,
-        id_sucursal: editingFlux.id_sucursal,
+        id_sucursal: sucursalId ? sucursalId._id : "",
         esDeuda: editingFlux.esDeuda == "SI" ? true : false,
       });
     } else {
@@ -311,7 +317,7 @@ function FinanceFluxFormModal({
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              name="id_trabajador"
+              name="founder"
               label="Founder"
               rules={[
                 ({ getFieldValue }) => ({
@@ -329,10 +335,14 @@ function FinanceFluxFormModal({
               <Select
                 placeholder="Selecciona un Founder"
                 allowClear
-                options={workers.map((worker: any) => ({
-                  value: worker._id,
-                  label: worker.nombre,
-                }))}
+                options={[
+                  { value: "Sebas", label: "Sebas" },
+                  { value: "Diego", label: "Diego" },
+                  { value: "Elian", label: "Elian" },
+                  { value: "Giorgio", label: "Giorgio" },
+                  { value: "Mayuki", label: "Mayuki" },
+                  { value: "Eddy Choque", label: "Eddy Choque" },
+                ]}
                 showSearch
                 filterOption={(input, option: any) =>
                   option.label.toLowerCase().includes(input.toLowerCase())

@@ -24,7 +24,6 @@ import {
   updateEntry,
   deleteEntryProductsAPI,
 } from "../../../api/entry";
-import { getPaymentProofsBySellerIdAPI } from "../../../api/paymentProof";
 import {
   getSalesBySellerIdAPI,
   updateSale,
@@ -32,7 +31,7 @@ import {
   deleteSaleByIdAPI,
   updateSaleByIdAPI,
 } from "../../../api/sales";
-import { getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
+import { getPaymentProofsBySellerIdAPI, getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
 
@@ -206,7 +205,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         ...formValues,
         pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
           ...sucursal,
-          alquiler: sucursal.almacenamiento
+          alquiler: sucursal.almacenamiento,
         })),
       });
       if (!resSeller?.success) {
@@ -258,6 +257,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
+                almacenamiento: sucursal.alquiler,
                 fecha_ingreso: sucursal.fecha_ingreso
                   ? dayjs(sucursal.fecha_ingreso)
                   : null,

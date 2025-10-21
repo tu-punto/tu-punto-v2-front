@@ -1,18 +1,15 @@
-import { Button, Table, Tooltip, Select, Space, Input, Modal } from "antd";
-import { useEffect, useState, useContext } from "react";
-import { EditOutlined, SearchOutlined, FileDoneOutlined } from "@ant-design/icons";
-import { UserContext } from "../../context/userContext.tsx";
+import { Button, Table, Tooltip, Select, Space, Input } from "antd";
+import { useEffect, useState } from "react";
+import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellerDebtsAPI, getSellersAPI } from "../../api/seller";
-import { getSalesBySellerIdAPI } from "../../api/sales";
+import { getSellersAPI } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
-import ShippingGuideTable from "../ShippingGuide/ShippingGuideTable";
 
 type SellerRow = ISeller & {
   key: string;
@@ -30,8 +27,6 @@ export default function SellerTable({
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
-  const [viewModalGuides, setViewModalGuides] = useState(false);
-  const [sellerID, setSellerID] = useState<string>("");
 
   const [searchText, setSearchText] = useState("");
   const [debtModal, setDebtModal] = useState(false);
@@ -39,7 +34,6 @@ export default function SellerTable({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
-  const { user } = useContext(UserContext);
 
   const getEstadoVendedor = (fechaVigencia: string) => {
     const hoy = dayjs();
@@ -146,6 +140,17 @@ export default function SellerTable({
         (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
     },
     {
+      title: "Emite factura?",
+      dataIndex: "emite_factura",
+      key: "emite_factura",
+      render: (tieneFactura: boolean) => (tieneFactura ? "Sí" : "No"),
+      sorter: (a: any, b: any) => {
+        const valorA = a.emite_factura ? 1 : 0;
+        const valorB = b.emite_factura ? 1 : 0;
+        return valorA - valorB;
+      },
+    },
+    {
       title: "Acciones",
       key: "acciones",
       render: (_: any, row: SellerRow) => (
@@ -163,14 +168,6 @@ export default function SellerTable({
               }}
             />
           </Tooltip>
-          <Tooltip title="Ver guías de envío">
-            <Button
-              type="primary"
-              size="small"
-              icon={<FileDoneOutlined />}
-              onClick={() => {handleGuideView(row._id)}}
-            />
-          </Tooltip>
         </div>
       ),
       width: 150,
@@ -185,18 +182,20 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-          const mensual = seller.pago_sucursales.reduce(
-            (t: number, p: ISucursalPago) =>
-              t +
-              Number(p.alquiler) +
-              Number(p.exhibicion) +
-              Number(p.delivery) +
-              Number(p.entrega_simple),
-            0
-          );
+          const mensual = seller.pago_sucursales
+            .filter((p) => p.activo)
+            .reduce(
+              (t: number, p: ISucursalPago) =>
+                t +
+                Number(p.alquiler) +
+                Number(p.exhibicion) +
+                Number(p.delivery) +
+                Number(p.entrega_simple),
+              0
+            );
 
-          const saldoPendiente = seller.saldo_pendiente
-          const deuda = seller.deuda
+          const saldoPendiente = seller.saldo_pendiente;
+          const deuda = seller.deuda;
           const pagoPendiente = saldoPendiente - deuda;
 
           return {
@@ -258,18 +257,10 @@ export default function SellerTable({
       });
     }
 
-    // Filtrar por factura
-    return isFactura
-      ? filtered.filter((s) => s.emite_factura)
-      : filtered.filter((s) => !s.emite_factura);
+    return filtered;
   };
 
   const filteredSellers = filterSellers(sellers);
-
-  const handleGuideView = (id: string) => {
-    setSellerID(id);
-    setViewModalGuides(true)
-  }
 
   return (
     <>
@@ -343,7 +334,7 @@ export default function SellerTable({
             }}
           />
           <SellerInfoModalTry
-            visible={infoModal && !debtModal && !viewModalGuides}
+            visible={infoModal && !debtModal}
             seller={selected}
             onCancel={closeAll}
             onSuccess={() => {
@@ -358,25 +349,6 @@ export default function SellerTable({
             sucursales={selected.pago_sucursales}
           />
         </>
-      )}
-      {viewModalGuides && (
-        <Modal 
-          title='Guías de Envío'
-          footer={false} 
-          open={viewModalGuides}
-          width={1000}
-          onCancel={() => {
-            setViewModalGuides(false);
-            setSellerID("");
-            closeAll();
-          }}>
-          <ShippingGuideTable
-            refreshKey={refreshKey}
-            user={user}
-            isFilterBySeller
-            id_vendedor={sellerID}
-          />
-        </Modal>
       )}
     </>
   );

@@ -27,7 +27,12 @@ interface Props {
   seller: any; // SellerRow
 }
 
-export default function DebtModal({ visible, onCancel, onSuccess, seller }: Props) {
+export default function DebtModal({
+  visible,
+  onCancel,
+  onSuccess,
+  seller,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
   const [form] = Form.useForm();
@@ -40,21 +45,26 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
       //console.log("👉 Sucursales cargadas desde API:", sucursales);
       setSucursalOptions(sucursales);
 
-      const initSucursales = (seller.pago_sucursales || []).map((p: ISucursalPago) => {
-        const id = p.id_sucursal?.$oid || p.id_sucursal;
-        const sucursal = sucursales.find((s) => s._id === id);
-        return {
-          id_sucursal: id,
-          sucursalName: sucursal?.nombre || p.sucursalName || "Sucursal sin nombre",
-          alquiler: p.alquiler,
-          exhibicion: p.exhibicion,
-          delivery: p.delivery,
-          entrega_simple: p.entrega_simple,
-          fecha_ingreso: p.fecha_ingreso ? dayjs(p.fecha_ingreso) : null,
-          fecha_salida: p.fecha_salida ? dayjs(p.fecha_salida) : null,
-          comentario: p.comentario || "",
-        };
-      });
+      const initSucursales = (seller.pago_sucursales || []).map(
+        (p: ISucursalPago) => {
+          const id = p.id_sucursal?.$oid || p.id_sucursal;
+          const sucursal = sucursales.find((s) => s._id === id);
+          return {
+            ...p,
+            id_sucursal: id,
+            sucursalName:
+              sucursal?.nombre || p.sucursalName || "Sucursal sin nombre",
+            alquiler: p.alquiler,
+            almacenamiento: p.alquiler,
+            exhibicion: p.exhibicion,
+            delivery: p.delivery,
+            entrega_simple: p.entrega_simple,
+            fecha_ingreso: p.fecha_ingreso ? dayjs(p.fecha_ingreso) : null,
+            fecha_salida: p.fecha_salida ? dayjs(p.fecha_salida) : null,
+            comentario: p.comentario || "",
+          };
+        }
+      );
 
       form.setFieldsValue({
         fecha_vigencia: dayjs(seller.fecha_vigencia, "D/M/YYYY/"),
@@ -66,7 +76,6 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
     })();
   }, [visible]);
 
-
   const addBranch = () => {
     const list = form.getFieldValue("sucursales") || [];
     if (list.length >= sucursalOptions.length) {
@@ -76,7 +85,6 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
   };
 
   const onFinish = async (values: any) => {
-
     setLoading(true);
     try {
       const montoFinanceFlux = (values.sucursales || []).reduce(
@@ -97,9 +105,9 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
         pago_sucursales: values.sucursales.map((formSucursal: any) => ({
           ...formSucursal,
           alquiler: formSucursal.almacenamiento,
-          sucursalName: sucursalOptions.find((optionSucursal) => 
-            optionSucursal._id=== formSucursal.id_sucursal
-          )?.nombre 
+          sucursalName: sucursalOptions.find(
+            (optionSucursal) => optionSucursal._id === formSucursal.id_sucursal
+          )?.nombre,
         })),
         deuda: nuevaDeuda,
         esDeuda: values.isDebt,
@@ -111,32 +119,42 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
       message.success("Vendedor renovado con éxito");
       onSuccess();
     } catch (err: any) {
-    console.error("Error al renovar vendedor:", err);
+      console.error("Error al renovar vendedor:", err);
 
-    const msg =
-        err?.response?.data?.msg ||
-        err?.message ||
-        "Error al renovar vendedor";
+      const msg =
+        err?.response?.data?.msg || err?.message || "Error al renovar vendedor";
 
       message.error({
         content: (
-            <div>
-              <strong>No se pueden eliminar estas sucursales:</strong>
-              <br />
-              <span style={{ color: "#cf1322", fontWeight: 600 }}>
-        {msg.split("stock:")[1]?.trim() || msg}
-      </span>
-            </div>
+          <div>
+            <strong>No se pueden eliminar estas sucursales:</strong>
+            <br />
+            <span style={{ color: "#cf1322", fontWeight: 600 }}>
+              {msg.split("stock:")[1]?.trim() || msg}
+            </span>
+          </div>
         ),
       });
-  } finally {
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal title="Renovar vendedor" open={visible} footer={null} onCancel={onCancel} width={850}>
+    <Modal
+      title="Renovar vendedor"
+      open={visible}
+      footer={null}
+      onCancel={onCancel}
+      width={850}
+    >
       <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Form.Item name="isDebt" label="¿Es deuda?">
+          <Radio.Group>
+            <Radio.Button value={true}>SI</Radio.Button>
+            <Radio.Button value={false}>NO</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
 
         <Row gutter={16}>
           <Col xs={24} md={12}>
@@ -165,7 +183,9 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Prop
 
         {/* Sucursales dinámicas */}
         <Row justify="space-between" align="middle">
-          <Col><h3>Sucursales</h3></Col>
+          <Col>
+            <h3>Sucursales</h3>
+          </Col>
           <Col>
             <Button type="dashed" icon={<PlusOutlined />} onClick={addBranch}>
               Añadir sucursal
