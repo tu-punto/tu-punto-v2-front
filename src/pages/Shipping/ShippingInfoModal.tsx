@@ -20,7 +20,7 @@ import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
 import moment from "moment-timezone";
-import {updateProductsByShippingAPI} from "../../api/sales.ts";
+import { updateProductsByShippingAPI } from "../../api/sales.ts";
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
@@ -447,7 +447,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
-                hora_entrega_acordada: fechaHoraEntregaAcordada,                pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
+                hora_entrega_acordada: fechaHoraEntregaAcordada, pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
                 esta_pagado: values.esta_pagado,
                 adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
                 quien_paga_delivery: values.quien_paga_delivery,
@@ -494,8 +494,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const phoneNumber = shipping.telefono_cliente;
 
         const shippingDate = new Date(shipping.hora_entrega_real);
-        if ((""+shipping.hora_entrega_real).endsWith("Z")) {
-            shippingDate.setTime(shippingDate.getTime() + 4*60*60*1000);
+        if (("" + shipping.hora_entrega_real).endsWith("Z")) {
+            shippingDate.setTime(shippingDate.getTime() + 4 * 60 * 60 * 1000);
         }
 
         const fixedMinutes = shippingDate.getMinutes() < 10 ? `0${shippingDate.getMinutes()}` : shippingDate.getMinutes();
@@ -684,20 +684,20 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 </Card>
                 {/* PRODUCTOS */}
                 <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}
-                      extra={
-                          isAdmin && (
-                              <Button
-                                  icon={<EditOutlined />}
-                                  onClick={() => {
-                                      setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
-                                      setEditProductsModalVisible(true);
-                                  }}
-                                  type="link"
-                              >
-                                  Editar Productos
-                              </Button>
-                          )
-                      }
+                    extra={
+                        isAdmin && (
+                            <Button
+                                icon={<EditOutlined />}
+                                onClick={() => {
+                                    setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
+                                    setEditProductsModalVisible(true);
+                                }}
+                                type="link"
+                            >
+                                Editar Productos
+                            </Button>
+                        )
+                    }
                 >
                     <EmptySalesTable
                         products={products}
@@ -994,9 +994,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 isAdmin={isAdmin}
                 shippingId={id_shipping}
                 sucursalId={localStorage.getItem("sucursalId")}
+                allowAddProducts={true} // Explícitamente permitir agregar productos
                 onSave={() => {
-                    setEditProductsModalVisible(false); // cerrar modal hijo
-                    message.success("Cambios guardados"); // opcional
+                    setEditProductsModalVisible(false);
+                    message.success("Cambios guardados");
                 }}
             />
         </Modal>
