@@ -51,8 +51,11 @@ export const getFlatProductListAPI = async (sucursalId?: string) => {
             params: { sucursalId }
         });
         return res.data;
-    } catch (error) { /* ... */ }
-}
+    } catch (error) {
+        console.error("❌ Error al obtener productos planos:", error);
+        return [];
+    }
+};
 export const getProductByIdAPI = async (idProduct) => {
     try {
         const res = await apiClient.get(`/product/${idProduct}`)
