@@ -22,6 +22,7 @@ import { getFilteredStats } from "../../helpers/financeFluxesHelpers";
 import dayjs from "dayjs";
 import StatisticCard from "../../components/StatisticCard";
 import { getFinancialSummaryAPI } from "../../api/financeFlux";
+import ReportsLauncher from "../../components/ReportsLauncher";
 
 const StatisticsDashboard = () => {
   const [stats, setStats] = useState<any>();
@@ -106,6 +107,9 @@ const StatisticsDashboard = () => {
 
   return (
     <Card className="m-4 shadow-md">
+      <div className="absolute right-4 top-4">
+        <ReportsLauncher />
+      </div>
       <Space direction="vertical" className="w-full" size="large">
         <div>
           <Space wrap className="mb-4">
