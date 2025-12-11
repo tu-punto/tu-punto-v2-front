@@ -61,57 +61,35 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
 
     const getVendedoresConEntregas = () => {
-        const vendedoresConEntregasSet = new Set();
+        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        const vendedoresConEntregasSet = new Set<string>();
 
-        // Obtener vendedores de pedidos en espera
-        esperaData.forEach((pedido: any) => {
-            // Buscar en las ventas del pedido
+        sourceData.forEach((pedido: any) => {
             (pedido.venta || []).forEach((venta: any) => {
                 if (venta.vendedor) {
-                    // Si vendedor es un objeto, usar su _id; si es string, usarlo directamente
-                    const vendedorId = typeof venta.vendedor === 'object'
-                        ? venta.vendedor._id
-                        : venta.vendedor;
-                    vendedoresConEntregasSet.add(vendedorId);
+                    const vendedorId =
+                        typeof venta.vendedor === 'object'
+                            ? venta.vendedor._id
+                            : venta.vendedor;
+                    if (vendedorId) vendedoresConEntregasSet.add(String(vendedorId));
+                }
+                if (venta.id_vendedor) {
+                    vendedoresConEntregasSet.add(String(venta.id_vendedor));
                 }
             });
 
-            // Buscar en productos temporales si existen
             (pedido.productos_temporales || []).forEach((producto: any) => {
                 if (producto.id_vendedor) {
-                    vendedoresConEntregasSet.add(producto.id_vendedor);
+                    vendedoresConEntregasSet.add(String(producto.id_vendedor));
                 }
             });
         });
 
-        // Obtener vendedores de pedidos entregados
-        entregadoData.forEach((pedido: any) => {
-            // Buscar en las ventas del pedido
-            (pedido.venta || []).forEach((venta: any) => {
-                if (venta.vendedor) {
-                    // Si vendedor es un objeto, usar su _id; si es string, usarlo directamente
-                    const vendedorId = typeof venta.vendedor === 'object'
-                        ? venta.vendedor._id
-                        : venta.vendedor;
-                    vendedoresConEntregasSet.add(vendedorId);
-                }
-            });
-
-            // Buscar en productos temporales si existen
-            (pedido.productos_temporales || []).forEach((producto: any) => {
-                if (producto.id_vendedor) {
-                    vendedoresConEntregasSet.add(producto.id_vendedor);
-                }
-            });
-        });
-
-        // Filtrar vendedores que están en los datos de entregas
-        const resultado = vendedores.filter(vendedor =>
-            vendedoresConEntregasSet.has(vendedor._id)
+        return vendedores.filter((vendedor: any) =>
+            vendedoresConEntregasSet.has(String(vendedor._id))
         );
-
-        return resultado;
     };
+
 
     const filterByLocationAndDate = (data: any) => {
         const nombreSucursalToIdMap = new Map(
@@ -328,6 +306,18 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         value={selectedVendedor || undefined}
                         onChange={(value) => setSelectedVendedor(value || "")}
                         allowClear
+                        showSearch
+                        filterOption={(input, option) => {
+                            const label =
+                                (option?.children ??
+                                    // por si en algún momento usas `options` en vez de `<Option>`
+                                    (option as any)?.label ??
+                                    "");
+
+                            return String(label)
+                                .toLowerCase()
+                                .includes(input.toLowerCase());
+                        }}
                     >
                         {getVendedoresConEntregas().map((vendedor: any) => (
                             <Option key={vendedor._id} value={vendedor._id}>
@@ -336,7 +326,6 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         ))}
                     </Select>
                 )}
-
                 <Input
                     style={{ width: 200, margin: 8 }}
                     placeholder="Buscar cliente..."
