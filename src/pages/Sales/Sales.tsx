@@ -80,9 +80,11 @@ export const Sales = () => {
 
         if ((isAdmin || isOperator) && selectedSellerId) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
-        } else if (!isAdmin || !isOperator) {
+        } else if (!isAdmin && !isOperator) {
+            // sólo vendedores normales
             filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
         }
+
 
         if (searchText.trim()) {
             const lower = searchText.trim().toLowerCase();
@@ -478,7 +480,7 @@ export const Sales = () => {
                                         >
                                             Añadir nuevo producto
                                         </Button>
-                                        {isAdmin || isOperator && (
+                                        {(isAdmin || isOperator) && (
                                             <Select
                                                 placeholder="Selecciona un vendedor"
                                                 options={sellers.map((vendedor: any) => ({
@@ -522,7 +524,7 @@ export const Sales = () => {
 
                                 <Col>
                                     <Space wrap>
-                                        {isAdmin || isOperator && (
+                                        {(isAdmin || isOperator) && (
                                             <Button
                                                 onClick={showSalesModal}
                                                 type="primary"

@@ -38,6 +38,9 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
 
     const [isMobile, setIsMobile] = useState(false);
+    const toggleStatus = () => {
+        setSelectedStatus(prev => prev === 'En Espera' ? 'entregado' : 'En Espera');
+    };
 
     const fetchShippings = async () => {
         try {
@@ -130,7 +133,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     toSimpleDate(new Date(pedido.hora_entrega_acordada)) <= toSimpleDate(dateRange[1])
                     : true;
             // Lógica actualizada para el filtro de vendedor
-            const matchesVendedor = isAdmin || isOperator
+            const matchesVendedor = (isAdmin || isOperator)
                 ? (selectedVendedor === "Todos" || !selectedVendedor || // Si es "Todos" o vacío, mostrar todos
                     pedido.venta?.some((v: any) => {
                         const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
@@ -266,27 +269,6 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         },
     ];
 
-    // const handleCancel = () => {
-    //     setIsModalExternalVisible(false)
-    // };
-
-    // const handleIconClick = (order: any) => {
-    //     if (order.estado_pedido === "Entregado") return;
-    //     setSelectedShipping(order);
-    //     setIsModalStateVisible(true);
-    // };
-
-    // const handleRowClick = async (record: any) => {
-    //     try {
-    //         const shipping = await getShippingByIdAPI(record._id); // ✅ este endpoint debe devolver solo UN pedido
-    //         console.log("📦 Pedido individual para el modal:", shipping);
-    //         setSelectedShipping(shipping);
-    //         setIsModalVisible(true);
-    //     } catch (error) {
-    //         console.error("Error al obtener pedido por ID:", error);
-    //         message.error("Error al cargar el pedido");
-    //     }
-    // };
     const fetchSucursal = async () => {
         try {
             const response = await getSucursalsAPI();
@@ -339,7 +321,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     return (
         <div>
             <div className="flex justify-center flex-wrap gap-2 mb-4">
-                {isAdmin || isOperator && (
+                {(isAdmin || isOperator) && (
                     <Select
                         style={{ width: 200, margin: 8 }}
                         placeholder="Vendedores"
@@ -362,7 +344,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     onChange={(e) => setSearchCliente(e.target.value)}
                     allowClear
                 />
-                
+                {
+                /*
                 <Select
                     style={{ width: 200, margin: 8 }}
                     placeholder="Estado del pedido"
@@ -372,6 +355,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     <Option value="En Espera">En Espera</Option>
                     <Option value="entregado">Entregado</Option>
                 </Select>
+
+                */}
                 <Select
                     placeholder="Sucursal de Origen"
                     style={{ width: 200, margin: 8 }}
@@ -456,7 +441,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 )}
             </div>
 
-            {selectedStatus === 'En Espera' && (
+            {/*selectedStatus === 'En Espera' && (
                 <>
                     <h2 className="text-mobile-sm xl:text-desktop-3xl text-center mb-4 font-bold">En Espera</h2>
                     <Table
@@ -474,9 +459,9 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         })}
                     />
                 </>
-            )}
+            )*/}
 
-            {selectedStatus === 'entregado' && (
+            {/*selectedStatus === 'entregado' && (
                 <>
                     <h2 className="text-mobile-sm xl:text-desktop-3xl text-center mb-4 font-bold">Entregado</h2>
                     <Table
@@ -494,7 +479,65 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         })}
                     />
                 </>
-            )}
+            )*/}
+
+            <div className="flex items-center justify-center gap-3 mb-4">
+                <h2
+                    className={`
+            text-mobile-sm xl:text-desktop-3xl font-bold
+            transition-all duration-300
+            ${selectedStatus === 'En Espera' ? 'text-blue-700' : 'text-green-700'}
+        `}
+                >
+                    {selectedStatus === 'En Espera' ? 'En Espera' : 'Entregado'}
+                </h2>
+
+                <button
+                    type="button"
+                    onClick={toggleStatus}
+                    className={`
+            relative flex items-center gap-1 rounded-full border px-3 py-1
+            text-xs xl:text-sm font-medium
+            transition-all duration-300
+            shadow-sm
+            ${selectedStatus === 'En Espera'
+                        ? 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100'
+                        : 'bg-green-50 border-green-300 text-green-600 hover:bg-green-100'
+                    }
+        `}
+                >
+        <span
+            className={`
+                inline-flex items-center justify-center w-5 h-5 rounded-full
+                bg-white/80
+                text-[10px]
+                transition-transform duration-300
+                ${selectedStatus === 'En Espera' ? '' : 'rotate-180'}
+            `}
+        >
+            ⇆
+        </span>
+                    <span>
+            {selectedStatus === 'En Espera' ? 'Ver entregados' : 'Ver en espera'}
+        </span>
+                </button>
+            </div>
+
+            <Table
+                columns={columns}
+                dataSource={selectedStatus === 'En Espera' ? filteredEsperaData : filteredEntregadoData}
+                pagination={false}
+                scroll={{ x: "max-content" }}
+                onRow={(record) => ({
+                    onClick: async () => {
+                        const fullShipping = await getShippingByIdAPI(record._id);
+                        console.log("📦 Pedido completo con ventas:", fullShipping);
+                        setSelectedShipping(fullShipping);
+                        setIsModalVisible(true);
+                    },
+                })}
+            />
+
 
             <ShippingInfoModal
                 visible={isModalVisible && !isModaStatelVisible}
