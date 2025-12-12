@@ -36,6 +36,30 @@ export const Sales = () => {
     const [searchText, setSearchText] = useState("");
     const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
     const [cartLoading, setCartLoading] = useState(false);
+    const normalizeId = (id: any) => String(id?._id ?? id?.$oid ?? id ?? "");
+
+    const getStockActual = (p: any, sucursalId?: string | null) => {
+        // Caso 1: viene "flat" (lo ideal)
+        const direct =
+            p.stockActual ?? p.stock ?? p.stock_actual ?? p.stockTotal ?? p.stock_total;
+
+        if (direct !== undefined && direct !== null && direct !== "") {
+            return Number(direct) || 0;
+        }
+
+        // Caso 2: viene el producto con sucursales/combinaciones (como tu JSON)
+        const sid = normalizeId(sucursalId);
+        const suc = (p.sucursales || []).find((s: any) => normalizeId(s.id_sucursal) === sid);
+
+        if (!suc) return 0;
+
+        const total = (suc.combinaciones || []).reduce((acc: number, c: any) => {
+            return acc + (Number(c.stock) || 0);
+        }, 0);
+
+        return total;
+    };
+
     useEffect(() => {
         const fetchSellerAndSetSucursales = async () => {
             if (isAdmin || isOperator || !user?.id_vendedor) return;
@@ -74,9 +98,17 @@ export const Sales = () => {
         const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
 
         let filtered = data.filter((p: any) => {
-            if (p.stockActual <= 0 || selectedProduct !== 'all' && selectedProduct !== p.id_producto) return false;
+            const stock = getStockActual(p, branchIdForFetch);
+
+            if (stock <= 0) return false;
+
+            if (selectedProduct !== "all" && String(selectedProduct) !== String(p.id_producto)) {
+                return false;
+            }
+
             return vendedoresVigentesIds.includes(String(p.id_vendedor));
         });
+
 
         if ((isAdmin || isOperator) && selectedSellerId) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
@@ -487,9 +519,10 @@ export const Sales = () => {
                                                     value: vendedor._id,
                                                     label: vendedor.nombre + " " + vendedor.apellido,
                                                 }))}
-                                                filterOption={(input, option: any) =>
-                                                    option.label.toLowerCase().includes(input.toLowerCase())
-                                                }
+                                                filterOption={(input, option) => {
+                                                    const label = String(option?.children ?? '');
+                                                    return label.toLowerCase().includes(input.toLowerCase());
+                                                }}
                                                 style={{ minWidth: 200 }}
                                                 onChange={(value) => setSelectedSellerId(value)}
                                                 showSearch
