@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import {Button, Input, Table, Spin, Select, message} from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
@@ -73,7 +73,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             setIngresoData({});
         }
     }, [resetSignal]);
-    const handleIngresoChange = (key: string, value: number) => {
+    const handleIngresoChange = useCallback((key: string, value: number) => {
         setIngresoData((prev) => {
             const updated = { ...prev, [key]: value };
 
@@ -106,7 +106,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
             return updated;
         });
-    };
+    }, [productsList, setStockListForConfirmModal]);
 
     const openInfoModal = (product: any) => {
         setSelectedProductInfo(product);
@@ -200,7 +200,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         alert("Stock actualizado (simulado)");
         setIngresoData({});
     };
-    const groupProductsByBaseName = (products: any[]) => {
+    // Memoizar la función de agrupamiento para evitar recrearla en cada render
+    const groupProductsByBaseName = useCallback((products: any[]) => {
         const groups: { [key: string]: any } = {};
 
         products.forEach((product) => {
@@ -236,7 +237,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         });
 
         return Object.values(groups);
-    };
+    }, [selectedCategory, searchText]);
 
 
     const columns = [

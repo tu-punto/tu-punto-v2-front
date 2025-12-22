@@ -1,12 +1,12 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { Button, Table, Spin, Select, Input, Switch } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+// import { PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import AddVariantModal from '../Product/AddVariantModal';
 import StockPerBranchModal from './StockPerBranchModal';
 import PricePerBranchModal from "./PricePerBranchModal.tsx";
 import { getCategoryByIdAPI } from '../../api/category';
-import { getSucursalsAPI } from "../../api/sucursal";
+// import { getSucursalsAPI } from "../../api/sucursal";
 import { getCategoriesAPI } from "../../api/category";
 import { getSellerAPI } from '../../api/seller';
 import VariantInfoModal from './VariantInfoModal.tsx';
@@ -64,10 +64,11 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
 
         if (productsList.length > 0) fetchData();
     }, [productsList]);
-    const flatVariantList = (products: any[]) => {
+    // Memoizar el listado plano de variantes para evitar recálculos costosos
+    const flatVariantList = useMemo(() => {
         const list: any[] = [];
 
-        products.forEach((product) => {
+        updatedProductsList.forEach((product) => {
             if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory || 
                 selectedProductForList !== 'all' && product._id !== selectedProductForList
             ) return;
@@ -114,7 +115,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
         });
 
         return list;
-    };
+    }, [updatedProductsList, selectedCategory, selectedProductForList, sucursalId, filterAvailableStock, searchText]);
 
     const columns = [
         {
@@ -244,7 +245,7 @@ const ProductTableSeller = ({ productsList, onUpdateProducts, sucursalId , setSu
             </div>
             <Table
                 columns={columns}
-                dataSource={flatVariantList(updatedProductsList)}
+                dataSource={flatVariantList}
                 pagination={{ pageSize: 100 }}
                 rowKey="key"
                 onRow={(record) => ({

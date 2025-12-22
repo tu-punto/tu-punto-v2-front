@@ -1,28 +1,26 @@
-import React, { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import {Row, Col, message} from 'antd';
 
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
-import { getFlatProductListAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
-import { Button, Input, Select, Spin } from 'antd';
-import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { getFlatProductListAPI, getProductsAPI } from '../../api/product';
+import { Button, Input, Select } from 'antd';
 //import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
-import { getGroupByIdAPI, getGroupsAPI } from '../../api/group';
+import { getGroupsAPI } from '../../api/group';
 import { getSellersAPI } from '../../api/seller';
 import { getCategoriesAPI } from '../../api/category';
 import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
-import { createProductsFromGroup } from '../../services/createProducts';
-import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
+import {saveTempStock, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
 //test
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
-    const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
+    const [stockListForConfirmModal, setStockListForConfirmModal] = useState<any[]>([]);
     const [resetSignal, setResetSignal] = useState(false);
     const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -39,7 +37,7 @@ const StockManagement = () => {
 
     const [options, setOptions] = useState<any[]>([{ option: "Vendedor", group: [], groupFunction: () => { } }]);
     const [productsToUpdate, setProductsToUpdate] = useState<{ [key: number]: number }>({});
-    const [stock, setStock] = useState([]);
+    const [stock, setStock] = useState<any[]>([]);
     const [newProducts, setNewProducts] = useState<any[]>([]);
     const [newVariants, setNewVariants] = useState<any[]>([]);
     const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
@@ -114,47 +112,34 @@ const StockManagement = () => {
 
         }
     }, [user]);
-    const fetchFullProducts = async () => {
-        const fullData = await getProductsAPI();
-        setProductosFull(fullData);
-    };
-
-    useEffect(() => {
-        if (isConfirmModalVisible) {
-            fetchFullProducts();
-        }
-    }, [isConfirmModalVisible]);
-
-    useEffect(() => {
-
-
-        fetchData();
-    }, [sucursalId]);
-
-    const fetchData = async () => {
-
+    const fetchData = useCallback(async () => {
         try {
-            const sellersResponse = await getSellersAPI();
-            const categoriesResponse = await getCategoriesAPI();
-            const groupsResponse = await getGroupsAPI();
+            // Hacer todas las llamadas en paralelo para reducir latencia
+            const [sellersResponse, categoriesResponse, groupsResponse] = await Promise.all([
+                getSellersAPI(),
+                getCategoriesAPI(),
+                getGroupsAPI()
+            ]);
 
             let productsResponse = [];
+            let fullProductsResponse = [];
 
             if (isSeller) {
                 // VENDEDOR → usa getProductsAPI() y filtra
                 const allProducts = await getProductsAPI();
+                fullProductsResponse = allProducts;
 
-                const filtered = allProducts.filter(p =>
+                const filtered = allProducts.filter((p: any) =>
                     p.id_vendedor?.toString() === user.id_vendedor &&
-                    (sucursalId === "all" || p.sucursales?.some(s => s.id_sucursal?.toString() === sucursalId))
+                    (sucursalId === "all" || p.sucursales?.some((s: any) => s.id_sucursal?.toString() === sucursalId))
                 );
 
                 productsResponse = filtered;
 
                 // Extraer sucursales del vendedor desde sus productos
                 const sucursalesMap = new Map();
-                filtered.forEach(prod => {
-                    (prod.sucursales || []).forEach(suc => {
+                filtered.forEach((prod: any) => {
+                    (prod.sucursales || []).forEach((suc: any) => {
                         if (suc?.id_sucursal) {
                             sucursalesMap.set(suc.id_sucursal, {
                                 id_sucursal: suc.id_sucursal,
@@ -173,36 +158,36 @@ const StockManagement = () => {
                     return;
                 }
 
-                productsResponse = await getFlatProductListAPI(idToUse);
+                // Obtener productos planos y completos en paralelo
+                [productsResponse, fullProductsResponse] = await Promise.all([
+                    getFlatProductListAPI(idToUse),
+                    getProductsAPI()
+                ]);
             }
 
-
+            // Actualizar todos los estados de una vez
             setSellers(sellersResponse);
             setCategories(categoriesResponse);
             setGroups(groupsResponse);
             setProducts(productsResponse);
+            setProductosFull(fullProductsResponse);
             setFilteredProducts(productsResponse);
         } catch (error) {
             console.error("Error al cargar los datos:", error);
             message.error("Ocurrió un error al cargar los datos.");
         }
-    };
+    }, [isSeller, sucursalId, user.id_vendedor]);
 
     useEffect(() => {
         clearTempStock();
         clearTempProducts();
         clearTempVariants();
         fetchData();
-        fetchFullProducts(); // ← cargamos el listado completo al inicio
-    }, []);
+    }, [fetchData]);
 
     useEffect(() => {
         filter();
-    }, [selectedSeller]);
-
-    useEffect(() => {
-        fetchData();
-    }, [prevKey]);
+    }, [selectedSeller, products, sellersVigentes, criteriaFilter]);
 
     useEffect(() => {
         const newOptions = [
@@ -210,15 +195,15 @@ const StockManagement = () => {
                 option: 'Categoria',
                 filter: filterByCategoria,
                 group: categories,
-                groupFunction: (category, products) =>
-                    products.filter((product) => product.id_categoria == category._id)
+                groupFunction: (category: any, products: any[]) =>
+                    products.filter((product: any) => product.id_categoria == category._id)
             },
             {
                 option: 'Grupo',
                 filter: filterByGroup,
                 group: groups,
-                groupFunction: (group, products) =>
-                    products.filter((product) => product.groupId == group._id)
+                groupFunction: (group: any, products: any[]) =>
+                    products.filter((product: any) => product.groupId == group._id)
             }
         ];
 
@@ -227,8 +212,8 @@ const StockManagement = () => {
                 option: 'Vendedor',
                 filter: filterBySeller,
                 group: sellers,
-                groupFunction: (seller, products) =>
-                    products.filter((product) => product.id_vendedor == seller._id)
+                groupFunction: (seller: any, products: any[]) =>
+                    products.filter((product: any) => product.id_vendedor == seller._id)
             });
         }
 
@@ -238,13 +223,17 @@ const StockManagement = () => {
         setTimeout(() => filter(), 100);
     }, [sellers, categories, groups]);
 
-    const finalProductList = isSeller
-        ? products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
-        : filteredProducts;
+    // Memoizar el listado final de productos para evitar re-cálculos
+    const finalProductList = useMemo(() => {
+        if (isSeller) {
+            return products.filter(product => product.id_vendedor?.toString() === user.id_vendedor);
+        }
+        return filteredProducts;
+    }, [isSeller, products, filteredProducts, user.id_vendedor]);
 
     //console.log("Productos originales:", products);
     //console.log("🧪 Productos filtrados:", finalProductList);
-    const showVariantModal = async (product: any) => {
+    const showVariantModal = useCallback(async (product: any) => {
         if (!product) return;
 
         const sucursalId = localStorage.getItem("sucursalId");
@@ -265,33 +254,32 @@ const StockManagement = () => {
 
         setSelectedGroup(group);
         setIsVariantModalVisible(true);
-    };
+    }, [productosFull]);
 
-    const closeConfirmProduct = async () => {
+    const closeConfirmProduct = useCallback(async () => {
         await fetchData();
-        setFilteredProducts(products);
         clearTempProducts();
         clearTempVariants();
         setProductsToUpdate({});
         setStockListForConfirmModal([]);
         setIsConfirmModalVisible(false);
-    };
+    }, [fetchData]);
 
     const cancelConfirmProduct = async () => {
         setIsConfirmModalVisible(false);
     };
 
-    const succesAddVariant = async (newVariant) => {
+    const succesAddVariant = async (newVariant: any) => {
         setProducts([...products, newVariant.product]);
         setFilteredProducts([...filteredProducts, newVariant.product]);
         setNewVariants([...newVariants, newVariant]);
         closeModal();
     };
 
-    const showModal = (product: any) => {
-        setSelectedProduct(product);
-        setInfoModalVisible(true);
-    };
+    // const showModal = (product: any) => {
+    //     setSelectedProduct(product);
+    //     setInfoModalVisible(true);
+    // };
 
     const closeModal = () => {
         setSelectedProduct(null);
@@ -300,16 +288,14 @@ const StockManagement = () => {
         setIsVariantModalVisible(false);
     };
 
-    const filterBySeller = (product, sellerId) => {
-        const sucursalId = localStorage.getItem("sucursalId");
-
+    const filterBySeller = (product: any, sellerId: any) => {
         return sellerId === null || product.id_vendedor === sellerId;
     };
-    const filterByCategoria = (product, sellerId) => {
+    const filterByCategoria = (product: any, sellerId: any) => {
         return sellerId === null || product.id_categoria === sellerId;
     };
 
-    const filterByGroup = (product, sellerId) => {
+    const filterByGroup = (product: any, sellerId: any) => {
         return sellerId === null || product.groupId === sellerId;
     };
 
@@ -332,31 +318,31 @@ const StockManagement = () => {
         setProductsToUpdate({});
         setStockListForConfirmModal([]);
     };
-    const handleChangeFilter = (index: number) => {
-        setCriteriaFilter(index);
-    };
+    // const handleChangeFilter = (index: number) => {
+    //     setCriteriaFilter(index);
+    // };
 
-    const handleChangeGroup = (index: number) => {
-        setCriteriaGroup(index);
-    };
+    // const handleChangeGroup = (index: number) => {
+    //     setCriteriaGroup(index);
+    // };
 
-    const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
-        const newProduct = {
-            productData,
-            combinations,
-            selectedFeatures,
-            features,
-            isNew: true // Marcar como nuevo
-        };
+    // const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
+    //     const newProduct = {
+    //         productData,
+    //         combinations,
+    //         selectedFeatures,
+    //         features,
+    //         isNew: true // Marcar como nuevo
+    //     };
 
-        // Guardar en localStorage
-        const stored = JSON.parse(localStorage.getItem("newProducts") || "[]");
-        localStorage.setItem("newProducts", JSON.stringify([...stored, newProduct]));
+    //     // Guardar en localStorage
+    //     const stored = JSON.parse(localStorage.getItem("newProducts") || "[]");
+    //     localStorage.setItem("newProducts", JSON.stringify([...stored, newProduct]));
 
-        // Actualizar estado para UI
-        setNewProducts(prev => [...prev, newProduct]);
-        setProductFormVisible(false);
-    };
+    //     // Actualizar estado para UI
+    //     setNewProducts(prev => [...prev, newProduct]);
+    //     setProductFormVisible(false);
+    // };
     const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
 
 
@@ -437,7 +423,7 @@ const StockManagement = () => {
                         <Col xs={24} sm={12} lg={6}>
                             <Button
                                 onClick={() => {
-                                    const stockMapped = stockListForConfirmModal.map(item => ({
+                                    const stockMapped = (stockListForConfirmModal as any[]).map((item: any) => ({
                                         ...item,
                                         product: {
                                             ...item.product,
@@ -590,9 +576,6 @@ const StockManagement = () => {
                         setResetSignal(true);
                         setTimeout(() => setResetSignal(false), 100);
                     }}
-                    newVariants={getTempVariants()}
-                    newProducts={getTempProducts()}
-                    newStock={stockListForConfirmModal}
                     productosConSucursales={productosFull}
                     selectedSeller={sellers.find(s => s._id === selectedSeller)}
                 />
