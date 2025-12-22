@@ -1,23 +1,29 @@
 import { useState, useEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import { Form, Input, Select, Button, message } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { checkLoginAPI, getUserByCookieAPI } from "../api/user";
 import { getSucursalsAPI } from "../api/sucursal";
-import { useNavigate } from "react-router-dom";
+import { checkLoginAPI, getUserByCookieAPI } from "../api/user";
 import { UserContext } from "../context/userContext";
+import { IBranch } from "../models/branchModel";
 
-export default function LoginForm({
-  showBranchSelect,
-  redirectTo,
-}: {
+type LoginFormProps = {
   showBranchSelect: boolean;
   redirectTo: string;
-}) {
+}
+
+export default function LoginForm({ showBranchSelect, redirectTo }: LoginFormProps) {
   const [form] = Form.useForm();
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<IBranch[]>([]);
   const [loading, setLoading] = useState(false);
   const { setUser } = useContext(UserContext);
   const navigate = useNavigate();
+
+  interface formValues {
+    sucursalId: string,
+    email: string,
+    password: string,
+  }
 
   useEffect(() => {
     if (!showBranchSelect) return;
@@ -26,7 +32,7 @@ export default function LoginForm({
       .catch(() => message.error("No se pudieron cargar las sucursales"));
   }, [showBranchSelect]);
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: formValues) => {
     setLoading(true);
     try {
       const loginRes = await checkLoginAPI(values);
