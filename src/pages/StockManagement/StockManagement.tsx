@@ -18,6 +18,7 @@ import ConfirmProductsModal from './ConfirmProductsModal';
 //import { createProductsFromGroup } from '../../services/createProducts';
 import { saveTempStock, getTempProducts, getTempVariants, clearTempProducts, clearTempStock, clearTempVariants, reconstructProductFromFlat } from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
+import PageTemplate from "../../components/PageTemplate";
 //test
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
@@ -311,239 +312,233 @@ const StockManagement = () => {
         return <div>Cargando datos...</div>;
     }
     return (
+        <PageTemplate
+            title="Gestión de Inventario"
+            iconSrc="/inventory-icon.png"
+        >
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {isSeller ? (
+                    <h2 style={{ fontSize: "1.5rem", textAlign: "center", marginBottom: 24, fontWeight: 600 }}>
+                        Productos de {user?.nombre_vendedor || 'Vendedor'}
+                    </h2>
+                ) : (
+                    <div className="block xl:flex justify-center">
+                        <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de Productos</h2>
+                        {/*
+                        <Select
+                            style={{ width: 200 }}
+                            placeholder="Select an option"
+                            onChange={handleChangeFilter}
+                            defaultValue={0}
+                        >
+                            {options.map((option, index) => (
+                                <Select.Option key={option.option} value={index}>
+                                    {option.option}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                        */}
+                    </div>
+                )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-                    <img src="/inventory-icon.png" alt="Inventario" className="w-8 h-8" />
-                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-                        Gestión de Inventario
-                    </h1>
-                </div>
-            </div>
+                {!isSeller && (
+                    <div className="bg-white rounded-xl px-5 py-4 shadow-md mb-4">
+                        <Row gutter={[16, 16]} align="middle" justify="center">
+                            <Col xs={24} sm={12} lg={6}>
+                                <SellerList
+                                    filterSelected={criteriaFilter}
+                                    onSelectSeller={handleSelectSeller}
+                                    onSellersLoaded={handleSellersLoaded}
+                                />
+                            </Col>
+                            <Col xs={24} sm={12} lg={6}>
+                                <Button
+                                    onClick={() => setProductFormVisible(true)}
+                                    type="primary"
+                                    block
+                                    disabled={!selectedSeller}
+                                    title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
+                                    className="text-mobile-base xl:text-mobile-base"
+                                >
+                                    Agregar Producto
+                                </Button>
+                            </Col>
+                            <Col xs={24} sm={12} lg={6}>
+                                <Button
+                                    onClick={() => {
+                                        const stockMapped = stockListForConfirmModal.map(item => ({
+                                            ...item,
+                                            product: {
+                                                ...item.product,
+                                                variantes: item.product.variantes || item.product.variantes_obj || {}
+                                            }
+                                        }));
 
-            {isSeller ? (
-                <h2 style={{ fontSize: "1.5rem", textAlign: "center", marginBottom: 24, fontWeight: 600 }}>
-                    Productos de {user?.nombre_vendedor || 'Vendedor'}
-                </h2>
-            ) : (
-                <div className="block xl:flex justify-center">
-                    <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de Productos</h2>
-                    {/*
-                    <Select
-                        style={{ width: 200 }}
-                        placeholder="Select an option"
-                        onChange={handleChangeFilter}
-                        defaultValue={0}
-                    >
-                        {options.map((option, index) => (
-                            <Select.Option key={option.option} value={index}>
-                                {option.option}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                    */}
-                </div>
-            )}
+                                        saveTempStock(stockMapped);
+                                        setStock(stockListForConfirmModal);
+                                        setIsConfirmModalVisible(true);
+                                    }}
+                                    block
+                                    disabled={!selectedSeller}
+                                    title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
+                                    className="text-mobile-base xl:text-mobile-base"
+                                >
+                                    Actualizar Stock
+                                </Button>
+                            </Col>
+                            <Col xs={24} sm={12} lg={6}>
+                                <Input.Search
+                                    placeholder="Buscar producto o variante..."
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    allowClear
+                                    className="w-full"
+                                />
+                            </Col>
+                            <Col xs={24} sm={12} lg={6}>
+                                <Select
+                                    value={selectedCategory}
+                                    onChange={setSelectedCategory}
+                                    className="w-full"
+                                >
+                                    <Select.Option value="all">Todas las categorías</Select.Option>
+                                    {categories.map((cat) => (
+                                        <Select.Option key={cat._id} value={cat._id}>
+                                            {cat.categoria}
+                                        </Select.Option>
+                                    ))}
+                                </Select>
+                            </Col>
+                        </Row>
+                    </div>
+                )}
+                <Row gutter={[16, 16]} justify="center" align="middle" style={{ marginBottom: "16px" }}>
 
-            {!isSeller && (
-                <div className="bg-white rounded-xl px-5 py-4 shadow-md mb-4">
-                    <Row gutter={[16, 16]} align="middle" justify="center">
-                        <Col xs={24} sm={12} lg={6}>
-                            <SellerList
-                                filterSelected={criteriaFilter}
-                                onSelectSeller={handleSelectSeller}
-                                onSellersLoaded={handleSellersLoaded}
-                            />
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Button
-                                onClick={() => setProductFormVisible(true)}
-                                type="primary"
-                                block
-                                disabled={!selectedSeller}
-                                title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
-                                className="text-mobile-base xl:text-mobile-base"
-                            >
-                                Agregar Producto
-                            </Button>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
+
+                    {/*!isSeller && (
+                        <>
+                            <Col xs={24} sm={12} lg={6}>
+                                <Button
+                                    onClick={() => setProductFormVisible(true)}
+                                    type="primary"
+                                    className='text-mobile-base xl:text-mobile-base'
+                                >
+                                    Agregar Producto
+                                </Button>
+                            </Col>
+                            {
+                            <Col xs={24} sm={12} lg={6}>
+                                <Button
+                                    onClick={() => setIsMoveModalVisible(true)}
+                                    type="default"
+                                    className='text-mobile-base xl:text-mobile-base'
+                                >
+                                    Mover Productos
+                                </Button>
+                            </Col>
+                            }
+                        </>
+                    )*/}
+                    {/*!isSeller && (
+                        <Col {...controlSpan}>
                             <Button
                                 onClick={() => {
-                                    const stockMapped = stockListForConfirmModal.map(item => ({
-                                        ...item,
-                                        product: {
-                                            ...item.product,
-                                            variantes: item.product.variantes || item.product.variantes_obj || {}
-                                        }
-                                    }));
-
-                                    saveTempStock(stockMapped);
+                                    saveTempStock(stockListForConfirmModal);
                                     setStock(stockListForConfirmModal);
                                     setIsConfirmModalVisible(true);
                                 }}
-                                block
-                                disabled={!selectedSeller}
-                                title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
-                                className="text-mobile-base xl:text-mobile-base"
+                                className='text-mobile-base xl:text-mobile-base'
                             >
                                 Actualizar Stock
                             </Button>
                         </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Input.Search
-                                placeholder="Buscar producto o variante..."
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                allowClear
-                                className="w-full"
-                            />
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Select
-                                value={selectedCategory}
-                                onChange={setSelectedCategory}
-                                className="w-full"
-                            >
-                                <Select.Option value="all">Todas las categorías</Select.Option>
-                                {categories.map((cat) => (
-                                    <Select.Option key={cat._id} value={cat._id}>
-                                        {cat.categoria}
-                                    </Select.Option>
-                                ))}
-                            </Select>
-                        </Col>
-                    </Row>
-                </div>
-            )}
-            <Row gutter={[16, 16]} justify="center" align="middle" style={{ marginBottom: "16px" }}>
+                    )*/}
+                </Row>
+                {isSeller ? (
+                    <ProductTableSeller
+                        productsList={finalProductList}
+                        onUpdateProducts={refetch}
+                        sucursalId={sucursalId}
+                        setSucursalId={setSucursalId}
+                    />
+                ) : (
+                    <ProductTable
+                        productsList={getFilteredProducts()}
+                        groupList={options[criteriaFilter]?.group || []}
+                        onUpdateProducts={async () => { await refetch(); }}
+                        setStockListForConfirmModal={setStockListForConfirmModal}
+                        resetSignal={resetSignal}
+                        searchText={searchText}
+                        setSearchText={setSearchText}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        selectedSeller={selectedSeller}
+                        onShowVariantModal={showVariantModal}
+                        sellersVigentes={sellersVigentes}
+                    />
 
+                )}
 
-                {/*!isSeller && (
-                    <>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Button
-                                onClick={() => setProductFormVisible(true)}
-                                type="primary"
-                                className='text-mobile-base xl:text-mobile-base'
-                            >
-                                Agregar Producto
-                            </Button>
-                        </Col>
-                        {
-                        <Col xs={24} sm={12} lg={6}>
-                            <Button
-                                onClick={() => setIsMoveModalVisible(true)}
-                                type="default"
-                                className='text-mobile-base xl:text-mobile-base'
-                            >
-                                Mover Productos
-                            </Button>
-                        </Col>
-                        }
-                    </>
+                {/*infoModalVisible && (
+                    <ProductInfoModal
+                        visible={infoModalVisible}
+                        onClose={closeModal}
+                        product={selectedProduct}
+                    />
                 )*/}
-                {/*!isSeller && (
-                    <Col {...controlSpan}>
-                        <Button
-                            onClick={() => {
-                                saveTempStock(stockListForConfirmModal);
-                                setStock(stockListForConfirmModal);
-                                setIsConfirmModalVisible(true);
-                            }}
-                            className='text-mobile-base xl:text-mobile-base'
-                        >
-                            Actualizar Stock
-                        </Button>
-                    </Col>
-                )*/}
-            </Row>
-            {isSeller ? (
-                <ProductTableSeller
-                    productsList={finalProductList}
-                    onUpdateProducts={refetch}
-                    sucursalId={sucursalId}
-                    setSucursalId={setSucursalId}
-                />
-            ) : (
-                <ProductTable
-                    productsList={getFilteredProducts()}
-                    groupList={options[criteriaFilter]?.group || []}
-                    onUpdateProducts={async () => { await refetch(); }}
-                    setStockListForConfirmModal={setStockListForConfirmModal}
-                    resetSignal={resetSignal}
-                    searchText={searchText}
-                    setSearchText={setSearchText}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    selectedSeller={selectedSeller}
-                    onShowVariantModal={showVariantModal}
-                    sellersVigentes={sellersVigentes}
-                />
 
-            )}
+                {isProductFormVisible && (
+                    <ProductFormModal
+                        visible={isProductFormVisible}
+                        onCancel={() => setProductFormVisible(false)}
+                        onSuccess={async () => {
+                            await refetch(); // Refresca productos
+                            setProductFormVisible(false);
+                        }}
+                        selectedSeller={sellers.find(s => s._id === selectedSeller)}
+                    />
+                )}
 
-            {/*infoModalVisible && (
-                <ProductInfoModal
-                    visible={infoModalVisible}
-                    onClose={closeModal}
-                    product={selectedProduct}
-                />
-            )*/}
+                {isVariantModalVisible && (
+                    <AddVariantModal
+                        group={selectedGroup}
+                        onAdd={succesAddVariant}
+                        onCancel={closeModal}
+                        visible={isVariantModalVisible}
+                    />
+                )}
 
-            {isProductFormVisible && (
-                <ProductFormModal
-                    visible={isProductFormVisible}
-                    onCancel={() => setProductFormVisible(false)}
-                    onSuccess={async () => {
-                        await refetch(); // Refresca productos
-                        setProductFormVisible(false);
-                    }}
-                    selectedSeller={sellers.find(s => s._id === selectedSeller)}
-                />
-            )}
-
-            {isVariantModalVisible && (
-                <AddVariantModal
-                    group={selectedGroup}
-                    onAdd={succesAddVariant}
-                    onCancel={closeModal}
-                    visible={isVariantModalVisible}
-                />
-            )}
-
-            {isConfirmModalVisible && (
-                <ConfirmProductsModal
-                    visible={isConfirmModalVisible}
-                    onClose={cancelConfirmProduct}
-                    onSuccess={() => {
-                        closeConfirmProduct();
-                        setProductsToUpdate({});
-                        setStockListForConfirmModal([]);
-                        setResetSignal(true);
-                        setTimeout(() => setResetSignal(false), 100);
-                    }}
-                    newVariants={getTempVariants()}
-                    newProducts={getTempProducts()}
-                    newStock={stockListForConfirmModal}
-                    productosConSucursales={productosFull}
-                    selectedSeller={sellers.find(s => s._id === selectedSeller)}
-                />
-            )}
-            {isMoveModalVisible && (
-                <MoveProductsModal
-                    visible={isMoveModalVisible}
-                    onClose={() => setIsMoveModalVisible(false)}
-                    onSuccess={async () => {
-                        await refetch();
-                        setIsMoveModalVisible(false);
-                    }}
-                    products={productsQuery || []}
-                />
-            )}
-        </div>
-
+                {isConfirmModalVisible && (
+                    <ConfirmProductsModal
+                        visible={isConfirmModalVisible}
+                        onClose={cancelConfirmProduct}
+                        onSuccess={() => {
+                            closeConfirmProduct();
+                            setProductsToUpdate({});
+                            setStockListForConfirmModal([]);
+                            setResetSignal(true);
+                            setTimeout(() => setResetSignal(false), 100);
+                        }}
+                        newVariants={getTempVariants()}
+                        newProducts={getTempProducts()}
+                        newStock={stockListForConfirmModal}
+                        productosConSucursales={productosFull}
+                        selectedSeller={sellers.find(s => s._id === selectedSeller)}
+                    />
+                )}
+                {isMoveModalVisible && (
+                    <MoveProductsModal
+                        visible={isMoveModalVisible}
+                        onClose={() => setIsMoveModalVisible(false)}
+                        onSuccess={async () => {
+                            await refetch();
+                            setIsMoveModalVisible(false);
+                        }}
+                        products={productsQuery || []}
+                    />
+                )}
+            </div>
+        </PageTemplate>
     );
 };
 

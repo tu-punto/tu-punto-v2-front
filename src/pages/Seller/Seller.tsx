@@ -1,7 +1,8 @@
-import { Button } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
 import { useState } from "react";
+import PageTemplate, { FunctionButtonProps } from "../../components/PageTemplate";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -26,25 +27,20 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     setRefreshKey((prevKey) => prevKey + 1);
   };
 
+  const actions: FunctionButtonProps[] = [
+    {
+      visible: true,
+      title: "Agregar Vendedor",
+      onClick: showModal
+    }
+  ];
+
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-          <img src="/seller-icon.png" alt="Vendedores" className="w-8 h-8" />
-          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-            {isFactura ? "Vendedores con factura" : "Vendedores"}
-          </h1>
-        </div>
-
-        <Button
-            onClick={showModal}
-            type="primary"
-            className="text-mobile-sm xl:text-desktop-sm"
-        >
-          Agregar Vendedor
-        </Button>
-      </div>
-
+    <PageTemplate
+      title={isFactura ? "Vendedores con factura" : "Vendedores"}
+      iconSrc="/seller-icon.png"
+      actions={actions}
+    >
       <SellerTable
         refreshKey={refreshKey}
         setRefreshKey={setRefreshKey}
@@ -56,7 +52,7 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         onFinish={onFinish}
         onSuccess={handleSuccess}
       />
-    </div>
+    </PageTemplate>
   );
 };
 
