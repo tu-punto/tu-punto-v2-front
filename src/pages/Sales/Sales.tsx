@@ -11,6 +11,7 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
+import PageTemplate from "../../components/PageTemplate";
 
 
 export const Sales = () => {
@@ -412,16 +413,10 @@ export const Sales = () => {
 
 
     return (
-        <>
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-                    <img src="/shopping-cart-icon.png" alt="Carrito" className="w-8 h-8" />
-                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-                        Carrito
-                    </h1>
-                </div>
-            </div>
-
+        <PageTemplate
+            title="Carrito"
+            iconSrc="/shopping-cart-icon.png"
+        >
             <Row gutter={[16, 16]}>
                 {/* Columna de Inventario */}
                 <Col xs={24} md={12}>
@@ -595,7 +590,7 @@ export const Sales = () => {
                 sellers={sellers}
                 suc={fallbackSucursalId}
             />
-        </>
+        </PageTemplate>
     );
 };
 
