@@ -1,10 +1,11 @@
 import { useEffect, useState, useContext } from "react";
-import { getSucursalsAPI } from "../../api/sucursal";
-import BranchTable from "./BranchTable";
-import { IBranch } from "../../models/branchModel";
-import { Button } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import BranchFormModal from "./BranchFormModal";
+import BranchTable from "./BranchTable";
+import { getSucursalsAPI } from "../../api/sucursal";
+import PageTemplate, { FunctionButtonProps } from "../../components/PageTemplate";
 import { UserContext } from "../../context/userContext";
+import { IBranch } from "../../models/branchModel";
 
 const BranchPage = () => {
   const [branches, setBranches] = useState<IBranch[]>();
@@ -33,29 +34,24 @@ const BranchPage = () => {
     fetchBranches();
   }, [refreshKey]);
 
-  return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-          <img src="/branches-icon.png" alt="Sucursales" className="w-8 h-8" />
-          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-            Sucursales
-          </h1>
-        </div>
-        {isAdmin || isOperator && (
-          <Button
-            onClick={() => {
-              setIsFormModal(true);
-              setSelectedBranch(null);
-            }}
-            type="primary"
-            className="text-mobile-sm xl:text-desktop-sm"
-          >
-            Agregar Sucursal
-          </Button>
-        )}
-      </div>
+  const actions: FunctionButtonProps[] = [
+    {
+      visible: isAdmin || isOperator,
+      title: "Agregar Sucursal",
+      onClick: () => {
+        setIsFormModal(true);
+        setSelectedBranch(null);
+      },
+      icon: <PlusOutlined />,
+    }
+  ]
 
+  return (
+    <PageTemplate
+      title="Sucursales"
+      iconSrc="/branches-icon.png"
+      actions={actions}
+    >
       <BranchTable
         refreshKey={refreshKey}
         branches={branches || []}
@@ -71,7 +67,7 @@ const BranchPage = () => {
         }}
         branch={selectedBranch}
       />
-    </div>
+    </PageTemplate>
   );
 };
 
