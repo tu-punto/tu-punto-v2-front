@@ -23,7 +23,7 @@ export const Sales = () => {
     const [productAddModal, setProductAddModal] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0)
     const [sellers, setSellers] = useState([])
-    const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined);
+    const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
     //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
     const [branches, setBranches] = useState([] as any[]);
@@ -37,7 +37,7 @@ export const Sales = () => {
     const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
     const [cartLoading, setCartLoading] = useState(false);
     const normalizeId = (id: any) => String(id?._id ?? id?.$oid ?? id ?? "");
-
+    const [inventoryLoading, setInventoryLoading] = useState(false);
     const getStockActual = (p: any, sucursalId?: string | null) => {
         // Caso 1: viene "flat" (lo ideal)
         const direct =
@@ -96,19 +96,18 @@ export const Sales = () => {
         }
 
         const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
-
+        const sellersReady = vendedoresVigentesIds.length > 0;
         let filtered = data.filter((p: any) => {
             const stock = getStockActual(p, branchIdForFetch);
-
             if (stock <= 0) return false;
 
             if (selectedProduct !== "all" && String(selectedProduct) !== String(p.id_producto)) {
                 return false;
             }
+            if (!sellersReady) return true;
 
             return vendedoresVigentesIds.includes(String(p.id_vendedor));
         });
-
 
         if ((isAdmin || isOperator) && selectedSellerId) {
             filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
@@ -143,12 +142,22 @@ export const Sales = () => {
             };
         });
         setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
+    }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
 
     useEffect(() => {
-        fetchSellers();
+        //fetchSellers();
         fetchSucursal();
     }, []);
+    useEffect(() => {
+        const sucursalId = (isAdmin || isOperator)
+            ? localStorage.getItem("sucursalId")
+            : selectedBranchId;
+
+        if (!sucursalId) return;
+
+        fetchSellers();
+    }, [isAdmin, isOperator, selectedBranchId]);
+
     useEffect(() => {
         if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
             setSelectedBranchId(branches[0]._id);
@@ -311,11 +320,17 @@ export const Sales = () => {
     useEffect(() => {
         if (!branchIdForFetch || branchIdForFetch === "undefined") return;
 
+        setInventoryLoading(true);
+
         const p = fetchProducts();
-        if (p && typeof p.finally === "function") {
-            p.finally(() => setCartLoading(false)); // ✅ apaga spinner cuando termina
+
+        if (p && typeof (p as any).finally === "function") {
+            (p as any).finally(() => {
+                setInventoryLoading(false);
+                setCartLoading(false); // si quieres que el carrito también espere a productos
+            });
         } else {
-            // fallback por si acaso
+            setInventoryLoading(false);
             setCartLoading(false);
         }
     }, [branchIdForFetch]);
@@ -325,37 +340,6 @@ export const Sales = () => {
             fetchSellers();
         }
     }, [branchIdForFetch]);
-
-    /*
-    const filteredProducts = () => {
-
-        let filteredData = data;
-        const today = new Date();
-        const vendedoresVigentesIds = sellers
-            .filter(v => !v.fecha_vigencia || new Date(v.fecha_vigencia) >= new Date(today.setHours(0, 0, 0, 0)))
-            .map(v => String(v._id));
-
-        filteredData = filteredData.filter(p => vendedoresVigentesIds.includes(String(p.id_vendedor)));
-        if (!isAdmin) {
-            filteredData = filteredData.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
-            if (selectedBranchId) {
-                filteredData = filteredData.filter(p => String(p.sucursalId) === String(selectedBranchId));
-            }
-        } else if (selectedSellerId) {
-            filteredData = filteredData.filter(p => p.id_vendedor === selectedSellerId);
-        }
-        if (searchText.trim()) {
-            const lowerSearch = searchText.toLowerCase();
-            filteredData = filteredData.filter(product =>
-                product.producto.toLowerCase().includes(lowerSearch)
-            );
-        }
-        filteredData = filteredData.filter(product => product.stockActual > 0);
-
-        //console.log(" Productos finales que se muestran:", filteredData);
-        return filteredData;
-    };
-    */
 
     const handleProductSelect = (product: any) => {
         setSelectedProducts((prevProducts: any) => {
@@ -480,19 +464,16 @@ export const Sales = () => {
                                                 placeholder="Sucursal"
                                                 value={selectedBranchId}
                                                 onChange={(value) => {
-                                                    // 🔥 mostrar spinner de carrito YA
                                                     setCartLoading(true);
-                                                    // 🔥 vaciar carrito al toque (sin esperar efectos)
+                                                    setInventoryLoading(true);
                                                     setSelectedProducts([]);
                                                     setTotalAmount(0);
-                                                    // forzar rerender del carrito si quieres (opcional):
-                                                    // setRefreshKey(prev => prev + 1);
 
-                                                    setSelectedBranchId(value); // esto gatilla el fetch por tus efectos existentes
+                                                    setSelectedBranchId(value);
                                                 }}
                                                 options={sucursalesPagadas}
                                                 style={{ minWidth: 180 }}
-                                                allowClear
+
                                             />
                                         )}
                                         {!isAdmin && !isOperator && (
@@ -515,17 +496,18 @@ export const Sales = () => {
                                         {(isAdmin || isOperator) && (
                                             <Select
                                                 placeholder="Selecciona un vendedor"
-                                                options={sellers.map((vendedor: any) => ({
-                                                    value: vendedor._id,
-                                                    label: vendedor.nombre + " " + vendedor.apellido,
+                                                options={sellers.map((v: any) => ({
+                                                    value: String(v._id),
+                                                    label: `${v.nombre} ${v.apellido}`,
                                                 }))}
-                                                filterOption={(input, option) => {
-                                                    const label = String(option?.children ?? '');
-                                                    return label.toLowerCase().includes(input.toLowerCase());
-                                                }}
-                                                style={{ minWidth: 200 }}
-                                                onChange={(value) => setSelectedSellerId(value)}
                                                 showSearch
+                                                optionFilterProp="label"
+                                                filterOption={(input, option) =>
+                                                    String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                                                }
+                                                style={{ minWidth: 200 }}
+                                                value={selectedSellerId ? String(selectedSellerId) : undefined}
+                                                onChange={(value) => setSelectedSellerId(value)}
                                                 allowClear
                                             />
                                         )}
@@ -536,11 +518,16 @@ export const Sales = () => {
                         }
                         bordered={false}
                     >
-                        <ProductTable
-                            onSelectProduct={handleProductSelect}
-                            refreshKey={refreshKey}
-                            data={filteredBySeller}
-                        />
+                        <Spin spinning={inventoryLoading} tip="Cargando inventario...">
+                            <div style={{ pointerEvents: inventoryLoading ? "none" : "auto" }}>
+                                <ProductTable
+                                    onSelectProduct={handleProductSelect}
+                                    refreshKey={refreshKey}
+                                    data={filteredBySeller}
+
+                                />
+                            </div>
+                        </Spin>
                     </Card>
                 </Col>
 
