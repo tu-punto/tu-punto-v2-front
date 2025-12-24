@@ -1,21 +1,18 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import BranchFormModal from "./BranchFormModal";
 import BranchTable from "./BranchTable";
 import { getSucursalsAPI } from "../../api/sucursal";
 import PageTemplate, { FunctionButtonProps } from "../../components/PageTemplate";
-import { UserContext } from "../../context/userContext";
+import { useUserRole } from "../../hooks/useUserRole";
 import { IBranch } from "../../models/branchModel";
 
 const BranchPage = () => {
+  const { isAdmin, isOperator } = useUserRole();
   const [branches, setBranches] = useState<IBranch[]>();
   const [selectedBranch, setSelectedBranch] = useState<IBranch | null>(null);
   const [isFormModal, setIsFormModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const { user } = useContext(UserContext);
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
-  const isOperator = user?.role.toLowerCase() === 'operator';
 
   const fetchBranches = async () => {
     try {

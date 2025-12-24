@@ -1,14 +1,17 @@
+import { useEffect } from "react";
 import { Form, Modal, Input, Button, message } from "antd";
-import React, { useEffect } from "react";
-import { IBranch } from "../../models/branchModel";
+import { EditOutlined, EnvironmentOutlined, HomeOutlined, PhoneOutlined } from "@ant-design/icons";
 import { registerSucursalAPI, updateSucursalAPI } from "../../api/sucursal";
+import { IBranch } from "../../models/branchModel";
 
-const BranchFormModal: React.FC<{
+type BranchFormModalProps = {
   visible: boolean;
   onClose: () => void;
   onSubmit: () => void;
   branch: IBranch | null;
-}> = ({ visible, onClose, onSubmit, branch }) => {
+}
+
+const BranchFormModal = ({ visible, onClose, onSubmit, branch }: BranchFormModalProps) => {
   const [form] = Form.useForm();
 
   const handleEdit = async (values: IBranch) => {
@@ -67,7 +70,9 @@ const BranchFormModal: React.FC<{
           label="Nombre"
           rules={[{ required: true, message: "Por favor ingrese el nombre!" }]}
         >
-          <Input />
+          <Input
+            prefix={<EditOutlined />}
+          />
         </Form.Item>
         <Form.Item
           className="text-mobile-sm xl:text-desktop-sm"
@@ -77,7 +82,9 @@ const BranchFormModal: React.FC<{
             { required: true, message: "Por favor ingrese la dirección!" },
           ]}
         >
-          <Input />
+          <Input
+            prefix={<HomeOutlined />}
+          />
         </Form.Item>
         <Form.Item
           className="text-mobile-sm xl:text-desktop-sm"
@@ -85,7 +92,9 @@ const BranchFormModal: React.FC<{
           label="Ciudad"
           rules={[{ required: true, message: "Por favor ingrese la ciudad!" }]}
         >
-          <Input />
+          <Input
+            prefix={<EnvironmentOutlined />}
+           />
         </Form.Item>
         <Form.Item
           className="text-mobile-sm xl:text-desktop-sm"
@@ -96,7 +105,12 @@ const BranchFormModal: React.FC<{
             { pattern: /^[0-9]+$/, message: "Solo se permiten números" },
           ]}
         >
-          <Input className="w-full" type="tel" maxLength={13} />
+          <Input 
+            className="w-full" 
+            type="tel" 
+            maxLength={13}
+            prefix={<PhoneOutlined/>}
+          />
 
         </Form.Item>
         <Form.Item>
