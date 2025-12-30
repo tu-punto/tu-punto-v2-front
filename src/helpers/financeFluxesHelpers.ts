@@ -10,6 +10,7 @@ export const getFilteredStats = async (filter: string, dateRange: any = []) => {
   const shippings: Shipping[] = await getShippingsAPI();
   let income = 0,
     expenses = 0,
+    investments = 0,
     deliveryIncome = 0,
     deliveryExpenses = 0;
 
@@ -50,6 +51,9 @@ export const getFilteredStats = async (filter: string, dateRange: any = []) => {
       if (flux.tipo.toLowerCase() === FLUX_TYPES.INGRESO.toLowerCase()) {
         income += Number(flux.monto);
       }
+      if (flux.tipo.toLowerCase() === 'inversion') {
+        investments += Number(flux.monto);
+      }
     }
   }
 
@@ -65,6 +69,7 @@ export const getFilteredStats = async (filter: string, dateRange: any = []) => {
   const stats = {
     expenses: expenses,
     income: income,
+    investments: investments,
     utility: income - expenses,
     deliveryIncome: deliveryIncome,
     deliveryExpenses: deliveryExpenses,
