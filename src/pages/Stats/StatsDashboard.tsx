@@ -271,10 +271,10 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
                 <StatisticCard
                   title="BALANCE DELIVERY"
-                  value={summary?.balanceDelivery ?? 0}
+                  value={stats?.deliveryBalance ?? 0}
                   prefix={<CarOutlined />}
                   color="#20c997"
                 />
