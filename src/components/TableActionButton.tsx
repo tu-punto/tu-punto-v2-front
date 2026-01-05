@@ -4,10 +4,12 @@ import { Button, Tooltip } from "antd";
 interface TableActionButtonProps {
     title: string,
     onClick: MouseEventHandler,
-    icon: ReactNode
+    icon: ReactNode,
+    backgroundColor?: string,
+    color?: string
 }
 
-function TableActionButton({title, onClick, icon}: TableActionButtonProps) {
+function TableActionButton({title, onClick, icon, backgroundColor, color}: TableActionButtonProps) {
     return (
         <Tooltip
             title={title}
@@ -18,6 +20,10 @@ function TableActionButton({title, onClick, icon}: TableActionButtonProps) {
                 onClick={onClick}
                 icon={icon}
                 className="text-mobile-sm xl:text-desktop-sm"
+                style={{
+                    backgroundColor,
+                    color
+                }}
             />
         </Tooltip>
     );
