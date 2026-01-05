@@ -1,24 +1,23 @@
 import { useContext, useEffect, useState } from "react";
-import { Button, Modal, Table, Tooltip } from "antd";
+import { Table } from "antd";
 import { EditOutlined, WhatsAppOutlined, FileDoneOutlined } from "@ant-design/icons";
-import ShippingGuideTable from "../ShippingGuide/ShippingGuideTable";
 import { getSellerAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
-import { IBranch } from "../../models/branchModel";
 import { useUserRole } from "../../hooks/useUserRole";
+import { IBranch } from "../../models/branchModel";
 import { openChat } from "../../utils/whatsAppUtils";
+import TableActionButton from "../../components/TableActionButton";
 
 interface BranchTableProps {
   refreshKey: number;
   branches: IBranch[];
   showEditModal: (branch: IBranch) => void;
+  showGuideModal: (branch: IBranch) => void
 }
 
-const BranchTable = ({ refreshKey, branches, showEditModal }: BranchTableProps) => {
+const BranchTable = ({ refreshKey, branches, showEditModal, showGuideModal }: BranchTableProps) => {
   const { user } = useContext(UserContext);
   const { isAdmin, isOperator, isSeller } = useUserRole();
-  const [showGuideModal, setShowGuideModal] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState<IBranch>();
   const [filteredBranches, setFilteredBranches] = useState<IBranch[]>(branches);
   const [tableColumns, setTableColumns] = useState<any[]>([]);
 
@@ -36,9 +35,9 @@ const BranchTable = ({ refreshKey, branches, showEditModal }: BranchTableProps) 
     const activeBranchIDs: Set<string> = new Set();
     const sellerFinalDate = new Date(sellerData.fecha_vigencia);
 
-    branchData.forEach((branch : Partial<IBranch>) => {
+    branchData.forEach((branch: Partial<IBranch>) => {
       if (isActiveSellerBranch(branch, sellerFinalDate) && branch.id_sucursal) {
-        activeBranchIDs.add(branch.id_sucursal+'');
+        activeBranchIDs.add(branch.id_sucursal + '');
       }
     });
 
@@ -107,28 +106,19 @@ const BranchTable = ({ refreshKey, branches, showEditModal }: BranchTableProps) 
       className: "text-mobile-sm xl:text-desktop-sm",
       render: (_: any, branch: IBranch) => (
         <>
-          <Tooltip title="Editar sucursal">
-            <Button
-              type="default"
-              onClick={(e) => {
-                e.stopPropagation();
-                showEditModal(branch);
-              }}
-              icon={<EditOutlined />}
-              className="text-mobile-sm xl:text-desktop-sm"
-            />
-          </Tooltip>
-          <Tooltip title="Mostrar Guías de Envío">
-            <Button
-              type="default"
-              onClick={() => {
-                setSelectedBranch(branch);
-                setShowGuideModal(true);
-              }}
-              icon={<FileDoneOutlined />}
-              className="text-mobile-sm xl:text-desktop-sm"
-            />
-          </Tooltip>
+          <TableActionButton
+            title="Editar sucursal"
+            onClick={(e) => {
+              e.stopPropagation();
+              showEditModal(branch);
+            }}
+            icon={<EditOutlined />}
+          />
+          <TableActionButton
+            title="Ver Guías de Envío"
+            onClick={() => { showGuideModal(branch) }}
+            icon={<FileDoneOutlined />}
+          />
         </>
       )
     }
@@ -141,17 +131,13 @@ const BranchTable = ({ refreshKey, branches, showEditModal }: BranchTableProps) 
       width: "10%",
       className: "text-mobile-sm xl:text-desktop-sm",
       render: (_: any, branch: IBranch) => (
-        <Tooltip title="Escribir por WhatsApp">
-          <Button
-            type="default"
-            onClick={() => handleChatBranch(branch)}
-            icon={<WhatsAppOutlined />}
-            style={{
-              backgroundColor: '#25D366',
-              color: 'white'
-            }}
-          />
-        </Tooltip>
+        <TableActionButton
+          title="Escribir por WhatsApp"
+          onClick={() => handleChatBranch(branch)}
+          icon={<WhatsAppOutlined />}
+          backgroundColor="#25D366"
+          color="white"
+        />
       )
     }
   ];
@@ -162,32 +148,13 @@ const BranchTable = ({ refreshKey, branches, showEditModal }: BranchTableProps) 
   }
 
   return (
-    <>
-      <Table
-        key={refreshKey}
-        columns={tableColumns}
-        dataSource={filteredBranches}
-        pagination={{ pageSize: 10 }}
-        scroll={{ x: "max-content" }}
-      />
-      {showGuideModal && (
-        <Modal
-          title='Guías de Envío'
-          footer={false}
-          open={showGuideModal}
-          width={1000}
-          onCancel={() => {
-            setShowGuideModal(false);
-          }}>
-          <ShippingGuideTable
-            refreshKey={refreshKey}
-            user={user}
-            isFilterByBranch
-            search_id={selectedBranch?._id || ""}
-          />
-        </Modal>
-      )}
-    </>
+    <Table
+      key={refreshKey}
+      columns={tableColumns}
+      dataSource={filteredBranches}
+      pagination={{ pageSize: 10 }}
+      scroll={{ x: "max-content" }}
+    />
   );
 };
 
