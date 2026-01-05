@@ -3,6 +3,7 @@ import { Table } from "antd";
 import { EditOutlined, WhatsAppOutlined, FileDoneOutlined } from "@ant-design/icons";
 import { getSellerAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
+import { BASIC_CELL } from "../../constants/tableCells";
 import { useUserRole } from "../../hooks/useUserRole";
 import { IBranch } from "../../models/branchModel";
 import { openChat } from "../../utils/whatsAppUtils";
@@ -72,30 +73,10 @@ const BranchTable = ({ refreshKey, branches, showEditModal, showGuideModal }: Br
   }, [user, isAdmin, isOperator, isSeller]);
 
   const cols = [
-    {
-      title: "Nombre",
-      dataIndex: "nombre",
-      key: "nombre",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    },
-    {
-      title: "Dirección",
-      dataIndex: "direccion",
-      key: "direccion",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    },
-    {
-      title: "Ciudad",
-      dataIndex: "ciudad",
-      key: "ciudad",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    },
-    {
-      title: "Telefono",
-      dataIndex: "telefono",
-      key: "telefono",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    }
+    { title: "Nombre", dataIndex: "nombre", key: "nombre", className: BASIC_CELL },
+    { title: "Dirección", dataIndex: "direccion", key: "direccion", className: BASIC_CELL },
+    { title: "Ciudad", dataIndex: "ciudad", key: "ciudad", className: BASIC_CELL },
+    { title: "Telefono", dataIndex: "telefono", key: "telefono", className: BASIC_CELL }
   ];
 
   const adminCols = [
@@ -103,7 +84,7 @@ const BranchTable = ({ refreshKey, branches, showEditModal, showGuideModal }: Br
       title: "Acciones",
       key: "actions",
       width: "10%",
-      className: "text-mobile-sm xl:text-desktop-sm",
+      className: BASIC_CELL,
       render: (_: any, branch: IBranch) => (
         <>
           <TableActionButton
@@ -129,7 +110,7 @@ const BranchTable = ({ refreshKey, branches, showEditModal, showGuideModal }: Br
       title: "Contactar",
       key: "contact",
       width: "10%",
-      className: "text-mobile-sm xl:text-desktop-sm",
+      className: BASIC_CELL,
       render: (_: any, branch: IBranch) => (
         <TableActionButton
           title="Escribir por WhatsApp"
