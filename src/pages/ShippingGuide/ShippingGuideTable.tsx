@@ -4,17 +4,18 @@ import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
 import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getSignedURL } from "../../helpers/s3Helper";
 import moment from "moment-timezone";
+import { useUserRole } from "../../hooks/useUserRole";
 
 const ShippingGuideTable = (
-    { refreshKey, user, isFilterBySeller, isFilterByBranch, search_id }:
-        { refreshKey: number, user: any, isFilterBySeller?: boolean, isFilterByBranch?: boolean, search_id: string }) => {
+    { refreshKey, isFilterBySeller, isFilterByBranch, search_id }:
+        { refreshKey: number, isFilterBySeller?: boolean, isFilterByBranch?: boolean, search_id: string }) => {
     const [guidesList, setGuidesList] = useState([]);
     const [imageUrl, setImageUrl] = useState<string | null>();
     const [imageDesc, setImageDesc] = useState<string | null>();
     const [isImageVisible, setIsImageVisible] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
 
-    const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const { isAdmin } = useUserRole()
 
     useEffect(() => {
         if (!isFilterBySeller && !isFilterByBranch) {
