@@ -212,10 +212,10 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loading.utility}>
                 <StatisticCard
                   title="CAJA"
-                  value={summary?.caja ?? 0}
+                  value={stats?.caja ?? 0}
                   prefix={<DollarOutlined />}
                   color="#faad14"
                 />

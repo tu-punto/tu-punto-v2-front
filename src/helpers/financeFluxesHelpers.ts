@@ -28,6 +28,7 @@ export const getFilteredStats = async (filter: string, dateRange: any = []) => {
       deliveryIncome: deliveryIncome,
       deliveryExpenses: deliveryExpenses,
       deliveryBalance: summary.balanceDelivery,
+      caja: summary.caja,
     };
   }
 
@@ -104,6 +105,7 @@ export const getFilteredStats = async (filter: string, dateRange: any = []) => {
     deliveryIncome: deliveryIncome,
     deliveryExpenses: deliveryExpenses,
     deliveryBalance: deliveryIncome - deliveryExpenses,
+    caja: income - expenses + investments,
   };
 
   return stats;
