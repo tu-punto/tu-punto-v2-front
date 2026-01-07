@@ -32,12 +32,14 @@ function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle 
                 {children}
 
                 <Form.Item>
-                    <Button key="cancel" onClick={onClose}>
-                        {closeTitle}
-                    </Button>
-                    <Button key="submit" type="primary" htmlType="submit">
-                        {submitTitle}
-                    </Button>
+                    <div className="flex gap-2 justify-end">
+                        <Button key="cancel" onClick={onClose}>
+                            {closeTitle}
+                        </Button>
+                        <Button key="submit" type="primary" htmlType="submit">
+                            {submitTitle}
+                        </Button>
+                    </div>
                 </Form.Item>
             </Form>
         </Modal>
