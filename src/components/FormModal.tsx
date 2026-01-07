@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Form, FormInstance, Modal, Button } from "antd";
+import { Callbacks } from "rc-field-form/lib/interface";
 
 interface FormModalProps {
     title: string,
@@ -7,13 +8,13 @@ interface FormModalProps {
     closeTitle?: string,
     onClose: () => void,
     submitTitle?: string,
-    onSubmit: any,
+    onFinish: Callbacks['onFinish'],
     width?: number,
     form: FormInstance<any>,
     children: ReactNode
 }
 
-function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle = "Guardar", onSubmit, width, form, children }: FormModalProps) {
+function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle = "Guardar", onFinish, width, form, children }: FormModalProps) {
     return (
         <Modal
             title={title}
@@ -25,7 +26,7 @@ function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle 
             <Form
                 layout="vertical"
                 form={form}
-                onFinish={onSubmit}
+                onFinish={onFinish}
             >
 
                 {children}
@@ -34,7 +35,7 @@ function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle 
                     <Button key="cancel" onClick={onClose}>
                         {closeTitle}
                     </Button>
-                    <Button key="submit" type="primary" htmlType="submit" onClick={onSubmit}>
+                    <Button key="submit" type="primary" htmlType="submit">
                         {submitTitle}
                     </Button>
                 </Form.Item>
