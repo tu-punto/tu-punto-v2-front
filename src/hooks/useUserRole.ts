@@ -21,5 +21,6 @@ export const useUserRole = () => {
         isAdmin,
         isOperator,
         isSeller,
+        user,
     };
 };
