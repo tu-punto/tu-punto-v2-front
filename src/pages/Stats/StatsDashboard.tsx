@@ -129,10 +129,6 @@ const StatisticsDashboard = () => {
   };
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  useEffect(() => {
     fetchStats(selectedTag || DATE_TAGS.ALL_TIME);
   }, [selectedTag, fetchStats]);
 
@@ -270,7 +266,7 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
+              <Spin spinning={loadingCommission} tip="Cargando...">
                 <StatisticCard
                   title="Comisión"
                   value={commission}
@@ -280,7 +276,7 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
+              <Spin spinning={loadingMerchandise} tip="Cargando...">
                 <StatisticCard
                   title="Mercadería Vendida"
                   value={merchandiseSold}
