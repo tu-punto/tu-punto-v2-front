@@ -82,8 +82,7 @@ const StatisticsDashboard = () => {
             break;
           case DATE_TAGS.LAST_YEAR:
             start = now.startOf("year");
-            // Not specified by backend mapping; fall back to explicit from/to
-            rangeParam = undefined;
+            rangeParam = "year"; 
             break;
           case DATE_TAGS.ALL_TIME:
           default:
