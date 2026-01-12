@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Select, message } from "antd";
-import CardSection from "../../../components/CardSection";
-import { useUserRole } from "../../../hooks/useUserRole";
-import useProductsFlat from "../../../hooks/useProductsFlat";
-import { getSellersAPI } from "../../../api/seller";
 import ProductTable from "../../Product/ProductTable";
 import ProductSellerViewModal from "../../Seller/ProductSellerViewModal";
+import { getSellersAPI } from "../../../api/seller";
+import CardSection from "../../../components/CardSection";
+import useProductsFlat from "../../../hooks/useProductsFlat";
+import { useUserRole } from "../../../hooks/useUserRole";
 
 interface InventorySectionProps {
     branchID: string | null,
@@ -20,6 +20,7 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
     const [searchText, setSearchText] = useState("");
     const [selectedProduct, setSelectedProduct] = useState<string>('all')
     const [sellers, setSellers] = useState([])
+    const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined)
 
     const { data, fetchProducts } = useProductsFlat(
@@ -32,9 +33,7 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
 
-            const sucursalId = branchID;
-
-            if (!sucursalId) {
+            if (!branchID) {
                 console.warn("Sucursal ID no disponible aún para filtrar vendedores");
                 setSellers([]);
                 return;
@@ -43,22 +42,17 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
             const sellersVigentes = response.filter((v: any) => {
                 return v.pago_sucursales?.some((pago: any) => {
                     const idSucursal = pago.id_sucursal?._id || pago.id_sucursal;
-                    const perteneceASucursal = String(idSucursal) === String(sucursalId);
-
-                    if (!perteneceASucursal) return false;
+                    if (!(String(idSucursal) === String(branchID))) return false;
 
                     const fechaSalida = pago.fecha_salida
                         ? new Date(pago.fecha_salida)
                         : v.fecha_vigencia
                             ? new Date(v.fecha_vigencia)
                             : null;
-
                     if (fechaSalida) fechaSalida.setHours(0, 0, 0, 0);
-
                     return !fechaSalida || fechaSalida >= hoy;
                 });
             });
-
             setSellers(sellersVigentes);
         } catch (error) {
             message.error('Error al obtener los vendedores');
@@ -70,8 +64,6 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
             fetchSellers();
         }
     }, [branchID]);
-
-    const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
 
     useEffect(() => {
         if (!data || data.length === 0) {
@@ -132,13 +124,11 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
         const options: JSX.Element[] = [];
         rawProducts.forEach((value, key) => {
             options.push(
-                <Select.Option key={key} value={key}>
-                    {value}
-                </Select.Option>
+                <Select.Option key={key} value={key}>{value}</Select.Option>
             )
         })
         setProductOptions(options)
-    }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers]);
+    }, [data, user]);
 
     const handleProductModalCancel = () => {
         setShowProductAddModal(false);
