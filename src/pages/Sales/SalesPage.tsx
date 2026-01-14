@@ -7,10 +7,11 @@ import PageTemplate from "../../components/PageTemplate";
 import { useUserRole } from "../../hooks/useUserRole";
 
 function SalesPage() {
-    const {isAdmin, isOperator, isSeller, user} = useUserRole();
+    const {isSeller, user} = useUserRole();
     const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
     const [paidBranchList, setPaidBranchList] = useState<any[]>([]);
-    
+    const [sellers, setSellers] = useState<any[]>([]);
+    const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
 
     useEffect(( ) => {
         const fetchSellerAndBranchs = async () => {
@@ -38,6 +39,49 @@ function SalesPage() {
         fetchSellerAndBranchs()
     }, [isSeller, user])
 
+    const handleProductSelect = (product: any) => {
+        setSelectedProducts((prevProducts: any) => {
+            const exists = prevProducts.find((p: any) => p.key === product.key);
+            if (exists) return prevProducts
+
+            const cantidad = 1;
+            const precio = product.precio;
+            const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
+            const comision = Number(vendedor?.comision_porcentual || 0);
+            const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            return [
+                ...prevProducts,
+                {
+                    ...product,
+                    cantidad,
+                    precio_unitario: precio,
+                    utilidad,
+                }
+            ];
+        });
+    };
+
+    const handleAddProduct = (newProduct: any) => {
+        const vendedor = sellers.find((v: any) => v._id === newProduct.id_vendedor);
+        const comision = Number(vendedor?.comision_porcentual || 0);
+        const precio = newProduct.precio_unitario || newProduct.precio || 0;
+        const cantidad = newProduct.cantidad || 1
+
+        const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+
+        setSelectedProducts((prevProducts: any) => [
+            ...prevProducts,
+            {
+                ...newProduct,
+                cantidad,
+                precio_unitario: precio,
+                utilidad,
+                stockActual: cantidad,
+                esTemporal: true,
+            }
+        ]);
+    };
+
     return (
         <PageTemplate
             title="Carrito"
@@ -50,10 +94,12 @@ function SalesPage() {
                         branchID={selectedBranchId}
                         selectBranch={setSelectedBranchId}
                         activeBranchs={paidBranchList}
+                        sellers={sellers}
+                        onSellersChange={setSellers}
                         onProductSelect={(product: any) => {
-                            // Este callback será usado para comunicar al componente de ventas
-                            console.log("Producto seleccionado:", product);
+                            handleProductSelect(product);
                         }}
+                        onAddProduct={handleAddProduct}
                     />
                 </Col>
 
@@ -61,6 +107,9 @@ function SalesPage() {
                 <Col xs={24} md={12}>
                     <SalesSection
                         branchID={selectedBranchId}
+                        selectedProducts={selectedProducts}
+                        setSelectedProducts={setSelectedProducts}
+                        sellers={sellers}
                     />
                 </Col>
             </Row>
