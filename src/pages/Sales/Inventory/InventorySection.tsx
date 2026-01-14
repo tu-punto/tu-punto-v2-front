@@ -143,11 +143,6 @@ function InventorySection({ branchID, selectBranch, activeBranchs, sellers, onSe
         setShowProductAddModal(false);
     };
 
-    const handleSuccessProductModal = async () => {
-        setShowProductAddModal(false);
-        await fetchProducts();
-    };
-
     const handleProductSelect = (product: any) => {
         if (onProductSelect) {
             onProductSelect(product);

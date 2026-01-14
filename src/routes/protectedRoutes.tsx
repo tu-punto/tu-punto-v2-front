@@ -3,7 +3,6 @@ import AppLayout from "../layout/AppLayout";
 import RoleGuard from "./RoleGuard";
 import FinanceFlux from "../pages/FinanceFlux/FinanceFlux";
 import Product from "../pages/Product/Product";
-import Sales from "../pages/Sales/Sales";
 import Seller from "../pages/Seller/Seller";
 import Shipping from "../pages/Shipping/Shipping";
 import StockManagement from "../pages/StockManagement/StockManagement";
@@ -17,6 +16,7 @@ import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
 import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
+import SalesPage from "../pages/Sales/SalesPage";
 
 const protectedRoutes = [
   {
@@ -48,7 +48,7 @@ const protectedRoutes = [
         path: "/sales",
         element: (
           <RoleGuard allowedRoles={["admin", "operator"]}>
-            <Sales />
+            <SalesPage />
           </RoleGuard>
         ),
       },
@@ -112,7 +112,7 @@ const protectedRoutes = [
         path: "/shop",
         element: (
           <RoleGuard allowedRoles={["seller"]}>
-            <Sales />
+            <SalesPage />
           </RoleGuard>
         ),
       },
