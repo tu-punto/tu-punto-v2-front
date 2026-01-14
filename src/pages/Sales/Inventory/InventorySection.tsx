@@ -11,15 +11,18 @@ interface InventorySectionProps {
     branchID: string | null,
     selectBranch: (branchId: string) => void,
     activeBranchs: any[],
+    sellers: any[],
+    onSellersChange?: (sellers: any[]) => void,
     onProductSelect?: (product: any) => void,
+    onAddProduct?: (product: any) => void,
 }
 
-function InventorySection({ branchID, selectBranch, activeBranchs, onProductSelect }: InventorySectionProps) {
+function InventorySection({ branchID, selectBranch, activeBranchs, sellers, onSellersChange, onProductSelect, onAddProduct }: InventorySectionProps) {
     const { isAdmin, isOperator, isSeller, user } = useUserRole()
     const [showProductAddModal, setShowProductAddModal] = useState(false)
     const [searchText, setSearchText] = useState("");
     const [selectedProduct, setSelectedProduct] = useState<string>('all')
-    const [sellers, setSellers] = useState([])
+    const [localSellers, setLocalSellers] = useState(sellers)
     const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
     const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined)
 
@@ -35,7 +38,8 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
 
             if (!branchID) {
                 console.warn("Sucursal ID no disponible aún para filtrar vendedores");
-                setSellers([]);
+                setLocalSellers([]);
+                if (onSellersChange) onSellersChange([]);
                 return;
             }
 
@@ -53,7 +57,8 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
                     return !fechaSalida || fechaSalida >= hoy;
                 });
             });
-            setSellers(sellersVigentes);
+            setLocalSellers(sellersVigentes);
+            if (onSellersChange) onSellersChange(sellersVigentes);
         } catch (error) {
             message.error('Error al obtener los vendedores');
         }
@@ -66,12 +71,16 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
     }, [branchID]);
 
     useEffect(() => {
+        setLocalSellers(sellers);
+    }, [sellers]);
+
+    useEffect(() => {
         if (!data || data.length === 0) {
             setFilteredBySeller([]);
             return;
         }
 
-        const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
+        const vendedoresVigentesIds = localSellers.map((v: any) => String(v._id));
 
         let filtered = data.filter((p: any) => {
             if (p.stockActual <= 0 || selectedProduct !== 'all' && selectedProduct !== p.id_producto) return false;
@@ -102,14 +111,14 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
             filtered = filtered.filter(p => filterWords(p, words));
         }
         filtered = filtered.map((p: any) => {
-            const vendedor = sellers.find((v: any) => String(v._id) === String(p.id_vendedor));
+            const vendedor = localSellers.find((v: any) => String(v._id) === String(p.id_vendedor));
             return {
                 ...p,
                 vendedor: vendedor ? `${vendedor.nombre} ${vendedor.apellido}` : "Sin vendedor"
             };
         });
         setFilteredBySeller(filtered);
-    }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
+    }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, localSellers, selectedProduct]);
     
     const [productOptions, setProductOptions] = useState<JSX.Element[]>([])
     useEffect(() => {
@@ -128,7 +137,7 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
             )
         })
         setProductOptions(options)
-    }, [data, user]);
+    }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, localSellers]);
 
     const handleProductModalCancel = () => {
         setShowProductAddModal(false);
@@ -143,6 +152,11 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
         if (onProductSelect) {
             onProductSelect(product);
         }
+    };
+
+    const handleProductAddSuccess = async () => {
+        setShowProductAddModal(false);
+        await fetchProducts();
     };
 
     const actions = (
@@ -176,7 +190,7 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
             {(isAdmin || isOperator) && (
                 <Select
                     placeholder="Selecciona un vendedor"
-                    options={sellers.map((vendedor: any) => ({
+                    options={localSellers.map((vendedor: any) => ({
                         value: vendedor._id,
                         label: vendedor.nombre + " " + vendedor.apellido,
                     }))}
@@ -215,18 +229,18 @@ function InventorySection({ branchID, selectBranch, activeBranchs, onProductSele
                 <ProductSellerViewModal
                     visible={showProductAddModal}
                     onCancel={handleProductModalCancel}
-                    onSuccess={handleSuccessProductModal}
+                    onSuccess={handleProductAddSuccess}
                     onAddProduct={(newProduct: any) => {
-                        if (onProductSelect) {
-                            onProductSelect(newProduct);
+                        if (onAddProduct) {
+                            onAddProduct(newProduct);
                         }
                     }}
                     selectedSeller={
                         isAdmin || isOperator 
-                            ? sellers.find((s: any) => s._id === selectedSellerId) || null
+                            ? localSellers.find((s: any) => s._id === selectedSellerId) || null
                             : { _id: user?.id_vendedor, nombre: user?.nombre_vendedor?.split(" ")[0] || "", apellido: user?.nombre_vendedor?.split(" ")[1] || "" }
                     }
-                    sellers={sellers}
+                    sellers={localSellers}
                     sucursalId={branchID}
                 />
             </>
