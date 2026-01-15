@@ -8,13 +8,15 @@ interface FormModalProps {
     closeTitle?: string,
     onClose: () => void,
     submitTitle?: string,
+    submitDisabled?: boolean,
+    submitLoading?: boolean,
     onFinish: Callbacks['onFinish'],
     width?: number,
     form: FormInstance<any>,
     children: ReactNode
 }
 
-function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle = "Guardar", onFinish, width, form, children }: FormModalProps) {
+function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle = "Guardar", submitDisabled = false, submitLoading = false, onFinish, width, form, children }: FormModalProps) {
     return (
         <Modal
             title={title}
@@ -36,7 +38,13 @@ function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle 
                         <Button key="cancel" onClick={onClose}>
                             {closeTitle}
                         </Button>
-                        <Button key="submit" type="primary" htmlType="submit">
+                        <Button
+                            key="submit"
+                            type="primary" 
+                            htmlType="submit"
+                            loading={submitLoading}
+                            disabled={submitDisabled}
+                        >
                             {submitTitle}
                         </Button>
                     </div>
