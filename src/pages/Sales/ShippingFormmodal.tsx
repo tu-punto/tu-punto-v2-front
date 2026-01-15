@@ -1,7 +1,7 @@
 import { Modal, Form, Input, InputNumber, Button, Radio, Col, Row, DatePicker, TimePicker, Card, message, Select, Switch } from 'antd';
 import { UserOutlined, PhoneOutlined, CommentOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
-import {useEffect, useMemo, useState} from 'react';
-import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
+import { useEffect, useMemo, useState } from 'react';
+import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
 import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
@@ -12,16 +12,17 @@ import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import dayjs from 'dayjs';
+import FormModal from '../../components/FormModal';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 
 function ShippingFormModal({
-                               visible, onCancel, onSuccess, selectedProducts,
-                               totalAmount, handleSales, sucursals,
-                               //handleDebt,
-                               clearSelectedProducts, isAdmin,sellers, suc
-                           }: any) {
+    visible, onCancel, onSuccess, selectedProducts,
+    totalAmount, handleSales, sucursals,
+    //handleDebt,
+    clearSelectedProducts, isAdmin, sellers, suc
+}: any) {
     const branchIdFromProps = suc || localStorage.getItem("sucursalId");
     const [loading, setLoading] = useState(false);
     const [qrInput, setQrInput] = useState<number>(0);
@@ -218,7 +219,7 @@ function ShippingFormModal({
         setter(prev => parseFloat((prev - value).toFixed(2)));
     };
     const actualizarStock = async (productos: any[]) => {
-        const sucursalId =  localStorage.getItem('sucursalId');
+        const sucursalId = localStorage.getItem('sucursalId');
 
         for (const prod of productos) {
             if (prod.esTemporal) continue;
@@ -291,378 +292,377 @@ function ShippingFormModal({
     }, [tipoPago, saldoACobrar, form]);
 
     return (
-        <Modal title="Realizar Entrega" open={visible} onCancel={onCancel} footer={null} width={800}>
-            <Form form={form} name="shippingForm" onFinish={handleFinish} layout="vertical">
-                {/* INFORMACIÓN DEL CLIENTE */}
-                <Card title="Información del Cliente" bordered={false}>
-                    <Row gutter={16}>
-                        <Col span={18}>
-                            <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true }]}>
-                                <Input prefix={<UserOutlined />} />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                    <Row gutter={16}>
-                        <Col span={6}>
-                            <Form.Item name="celular_cliente" label="Celular">
-                                <Select
-                                    placeholder="Código celular"
-                                    allowClear
-                                    value={codigoCelular}
-                                    onChange={(value) => setCodigoCelular(value)}
-                                >
-                                    {COUNTRY_CODES.map((codigo) => (
-                                        <Select.Option key={codigo.code} value={codigo.code} >
-                                            <ReactCountryFlag
-                                                countryCode={codigo.flag}
-                                                svg
-                                                style={{
-                                                    width: '20px',
-                                                    height: '20px',
-                                                    marginRight: '8px',
-                                                }}
-                                                aria-label={codigo.name}
-                                            />
-                                            {codigo.name}
-                                        </Select.Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="telefono_cliente" label>
-                                <Input
-                                    prefix={<PhoneOutlined />}
-                                    onKeyDown={(e) => {
-                                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'].includes(e.key)) {
-                                            e.preventDefault();
-                                        }
-                                    }}
-                                />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                </Card>
-
-                {/* DATOS DEL PEDIDO */}
-                <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
-                    <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
-                                <DatePicker style={{ width: '100%' }} />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                    <Row gutter={16}>
-                        <div style={{ margin:8 }}>
-                            <span style={{ marginRight:8 }}>
-                                - ¿Acordar entrega en un rango de horas?
-                            </span>
-                            <Switch
-                                checked={isRangeHour}
-                                onChange={(checked) => { setIsRangeHour(checked); }}
-                                unCheckedChildren="Hora específica"
-                                checkedChildren="Rango de horas"
-                            />
-                        </div>
-                        <Col span={12}>
-                            <Form.Item 
-                                name="hora_entrega_acordada" 
-                                label={isRangeHour? "Inicio del Rango Horario":"Hora de Entrega"}
+        <FormModal
+            title='Realizar Entrega'
+            open={visible}
+            onClose={onCancel}
+            submitLoading={loading}
+            onFinish={handleFinish}
+            width={800}
+            form={form}
+        >
+            {/* INFORMACIÓN DEL CLIENTE */}
+            <Card title="Información del Cliente" bordered={false}>
+                <Row gutter={16}>
+                    <Col span={18}>
+                        <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true }]}>
+                            <Input prefix={<UserOutlined />} />
+                        </Form.Item>
+                    </Col>
+                </Row>
+                <Row gutter={16}>
+                    <Col span={6}>
+                        <Form.Item name="celular_cliente" label="Celular">
+                            <Select
+                                placeholder="Código celular"
+                                allowClear
+                                value={codigoCelular}
+                                onChange={(value) => setCodigoCelular(value)}
                             >
+                                {COUNTRY_CODES.map((codigo) => (
+                                    <Select.Option key={codigo.code} value={codigo.code} >
+                                        <ReactCountryFlag
+                                            countryCode={codigo.flag}
+                                            svg
+                                            style={{
+                                                width: '20px',
+                                                height: '20px',
+                                                marginRight: '8px',
+                                            }}
+                                            aria-label={codigo.name}
+                                        />
+                                        {codigo.name}
+                                    </Select.Option>
+                                ))}
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item name="telefono_cliente" label>
+                            <Input
+                                prefix={<PhoneOutlined />}
+                                onKeyDown={(e) => {
+                                    if (!/[0-9]/.test(e.key) && !['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'].includes(e.key)) {
+                                        e.preventDefault();
+                                    }
+                                }}
+                            />
+                        </Form.Item>
+                    </Col>
+                </Row>
+            </Card>
+
+            {/* DATOS DEL PEDIDO */}
+            <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
+                            <DatePicker style={{ width: '100%' }} />
+                        </Form.Item>
+                    </Col>
+                </Row>
+                <Row gutter={16}>
+                    <div style={{ margin: 8 }}>
+                        <span style={{ marginRight: 8 }}>
+                            - ¿Acordar entrega en un rango de horas?
+                        </span>
+                        <Switch
+                            checked={isRangeHour}
+                            onChange={(checked) => { setIsRangeHour(checked); }}
+                            unCheckedChildren="Hora específica"
+                            checkedChildren="Rango de horas"
+                        />
+                    </div>
+                    <Col span={12}>
+                        <Form.Item
+                            name="hora_entrega_acordada"
+                            label={isRangeHour ? "Inicio del Rango Horario" : "Hora de Entrega"}
+                        >
+                            <TimePicker format='HH:mm' style={{ width: '100%' }} />
+                        </Form.Item>
+                    </Col>
+                    {isRangeHour && (
+                        <Col span={12}>
+                            <Form.Item name="hora_entrega_rango_final" label="Fin del Rango Horario">
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
-                        {isRangeHour && (
-                            <Col span={12}>
-                                <Form.Item name="hora_entrega_rango_final" label="Fin del Rango Horario">
-                                    <TimePicker format='HH:mm' style={{ width: '100%' }} />
-                                </Form.Item>
-                            </Col>
-                        )}
-                    </Row>
-                    <Row gutter={16}>
-                        <Col span={24}>
-                            <Form.Item name="lugar_entrega" label="Lugar De Entrega" rules={[{ required: true }]}>
-                                {isDeliveryPlaceInput ? (
-                                    <div className='flex align-middle gap-2'>
-                                        <Input placeholder='Escriba el lugar de entrega' />
-                                        <Button onClick={() => { setIsDeliveryPlaceInput(false); form.resetFields(['lugar_entrega']) }}>
-                                            Volver a seleccionar
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Select
-                                        placeholder="Seleccione el lugar de entrega"
-                                        allowClear
-                                        style={{ width: '100%' }}
-                                        onChange={(value) => {
-                                            if (value === 'otro') setIsDeliveryPlaceInput(true);
-                                        }}
-                                        options={[
-                                            ...sucursals.map((s: any) => ({
-                                                value: s.nombre,
-                                                label: s.nombre,
-                                            })),
-                                            { value: "otro", label: "Otro" }
-                                        ]}
-                                    />
-                                )}
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                    <Row gutter={16}>
-                        <Col span={24}>
-                            <Form.Item name="observaciones" label="Observaciones">
-                                <Input prefix={<CommentOutlined />} />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                </Card>
-
-                {/* DETALLES DEL PAGO */}
-                <Card
-                    title={
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>Detalles del Pago</span>
-                            <span style={{ fontWeight: 'bold' }}>Monto total: Bs. {totalAmount.toFixed(2)}</span>
-                        </div>
-                    }
-                    bordered={false}
-                    style={{ marginTop: 16 }}
-                >
-                    {/* ¿Está ya pagado? */}
-                    <Row gutter={16}>
-                        <Col span={24}>
-                            <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
-                                <Radio.Group
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        setEstaPagado(value);
-                                        setAdelantoVisible(value === 'adelanto');
-
-                                        if (value !== 'adelanto') {
-                                            setAdelantoClienteInput(0);
-                                            form.setFieldValue("adelanto_cliente", 0);
-                                        }
-
-                                        if (value === 'si') {
-                                            setTipoPago("3");
-                                            form.setFieldValue("tipo_de_pago", "3");
-                                        }
+                    )}
+                </Row>
+                <Row gutter={16}>
+                    <Col span={24}>
+                        <Form.Item name="lugar_entrega" label="Lugar De Entrega" rules={[{ required: true }]}>
+                            {isDeliveryPlaceInput ? (
+                                <div className='flex align-middle gap-2'>
+                                    <Input placeholder='Escriba el lugar de entrega' />
+                                    <Button onClick={() => { setIsDeliveryPlaceInput(false); form.resetFields(['lugar_entrega']) }}>
+                                        Volver a seleccionar
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Select
+                                    placeholder="Seleccione el lugar de entrega"
+                                    allowClear
+                                    style={{ width: '100%' }}
+                                    onChange={(value) => {
+                                        if (value === 'otro') setIsDeliveryPlaceInput(true);
                                     }}
-                                >
-                                    <Radio.Button value="si">Sí</Radio.Button>
-                                    <Radio.Button value="no">No</Radio.Button>
-                                    <Radio.Button value="adelanto" disabled={hayMultiplesVendedores}>Pago Adelanto</Radio.Button>
-                                </Radio.Group>
-                            </Form.Item>
-                        </Col>
-                    </Row>
+                                    options={[
+                                        ...sucursals.map((s: any) => ({
+                                            value: s.nombre,
+                                            label: s.nombre,
+                                        })),
+                                        { value: "otro", label: "Otro" }
+                                    ]}
+                                />
+                            )}
+                        </Form.Item>
+                    </Col>
+                </Row>
+                <Row gutter={16}>
+                    <Col span={24}>
+                        <Form.Item name="observaciones" label="Observaciones">
+                            <Input prefix={<CommentOutlined />} />
+                        </Form.Item>
+                    </Col>
+                </Row>
+            </Card>
 
-                    {adelantoVisible && (
-                        <Row gutter={16}>
-                            <Col span={24}>
-                                <Form.Item name="adelanto_cliente" label="Monto del adelanto" rules={[{ required: true }]}>
-                                    <InputNumber
-                                        prefix="Bs."
-                                        min={0}
-                                        value={adelantoClienteInput}
-                                        onChange={value => setAdelantoClienteInput(value ?? 0)}
-                                        style={{ width: '100%' }}
-                                    />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    )}
+            {/* DETALLES DEL PAGO */}
+            <Card
+                title={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Detalles del Pago</span>
+                        <span style={{ fontWeight: 'bold' }}>Monto total: Bs. {totalAmount.toFixed(2)}</span>
+                    </div>
+                }
+                bordered={false}
+                style={{ marginTop: 16 }}
+            >
+                {/* ¿Está ya pagado? */}
+                <Row gutter={16}>
+                    <Col span={24}>
+                        <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
+                            <Radio.Group
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setEstaPagado(value);
+                                    setAdelantoVisible(value === 'adelanto');
 
-                    {/* Estado del Pedido */}
+                                    if (value !== 'adelanto') {
+                                        setAdelantoClienteInput(0);
+                                        form.setFieldValue("adelanto_cliente", 0);
+                                    }
+
+                                    if (value === 'si') {
+                                        setTipoPago("3");
+                                        form.setFieldValue("tipo_de_pago", "3");
+                                    }
+                                }}
+                            >
+                                <Radio.Button value="si">Sí</Radio.Button>
+                                <Radio.Button value="no">No</Radio.Button>
+                                <Radio.Button value="adelanto" disabled={hayMultiplesVendedores}>Pago Adelanto</Radio.Button>
+                            </Radio.Group>
+                        </Form.Item>
+                    </Col>
+                </Row>
+
+                {adelantoVisible && (
                     <Row gutter={16}>
                         <Col span={24}>
-                            <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "En Espera"}>
-                                    <Radio.Button value="En Espera">En espera</Radio.Button>
-                                    {isAdmin && <Radio.Button value="Entregado">Entregado</Radio.Button>}
-                                </Radio.Group>
-                            </Form.Item>
-                        </Col>
-                    </Row>
-
-                    {/* ¿Quién paga el delivery? */}
-                    {lugarEntrega && !origenEsIgualADestino && (
-                        <>
-                            <Row gutter={16}>
-                                <Col span={24}>
-                                    <Form.Item
-                                        name="quien_paga_delivery"
-                                        label="¿Quién paga el delivery?"
-                                        rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}
-                                    >
-                                        <Radio.Group
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setQuienPaga(value);
-                                                form.setFieldValue("quien_paga_delivery", value);
-
-                                                // Recalcular saldo al cambiar a comprador si ya había monto ingresado
-                                                if (value === "comprador") {
-                                                    setMontoCobradoDelivery(prev => prev); // forzar re-render de saldo
-                                                }
-                                            }}
-                                        >
-                                            <Radio.Button value="comprador" disabled={hayMultiplesVendedores}>COMPRADOR</Radio.Button>
-                                            <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
-                                            <Radio.Button value="tupunto">Tu Punto</Radio.Button>
-                                        </Radio.Group>
-                                    </Form.Item>
-                                </Col>
-                            </Row>
-
-                            <Row gutter={16}>
-                                {!hideDeliveryCosts && (
-                                    <Col span={12}>
-                                        <Form.Item
-                                            name="costo_delivery"
-                                            label="Costo de realizar el Delivery"
-                                            rules={[{ required: true }]}
-                                        >
-                                            <InputNumber
-                                                prefix="Bs."
-                                                value={costoRealizarDelivery}
-                                                onChange={val => setCostoRealizarDelivery(val ?? 0)}
-                                                style={{ width: '100%' }}
-                                            />
-                                        </Form.Item>
-                                    </Col>
-                                )}
-                                {["comprador", "vendedor"].includes(quienPaga || "") && (
-                                    <Col span={12}>
-                                        <Form.Item
-                                            name="cargo_delivery"
-                                            label="Monto cobrado por el Delivery"
-                                            rules={
-                                                (!isAdmin && (quienPaga === 'vendedor' ||quienPaga === 'comprador') )
-                                                    ? [] // No requerido si es vendedor (no admin)
-                                                    : [{ required: true, message: "Este campo es obligatorio" }]
-                                            }
-                                        >
-                                            <InputNumber
-                                                prefix="Bs."
-                                                value={montoCobradoDelivery}
-                                                onChange={val => setMontoCobradoDelivery(val ?? 0)}
-                                                style={{ width: '100%' }}
-                                                disabled={!isAdmin}
-                                            />
-                                        </Form.Item>
-                                    </Col>
-                                )}
-                            </Row>
-                        </>
-                    )}
-
-                    {/* Saldo a cobrar */}
-                    <Row gutter={16}>
-                        <Col span={24}>
-                            <Form.Item label="Saldo a Cobrar">
-                                <Input
+                            <Form.Item name="adelanto_cliente" label="Monto del adelanto" rules={[{ required: true }]}>
+                                <InputNumber
                                     prefix="Bs."
-                                    readOnly
-                                    value={saldoACobrar.toFixed(2)}
-                                    style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                    min={0}
+                                    value={adelantoClienteInput}
+                                    onChange={value => setAdelantoClienteInput(value ?? 0)}
+                                    style={{ width: '100%' }}
                                 />
                             </Form.Item>
                         </Col>
                     </Row>
+                )}
 
-                    {/* Tipo de pago */}
-                    {estadoPedido === "Entregado" && (
-                        <>
-                            <Row gutter={16}>
-                                <Col span={24}>
-                                    <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
-                                        <Radio.Group
-                                            onChange={(e) => setTipoPago(e.target.value.toString())}
-                                            value={tipoPago}
-                                            disabled={estaPagado === "si"}
-                                        >
+                {/* Estado del Pedido */}
+                <Row gutter={16}>
+                    <Col span={24}>
+                        <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
+                            <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "En Espera"}>
+                                <Radio.Button value="En Espera">En espera</Radio.Button>
+                                {isAdmin && <Radio.Button value="Entregado">Entregado</Radio.Button>}
+                            </Radio.Group>
+                        </Form.Item>
+                    </Col>
+                </Row>
+
+                {/* ¿Quién paga el delivery? */}
+                {lugarEntrega && !origenEsIgualADestino && (
+                    <>
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item
+                                    name="quien_paga_delivery"
+                                    label="¿Quién paga el delivery?"
+                                    rules={[{ required: true, message: "Selecciona quién paga el delivery" }]}
+                                >
+                                    <Radio.Group
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setQuienPaga(value);
+                                            form.setFieldValue("quien_paga_delivery", value);
+
+                                            // Recalcular saldo al cambiar a comprador si ya había monto ingresado
+                                            if (value === "comprador") {
+                                                setMontoCobradoDelivery(prev => prev); // forzar re-render de saldo
+                                            }
+                                        }}
+                                    >
+                                        <Radio.Button value="comprador" disabled={hayMultiplesVendedores}>COMPRADOR</Radio.Button>
+                                        <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
+                                        <Radio.Button value="tupunto">Tu Punto</Radio.Button>
+                                    </Radio.Group>
+                                </Form.Item>
+                            </Col>
+                        </Row>
+
+                        <Row gutter={16}>
+                            {!hideDeliveryCosts && (
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="costo_delivery"
+                                        label="Costo de realizar el Delivery"
+                                        rules={[{ required: true }]}
+                                    >
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={costoRealizarDelivery}
+                                            onChange={val => setCostoRealizarDelivery(val ?? 0)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            )}
+                            {["comprador", "vendedor"].includes(quienPaga || "") && (
+                                <Col span={12}>
+                                    <Form.Item
+                                        name="cargo_delivery"
+                                        label="Monto cobrado por el Delivery"
+                                        rules={
+                                            (!isAdmin && (quienPaga === 'vendedor' || quienPaga === 'comprador'))
+                                                ? [] // No requerido si es vendedor (no admin)
+                                                : [{ required: true, message: "Este campo es obligatorio" }]
+                                        }
+                                    >
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={montoCobradoDelivery}
+                                            onChange={val => setMontoCobradoDelivery(val ?? 0)}
+                                            style={{ width: '100%' }}
+                                            disabled={!isAdmin}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            )}
+                        </Row>
+                    </>
+                )}
+
+                {/* Saldo a cobrar */}
+                <Row gutter={16}>
+                    <Col span={24}>
+                        <Form.Item label="Saldo a Cobrar">
+                            <Input
+                                prefix="Bs."
+                                readOnly
+                                value={saldoACobrar.toFixed(2)}
+                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                            />
+                        </Form.Item>
+                    </Col>
+                </Row>
+
+                {/* Tipo de pago */}
+                {estadoPedido === "Entregado" && (
+                    <>
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item name="tipo_de_pago" label="Tipo de pago" rules={[{ required: true }]}>
+                                    <Radio.Group
+                                        onChange={(e) => setTipoPago(e.target.value.toString())}
+                                        value={tipoPago}
+                                        disabled={estaPagado === "si"}
+                                    >
 
                                         <Radio.Button value="1">Transferencia o QR</Radio.Button>
-                                            <Radio.Button value="2">Efectivo</Radio.Button>
-                                            <Radio.Button value="3">Pagado al dueño</Radio.Button>
-                                            <Radio.Button value="4">Efectivo + QR</Radio.Button>
-                                        </Radio.Group>
+                                        <Radio.Button value="2">Efectivo</Radio.Button>
+                                        <Radio.Button value="3">Pagado al dueño</Radio.Button>
+                                        <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                                    </Radio.Group>
+                                </Form.Item>
+                            </Col>
+                        </Row>
+
+                        {/* Subtotales */}
+                        {["1", "2"].includes(tipoPago || "") && (
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item label={tipoPago === "1" ? "Subtotal QR" : "Subtotal Efectivo"}>
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={saldoACobrar}
+                                            readOnly
+                                            style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                        />
                                     </Form.Item>
                                 </Col>
                             </Row>
+                        )}
 
-                            {/* Subtotales */}
-                            {["1", "2"].includes(tipoPago || "") && (
-                                <Row gutter={16}>
+                        {tipoPago === "4" && (
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item label="Subtotal QR" name="subtotal_qr">
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={qrInput}
+                                            min={0.01}
+                                            max={saldoACobrar}
+                                            onChange={(val) => {
+                                                const qr = val ?? 0;
+                                                const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
+                                                setQrInput(qr);
+                                                setEfectivoInput(efectivo);
+                                                form.setFieldsValue({ subtotal_efectivo: efectivo });
+                                            }}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
+                                        <InputNumber
+                                            prefix="Bs."
+                                            value={efectivoInput}
+                                            readOnly
+                                            style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                {showWarning && (
                                     <Col span={24}>
-                                        <Form.Item label={tipoPago === "1" ? "Subtotal QR" : "Subtotal Efectivo"}>
-                                            <InputNumber
-                                                prefix="Bs."
-                                                value={saldoACobrar}
-                                                readOnly
-                                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
-                                            />
-                                        </Form.Item>
+                                        <div style={{ color: 'red', fontWeight: 'bold' }}>
+                                            La suma de QR + Efectivo debe ser igual al saldo a cobrar.
+                                        </div>
                                     </Col>
-                                </Row>
-                            )}
-
-                            {tipoPago === "4" && (
-                                <Row gutter={16}>
-                                    <Col span={12}>
-                                        <Form.Item label="Subtotal QR" name="subtotal_qr">
-                                            <InputNumber
-                                                prefix="Bs."
-                                                value={qrInput}
-                                                min={0.01}
-                                                max={saldoACobrar}
-                                                onChange={(val) => {
-                                                    const qr = val ?? 0;
-                                                    const efectivo = parseFloat((saldoACobrar - qr).toFixed(2));
-                                                    setQrInput(qr);
-                                                    setEfectivoInput(efectivo);
-                                                    form.setFieldsValue({ subtotal_efectivo: efectivo });
-                                                }}
-                                                style={{ width: '100%' }}
-                                            />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={12}>
-                                        <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                                            <InputNumber
-                                                prefix="Bs."
-                                                value={efectivoInput}
-                                                readOnly
-                                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
-                                            />
-                                        </Form.Item>
-                                    </Col>
-                                    {showWarning && (
-                                        <Col span={24}>
-                                            <div style={{ color: 'red', fontWeight: 'bold' }}>
-                                                La suma de QR + Efectivo debe ser igual al saldo a cobrar.
-                                            </div>
-                                        </Col>
-                                    )}
-                                </Row>
-                            )}
-                        </>
-                    )}
-                </Card>
-
-                <Form.Item style={{ marginTop: 16 }}>
-                    <Button type="primary" htmlType="submit" loading={loading}>
-                        Guardar
-                    </Button>
-                </Form.Item>
-            </Form>
-        </Modal>
-    );
-
+                                )}
+                            </Row>
+                        )}
+                    </>
+                )}
+            </Card>
+        </FormModal>
+    )
 }
 
 export default ShippingFormModal;
