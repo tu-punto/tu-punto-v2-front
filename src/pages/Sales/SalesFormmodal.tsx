@@ -1,7 +1,8 @@
-import { Modal, Form, Input, Button, Radio, message, InputNumber, Row, Col } from 'antd';
 import { useEffect, useState } from 'react';
-import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
+import { Form, Input, Radio, message, InputNumber, Row, Col } from 'antd';
+import FormModal from '../../components/FormModal';
 import { updateSubvariantStockAPI } from '../../api/product';
+import { registerShippingAPI } from '../../api/shipping';
 
 const tipoPagoMap: Record<number, string> = {
     1: 'Transferencia o QR',
@@ -11,17 +12,17 @@ const tipoPagoMap: Record<number, string> = {
 };
 
 function SalesFormModal({
-                            visible,
-                            onCancel,
-                            onSuccess,
-                            selectedProducts,
-                            totalAmount,
-                            handleSales,
-                            //handleDebt,
-                            clearSelectedProducts,
-                            sellers,
-                            suc
-                        }: any) {
+    visible,
+    onCancel,
+    onSuccess,
+    selectedProducts,
+    totalAmount,
+    handleSales,
+    //handleDebt,
+    clearSelectedProducts,
+    sellers,
+    suc
+}: any) {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
@@ -170,104 +171,105 @@ function SalesFormModal({
             }
         }
     };
+
     return (
-        <Modal title="Registrar Venta" open={visible} onCancel={onCancel} footer={null}>
-            <Form form={form} onFinish={handleFinish} layout="vertical">
-                <Form.Item label="Monto Total de la Venta" name="montoTotal">
-                    <Input prefix="Bs." readOnly />
+        <FormModal
+            title='Registrar Venta'
+            open={visible}
+            onClose={onCancel}
+            submitTitle='Registrar'
+            submitDisabled={showWarning}
+            submitLoading={loading}
+            onFinish={handleFinish}
+            form={form}
+        >
+            <Form.Item label="Monto Total de la Venta" name="montoTotal">
+                <Input prefix="Bs." readOnly />
+            </Form.Item>
+            <Form.Item
+                name="tipoDePago"
+                label="Tipo de Pago"
+                rules={[{ required: true, message: "Selecciona un tipo de pago" }]}
+            >
+                <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
+                    <Radio.Button value="1">{tipoPagoMap[1]}</Radio.Button>
+                    <Radio.Button value="2">{tipoPagoMap[2]}</Radio.Button>
+                    <Radio.Button value="3">{tipoPagoMap[3]}</Radio.Button>
+                    <Radio.Button value="4">{tipoPagoMap[4]}</Radio.Button>
+                </Radio.Group>
+            </Form.Item>
+            {tipoPago === '1' && (
+                <Form.Item label="Subtotal QR" name="subtotal_qr">
+                    <InputNumber
+                        prefix="Bs."
+                        value={totalAmount}
+                        readOnly
+                        style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                    />
                 </Form.Item>
+            )}
 
-                <Form.Item
-                    name="tipoDePago"
-                    label="Tipo de Pago"
-                    rules={[{ required: true, message: "Selecciona un tipo de pago" }]}
-                >
-                    <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
-                        <Radio.Button value="1">{tipoPagoMap[1]}</Radio.Button>
-                        <Radio.Button value="2">{tipoPagoMap[2]}</Radio.Button>
-                        <Radio.Button value="3">{tipoPagoMap[3]}</Radio.Button>
-                        <Radio.Button value="4">{tipoPagoMap[4]}</Radio.Button>
-                    </Radio.Group>
+            {(tipoPago === '2') && (
+                <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
+                    <InputNumber
+                        prefix="Bs."
+                        value={totalAmount}
+                        readOnly
+                        style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
+                    />
                 </Form.Item>
+            )}
 
-                {tipoPago === '1' && (
-                    <Form.Item label="Subtotal QR" name="subtotal_qr">
-                        <InputNumber
-                            prefix="Bs."
-                            value={totalAmount}
-                            readOnly
-                            style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
-                        />
-                    </Form.Item>
-                )}
-
-                {(tipoPago === '2') && (
-                    <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                        <InputNumber
-                            prefix="Bs."
-                            value={totalAmount}
-                            readOnly
-                            style={{ width: '100%', backgroundColor: '#fffbe6', color: '#000', fontWeight: 'bold' }}
-                        />
-                    </Form.Item>
-                )}
-
-                {tipoPago === '4' && (
-                    <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item label="Subtotal QR" name="subtotal_qr" rules={[
-                                {
-                                    validator: (_, value) => {
-                                        if (value <= 0) return Promise.reject("El monto QR debe ser mayor a 0");
-                                        if (value >= totalAmount) return Promise.reject("El monto QR debe ser menor al total");
-                                        return Promise.resolve();
-                                    }
+            {tipoPago === '4' && (
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item label="Subtotal QR" name="subtotal_qr" rules={[
+                            {
+                                validator: (_, value) => {
+                                    if (value <= 0) return Promise.reject("El monto QR debe ser mayor a 0");
+                                    if (value >= totalAmount) return Promise.reject("El monto QR debe ser menor al total");
+                                    return Promise.resolve();
                                 }
-                            ]}>
-                                <InputNumber
-                                    prefix="Bs."
-                                    value={qrInput}
-                                    min={0.01}
-                                    max={totalAmount - 0.01}
-                                    onChange={(val) => {
-                                        const qr = val ?? 0;
-                                        setQrInput(qr);
-                                        const efectivo = parseFloat((totalAmount - qr).toFixed(2));
-                                        setEfectivoInput(efectivo);
-                                        form.setFieldsValue({ subtotal_efectivo: efectivo });
-                                    }}
-                                    style={{ width: '100%' }}
-                                />
-                            </Form.Item>
+                            }
+                        ]}>
+                            <InputNumber
+                                prefix="Bs."
+                                value={qrInput}
+                                min={0.01}
+                                max={totalAmount - 0.01}
+                                onChange={(val) => {
+                                    const qr = val ?? 0;
+                                    setQrInput(qr);
+                                    const efectivo = parseFloat((totalAmount - qr).toFixed(2));
+                                    setEfectivoInput(efectivo);
+                                    form.setFieldsValue({ subtotal_efectivo: efectivo });
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
+                            <InputNumber
+                                prefix="Bs."
+                                value={efectivoInput}
+                                readOnly
+                                style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
+                            />
+                        </Form.Item>
+                    </Col>
+                    {showWarning && (
+                        <Col span={24}>
+                            <div style={{ color: 'red', fontWeight: 'bold' }}>
+                                La suma de QR + Efectivo debe ser igual al monto total.
+                            </div>
                         </Col>
-                        <Col span={12}>
-                            <Form.Item label="Subtotal Efectivo" name="subtotal_efectivo">
-                                <InputNumber
-                                    prefix="Bs."
-                                    value={efectivoInput}
-                                    readOnly
-                                    style={{ width: '100%', backgroundColor: '#fffbe6', fontWeight: 'bold' }}
-                                />
-                            </Form.Item>
-                        </Col>
-                        {showWarning && (
-                            <Col span={24}>
-                                <div style={{ color: 'red', fontWeight: 'bold' }}>
-                                    La suma de QR + Efectivo debe ser igual al monto total.
-                                </div>
-                            </Col>
-                        )}
-                    </Row>
-                )}
+                    )}
+                </Row>
+            )}
 
-                <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={loading} disabled={showWarning}>
-                        Registrar
-                    </Button>
-                </Form.Item>
-            </Form>
-        </Modal>
-    );
+        </FormModal>
+    )
 }
 
 export default SalesFormModal;
