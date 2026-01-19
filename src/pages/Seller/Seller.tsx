@@ -1,12 +1,13 @@
-import { PlusOutlined } from "@ant-design/icons";
-import SellerTable from "./SellerTable";
-import SellerForm from "./SellerFormModal";
 import { useState } from "react";
+import SellerForm from "./SellerFormModal";
+import SellerTable from "./SellerTable";
 import PageTemplate, { FunctionButtonProps } from "../../components/PageTemplate";
 
-export const Seller: React.FC<{ isFactura: boolean }> = ({
-  isFactura = false,
-}) => {
+interface SellerProps {
+  isFactura: boolean
+}
+
+export const Seller = ({ isFactura }: SellerProps) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
@@ -15,10 +16,6 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   };
 
   const handleCancel = () => {
-    setIsModalVisible(false);
-  };
-
-  const onFinish = () => {
     setIsModalVisible(false);
   };
 
@@ -49,7 +46,6 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
       <SellerForm
         visible={isModalVisible}
         onCancel={handleCancel}
-        onFinish={onFinish}
         onSuccess={handleSuccess}
       />
     </PageTemplate>
