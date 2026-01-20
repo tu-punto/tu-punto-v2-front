@@ -22,18 +22,24 @@ export default function SellerFormModal({ visible, onCancel, onSuccess }: Seller
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
 
   useEffect(() => {
-    if (visible) {
-      (async () => {
-        const res = await getSucursalsAPI();
-        setSucursalOptions(res || []);
-        form.resetFields();
-        form.setFieldsValue({ sucursales: [{}] });
-      })();
-    }
+    if (!visible) return
+
+    fetchBranches()
+    form.resetFields()
+    form.setFieldsValue({ sucursales: [{}] });
   }, [visible]);
 
-  /* añadir card */
-  const addBranch = () => {
+  const fetchBranches = async () => {
+    const res = await getSucursalsAPI();
+    if (!res) {
+      message.error("Ha ocurrido un error al recuperar las sucursales.")
+      setSucursalOptions([])
+      return
+    }
+    setSucursalOptions(res)
+  }
+
+  const handleAddBranch = () => {
     const list = form.getFieldValue("sucursales") || [];
     if (list.length >= sucursalOptions.length) {
       return message.warning("Ya agregaste todas las sucursales");
@@ -187,7 +193,7 @@ export default function SellerFormModal({ visible, onCancel, onSuccess }: Seller
           <Button
             type="dashed"
             icon={<PlusOutlined />}
-            onClick={addBranch}
+            onClick={handleAddBranch}
             disabled={
               (form.getFieldValue("sucursales") || []).length >=
               sucursalOptions.length
