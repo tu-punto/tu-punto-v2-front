@@ -1,14 +1,13 @@
-import { Button, Table, Tooltip, Select, Space, Input } from "antd";
 import { useEffect, useState } from "react";
+import { Button, Table, Select, Space, Input } from "antd";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
+import SucursalDrawer from "./components/SucursalDrawer";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
-import SucursalDrawer from "./components/SucursalDrawer";
-
 import { getSellersAPI } from "../../api/seller";
-
+import TableActionButton from "../../components/TableActionButton";
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
 type SellerRow = ISeller & {
@@ -18,11 +17,12 @@ type SellerRow = ISeller & {
   pago_mensual: string;
 };
 
-export default function SellerTable({
-  refreshKey,
-  setRefreshKey,
-  isFactura,
-}: any) {
+interface SellerTableProps {
+  refreshKey: number,
+  setRefreshKey: (arg: number) => void
+}
+
+export default function SellerTable({ refreshKey, setRefreshKey }: SellerTableProps) {
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
@@ -156,18 +156,15 @@ export default function SellerTable({
       render: (_: any, row: SellerRow) => (
         <div className="flex gap-2 justify-end">
           <PayDebtButton seller={row} onSuccess={refresh} />
-          <Tooltip title="Renovar vendedor">
-            <Button
-              type="primary"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelected(row);
-                setDebtModal(true);
-              }}
-            />
-          </Tooltip>
+          <TableActionButton
+            title="Renovar vendedor"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelected(row);
+              setDebtModal(true);
+            }}
+            icon={<EditOutlined />}
+          />
         </div>
       ),
       width: 150,
