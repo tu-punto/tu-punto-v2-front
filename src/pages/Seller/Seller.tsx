@@ -41,7 +41,6 @@ export const Seller = ({ isFactura }: SellerProps) => {
       <SellerTable
         refreshKey={refreshKey}
         setRefreshKey={setRefreshKey}
-        isFactura={isFactura}
       />
       <SellerForm
         visible={isModalVisible}
