@@ -23,6 +23,7 @@ export const Sales = () => {
     const [productAddModal, setProductAddModal] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0)
     const [sellers, setSellers] = useState([])
+    const [sellersLoading, setSellersLoading] = useState(true);
     const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
     //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
     const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
@@ -95,8 +96,19 @@ export const Sales = () => {
             return;
         }
 
+        if (sellersLoading) {
+            setFilteredBySeller([]);
+            return;
+        }
+
         const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
         const sellersReady = vendedoresVigentesIds.length > 0;
+
+        if (!sellersReady) {
+            setFilteredBySeller([]);
+            return;
+        }
+
         let filtered = data.filter((p: any) => {
             const stock = getStockActual(p, branchIdForFetch);
             if (stock <= 0) return false;
@@ -104,7 +116,6 @@ export const Sales = () => {
             if (selectedProduct !== "all" && String(selectedProduct) !== String(p.id_producto)) {
                 return false;
             }
-            if (!sellersReady) return true;
 
             return vendedoresVigentesIds.includes(String(p.id_vendedor));
         });
@@ -142,7 +153,7 @@ export const Sales = () => {
             };
         });
         setFilteredBySeller(filtered);
-    }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
+    }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct, sellersLoading]);
 
     useEffect(() => {
         //fetchSellers();
@@ -251,6 +262,7 @@ export const Sales = () => {
         setRefreshKey(prevKey => prevKey + 1); // para que también se actualicen las tablas dependientes
     };
     const fetchSellers = async () => {
+        setSellersLoading(true);
         try {
             const response = await getSellersAPI();
             const hoy = new Date();
@@ -263,6 +275,7 @@ export const Sales = () => {
             if (!sucursalId) {
                 console.warn("Sucursal ID no disponible aún para filtrar vendedores");
                 setSellers([]);
+                setSellersLoading(false);
                 return;
             }
 
@@ -288,6 +301,8 @@ export const Sales = () => {
             setSellers(sellersVigentes);
         } catch (error) {
             message.error('Error al obtener los vendedores');
+        } finally {
+            setSellersLoading(false);
         }
     };
 
@@ -518,8 +533,8 @@ export const Sales = () => {
                         }
                         bordered={false}
                     >
-                        <Spin spinning={inventoryLoading} tip="Cargando inventario...">
-                            <div style={{ pointerEvents: inventoryLoading ? "none" : "auto" }}>
+                        <Spin spinning={inventoryLoading || sellersLoading} tip="Cargando inventario...">
+                            <div style={{ pointerEvents: (inventoryLoading || sellersLoading) ? "none" : "auto" }}>
                                 <ProductTable
                                     onSelectProduct={handleProductSelect}
                                     refreshKey={refreshKey}
