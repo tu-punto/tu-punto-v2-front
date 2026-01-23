@@ -2,7 +2,6 @@ import {
   Card,
   Row,
   Col,
-  Statistic,
   Spin,
   Tag,
   DatePicker,
@@ -16,12 +15,12 @@ import {
   RiseOutlined,
   CarOutlined,
 } from "@ant-design/icons";
-import { FC, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DATE_TAGS } from "../../constants/fluxes";
 import { getFilteredStats } from "../../helpers/financeFluxesHelpers";
 import dayjs from "dayjs";
 import StatisticCard from "../../components/StatisticCard";
-import { getFinancialSummaryAPI } from "../../api/financeFlux";
+import { getCommissionAPI, getMerchandiseSoldAPI } from "../../api/financeFlux";
 import ReportsLauncher from "../../components/ReportsLauncher";
 
 const StatisticsDashboard = () => {
@@ -37,8 +36,12 @@ const StatisticsDashboard = () => {
     deliveryIncome: true,
     deliveryExpenses: true,
   });
+  const [commission, setCommission] = useState<number>(0);
+  const [loadingCommission, setLoadingCommission] = useState<boolean>(true);
+  const [merchandiseSold, setMerchandiseSold] = useState<number>(0);
+  const [loadingMerchandise, setLoadingMerchandise] = useState<boolean>(true);
 
-  const fetchStats = async (filter: string = DATE_TAGS.ALL_TIME) => {
+  const fetchStats = useCallback(async (filter: string = DATE_TAGS.ALL_TIME) => {
     setLoading({
       income: true,
       expenses: true,
@@ -46,9 +49,62 @@ const StatisticsDashboard = () => {
       deliveryIncome: true,
       deliveryExpenses: true,
     });
+    setLoadingCommission(true);
+    setLoadingMerchandise(true);
     try {
       const statsInfo = await getFilteredStats(filter, customDateRange);
       setStats(statsInfo);
+
+      let from: string | undefined;
+      let to: string | undefined;
+      let rangeParam: string | undefined;
+
+      if (filter === DATE_TAGS.CUSTOM && customDateRange && customDateRange.length === 2) {
+        from = customDateRange[0] ? dayjs(customDateRange[0]).format("YYYY-MM-DD") : undefined;
+        to = customDateRange[1] ? dayjs(customDateRange[1]).format("YYYY-MM-DD") : undefined;
+        rangeParam = "custom";
+      } else {
+        // Derive range via dates to avoid backend range mismatch; omit params for ALL_TIME
+        const now = dayjs();
+        let start: dayjs.Dayjs | null = null;
+        switch (filter) {
+          case DATE_TAGS.LAST_7_DAYS:
+            start = now.subtract(7, "day").startOf("day");
+            rangeParam = "7d";
+            break;
+          case DATE_TAGS.LAST_30_DAYS:
+            start = now.subtract(30, "day").startOf("day");
+            rangeParam = "30d";
+            break;
+          case DATE_TAGS.LAST_90_DAYS:
+            start = now.subtract(90, "day").startOf("day");
+            rangeParam = "90d";
+            break;
+          case DATE_TAGS.LAST_YEAR:
+            start = now.startOf("year");
+            rangeParam = "year"; 
+            break;
+          case DATE_TAGS.ALL_TIME:
+          default:
+            start = null;
+            rangeParam = "all";
+            break;
+        }
+        if (start) {
+          from = start.format("YYYY-MM-DD");
+          to = now.endOf("day").format("YYYY-MM-DD");
+        }
+      }
+
+      const commissionRes = await getCommissionAPI({ from, to });
+      const commissionValue = typeof commissionRes === "number"
+        ? commissionRes
+        : (commissionRes?.comision ?? commissionRes?.total ?? 0);
+      setCommission(Number(commissionValue) || 0);
+
+      const merchRes = await getMerchandiseSoldAPI({ range: rangeParam, from, to });
+      const merchValue = typeof merchRes === "number" ? merchRes : (merchRes?.mercaderiaVendida ?? merchRes?.total ?? 0);
+      setMerchandiseSold(Number(merchValue) || 0);
     } catch (error) {
       console.error(error);
     } finally {
@@ -59,8 +115,10 @@ const StatisticsDashboard = () => {
         deliveryIncome: false,
         deliveryExpenses: false,
       });
+      setLoadingCommission(false);
+      setLoadingMerchandise(false);
     }
-  };
+  }, [customDateRange]);
 
   const onTagClick = (tag: string) => {
     setSelectedTag(tag);
@@ -69,24 +127,9 @@ const StatisticsDashboard = () => {
     }
   };
 
-  const [summary, setSummary] = useState<any>(null);
-  const [loadingSummary, setLoadingSummary] = useState(true);
-
-
-  useEffect(() => {
-    setLoadingSummary(true);
-    getFinancialSummaryAPI()
-      .then(setSummary)
-      .finally(() => setLoadingSummary(false));
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   useEffect(() => {
     fetchStats(selectedTag || DATE_TAGS.ALL_TIME);
-  }, [selectedTag]);
+  }, [selectedTag, fetchStats]);
 
   if (!stats) {
     return (
@@ -192,50 +235,50 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loading.utility}>
                 <StatisticCard
                   title="UTILIDAD"
-                  value={summary?.utilidad ?? 0}
+                  value={stats?.utility ?? 0}
                   prefix={<RiseOutlined />}
                   color="#28a745"
                 />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loading.expenses} tip="Cargando...">
                 <StatisticCard
                   title="INVERSIÓN"
-                  value={summary?.inversiones ?? 0}
+                  value={stats?.investments || 0}
                   prefix={<RiseOutlined />}
                   color="#007bff"
                 />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
                 <StatisticCard
                   title="CAJA"
-                  value={summary?.caja ?? 0}
+                  value={stats?.caja ?? 0}
                   prefix={<DollarOutlined />}
                   color="#faad14"
                 />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loadingCommission} tip="Cargando...">
                 <StatisticCard
                   title="Comisión"
-                  value={summary?.comision ?? 0}
+                  value={commission}
                   prefix={<RiseOutlined />}
                   color="#6f42c1"
                 />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loadingMerchandise} tip="Cargando...">
                 <StatisticCard
                   title="Mercadería Vendida"
-                  value={summary?.mercaderiaVendida ?? 0}
+                  value={merchandiseSold}
                   prefix={<ShoppingCartOutlined />}
                   color="#dc3545"
                 />
@@ -271,10 +314,10 @@ const StatisticsDashboard = () => {
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingSummary}>
+              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
                 <StatisticCard
                   title="BALANCE DELIVERY"
-                  value={summary?.balanceDelivery ?? 0}
+                  value={stats?.deliveryBalance ?? 0}
                   prefix={<CarOutlined />}
                   color="#20c997"
                 />
