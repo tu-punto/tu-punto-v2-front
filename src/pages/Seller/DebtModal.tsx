@@ -1,38 +1,20 @@
-import {
-  Modal,
-  Form,
-  DatePicker,
-  InputNumber,
-  Button,
-  Col,
-  Row,
-  message,
-  Radio,
-  Card,
-} from "antd";
-import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
+import { Modal, Form, DatePicker, InputNumber, Button, Col, Row, message, Radio, Card } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-
-import { getSucursalsAPI } from "../../api/sucursal";
-import { renewSellerAPI } from "../../api/seller";
-
 import BranchFields from "./components/BranchFields";
+import { renewSellerAPI } from "../../api/seller";
+import { getSucursalsAPI } from "../../api/sucursal";
 import { ISucursalPago } from "../../models/sellerModels";
 
-interface Props {
+interface DebtModalProps {
   visible: boolean;
   onCancel: () => void;
   onSuccess: () => void;
-  seller: any; // SellerRow
+  seller: any;
 }
 
-export default function DebtModal({
-  visible,
-  onCancel,
-  onSuccess,
-  seller,
-}: Props) {
+export default function DebtModal({ visible, onCancel, onSuccess, seller }: DebtModalProps) {
   const [loading, setLoading] = useState(false);
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
   const [form] = Form.useForm();
