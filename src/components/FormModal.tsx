@@ -34,7 +34,7 @@ function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle 
                 {children}
 
                 <Form.Item>
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-2 justify-end my-2">
                         <Button key="cancel" onClick={onClose}>
                             {closeTitle}
                         </Button>
