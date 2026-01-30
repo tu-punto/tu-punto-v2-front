@@ -3,19 +3,21 @@ import { useEffect, useMemo, useState } from "react";
 import {
     Button, Modal, Form, DatePicker, Select, Radio, Space, Tabs, Table, Typography, Divider, message, Alert, Spin
 } from "antd";
-import { FileExcelOutlined, BarChartOutlined, EyeOutlined, DownloadOutlined } from "@ant-design/icons";
+import { FileExcelOutlined, BarChartOutlined, EyeOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import { getOperacionMensualAPI, downloadOperacionMensualXlsx } from "../api/reports";
 import { getAllSucursalsAPI } from "../api/sucursal";
 type ReportFormValues = {
-    mes: Dayjs;
+    meses: Dayjs[];
     sucursales?: string[];
     modoTop: "clientes" | "vendedores";
+    reportes?: string[];
 };
 
 const columnsByKey: Record<string, any[]> = {
     topProductosPorSucursal: [
         { title: "Sucursal", dataIndex: "sucursal" },
+        { title: "CategorÃ­a", dataIndex: "categoria" },
         { title: "Producto", dataIndex: "nombre_producto" },
         { title: "Unid.", dataIndex: "unidades", width: 90 },
         { title: "Monto (Bs.)", dataIndex: "monto_bs", width: 120 },
@@ -33,9 +35,14 @@ const columnsByKey: Record<string, any[]> = {
         { title: "Promedio (Bs.)", dataIndex: "promedio_bs", width: 140 },
         { title: "Prom. sin 0 (Bs.)", dataIndex: "promedio_sin_ceros_bs", width: 160 }
     ],
+    costoEntregaPromedioPorSucursal: [
+        { title: "Sucursal", dataIndex: "sucursal" },
+        { title: "Costos operativos (Bs.)", dataIndex: "costos_operativos_bs", width: 170 },
+        { title: "Entregas", dataIndex: "entregas", width: 100 },
+        { title: "Costo/Entrega (Bs.)", dataIndex: "costo_entrega_promedio_bs", width: 160 }
+    ],
     ticketPromedioPorSucursal: [
         { title: "Sucursal", dataIndex: "sucursal" },
-        { title: "Pedidos", dataIndex: "pedidos", width: 100 },
         { title: "Ticket Prom. (Bs.)", dataIndex: "ticket_promedio_bs", width: 160 }
     ],
     ventasMensualPorSucursal: [
@@ -55,6 +62,17 @@ const columnsByKey: Record<string, any[]> = {
     ]
 };
 
+const reportDefinitions = [
+    { key: "topProductosPorSucursal", label: "Top Productos por Sucursal" },
+    { key: "topGlobal", label: "Top Global" },
+    { key: "deliveryPromedioPorSucursal", label: "Delivery Promedio" },
+    { key: "costoEntregaPromedioPorSucursal", label: "Costo por Entrega Promedio" },
+    { key: "ticketPromedioPorSucursal", label: "Ticket Promedio" },
+    { key: "ventasMensualPorSucursal", label: "Ventas Mensual x Sucursal" },
+    { key: "clientesActivosPorSucursal", label: "Clientes Activos" },
+    { key: "clientesPorHoraMensual", label: "Clientes por Hora (Lâ€“S)" },
+];
+
 const { Title, Text } = Typography;
 
 export default function ReportsLauncher() {
@@ -64,6 +82,10 @@ export default function ReportsLauncher() {
     const [preview, setPreview] = useState<any | null>(null);
     const [sucursales, setSucursales] = useState<{_id: string; nombre: string}[]>([]);
     const [loadingSucursales, setLoadingSucursales] = useState(false);
+    const [selectedColumns, setSelectedColumns] = useState<Record<string, string[]>>({});
+
+    const reportesSeleccionadosRaw = Form.useWatch("reportes", form);
+    const reportesSeleccionados = reportesSeleccionadosRaw || [];
 
     useEffect(() => {
         setLoadingSucursales(true);
@@ -76,25 +98,46 @@ export default function ReportsLauncher() {
     useEffect(() => {
         // defaults del formulario
         form.setFieldsValue({
-            mes: dayjs().startOf("month"),
-            modoTop: "clientes"
+            meses: [],
+            modoTop: "clientes",
+            reportes: []
         });
+    }, []);
+
+    useEffect(() => {
+        setSelectedColumns({});
     }, []);
 
     const sucOptions = useMemo(() =>
         sucursales.map(s => ({ value: s._id, label: s.nombre })), [sucursales]
     );
+    const reportLabelByKey = useMemo(
+        () => Object.fromEntries(reportDefinitions.map(r => [r.key, r.label])),
+        []
+    );
+
+    const columnOptionsByKey = useMemo(() => {
+        return Object.fromEntries(
+            reportDefinitions.map((r) => [
+                r.key,
+                (columnsByKey[r.key] || []).map((c:any) => ({ value: c.dataIndex, label: c.title }))
+            ])
+        );
+    }, []);
 
     const handlePreview = async () => {
         try {
             const vals = await form.validateFields();
-            const mes = vals.mes?.format("YYYY-MM");
-            if (!mes) return message.error("Selecciona el mes");
+            const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+            if (!meses.length) return message.error("Selecciona al menos un mes");
+            const reportes = vals.reportes || [];
+            if (!reportes.length) return message.error("Selecciona al menos un reporte");
             setLoading(true);
             const data = await getOperacionMensualAPI({
-                mes,
+                meses,
                 sucursales: vals.sucursales,
-                modoTop: vals.modoTop
+                modoTop: vals.modoTop,
+                reportes
             });
             setPreview(data);
         } catch (e:any) {
@@ -108,12 +151,19 @@ export default function ReportsLauncher() {
     const handleDownload = async () => {
         try {
             const vals = await form.validateFields();
-            const mes = vals.mes?.format("YYYY-MM");
-            if (!mes) return message.error("Selecciona el mes");
+            const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+            if (!meses.length) return message.error("Selecciona al menos un mes");
+            const reportes = vals.reportes || [];
+            if (!reportes.length) return message.error("Selecciona al menos un reporte");
+            const columnasFiltradas = Object.fromEntries(
+                reportes.map((key) => [key, selectedColumns[key]])
+            );
             downloadOperacionMensualXlsx({
-                mes,
+                meses,
                 sucursales: vals.sucursales,
-                modoTop: vals.modoTop
+                modoTop: vals.modoTop,
+                reportes,
+                columnas: columnasFiltradas
             });
         } catch (e:any) {
             console.error(e);
@@ -127,10 +177,33 @@ export default function ReportsLauncher() {
                 Generador de Reportes
             </Title>
             <Text type="secondary">
-                Elige el mes, las sucursales y el tipo de Top 10 (clientes o vendedores). Puedes previsualizar o descargar en XLSX.
+                Elige uno o varios meses, sucursales, reportes y columnas. Puedes previsualizar o descargar en XLSX.
             </Text>
         </Space>
     );
+
+    const getColumns = (key: string) => {
+        const selected = selectedColumns[key];
+        const base = columnsByKey[key] || [];
+        if (!selected || !selected.length) return base;
+        return base.filter((c:any) => selected.includes(c.dataIndex));
+    };
+
+    const tabItems = reportDefinitions
+        .filter((r) => reportesSeleccionados.includes(r.key))
+        .map((r) => ({
+            key: r.key,
+            label: r.label,
+            children: (
+                <Table
+                    rowKey={(_, i) => String(i)}
+                    size="small"
+                    dataSource={preview?.[r.key] || []}
+                    columns={getColumns(r.key)}
+                    pagination={{ pageSize: 10 }}
+                />
+            )
+        }));
 
     return (
         <>
@@ -167,8 +240,8 @@ export default function ReportsLauncher() {
                         initialValues={{ modoTop: "clientes" }}
                     >
                         <Space size="large" wrap>
-                            <Form.Item name="mes" label="Mes" rules={[{ required: true }]}>
-                                <DatePicker picker="month" format="YYYY-MM" />
+                            <Form.Item name="meses" label="Meses" rules={[{ required: true }]}>
+                                <DatePicker picker="month" multiple format="YYYY-MM" />
                             </Form.Item>
 
                             <Form.Item name="sucursales" label="Sucursales (opcional)">
@@ -188,6 +261,15 @@ export default function ReportsLauncher() {
                                     <Radio.Button value="vendedores">Vendedores</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
+
+                            <Form.Item name="reportes" label="Reportes a incluir">
+                                <Select
+                                    mode="multiple"
+                                    allowClear
+                                    options={reportDefinitions.map((r) => ({ value: r.key, label: r.label }))}
+                                    style={{ minWidth: 360 }}
+                                />
+                            </Form.Item>
                         </Space>
                     </Form>
 
@@ -195,31 +277,36 @@ export default function ReportsLauncher() {
                         type="info"
                         showIcon
                         message="Consejo"
-                        description="Usa Vista previa para validar datos del mes antes de descargar el Excel con las 7 hojas."
+                        description="Usa Vista previa para validar datos antes de descargar el Excel."
                     />
+
+                    {reportesSeleccionados.length > 0 && (
+                        <Space direction="vertical" size="small" className="w-full">
+                            <Text strong>Campos por reporte (opcional)</Text>
+                            {reportesSeleccionados.map((key: string) => (
+                                <div key={`cols-${key}`} className="w-full">
+                                    <Text type="secondary">{`Campos: ${reportLabelByKey[key] || key}`}</Text>
+                                    <Select
+                                        mode="multiple"
+                                        allowClear
+                                        options={columnOptionsByKey[key] || []}
+                                        value={selectedColumns[key]}
+                                        onChange={(vals) =>
+                                            setSelectedColumns((prev) => ({ ...prev, [key]: vals }))
+                                        }
+                                    />
+                                </div>
+                            ))}
+                        </Space>
+                    )}
 
                     <Divider style={{ margin: "8px 0" }} />
 
                     <Spin spinning={loading}>
                         {preview ? (
                             <Tabs
-                                defaultActiveKey="topProductosPorSucursal"
-                                items={[
-                                    { key: "topProductosPorSucursal", label: "Top Productos por Sucursal",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.topProductosPorSucursal || []} columns={columnsByKey.topProductosPorSucursal} pagination={{ pageSize: 10 }} /> },
-                                    { key: "topGlobal", label: "Top Global",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.topGlobal || []} columns={columnsByKey.topGlobal} pagination={{ pageSize: 10 }} /> },
-                                    { key: "deliveryPromedioPorSucursal", label: "Delivery Promedio",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.deliveryPromedioPorSucursal || []} columns={columnsByKey.deliveryPromedioPorSucursal} pagination={{ pageSize: 10 }} /> },
-                                    { key: "ticketPromedioPorSucursal", label: "Ticket Promedio",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.ticketPromedioPorSucursal || []} columns={columnsByKey.ticketPromedioPorSucursal} pagination={{ pageSize: 10 }} /> },
-                                    { key: "ventasMensualPorSucursal", label: "Ventas Mensual x Sucursal",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.ventasMensualPorSucursal || []} columns={columnsByKey.ventasMensualPorSucursal} pagination={{ pageSize: 10 }} /> },
-                                    { key: "clientesActivosPorSucursal", label: "Clientes Activos",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.clientesActivosPorSucursal || []} columns={columnsByKey.clientesActivosPorSucursal} pagination={{ pageSize: 10 }} /> },
-                                    { key: "clientesPorHoraMensual", label: "Clientes por Hora (L–S)",
-                                        children: <Table rowKey={(_,i)=>String(i)} size="small" dataSource={preview.clientesPorHoraMensual || []} columns={columnsByKey.clientesPorHoraMensual} pagination={{ pageSize: 12 }} /> }
-                                ]}
+                                defaultActiveKey={tabItems[0]?.key}
+                                items={tabItems}
                             />
                         ) : (
                             <Alert type="warning" showIcon message="Sin datos aún" description="Genera una vista previa para ver resultados aquí." />
@@ -230,3 +317,5 @@ export default function ReportsLauncher() {
         </>
     );
 }
+
+
