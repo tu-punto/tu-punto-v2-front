@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { Form, DatePicker, InputNumber, Button, Col, Row, message, Radio, Card } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { Form, DatePicker, InputNumber, Col, Row, message, Radio } from "antd";
 import dayjs from "dayjs";
-import BranchFields from "./components/BranchFields";
 import { renewSellerAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
 import { ISucursalPago } from "../../models/sellerModels";
 import FormModal from "../../components/FormModal";
+import DynamicBranchSection from "../../components/DynamicBranchSection";
 
 interface DebtModalProps {
   visible: boolean;
@@ -165,34 +164,11 @@ export default function DebtModal({ visible, onCancel, onSuccess, seller }: Debt
         </Col>
       </Row>
 
-      {/* Sucursales dinámicas */}
-      <Row justify="space-between" align="middle">
-        <Col>
-          <h3>Sucursales</h3>
-        </Col>
-        <Col>
-          <Button type="dashed" icon={<PlusOutlined />} onClick={addBranch}>
-            Añadir sucursal
-          </Button>
-        </Col>
-      </Row>
-
-      <Form.List name="sucursales">
-        {(fields, { remove }) => (
-          <>
-            {fields.map((field) => (
-              <Card key={field.key} style={{ marginTop: 16 }}>
-                <BranchFields
-                  field={field}
-                  remove={remove}
-                  sucursalOptions={sucursalOptions}
-                  form={form}
-                />
-              </Card>
-            ))}
-          </>
-        )}
-      </Form.List>
+      <DynamicBranchSection
+        form={form}
+        branchOptions={sucursalOptions}
+        handleAddBranch={addBranch}
+      />
     </FormModal>
   )
 }
