@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { Form, Input, InputNumber, DatePicker, Button, Row, Col, Radio, Card, message } from "antd";
-import { PhoneOutlined, UserOutlined, MailOutlined, HomeOutlined, PlusOutlined } from "@ant-design/icons";
-import BranchFields from "./components/BranchFields";
+import { Form, Input, InputNumber, DatePicker, Row, Col, Radio, message } from "antd";
+import { PhoneOutlined, UserOutlined, MailOutlined, HomeOutlined } from "@ant-design/icons";
 import { registerSellerAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
 import { registerUserAPI } from "../../api/user";
 import { roles } from "../../constants/roles";
 import dayjs from "dayjs";
 import FormModal from "../../components/FormModal";
+import DynamicBranchSection from "../../components/DynamicBranchSection";
 const { SELLER } = roles;
 
 interface SellerFormModalProps {
@@ -185,41 +185,12 @@ export default function SellerFormModal({ visible, onCancel, onSuccess }: Seller
         </Col>
       </Row>
 
-      <Row justify="space-between" align="middle">
-        <Col>
-          <h3>Sucursales</h3>
-        </Col>
-        <Col>
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={handleAddBranch}
-            disabled={
-              (form.getFieldValue("sucursales") || []).length >=
-              sucursalOptions.length
-            }
-          >
-            Añadir sucursal
-          </Button>
-        </Col>
-      </Row>
-
-      <Form.List name="sucursales">
-        {(fields, { remove }) => (
-          <>
-            {fields.map((field) => (
-              <Card key={field.key} style={{ marginTop: 16 }}>
-                <BranchFields
-                  field={field}
-                  remove={remove}
-                  sucursalOptions={sucursalOptions}
-                  form={form}
-                />
-              </Card>
-            ))}
-          </>
-        )}
-      </Form.List>
+      <DynamicBranchSection
+        form={form}
+        branchOptions={sucursalOptions}
+        handleAddBranch={handleAddBranch}
+        disabled={ (form.getFieldValue("sucursales") || []).length >= sucursalOptions.length }
+      />
     </FormModal>
   );
 }
