@@ -28,3 +28,12 @@ export const getBoxCloseByIdAPI = async (id: string) => {
     parseError(error as AxiosError);
   }
 };
+
+export const updateBoxCloseAPI = async (id: string, boxCloseData: any) => {
+  try {
+    const res = await apiClient.patch(`/boxClose/${id}`, boxCloseData);
+    return res.data;
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
