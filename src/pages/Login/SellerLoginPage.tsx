@@ -7,7 +7,7 @@ export default function SellerLoginPage() {
   return (
     <LoginTemplate
       title="Tu Punto (Vendedor)"
-      buttonTitle="Iniciar sesión como Admin"
+      buttonTitle="Inicia sesión como Admin"
       buttonOnClick={() => navigate("/login-admin")}
       redirectTo="/seller-info"
     />

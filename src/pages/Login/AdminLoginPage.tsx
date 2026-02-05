@@ -7,7 +7,7 @@ export default function AdminLoginPage() {
   return (
     <LoginTemplate
       title="Tu Punto (Admin)"
-      buttonTitle="Iniciar sesión como Vendedor"
+      buttonTitle="Inicia sesión como Vendedor"
       buttonOnClick={() => navigate("/login-seller")}
       showBranchSelect
       redirectTo="/stock"
