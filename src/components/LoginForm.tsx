@@ -27,10 +27,17 @@ export default function LoginForm({ showBranchSelect, redirectTo }: LoginFormPro
 
   useEffect(() => {
     if (!showBranchSelect) return;
-    getSucursalsAPI()
-      .then((data) => setBranches(data))
-      .catch(() => message.error("No se pudieron cargar las sucursales"));
+    fetchBranches();
   }, [showBranchSelect]);
+
+  const fetchBranches = async () => {
+    const data = await getSucursalsAPI()
+    if (!data) {
+      setBranches([])
+      return message.error("No se pudieron cargar las sucursales")
+    }
+    setBranches(data)
+  }
 
   const onFinish = async (values: formValues) => {
     setLoading(true);
