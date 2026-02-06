@@ -7,8 +7,7 @@ import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellerDebtsAPI, getSellersAPI } from "../../api/seller";
-import { getSalesBySellerIdAPI } from "../../api/sales";
+import { getSellersAPI } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
@@ -141,6 +140,17 @@ export default function SellerTable({
         (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
     },
     {
+      title: "Emite factura?",
+      dataIndex: "emite_factura",
+      key: "emite_factura",
+      render: (tieneFactura: boolean) => (tieneFactura ? "Sí" : "No"),
+      sorter: (a: any, b: any) => {
+        const valorA = a.emite_factura ? 1 : 0;
+        const valorB = b.emite_factura ? 1 : 0;
+        return valorA - valorB;
+      },
+    },
+    {
       title: "Acciones",
       key: "acciones",
       render: (_: any, row: SellerRow) => (
@@ -172,18 +182,20 @@ export default function SellerTable({
 
       const rows: SellerRow[] = await Promise.all(
         sellers.map(async (seller) => {
-          const mensual = seller.pago_sucursales.reduce(
-            (t: number, p: ISucursalPago) =>
-              t +
-              Number(p.alquiler) +
-              Number(p.exhibicion) +
-              Number(p.delivery) +
-              Number(p.entrega_simple),
-            0
-          );
+          const mensual = seller.pago_sucursales
+            .filter((p) => p.activo)
+            .reduce(
+              (t: number, p: ISucursalPago) =>
+                t +
+                Number(p.alquiler) +
+                Number(p.exhibicion) +
+                Number(p.delivery) +
+                Number(p.entrega_simple),
+              0
+            );
 
-          const saldoPendiente = seller.saldo_pendiente
-          const deuda = seller.deuda
+          const saldoPendiente = seller.saldo_pendiente;
+          const deuda = seller.deuda;
           const pagoPendiente = saldoPendiente - deuda;
 
           return {
@@ -245,10 +257,7 @@ export default function SellerTable({
       });
     }
 
-    // Filtrar por factura
-    return isFactura
-      ? filtered.filter((s) => s.emite_factura)
-      : filtered.filter((s) => !s.emite_factura);
+    return filtered;
   };
 
   const filteredSellers = filterSellers(sellers);

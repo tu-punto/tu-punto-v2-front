@@ -96,3 +96,47 @@ export const deleteFinanceFluxCategoryAPI = async (id: string) => {
         parseError(error as AxiosError)
     }
 }
+
+export const getFinancialSummaryAPI = async () => {
+  const res = await apiClient.get("/financeFlux/financial-summary");
+  return res.data;
+};
+
+export const getCommissionAPI = async (options?: {
+    range?: string;
+    from?: string;
+    to?: string;
+}) => {
+    try {
+        const params = new URLSearchParams();
+        if (options?.range) params.append("range", options.range);
+        if (options?.from) params.append("from", options.from);
+        if (options?.to) params.append("to", options.to);
+        const qs = params.toString();
+        const url = qs ? `/financeFlux/commission?${qs}` : "/financeFlux/commission";
+        const res = await apiClient.get(url);
+        return res.data;
+    } catch (error) {
+        parseError(error as AxiosError);
+    }
+};
+
+export const getMerchandiseSoldAPI = async (options?: {
+    range?: string;
+    from?: string;
+    to?: string;
+}) => {
+    try {
+        const params = new URLSearchParams();
+        if (options?.range) params.append("range", options.range);
+        if (options?.from) params.append("from", options.from);
+        if (options?.to) params.append("to", options.to);
+        const qs = params.toString();
+        const url = qs ? `/financeFlux/merchandise-sold?${qs}` : "/financeFlux/merchandise-sold";
+        const res = await apiClient.get(url);
+        return res.data;
+    } catch (error) {
+        parseError(error as AxiosError);
+    }
+};
+

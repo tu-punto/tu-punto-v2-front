@@ -8,3 +8,8 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+export const apiClientNoJSON = axios.create({
+  baseURL: SERVER_URL,
+  withCredentials: true, // para las cookies
+});

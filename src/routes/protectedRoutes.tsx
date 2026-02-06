@@ -17,6 +17,8 @@ import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
 import FindShipping from "../pages/Shipping/FindShipping";
+import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
+
 
 const protectedRoutes = [
   {
@@ -47,7 +49,7 @@ const protectedRoutes = [
       {
         path: "/sales",
         element: (
-          <RoleGuard allowedRoles={["admin"]}>
+          <RoleGuard allowedRoles={["admin", "operator"]}>
             <Sales />
           </RoleGuard>
         ),
@@ -55,7 +57,7 @@ const protectedRoutes = [
       {
         path: "/shipping",
         element: (
-          <RoleGuard allowedRoles={["admin", "seller"]}>
+          <RoleGuard allowedRoles={["admin", "seller", "operator"]}>
             <Shipping />
           </RoleGuard>
         ),
@@ -79,7 +81,7 @@ const protectedRoutes = [
       {
         path: "/stock",
         element: (
-          <RoleGuard allowedRoles={["admin", "seller"]}>
+          <RoleGuard allowedRoles={["admin", "seller", "operator"]}>
             <StockManagement />
           </RoleGuard>
         ),
@@ -127,7 +129,7 @@ const protectedRoutes = [
       {
         path: "/cash",
         element: (
-          <RoleGuard allowedRoles={["admin"]}>
+          <RoleGuard allowedRoles={["admin", "operator"]}>
             <CashReconciliationPage />
           </RoleGuard>
         ),
@@ -143,7 +145,7 @@ const protectedRoutes = [
       {
         path: "/branch",
         element: (
-          <RoleGuard allowedRoles={["admin", "seller"]}>
+          <RoleGuard allowedRoles={["admin","seller", "operator"]}>
             <BranchPage />
           </RoleGuard>
         ),
@@ -151,7 +153,7 @@ const protectedRoutes = [
       {
         path: "/sales-history",
         element: (
-          <RoleGuard allowedRoles={["admin"]}>
+          <RoleGuard allowedRoles={["admin", "operator"]}>
             <SalesHistoryPage />
           </RoleGuard>
         ),
@@ -163,6 +165,14 @@ const protectedRoutes = [
             <UsersPage />
           </RoleGuard>
         ),
+      },
+      {
+        path: "/shipping-guide",
+        element: (
+          <RoleGuard allowedRoles={["seller"]}>
+            <ShippingGuide/>
+          </RoleGuard>
+        )
       },
       {
         path: "*",

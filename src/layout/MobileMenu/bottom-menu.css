@@ -1,0 +1,32 @@
+.bottom-menu .ant-menu,
+.bottom-menu .ant-menu-sub,
+.bottom-menu.ant-menu,
+.bottom-menu .ant-menu-dark {
+    background: #094f89 !important;
+}
+.bottom-menu .ant-menu-horizontal { border-bottom: none !important; }
+
+.bottom-menu .ant-menu-horizontal > .ant-menu-item::after {
+    border-bottom: none !important;
+}
+
+.bottom-menu .ant-menu-item,
+.bottom-menu .ant-menu-submenu-title {
+    background: transparent !important;
+}
+
+.bottom-menu .ant-menu-item:hover,
+.bottom-menu .ant-menu-item-active,
+.bottom-menu .ant-menu-item-selected {
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+.bottom-menu .ant-menu a {
+    color: #e8f1ff;
+}
+
+.bottom-menu .ant-menu-overflow-item {
+    flex: 1 1 0% !important;
+    text-align: center;
+    min-width: 0;
+}

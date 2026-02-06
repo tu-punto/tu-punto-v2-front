@@ -1,4 +1,4 @@
-import { Button, Card, Col, Input, message, Row, Select, Space, Typography } from "antd";
+import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SalesFormModal from "./SalesFormmodal";
@@ -16,17 +16,18 @@ import QRScanner from "./QRScanner.tsx";
 
 export const Sales = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
-
   const navigate = useNavigate();
   const { user }: any = useContext(UserContext);
   const isAdmin = user?.role === 'admin';
+  const isOperator = user?.role === 'operator';
   //console.log ("🚀 user en Sales:", user);
 
   const [modalType, setModalType] = useState<'sales' | 'shipping' | null>(null);
   const [productAddModal, setProductAddModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0)
-  const [sellers, setSellers] = useState([])
-  const [selectedSellerId, setSelectedSellerId] = useState<number | undefined>(undefined);
+  const [sellers, setSellers] = useState<any[]>([])
+  const [sellersLoading, setSellersLoading] = useState(true);
+  const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
   //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
   const [selectedProducts, setSelectedProducts, handleValueChange] = useEditableTable([])
   const [branches, setBranches] = useState([] as any[]);
@@ -38,9 +39,34 @@ export const Sales = () => {
   );
   const [searchText, setSearchText] = useState("");
   const [sucursalesPagadas, setSucursalesPagadas] = useState<any[]>([]);
+  const [cartLoading, setCartLoading] = useState(false);
+  const normalizeId = (id: any) => String(id?._id ?? id?.$oid ?? id ?? "");
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const getStockActual = (p: any, sucursalId?: string | null) => {
+    // Caso 1: viene "flat" (lo ideal)
+    const direct =
+      p.stockActual ?? p.stock ?? p.stock_actual ?? p.stockTotal ?? p.stock_total;
+
+    if (direct !== undefined && direct !== null && direct !== "") {
+      return Number(direct) || 0;
+    }
+
+    // Caso 2: viene el producto con sucursales/combinaciones (como tu JSON)
+    const sid = normalizeId(sucursalId);
+    const suc = (p.sucursales || []).find((s: any) => normalizeId(s.id_sucursal) === sid);
+
+    if (!suc) return 0;
+
+    const total = (suc.combinaciones || []).reduce((acc: number, c: any) => {
+      return acc + (Number(c.stock) || 0);
+    }, 0);
+
+    return total;
+  };
+
   useEffect(() => {
     const fetchSellerAndSetSucursales = async () => {
-      if (isAdmin || !user?.id_vendedor) return;
+      if (isAdmin || isOperator || !user?.id_vendedor) return;
 
       try {
         const vendedor = await getSellerAPI(user.id_vendedor);
@@ -63,7 +89,7 @@ export const Sales = () => {
     };
 
     fetchSellerAndSetSucursales();
-  }, [isAdmin, user?.id_vendedor]);
+  }, [isAdmin, isOperator, user?.id_vendedor]);
 
   const [filteredBySeller, setFilteredBySeller] = useState<any[]>([]);
 
@@ -73,24 +99,52 @@ export const Sales = () => {
       return;
     }
 
+
+    if (sellersLoading) {
+      setFilteredBySeller([]);
+      return;
+    }
+
     const vendedoresVigentesIds = sellers.map((v: any) => String(v._id));
+    const sellersReady = vendedoresVigentesIds.length > 0;
+
+    if (!sellersReady) {
+      setFilteredBySeller([]);
+      return;
+    }
 
     let filtered = data.filter((p: any) => {
-      if (p.stockActual <= 0 || selectedProduct !== 'all' && selectedProduct !== p.id_producto) return false;
+      const stock = getStockActual(p, branchIdForFetch);
+      if (stock <= 0) return false;
+
+      if (selectedProduct !== "all" && String(selectedProduct) !== String(p.id_producto)) {
+        return false;
+      }
       return vendedoresVigentesIds.includes(String(p.id_vendedor));
     });
 
-    if (isAdmin && selectedSellerId) {
+    if ((isAdmin || isOperator) && selectedSellerId) {
       filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
-    } else if (!isAdmin) {
+    } else if (!isAdmin && !isOperator) {
       filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
     }
 
     if (searchText.trim()) {
       const lower = searchText.trim().toLowerCase();
-      filtered = filtered.filter(p =>
-        (p.producto ?? '').toString().toLowerCase().includes(lower)
-      );
+      const words = lower.split(" ");
+      const specialChars = /[!@#$%^&*?:{}|<>]/
+
+      const filterWords = (p: any, words: string[]) => {
+        let match = true;
+        for (const word of words) {
+          if (!match) return false;
+          if (specialChars.test(word)) continue;
+          match = match && (p.producto ?? '').toString().toLowerCase().includes(word);
+        }
+        return match;
+      };
+
+      filtered = filtered.filter(p => filterWords(p, words));
     }
     filtered = filtered.map((p: any) => {
       const vendedor = sellers.find((v: any) => String(v._id) === String(p.id_vendedor));
@@ -100,26 +154,36 @@ export const Sales = () => {
       };
     });
     setFilteredBySeller(filtered);
-  }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers, selectedProduct]);
+  }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
 
   useEffect(() => {
-    fetchSellers();
+    // fetchSellers();
     fetchSucursal();
   }, []);
   useEffect(() => {
-    if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+    const sucursalId = (isAdmin || isOperator)
+      ? localStorage.getItem("sucursalId")
+      : selectedBranchId;
+
+    if (!sucursalId) return;
+
+    fetchSellers();
+  }, [isAdmin, isOperator, selectedBranchId]);
+
+  useEffect(() => {
+    if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
-  }, [branches, isAdmin, selectedBranchId]);
+  }, [branches, isAdmin, isOperator, selectedBranchId]);
   useEffect(() => {
-    const newSucursalId = isAdmin
+    const newSucursalId = (isAdmin || isOperator)
       ? localStorage.getItem("sucursalId")
       : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
     if (newSucursalId && newSucursalId !== branchIdForFetch) {
       setBranchIdForFetch(newSucursalId);
     }
-  }, [branches, isAdmin, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
+  }, [branches, isAdmin, isOperator, selectedBranchId]); // ❌ sacá branchIdForFetch del array de dependencias
 
   const [productOptions, setProductOptions] = useState<JSX.Element[]>([])
   useEffect(() => {
@@ -140,7 +204,7 @@ export const Sales = () => {
       )
     })
     setProductOptions(options)
-  }, [data, selectedSellerId, isAdmin, user?.id_vendedor, searchText, sellers]);
+  }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers]);
 
   //console.log(" Productos desde useProductsFlat:", data);
   const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -199,18 +263,20 @@ export const Sales = () => {
     setRefreshKey(prevKey => prevKey + 1); // para que también se actualicen las tablas dependientes
   };
   const fetchSellers = async () => {
+    setSellersLoading(true);
     try {
       const response = await getSellersAPI();
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
-      const sucursalId = isAdmin
+      const sucursalId = (isAdmin || isOperator)
         ? localStorage.getItem("sucursalId")
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
       if (!sucursalId) {
         console.warn("Sucursal ID no disponible aún para filtrar vendedores");
         setSellers([]);
+        setSellersLoading(false);
         return;
       }
 
@@ -236,6 +302,8 @@ export const Sales = () => {
       setSellers(sellersVigentes);
     } catch (error) {
       message.error('Error al obtener los vendedores');
+    } finally {
+      setSellersLoading(false);
     }
   };
 
@@ -243,7 +311,7 @@ export const Sales = () => {
     try {
       const response = await getSucursalsAPI()
       setBranches(response)
-      if (isAdmin) {
+      if (isAdmin || isOperator) {
         const sucursalIdLogin = localStorage.getItem("sucursalId");
         if (sucursalIdLogin) {
           setSelectedBranchId(sucursalIdLogin);
@@ -256,14 +324,32 @@ export const Sales = () => {
   }
 
   useEffect(() => {
-    if (!isAdmin && branches.length > 0 && !selectedBranchId) {
+    if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
   }, [branches, isAdmin, selectedBranchId]);
 
-  const fallbackSucursalId = isAdmin
+  const fallbackSucursalId = isAdmin || isOperator
     ? localStorage.getItem('sucursalId')
     : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
+
+  useEffect(() => {
+    if (!branchIdForFetch || branchIdForFetch === "undefined") return;
+
+    setInventoryLoading(true);
+
+    const p = fetchProducts();
+
+    if (p && typeof (p as any).finally === "function") {
+      (p as any).finally(() => {
+        setInventoryLoading(false);
+        setCartLoading(false); // si quieres que el carrito también espere a productos
+      });
+    } else {
+      setInventoryLoading(false);
+      setCartLoading(false);
+    }
+  }, [branchIdForFetch]);
 
   useEffect(() => {
     if (!branchIdForFetch || branchIdForFetch === "undefined") return;
@@ -424,17 +510,23 @@ export const Sales = () => {
                       style={{ width: 200 }}
                       allowClear
                     />
-                    {!isAdmin && (
+                    {!isAdmin && !isOperator && (
                       <Select
                         placeholder="Sucursal"
                         value={selectedBranchId}
-                        onChange={(value) => setSelectedBranchId(value)}
+                        onChange={(value) => {
+                          setCartLoading(true);
+                          setInventoryLoading(true);
+                          setSelectedProducts([]);
+                          setTotalAmount(0);
+                          setSelectedBranchId(value)
+                        }}
                         options={sucursalesPagadas}
                         style={{ minWidth: 180 }}
                         allowClear
                       />
                     )}
-                    {!isAdmin && (
+                    {!isAdmin && !isOperator && (
                       <Select
                         value={selectedProduct}
                         onChange={setSelectedProduct}
@@ -451,19 +543,21 @@ export const Sales = () => {
                     >
                       Añadir nuevo producto
                     </Button>
-                    {isAdmin && (
+                    {isAdmin && !isOperator && (
                       <Select
                         placeholder="Selecciona un vendedor"
                         options={sellers.map((vendedor: any) => ({
                           value: vendedor._id,
-                          label: vendedor.nombre + " " + vendedor.apellido,
+                          label: `${vendedor.nombre} ${vendedor.apellido}`,
                         }))}
-                        filterOption={(input, option: any) =>
-                          option.label.toLowerCase().includes(input.toLowerCase())
+                        showSearch
+                        optionFilterProp="label"
+                        filterOption={(input, option) =>
+                          String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
                         }
                         style={{ minWidth: 200 }}
+                        value={selectedSellerId}
                         onChange={(value) => setSelectedSellerId(value)}
-                        showSearch
                         allowClear
                       />
                     )}
@@ -474,11 +568,14 @@ export const Sales = () => {
             }
             bordered={false}
           >
-            <ProductTable
-              onSelectProduct={handleProductSelect}
-              refreshKey={refreshKey}
-              data={filteredBySeller}
-            />
+            <Spin spinning={inventoryLoading || sellersLoading} tip="Cargando inventario...">
+              <div style={{ pointerEvents: (inventoryLoading || sellersLoading) ? "none" : "auto" }}></div>
+              <ProductTable
+                onSelectProduct={handleProductSelect}
+                refreshKey={refreshKey}
+                data={filteredBySeller}
+              />
+            </Spin>
           </Card>
         </Col>
 
@@ -495,7 +592,7 @@ export const Sales = () => {
 
                 <Col>
                   <Space wrap>
-                    {isAdmin && (
+                    {(isAdmin || !isOperator) && (
                       <Button
                         onClick={showSalesModal}
                         type="primary"
@@ -507,7 +604,7 @@ export const Sales = () => {
                     <Button onClick={showShippingModal} type="primary">
                       Realizar Entrega
                     </Button>
-                    {isAdmin && (
+                    {(isAdmin || isOperator) && (
                       <Button
                         type="primary"
                         className="text-mobile-sm xl:text-desktop-sm"
@@ -522,16 +619,17 @@ export const Sales = () => {
             }
             bordered={false}
           >
-
-            <EmptySalesTable
-              products={selectedProducts}
-              onDeleteProduct={handleDeleteProduct}
-              handleValueChange={handleEnhancedValueChange}
-              onUpdateTotalAmount={updateTotalAmount}
-              key={refreshKey}
-              sellers={sellers}
-              isAdmin={isAdmin}
-            />
+            <Spin spinning={cartLoading} tip="Cargando carrito...">
+              <EmptySalesTable
+                products={selectedProducts}
+                onDeleteProduct={handleDeleteProduct}
+                handleValueChange={handleEnhancedValueChange}
+                onUpdateTotalAmount={updateTotalAmount}
+                key={refreshKey}
+                sellers={sellers}
+                isAdmin={isAdmin || isOperator}
+              />
+            </Spin>
           </Card>
           {showQRScanner && (
             <div style={{ paddingTop: 24 }}>
@@ -573,7 +671,7 @@ export const Sales = () => {
         onSuccess={handleSuccessProductModal}
         onAddProduct={handleAddProduct}
         selectedSeller={
-          isAdmin
+          isAdmin || isOperator
             ? sellers.find((s: any) => s._id === selectedSellerId) || null
             : { _id: user?.id_vendedor, nombre: user?.nombre_vendedor?.split(" ")[0] || "", apellido: user?.nombre_vendedor?.split(" ")[1] || "" }
         }
@@ -604,7 +702,7 @@ export const Sales = () => {
         sucursals={branches}
         //handleDebt={updateSellerDebt}
         clearSelectedProducts={() => setSelectedProducts([])}
-        isAdmin={isAdmin}
+        isAdmin={isAdmin || isOperator}
         sellers={sellers}
         suc={fallbackSucursalId}
       />

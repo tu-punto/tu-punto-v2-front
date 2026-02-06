@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import {Row, Col, message} from 'antd';
+
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
@@ -17,7 +18,7 @@ import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
 import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
-
+//test
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
@@ -55,6 +56,47 @@ const StockManagement = () => {
         setSellersVigentes(listaVigente.filter(s => s._id));
     };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     useEffect(() => {
         if (!user || Object.keys(user).length === 0) return;
 
@@ -64,6 +106,12 @@ const StockManagement = () => {
         } else {
             const stored = localStorage.getItem("sucursalId");
             if (stored) setSucursalId(stored);
+
+
+
+
+
+
         }
     }, [user]);
     const fetchFullProducts = async () => {
@@ -78,6 +126,8 @@ const StockManagement = () => {
     }, [isConfirmModalVisible]);
 
     useEffect(() => {
+
+
         fetchData();
     }, [sucursalId]);
 
@@ -187,6 +237,7 @@ const StockManagement = () => {
         // NUEVO: aplicar filtro por defecto cuando se cargan
         setTimeout(() => filter(), 100);
     }, [sellers, categories, groups]);
+
     const finalProductList = isSeller
         ? products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
         : filteredProducts;
@@ -267,6 +318,7 @@ const StockManagement = () => {
     };
 
     const filter = () => {
+
         const selectedOption = options[criteriaFilter];
         if (!selectedOption || !selectedOption.filter) return;
 
@@ -307,12 +359,22 @@ const StockManagement = () => {
     };
     const controlSpan = isSeller ? { xs: 24, sm: 12, lg: 8 } : { xs: 24, sm: 12, lg: 6 };
 
+
+
+
+
+
     const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
 
     const handleMoveSuccess = () => {
         fetchData();
         setIsMoveModalVisible(false);
     };
+
+
+
+
+
 
     return (
 
@@ -541,6 +603,9 @@ const StockManagement = () => {
                     onClose={() => setIsMoveModalVisible(false)}
                     onSuccess={handleMoveSuccess}
                     products={products}
+
+
+
                 />
             )}
         </div>

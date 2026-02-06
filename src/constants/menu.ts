@@ -15,10 +15,25 @@ export const menu = [
   //   icon: boxIcon,
   //   roles: ["admin"],
   // },
-  { path: "/seller", label: "Vendedores", icon: sellerIcon, roles: ["admin"] },
+  { 
+    path: "/seller", 
+    label: "Vendedores", 
+    icon: sellerIcon, 
+    roles: ["admin"] 
+  },
   //{ path: "/sellerFactura", label: "Vendedores de Factura", icon: sellerIcon, roles: ["admin"] },
-  { path: "/sales", label: "Ventas", icon: cartIcon, roles: ["admin"] },
-  { path: "/shipping", label: "Pedidos", icon: shippingIcon, roles: ["admin", "seller"] },
+  { 
+    path: "/sales", 
+    label: "Ventas", 
+    icon: cartIcon, 
+    roles: ["admin", "operator"] 
+  },
+  { 
+    path: "/shipping", 
+    label: "Pedidos", 
+    icon: shippingIcon, 
+    roles: ["admin", "seller", "operator"] 
+  },
   {
     path: "/financeFlux",
     label: "Flujo Financiero",
@@ -29,7 +44,7 @@ export const menu = [
     path: "/stock",
     label: "Stock",
     icon: stockManagementIcon,
-    roles: ["admin", "seller"],
+    roles: ["admin", "seller", "operator"],
   },
   {
     path: "/shop",
@@ -53,25 +68,31 @@ export const menu = [
     path: "/cash",
     label: "Reconciliación de Caja",
     icon: boxIcon,
-    roles: ["admin"],
+    roles: ["admin", "operator"],
   },
   //{ path: "/cierreCaja",label: "Reconciliación de Caja",icon: boxIcon,roles: ["admin"] },
   {
     path: "/branch",
     label: "Sucursales",
     icon: branchIcon,
-    roles: ["admin","seller"],
+    roles: ["admin","seller", "operator"],
   },
   {
     path: "/sales-history",
     label: "Historial de Ventas",
     icon: salesHistoryIcon,
-    roles: ["admin"],
+    roles: ["admin", "operator"],
   },
   {
     path: "/user",
     label: "Usuarios",
     icon: sellerIcon,
     roles: ["admin"],
+  },
+  {
+    path: "/shipping-guide",
+    label: "Guías de Envío",
+    icon: shippingIcon,
+    roles: ["seller"]
   }
 ];
