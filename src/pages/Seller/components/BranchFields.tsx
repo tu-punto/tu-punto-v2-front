@@ -1,26 +1,18 @@
-import {
-  Button,
-  Col,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Radio,
-  Row,
-  Select,
-} from "antd";
+import { Button, Col, DatePicker, Form, FormInstance, FormListFieldData, Input, InputNumber, Radio, Row, Select } from "antd";
 import { DeleteOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 const { TextArea } = Input;
 
-const BranchFields = ({
-  field,
-  remove,
-  sucursalOptions,
-  form,
-  isSeller = false,
-}: any) => {
+interface BranchFieldsProps {
+  field: FormListFieldData,
+  remove: (index: number | number[]) => void,
+  sucursalOptions: any[],
+  form: FormInstance<any>,
+  isSeller?: boolean
+}
+
+const BranchFields = ({ field, remove, sucursalOptions, form, isSeller = false }: BranchFieldsProps) => {
   const sucursales = form.getFieldValue("sucursales") || [];
   const currentBranch = sucursales[field.name] || {};
   const handleActivoChange = (e: any) => {
