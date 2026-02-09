@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getSucursalsAPI } from "../api/sucursal";
 import { getSellerAPI } from "../api/seller";
 import { IBranch } from "../models/branchModel";
