@@ -55,11 +55,16 @@ function UploadGuideForm({ visible, onCancel, onFinish }: UploadGuideFormProps) 
         }
     }
 
+    const handleCancel = () => {
+        form.resetFields()
+        onCancel()
+    }
+
     return (
         <FormModal
             title="Subir Guía de Envío"
             open={visible}
-            onClose={onCancel}
+            onClose={handleCancel}
             onFinish={handleFinish}
             form={form}
             submitLoading={loading}
@@ -72,7 +77,7 @@ function UploadGuideForm({ visible, onCancel, onFinish }: UploadGuideFormProps) 
                 <DatePicker
                     style={{ width: '100%' }}
                     disabled={true}
-                    value={moment()}
+                    defaultValue={moment()}
                 />
             </Form.Item>
             <Form.Item
