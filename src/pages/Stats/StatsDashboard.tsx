@@ -82,7 +82,7 @@ const StatisticsDashboard = () => {
             break;
           case DATE_TAGS.LAST_YEAR:
             start = now.startOf("year");
-            rangeParam = "year"; 
+            rangeParam = "365d"; 
             break;
           case DATE_TAGS.ALL_TIME:
           default:
