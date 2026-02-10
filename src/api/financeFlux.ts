@@ -97,9 +97,21 @@ export const deleteFinanceFluxCategoryAPI = async (id: string) => {
     }
 }
 
-export const getFinancialSummaryAPI = async () => {
-  const res = await apiClient.get("/financeFlux/financial-summary");
-  return res.data;
+export const getFinancialSummaryAPI = async (options?: {
+        range?: string;
+        from?: string;
+        to?: string;
+        mode?: string;
+}) => {
+        const params = new URLSearchParams();
+        if (options?.range) params.append("range", options.range);
+        if (options?.from) params.append("from", options.from);
+        if (options?.to) params.append("to", options.to);
+        if (options?.mode) params.append("mode", options.mode);
+        const qs = params.toString();
+        const url = qs ? `/financeFlux/financial-summary?${qs}` : "/financeFlux/financial-summary";
+        const res = await apiClient.get(url);
+        return res.data;
 };
 
 export const getCommissionAPI = async (options?: {
