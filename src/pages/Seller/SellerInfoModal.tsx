@@ -9,6 +9,7 @@ const SellerInfoModalTry = ({ visible, onSuccess, onCancel, seller }: any) => {
             onCancel={onCancel}
             footer={null}
             width={800}
+            className="p-3"
         >
             <SellerInfoPage
                 visible={visible}
