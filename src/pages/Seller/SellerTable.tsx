@@ -261,20 +261,20 @@ export default function SellerTable({ refreshKey, setRefreshKey }: SellerTablePr
 
   return (
     <>
-      <Space direction="horizontal" size="middle" className="mb-4">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 mb-4 flex-wrap">
         <Input
           placeholder="Buscar vendedor..."
           prefix={<SearchOutlined />}
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ width: 250 }}
+          className="flex-1 min-w-[250px] md:min-w-[250px]"
           allowClear
         />
 
         <Select
           value={estadoFilter}
           onChange={setEstadoFilter}
-          style={{ width: 200 }}
+          className="flex-1 min-w-[200px] md:w-[200px]"
           options={[
             { value: "todos", label: "Todos" },
             { value: "Activo", label: "Activos" },
@@ -285,14 +285,14 @@ export default function SellerTable({ refreshKey, setRefreshKey }: SellerTablePr
         <Select
           value={pagoFilter}
           onChange={setPagoFilter}
-          style={{ width: 200 }}
+          className="flex-1 min-w-[200px] md:w-[200px]"
           options={[
             { value: "todos", label: "Todos" },
             { value: "con deuda", label: "Pago Pendiente" },
             { value: "sin deuda", label: "Sin Pago Pendiente" },
           ]}
         />
-      </Space>
+      </div>
 
       <Table
         columns={columns}
