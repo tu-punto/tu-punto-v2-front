@@ -24,6 +24,7 @@ function FormModal({ title, open, closeTitle = "Cancelar", onClose, submitTitle 
             onCancel={onClose}
             width={width}
             footer={null}
+            className="p-3"
         >
             <Form
                 layout="vertical"
