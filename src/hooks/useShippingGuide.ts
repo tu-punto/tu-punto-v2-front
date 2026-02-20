@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI } from "../api/shippingGuide";
+import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../api/shippingGuide";
 
 function useShippingGuide() {
     const [guidesList, setGuidesList] = useState([]);
@@ -39,11 +39,25 @@ function useShippingGuide() {
         }
     }
 
+    const checkShippingDelivered = async (guideId: string) => {
+        try {
+            const res = await markAsDelivered(guideId)
+            if (res.success) {
+                console.log("El estado de la guía se ha actualizado correctamente")
+            } else {
+                console.error("Error al actualizar el estado de la guía")
+            }
+        } catch (error) {
+            console.error("Error al actualizar la guía:", error)
+        }
+    }
+
     return {
         guidesList,
         fetchAllGuides,
         fetchGuidesByBranch,
         fetchGuidesBySeller,
+        checkShippingDelivered,
     }
 }
 
