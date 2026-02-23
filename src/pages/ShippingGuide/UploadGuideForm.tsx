@@ -32,7 +32,7 @@ function UploadGuideForm({ visible, onCancel, onFinish }: UploadGuideFormProps) 
             const formData = new FormData();
             formData.append('vendedor', user.id_vendedor);
             formData.append('sucursal', values.sucursal)
-            formData.append('descripcion', values.descripcion);
+            formData.append('descripcion', values.description);
             if (imagen) {
                 formData.append('imagen', imagen);
             }
