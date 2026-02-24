@@ -10,10 +10,11 @@ import { IShippingGuide } from "../../interfaces/shipping_guide.interfaces";
 
 interface ShippingGuideTableProps {
     filterData: 'all' | 'seller' | 'branch',
-    search_id?: string
+    search_id?: string,
+    refreshKey?: number
 }
 
-function ShippingGuideTab({ filterData, search_id }: ShippingGuideTableProps) {
+function ShippingGuideTab({ filterData, search_id, refreshKey = 0 }: ShippingGuideTableProps) {
     const [isImageVisible, setIsImageVisible] = useState(false)
     const [imageUrl, setImageUrl] = useState<string | null>()
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend')
@@ -21,6 +22,10 @@ function ShippingGuideTab({ filterData, search_id }: ShippingGuideTableProps) {
     const { guidesList, fetchAllGuides, fetchGuidesByBranch, fetchGuidesBySeller, checkShippingDelivered } = useShippingGuide()
 
     useEffect(() => {
+        fetchGuides()
+    }, [filterData, refreshKey])
+
+    const fetchGuides = () => {
         if (filterData == 'all') {
             fetchAllGuides()
         } else {
@@ -34,7 +39,7 @@ function ShippingGuideTab({ filterData, search_id }: ShippingGuideTableProps) {
                 fetchGuidesByBranch(search_id)
             }
         }
-    }, [filterData])
+    }
 
     const imageView = useMemo(() => {
         return (
@@ -44,7 +49,7 @@ function ShippingGuideTab({ filterData, search_id }: ShippingGuideTableProps) {
                 footer={null}
             >
                 <Typography.Title level={4}>Guía de Envío - Foto</Typography.Title>
-                <Divider/>
+                <Divider />
                 {imageUrl && <img src={imageUrl} alt="Imagen" style={{ width: '100%' }} />}
             </Modal>
         )
@@ -60,12 +65,17 @@ function ShippingGuideTab({ filterData, search_id }: ShippingGuideTableProps) {
     }
 
     const handleCheckShipping = async (record: IShippingGuide) => {
-        if (record.is_recogido) {
+        if (record.isRecogido) {
             message.info("Esta guía ya fue marcada como recogida")
             return
         }
-        //TODO actualizar tabla y mensaje de confirmación quiza
-        checkShippingDelivered(record._id)
+        const res = await checkShippingDelivered(record._id)
+        if (res.success) {
+            fetchGuides()
+            message.success("Guía actualizada correctamente")
+        } else {
+            message.error("Ha ocurrido un error al actualizar esta guía")
+        }
     }
 
     const columns = [
