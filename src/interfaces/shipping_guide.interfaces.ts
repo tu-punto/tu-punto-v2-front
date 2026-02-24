@@ -5,5 +5,5 @@ export interface IShippingGuide {
     descripcion: string,
     fecha_subida: Date,
     imagen_key: string,
-    is_recogido: boolean,
+    isRecogido: boolean,
 }
