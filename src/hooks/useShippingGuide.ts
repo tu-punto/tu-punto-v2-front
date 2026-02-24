@@ -44,11 +44,14 @@ function useShippingGuide() {
             const res = await markAsDelivered(guideId)
             if (res.success) {
                 console.log("El estado de la guía se ha actualizado correctamente")
+                return { success : true }
             } else {
                 console.error("Error al actualizar el estado de la guía")
+                return { success : false }
             }
         } catch (error) {
             console.error("Error al actualizar la guía:", error)
+            return { success : false }
         }
     }
 
