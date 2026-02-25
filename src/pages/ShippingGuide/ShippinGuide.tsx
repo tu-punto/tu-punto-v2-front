@@ -1,31 +1,28 @@
-import { useContext, useState } from "react";
-import { UserContext } from "../../context/userContext.tsx";
+import { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import UploadGuideModal from "./UploadGuideModal.tsx";
-import ShippingGuideTable from "./ShippingGuideTable.tsx";
+import ShippingGuideTable from './ShippingGuideTable';
+import UploadGuideForm from './UploadGuideForm';
 import PageTemplate, { FunctionButtonProps } from "../../components/PageTemplate";
+import { useUserRole } from '../../hooks/useUserRole';
 
-const ShippingGuide = () => {
-    const [isUploadGuideModalView, setIsUploadGuideModalView] = useState(false);
+function ShippingGuide() {
+    const [showUploadModal, setShowUploadModal] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
-
-    const { user } = useContext(UserContext);
-    const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const { user, isAdmin } = useUserRole();
 
     const handleFinish = () => {
-        setRefreshKey(prevKey => prevKey + 1);
-        setIsUploadGuideModalView(false); 
-        console.log("key",refreshKey)
-    };
+        setShowUploadModal(false)
+        setRefreshKey(prev => prev + 1)
+    }
 
     const actions: FunctionButtonProps[] = [
         {
             visible: !isAdmin,
             title: "Subir nueva guía",
-            onClick: () => { setIsUploadGuideModalView(true) },
-            icon:<PlusOutlined/>
+            onClick: () => { setShowUploadModal(true) },
+            icon: <PlusOutlined />
         }
-    ];
+    ]
 
     return (
         <PageTemplate
@@ -33,22 +30,18 @@ const ShippingGuide = () => {
             iconSrc="/box-icon.png"
             actions={actions}
         >
-            <div className="px-5 py-4">
-                <ShippingGuideTable
-                    refreshKey={refreshKey}
-                    user={user}
-                    isFilterBySeller
-                    search_id={user.id_vendedor}
-                />
-            </div>
-            
-            <UploadGuideModal
-                visible={isUploadGuideModalView}
-                onCancel={() => { setIsUploadGuideModalView(false) }}
+            <ShippingGuideTable
+                filterData='seller'
+                search_id={user.id_vendedor}
+                refreshKey={refreshKey}
+            />
+            <UploadGuideForm
+                visible={showUploadModal}
+                onCancel={() => { setShowUploadModal(false) }}
                 onFinish={handleFinish}
             />
         </PageTemplate>
     );
 }
 
-export default ShippingGuide
+export default ShippingGuide;
