@@ -15,7 +15,7 @@ import BranchPage from "../pages/Branch/BranchPage";
 import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
-import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
+import ShippingGuide from "../pages/ShippingGuide/ShippingGuide";
 import SalesPage from "../pages/Sales/SalesPage";
 
 const protectedRoutes = [
