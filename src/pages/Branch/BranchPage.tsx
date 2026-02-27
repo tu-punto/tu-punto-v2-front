@@ -83,7 +83,7 @@ const BranchPage = () => {
           setSelectedBranch(null);
         }}
         refreshKey={refreshKey}
-        search_id={selectedBranch?._id}
+        branch={selectedBranch!}
       />
     </PageTemplate>
   );
