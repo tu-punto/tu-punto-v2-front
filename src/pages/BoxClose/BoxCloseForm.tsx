@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { IBoxClose } from "../../models/boxClose";
 import { getDailySummary, IDailySummary } from "../../helpers/shippingHelpers";
-import { registerBoxCloseAPI } from "../../api/boxClose";
+import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
 const { Title } = Typography;
 type Metodo = "efectivo" | "qr";
@@ -35,9 +35,18 @@ interface Props {
   onCancel: () => void;
   lastClosingBalance?: any;
   selectedDate?: dayjs.Dayjs | null;
+  mode?: "create" | "edit" | "view";
+  initialData?: IBoxClose;
 }
 
-const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_real: 0 }, selectedDate }: Props) => {
+const BoxCloseForm = ({
+  onSuccess,
+  onCancel,
+  lastClosingBalance = { efectivo_real: 0 },
+  selectedDate,
+  mode = "create",
+  initialData,
+}: Props) => {
   const [coinTotals, setCoinTotals] = useState(0);
   const [billTotals, setBillTotals] = useState(0);
   const [salesSummary, setSalesSummary] = useState<IDailySummary>();
@@ -150,8 +159,68 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
     Form.useWatch("bancario_inicial", form), Form.useWatch("ventas_qr", form)]);
 
   useEffect(() => {
-    fetchSalesSummary();
-  }, []);
+    if (mode !== "edit") {
+      fetchSalesSummary();
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "edit" || !initialData) return;
+
+    const efectivo_diario = initialData.efectivo_diario || [];
+    const coinsValues: Record<string, number> = {};
+    const billsValues: Record<string, number> = {};
+
+    efectivo_diario.forEach((item: any) => {
+      const key = String(item.corte);
+      if (item.corte < 10) coinsValues[key] = item.cantidad || 0;
+      else billsValues[key] = item.cantidad || 0;
+    });
+
+    const responsableValue = initialData.responsable
+      ? {
+          value: (initialData.responsable as any).id || (initialData.responsable as any)._id,
+          label: (initialData.responsable as any).nombre || (initialData.responsable as any).name || "",
+        }
+      : undefined;
+
+    setOperations(initialData.operaciones_adicionales || []);
+    setSalesSummary({
+      cash: initialData.ventas_efectivo || 0,
+      bank: initialData.ventas_qr || 0,
+      total: (initialData.ventas_efectivo || 0) + (initialData.ventas_qr || 0),
+    });
+
+    form.setFieldsValue({
+      responsable: responsableValue,
+      efectivo_inicial: initialData.efectivo_inicial || 0,
+      bancario_inicial: initialData.bancario_inicial || 0,
+      ventas_efectivo: initialData.ventas_efectivo || 0,
+      ventas_qr: initialData.ventas_qr || 0,
+      efectivo_esperado: initialData.efectivo_esperado || 0,
+      bancario_esperado: initialData.bancario_esperado || 0,
+      efectivo_real: initialData.efectivo_real || 0,
+      bancario_real: initialData.bancario_real || 0,
+      diferencia_efectivo: initialData.diferencia_efectivo || 0,
+      diferencia_bancario: initialData.diferencia_bancario || 0,
+      cambios_externos: initialData.cambios_externos || 0,
+      observaciones: initialData.observaciones || "",
+      coins: coinsValues,
+      bills: billsValues,
+    });
+
+    const totalCoins = Object.entries(coinsValues).reduce(
+      (sum, [denom, qty]) => sum + parseFloat(denom) * (qty || 0),
+      0
+    );
+    const totalBills = Object.entries(billsValues).reduce(
+      (sum, [denom, qty]) => sum + parseFloat(denom) * (qty || 0),
+      0
+    );
+    setCoinTotals(totalCoins);
+    setBillTotals(totalBills);
+    recalcExpectedAndDiffs(initialData.operaciones_adicionales || []);
+  }, [mode, initialData, form]);
 
   useEffect(() => {
     const efectivoEsperado = form.getFieldValue("efectivo_esperado") || 0;
@@ -213,23 +282,34 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
         })),
       ];
 
-      const newBoxClose = {
-        ...boxCloseValues,
-        responsable: {
-          id: values.responsable.value,
-          nombre: values.responsable.label,
-        },
-        cambios_externos: form.getFieldValue("cambios_externos") || 0,
-        ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
-        ventas_efectivo: salesSummary?.cash ?? 0,
-        ventas_qr:       salesSummary?.bank ?? 0,
-        id_sucursal: localStorage.getItem("sucursalId"),
-        efectivo_diario,
-        operaciones_adicionales: operations,
-      };
+      if (mode === "edit" && initialData?._id) {
+        const updatePayload = {
+          efectivo_real: form.getFieldValue("efectivo_real"),
+          diferencia_efectivo: form.getFieldValue("diferencia_efectivo"),
+          observaciones: form.getFieldValue("observaciones") || "",
+          efectivo_diario,
+          operaciones_adicionales: operations,
+        };
 
+        await updateBoxCloseAPI(initialData._id, updatePayload);
+      } else {
+        const newBoxClose = {
+          ...boxCloseValues,
+          responsable: {
+            id: values.responsable.value,
+            nombre: values.responsable.label,
+          },
+          cambios_externos: form.getFieldValue("cambios_externos") || 0,
+          ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
+          ventas_efectivo: salesSummary?.cash ?? 0,
+          ventas_qr:       salesSummary?.bank ?? 0,
+          id_sucursal: localStorage.getItem("sucursalId"),
+          efectivo_diario,
+          operaciones_adicionales: operations,
+        };
 
-      await registerBoxCloseAPI(newBoxClose);
+        await registerBoxCloseAPI(newBoxClose);
+      }
 
       message.success("Proceso completado con éxito.");
       onSuccess();
@@ -334,29 +414,35 @@ const BoxCloseForm = ({ onSuccess, onCancel, lastClosingBalance = { efectivo_rea
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                  label="Responsable"
-                  name="responsable"
-                  rules={[{ required: true, message: "Campo requerido" }]}
+                label="Responsable"
+                name="responsable"
+                rules={[{ required: true, message: "Campo requerido" }]}
               >
                 <Select
-                    placeholder="Selecciona un responsable"
-                    labelInValue
-                    onChange={(option) => {
-                      form.setFieldValue("responsable", option); // <- ¡simplemente esto!
-                    }}
-                    options={admins.map((admin) => ({
-                      label: admin.name,
-                      value: admin._id,
-                    }))}
+                  placeholder="Selecciona un responsable"
+                  labelInValue
+                  disabled={mode === "edit"}
+                  onChange={(option) => {
+                    form.setFieldValue("responsable", option); // <- ¡simplemente esto!
+                  }}
+                  options={admins.map((admin) => ({
+                    label: admin.name,
+                    value: admin._id,
+                  }))}
                 />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Fecha">
                 <Input
-                    readOnly
-                    value={dayjs().format("DD/MM/YYYY")}
-                    className="w-full bg-gray-200 text-gray-700"
+                  readOnly
+                  disabled={mode === "edit"}
+                  value={
+                    mode === "edit" && initialData?.created_at
+                      ? dayjs(initialData.created_at).format("DD/MM/YYYY")
+                      : dayjs().format("DD/MM/YYYY")
+                  }
+                  className="w-full bg-gray-200 text-gray-700"
                 />
               </Form.Item>
             </Col>

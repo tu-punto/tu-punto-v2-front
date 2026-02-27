@@ -36,6 +36,7 @@ const BoxClosePage = () => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [selectedReconciliation, setSelectedReconciliation] = useState<IBoxClose | null>(null);
+  const [formMode, setFormMode] = useState<"create" | "view" | "edit">("create");
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(dayjs());
 
   const fetchBoxClosings = async () => {
@@ -47,12 +48,12 @@ const BoxClosePage = () => {
         const efectivo = boxClose.efectivo_diario || [];
 
         const total_coins = efectivo
-            .filter((item: any) => item.corte < 10)
-            .reduce((sum: number, item: any) => sum + item.corte * item.cantidad, 0);
+          .filter((item: any) => item.corte < 10)
+          .reduce((sum: number, item: any) => sum + item.corte * item.cantidad, 0);
 
         const total_bills = efectivo
-            .filter((item: any) => item.corte >= 10)
-            .reduce((sum: number, item: any) => sum + item.corte * item.cantidad, 0);
+          .filter((item: any) => item.corte >= 10)
+          .reduce((sum: number, item: any) => sum + item.corte * item.cantidad, 0);
 
         return {
           ...boxClose,
@@ -124,9 +125,9 @@ const BoxClosePage = () => {
             const color = amount === 0 ? "success" : amount > 0 ? "warning" : "error";
             const icon = amount === 0 ? <CheckCircleOutlined /> : <WarningOutlined />;
             return (
-                <Tooltip title={amount === 0 ? "Cuadrado" : "Descuadre"}>
-                  <Tag icon={icon} color={color}>Bs. {round(amount)}</Tag>
-                </Tooltip>
+              <Tooltip title={amount === 0 ? "Cuadrado" : "Descuadre"}>
+                <Tag icon={icon} color={color}>Bs. {round(amount)}</Tag>
+              </Tooltip>
             );
           },
         },
@@ -161,9 +162,9 @@ const BoxClosePage = () => {
             const color = amount === 0 ? "success" : amount > 0 ? "warning" : "error";
             const icon = amount === 0 ? <CheckCircleOutlined /> : <WarningOutlined />;
             return (
-                <Tooltip title={amount === 0 ? "Cuadrado" : "Descuadre"}>
-                  <Tag icon={icon} color={color}>Bs. {round(amount)}</Tag>
-                </Tooltip>
+              <Tooltip title={amount === 0 ? "Cuadrado" : "Descuadre"}>
+                <Tag icon={icon} color={color}>Bs. {round(amount)}</Tag>
+              </Tooltip>
             );
           },
         },
@@ -180,84 +181,129 @@ const BoxClosePage = () => {
   const handleFormSuccess = () => {
     setShowForm(false);
     setSelectedReconciliation(null);
+    setFormMode("create");
     fetchBoxClosings();
   };
 
   return (
-      <>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-            <img src="/cierre-caja-icon.png" alt="Cierre de Caja" className="w-8 h-8" />
-            <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-              Cierre de Caja
-            </h1>
-          </div>
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+          <img src="/cierre-caja-icon.png" alt="Cierre de Caja" className="w-8 h-8" />
+          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
+            Cierre de Caja
+          </h1>
         </div>
+      </div>
 
-        <Card>
-          <Row gutter={16} className="mb-4">
-            <Col xs={24} sm={12}>
-              <DatePicker
-                  value={selectedDate}
-                  onChange={(date) => setSelectedDate(date)}
-                  format="DD/MM/YYYY"
-                  allowClear
-                  style={{ width: "100%" }}
-              />
-            </Col>
-            <Col xs={24} sm={12}>
-              <Button onClick={() => setShowForm(true)} type="primary" icon={<PlusOutlined />} block>
-                Nuevo Cierre
-              </Button>
-            </Col>
-          </Row>
+      <Card>
+        <Row gutter={16} className="mb-4">
+          <Col xs={24} sm={12}>
+            <DatePicker
+              value={selectedDate}
+              onChange={(date) => setSelectedDate(date)}
+              format="DD/MM/YYYY"
+              allowClear
+              style={{ width: "100%" }}
+            />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Button
+              onClick={() => {
+                setFormMode("create");
+                setSelectedReconciliation(null);
+                setShowForm(true);
+              }}
+              type="primary"
+              icon={<PlusOutlined />}
+              block
+            >
+              Nuevo Cierre
+            </Button>
+          </Col>
+        </Row>
 
-          <Modal
-              title={selectedReconciliation ? "Ver Cierre" : "Nuevo Cierre"}
-              open={showForm}
+        <Modal
+          title={
+            formMode === "edit"
+              ? "Editar Cierre"
+              : formMode === "view"
+                ? "Ver Cierre"
+                : "Nuevo Cierre"
+          }
+          open={showForm}
+          onCancel={() => {
+            setShowForm(false);
+            setSelectedReconciliation(null);
+            setFormMode("create");
+          }}
+          footer={null}
+          width={1000}
+        >
+          {formMode === "view" && selectedReconciliation && (
+            <div className="flex justify-end mb-4">
+              {(() => {
+                const isToday = dayjs(selectedReconciliation.created_at).isSame(dayjs(), "day");
+                return (
+                  <Tooltip title={!isToday ? "Solo se pueden editar cierres del día actual" : ""}>
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        if (isToday) {
+                          setFormMode("edit");
+                        } else {
+                          message.warning("Solo se pueden editar cierres de caja del día actual");
+                        }
+                      }}
+                      disabled={!isToday}
+                    >
+                      Editar
+                    </Button>
+                  </Tooltip>
+                );
+              })()}
+            </div>
+          )}
+          {formMode === "view" && selectedReconciliation ? (
+            <BoxCloseView boxClose={selectedReconciliation} />
+          ) : (
+            <BoxCloseForm
+              onSuccess={handleFormSuccess}
               onCancel={() => {
                 setShowForm(false);
                 setSelectedReconciliation(null);
+                setFormMode("create");
               }}
-              footer={null}
-              width={1000}
-          >
-            {selectedReconciliation ? (
-                <BoxCloseView boxClose={selectedReconciliation} />
-            ) : (
-                <BoxCloseForm
-                    onSuccess={handleFormSuccess}
-                    onCancel={() => {
-                      setShowForm(false);
-                      setSelectedReconciliation(null);
-                    }}
-                    lastClosingBalance={boxClosings[boxClosings.length - 1] || {}}
-                    selectedDate={selectedDate}
-                />
-            )}
-          </Modal>
+              lastClosingBalance={boxClosings[boxClosings.length - 1] || {}}
+              selectedDate={selectedDate}
+              mode={formMode}
+              initialData={selectedReconciliation || undefined}
+            />
+          )}
+        </Modal>
 
-          <Table
-              columns={columns}
-              dataSource={filterBoxCloses()}
-              loading={loading}
-              rowKey="_id"
-              onRow={(record) => ({
-                onClick: () => {
-                  setSelectedReconciliation(record);
-                  setShowForm(true);
-                },
-                style: { cursor: "pointer" },
-              })}
-              pagination={{
-                defaultPageSize: 10,
-                showSizeChanger: true,
-                showTotal: (total) => `Total ${total} registros`,
-              }}
-              scroll={{ x: "max-content" }}
-          />
-        </Card>
-      </>
+        <Table
+          columns={columns}
+          dataSource={filterBoxCloses()}
+          loading={loading}
+          rowKey="_id"
+          onRow={(record) => ({
+            onClick: () => {
+              setSelectedReconciliation(record);
+              setFormMode("view");
+              setShowForm(true);
+            },
+            style: { cursor: "pointer" },
+          })}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} registros`,
+          }}
+          scroll={{ x: "max-content" }}
+        />
+      </Card>
+    </>
   );
 };
 
