@@ -19,8 +19,8 @@ function ViewGuideModal({ visible, onCancel, refreshKey, search_id }: ViewGuideM
         >
             <ShippingGuideTable
                 refreshKey={refreshKey}
-                isFilterByBranch
-                search_id={search_id || ""}
+                filterData='branch'
+                search_id={search_id}
             />
         </Modal>
     );

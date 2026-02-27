@@ -23,7 +23,7 @@ function ShippingGuideTab({ filterData, search_id, refreshKey = 0 }: ShippingGui
 
     useEffect(() => {
         fetchGuides()
-    }, [filterData, refreshKey])
+    }, [filterData, refreshKey, search_id])
 
     const fetchGuides = () => {
         if (filterData == 'all') {
@@ -57,7 +57,6 @@ function ShippingGuideTab({ filterData, search_id, refreshKey = 0 }: ShippingGui
 
     const handleShowImage = async (record: IShippingGuide) => {
         if (record.imagen_key) {
-            console.log(record)
             const image_url = await getSignedURL(record.imagen_key);
             setImageUrl(image_url);
             setIsImageVisible(true);
