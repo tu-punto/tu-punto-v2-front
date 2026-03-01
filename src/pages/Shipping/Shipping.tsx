@@ -1,20 +1,20 @@
 import { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../context/userContext.tsx";
 import { Switch, Button } from 'antd';
 
 import ShippingTable from "./ShippingTable";
 import ExternalSalesTable from "./ExternalSalesTable.tsx";
+import ShippingQRScannerModal from "./ShippingQRScannerModal.tsx";
 
 
 const Shipping = () => {
 	const [refreshKey, setRefreshKey] = useState(0)
 	const [isExternalSalesMode, setIsExternalSalesMode] = useState(false);
+	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
 	const { user }: any = useContext(UserContext);
 	const isAdmin = user?.role?.toLowerCase() === 'admin';
 	const isOperator = user?.role.toLowerCase() === 'operator';
-	const navigate = useNavigate();
 
 
 	return (
@@ -26,13 +26,13 @@ const Shipping = () => {
 						Pedidos
 					</h1>
 				</div>
-				{isAdmin && (
+				{(isAdmin || isOperator) && (
 					<Button
 						type="primary"
 						className="text-mobile-sm xl:text-desktop-sm "
-						onClick={() => navigate('/find-shipping')}
+						onClick={() => setIsQRModalOpen(true)}
 					>
-						Buscar Pedido
+						Escaner de pedidos
 					</Button>
 				)}
 			</div>
@@ -53,6 +53,10 @@ const Shipping = () => {
 			{isExternalSalesMode && (
 				<ExternalSalesTable refreshKey={refreshKey} />
 			)}
+			<ShippingQRScannerModal
+				open={isQRModalOpen}
+				onClose={() => setIsQRModalOpen(false)}
+			/>
 		</div >
 	);
 };

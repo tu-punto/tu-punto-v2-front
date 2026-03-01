@@ -1,6 +1,5 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
 import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
 import { getSellerAPI, getSellersAPI } from "../../api/seller";
@@ -16,7 +15,6 @@ import QRScanner from "./QRScanner.tsx";
 
 export const Sales = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const navigate = useNavigate();
   const { user }: any = useContext(UserContext);
   const isAdmin = user?.role === 'admin';
   const isOperator = user?.role === 'operator';
@@ -459,23 +457,58 @@ export const Sales = () => {
 
 
   const handleAddProduct = (newProduct: any) => {
-    const vendedor = sellers.find((v: any) => v._id === newProduct.id_vendedor);
+    const vendedor = sellers.find((v: any) => String(v._id) === String(newProduct.id_vendedor));
     const comision = Number(vendedor?.comision_porcentual || 0);
-    const precio = newProduct.precio_unitario || newProduct.precio || 0;
-    const cantidad = newProduct.cantidad || 1;
+    const precio = Number(newProduct.precio_unitario || newProduct.precio || 0);
+    const cantidadSolicitada = Number(newProduct.cantidad || 1);
+    const stockActual = Number(newProduct.stockActual ?? newProduct.stock ?? 0);
+    const stableKey = String(
+      newProduct.key ||
+      (newProduct.variantKey
+        ? `${newProduct.id_producto}-${newProduct.variantKey}`
+        : `${newProduct.id_producto}-${Date.now()}`)
+    );
 
-    const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+    setSelectedProducts((prevProducts: any[]) => {
+      const duplicateIndex = prevProducts.findIndex((p: any) => {
+        if (newProduct.variantKey) {
+          return (
+            String(p.id_producto) === String(newProduct.id_producto) &&
+            String(p.variantKey) === String(newProduct.variantKey)
+          );
+        }
+        return String(p.key) === stableKey;
+      });
 
-    setSelectedProducts((prevProducts: any) => [
-      ...prevProducts,
-      {
-        ...newProduct,
-        cantidad,
-        precio_unitario: precio,
-        utilidad,
-        stockActual: cantidad
+      if (duplicateIndex >= 0) {
+        const updated = [...prevProducts];
+        const existing = { ...updated[duplicateIndex] };
+        const nextCantidadRaw = Number(existing.cantidad || 0) + cantidadSolicitada;
+        const max = Number(existing.stockActual ?? stockActual ?? 0);
+        const nextCantidad = max > 0 ? Math.min(nextCantidadRaw, max) : nextCantidadRaw;
+        if (max > 0 && nextCantidadRaw > max) {
+          message.warning("No hay mas stock disponible para esa variante");
+        }
+        existing.cantidad = nextCantidad;
+        existing.precio_unitario = precio;
+        existing.utilidad = parseFloat(((precio * nextCantidad * comision) / 100).toFixed(2));
+        updated[duplicateIndex] = existing;
+        return updated;
       }
-    ]);
+
+      const utilidad = parseFloat(((precio * cantidadSolicitada * comision) / 100).toFixed(2));
+      return [
+        ...prevProducts,
+        {
+          ...newProduct,
+          key: stableKey,
+          cantidad: cantidadSolicitada,
+          precio_unitario: precio,
+          utilidad,
+          stockActual
+        }
+      ];
+    });
   };
   //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
 
@@ -634,31 +667,31 @@ export const Sales = () => {
           {showQRScanner && (
             <div style={{ paddingTop: 24 }}>
               <QRScanner
-                onProductScanned={(product) => {
-                  const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
+                onClose={() => setShowQRScanner(false)}
+                onProductScanned={(item) => {
+                  const vendedor = sellers.find((v: any) => v._id === item.id_vendedor);
                   const comision = Number(vendedor?.comision_porcentual || 0);
 
-                  const nombre = product.nombre_producto || product.producto || "Producto sin nombre";
-                  const sucursal = product.sucursales?.[0];
-                  const combinacion = sucursal?.combinaciones?.[0];
-                  const precio = combinacion?.precio || 0;
-                  const stock = combinacion?.stock || 0;
+                  const nombre = item.nombre_producto || "Producto sin nombre";
+                  const variantLabel = item.variantLabel || "";
+                  const precio = Number(item.precio || 0);
+                  const stock = Number(item.stock || 0);
 
                   const cantidad = 1;
                   const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
 
                   handleAddProduct({
-                    ...product,
-                    key: product._id + "-" + Date.now(),
-                    producto: nombre,
+                    ...item,
+                    key: `${item.id_producto}-${item.variantKey}`,
+                    id_producto: item.id_producto,
+                    producto: `${nombre} - ${variantLabel}`,
+                    nombre_variante: `${nombre}${variantLabel ? ` - ${variantLabel}` : ""}`,
                     cantidad,
                     precio_unitario: precio,
                     utilidad,
                     stockActual: stock,
                     esTemporal: false,
                   });
-
-                  message.success("Producto agregado al carrito por QR");
                 }}
               />
             </div>

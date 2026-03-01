@@ -18,6 +18,7 @@ import ConfirmProductsModal from './ConfirmProductsModal';
 import { createProductsFromGroup } from '../../services/createProducts';
 import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
+import VariantQRBatchModal from "./VariantQRBatchModal.tsx";
 //test
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
@@ -43,6 +44,9 @@ const StockManagement = () => {
     const [newProducts, setNewProducts] = useState<any[]>([]);
     const [newVariants, setNewVariants] = useState<any[]>([]);
     const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false);
+    const [isQRBatchModalVisible, setIsQRBatchModalVisible] = useState(false);
+    const [qrModalProductIds, setQrModalProductIds] = useState<string[]>([]);
+    const [qrModalAutoGenerate, setQrModalAutoGenerate] = useState(false);
 
     const [products, setProducts] = useState<any[]>([]);
     const [sellers, setSellers] = useState<any[]>([]);
@@ -437,6 +441,19 @@ const StockManagement = () => {
                         <Col xs={24} sm={12} lg={6}>
                             <Button
                                 onClick={() => {
+                                    setQrModalProductIds([]);
+                                    setQrModalAutoGenerate(false);
+                                    setIsQRBatchModalVisible(true);
+                                }}
+                                block
+                                className="text-mobile-base xl:text-mobile-base"
+                            >
+                                Generar QRs Variantes
+                            </Button>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Button
+                                onClick={() => {
                                     const stockMapped = stockListForConfirmModal.map(item => ({
                                         ...item,
                                         product: {
@@ -583,12 +600,19 @@ const StockManagement = () => {
                 <ConfirmProductsModal
                     visible={isConfirmModalVisible}
                     onClose={cancelConfirmProduct}
-                    onSuccess={() => {
+                    onSuccess={(context?: { createdProductIds?: string[] }) => {
                         closeConfirmProduct();
                         setProductsToUpdate({});
                         setStockListForConfirmModal([]);
                         setResetSignal(true);
                         setTimeout(() => setResetSignal(false), 100);
+
+                        const createdProductIds = (context?.createdProductIds || []).filter(Boolean);
+                        if (createdProductIds.length > 0) {
+                            setQrModalProductIds(createdProductIds);
+                            setQrModalAutoGenerate(true);
+                            setIsQRBatchModalVisible(true);
+                        }
                     }}
                     newVariants={getTempVariants()}
                     newProducts={getTempProducts()}
@@ -608,6 +632,18 @@ const StockManagement = () => {
 
                 />
             )}
+            <VariantQRBatchModal
+                visible={isQRBatchModalVisible}
+                onClose={() => {
+                    setIsQRBatchModalVisible(false);
+                    setQrModalAutoGenerate(false);
+                    setQrModalProductIds([]);
+                }}
+                sellers={sellers}
+                selectedSellerId={selectedSeller ? String(selectedSeller) : undefined}
+                initialProductIds={qrModalProductIds}
+                autoGenerateOnOpen={qrModalAutoGenerate}
+            />
         </div>
 
     );

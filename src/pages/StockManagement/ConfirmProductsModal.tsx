@@ -3,33 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { createVariantAPI, generateIngressPDFAPI, registerProductAPI, updateSubvariantStockAPI } from "../../api/product";
 import { getTempStock, getTempProducts, getTempVariants, clearTempStock, clearTempProducts, clearTempVariants } from "../../utils/storageHelpers";
 import { createEntryAPI } from "../../api/entry.ts";
-
-// Función para descargar QR desde AWS S3 usando solo el atributo download
-const downloadQRFromBackend = async (qrImagePath, productName, productId) => {
-  if (!qrImagePath) {
-    console.error('No hay imagen QR disponible para este producto');
-    return;
-  }
-  try {
-    const response = await fetch(qrImagePath, { method: 'GET' });
-    if (!response.ok) throw new Error('No se pudo descargar el QR');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `QR_${productName || productId || 'producto'}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Error descargando QR:', error);
-    const link = document.createElement('a');
-    link.href = qrImagePath;
-    document.body.appendChild(link);
-    link.click();
-  }
-};
 // const downloadQRFromBackend = (qrImagePath, productName, productId) => {
 //   if (!qrImagePath) {
 //     console.error('No hay imagen QR disponible para este producto');
@@ -236,50 +209,22 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
         });
       }
 
-      // 4. Descargar QR para cada producto creado
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const product of createdProducts) {
-        if (!product || !product.qrImagePath) {
-          console.warn(`Producto ${product?._id} no tiene qrImagePath`);
-          errorCount++;
-          continue;
-        }
-        try {
-          if (product.qrImagePath) {
-            await downloadQRFromBackend(
-              product.qrImagePath,
-              product.nombre_producto,
-              product._id
-            );
-            successCount++;
-
-          } else {
-            console.warn(`Producto ${product._id} no tiene qrImagePath`);
-            errorCount++;
-          }
-        } catch (error) {
-          console.error(`Error descargando QR para producto ${product._id}:`, error);
-          errorCount++;
-        }
-      }
-
-      // 5. Limpiar
+      // 4. Limpiar
       clearAll();
+      const createdProductIds = createdProducts
+        .map((p: any) => String(p?._id || ""))
+        .filter(Boolean);
 
       // Mostrar resultado
-      if (successCount > 0 && errorCount === 0) {
-        message.success(`Todos los cambios aplicados y ${successCount} códigos QR descargados correctamente.`);
-      } else if (successCount > 0 && errorCount > 0) {
-        message.warning(`Cambios aplicados. ${successCount} QR descargados, ${errorCount} fallaron.`);
-      } else if (errorCount > 0) {
-        message.error(`Cambios aplicados pero no se pudieron descargar los códigos QR.`);
+      if (createdProductIds.length > 0) {
+        message.success(`Cambios aplicados. Productos nuevos: ${createdProductIds.length}`);
       } else {
         message.success("Todos los cambios fueron aplicados correctamente.");
       }
 
-      onSuccess?.();
+      onSuccess?.({
+        createdProductIds
+      });
     } catch (error) {
       console.error("Error al guardar productos:", error);
       message.error("Ocurrió un error al guardar los cambios.");
@@ -347,7 +292,7 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
               }
             }}
           >
-            Confirmar y Descargar QRs
+            Confirmar cambios
           </Button>
 
         ]}
