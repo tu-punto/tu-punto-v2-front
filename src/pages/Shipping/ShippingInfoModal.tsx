@@ -19,6 +19,7 @@ import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
+import { generateShippingLabelQRAPI } from '../../api/qr.ts';
 import moment from "moment-timezone";
 import { updateProductsByShippingAPI } from "../../api/sales.ts";
 
@@ -44,6 +45,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [showWarning, setShowWarning] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [qrLoading, setQrLoading] = useState(false);
     const { rawProducts: data } = useRawProducts(); const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
     const adelantoCliente = useWatch('adelanto_cliente', internalForm);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
@@ -395,6 +397,25 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             }
         }
     };
+    const handleGenerateShippingQR = async () => {
+        if (!shipping?._id) return;
+        setQrLoading(true);
+        try {
+            const response = await generateShippingLabelQRAPI(shipping._id);
+            const qrPath = response?.qrData?.shippingQrImagePath;
+            if (!response?.success || !qrPath) {
+                message.error("No se pudo generar QR de entrega");
+                return;
+            }
+            window.open(qrPath, "_blank");
+            message.success("QR de entrega generado");
+        } catch (error) {
+            console.error(error);
+            message.error("Error generando QR de entrega");
+        } finally {
+            setQrLoading(false);
+        }
+    };
     const handleCancelChanges = () => {
         internalForm.resetFields();
         setProducts(originalProducts);
@@ -604,6 +625,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             });
                         }}
                     />
+                </div>
+            )}
+            {isAdmin && shipping?._id && (
+                <div style={{ marginBottom: 12, textAlign: "right", marginTop: 6 }}>
+                    <Button onClick={handleGenerateShippingQR} loading={qrLoading}>
+                        Generar / Ver QR de Entrega
+                    </Button>
                 </div>
             )}
             <Form
