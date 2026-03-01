@@ -60,6 +60,7 @@ export const generateVariantQRAPI = async (params: {
 
 export const batchGenerateVariantQRAPI = async (params: {
   sellerId?: string;
+  sucursalId?: string;
   productIds?: string[];
   onlyMissing?: boolean;
   forceRegenerate?: boolean;
@@ -74,6 +75,7 @@ export const batchGenerateVariantQRAPI = async (params: {
 
 export const listVariantQRAPI = async (params: {
   sellerId?: string;
+  sucursalId?: string;
   productIds?: string[];
   limit?: number;
 }) => {
@@ -81,6 +83,7 @@ export const listVariantQRAPI = async (params: {
     const res = await apiClient.get("/product/variant-qr/list", {
       params: {
         sellerId: params.sellerId,
+        sucursalId: params.sucursalId,
         productIds: params.productIds?.join(","),
         limit: params.limit
       }
