@@ -18,7 +18,11 @@ import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
 import FindShipping from "../pages/Shipping/FindShipping";
 import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
+import { getAllowedRoles } from "../constants/accessControl";
 
+const guard = (path: string, element: JSX.Element) => (
+  <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
+);
 
 const protectedRoutes = [
   {
@@ -31,148 +35,75 @@ const protectedRoutes = [
       },
       {
         path: "/product",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <Product />
-          </RoleGuard>
-        ),
+        element: guard("/product", <Product />),
       },
       {
         path: "/seller",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <Seller isFactura={false} />
-          </RoleGuard>
-        ),
+        element: guard("/seller", <Seller isFactura={false} />),
       },
-
       {
         path: "/sales",
-        element: (
-          <RoleGuard allowedRoles={["admin", "operator"]}>
-            <Sales />
-          </RoleGuard>
-        ),
+        element: guard("/sales", <Sales />),
       },
       {
         path: "/shipping",
-        element: (
-          <RoleGuard allowedRoles={["admin", "seller", "operator"]}>
-            <Shipping />
-          </RoleGuard>
-        ),
+        element: guard("/shipping", <Shipping />),
       },
       {
         path: "/find-shipping",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <FindShipping />
-          </RoleGuard>
-        ),
+        element: guard("/find-shipping", <FindShipping />),
       },
       {
         path: "/financeFlux",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <FinanceFlux />
-          </RoleGuard>
-        ),
+        element: guard("/financeFlux", <FinanceFlux />),
       },
       {
         path: "/stock",
-        element: (
-          <RoleGuard allowedRoles={["admin", "seller", "operator"]}>
-            <StockManagement />
-          </RoleGuard>
-        ),
+        element: guard("/stock", <StockManagement />),
       },
       {
         path: "/stats",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <StatsPage />
-          </RoleGuard>
-        )
+        element: guard("/stats", <StatsPage />),
       },
       {
         path: "/sellerFactura",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <Seller isFactura={true} />
-          </RoleGuard>
-        ),
+        element: guard("/sellerFactura", <Seller isFactura={true} />),
       },
       {
         path: "/servicesPage",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <ServicesPage isFactura={false} />
-          </RoleGuard>
-        ),
+        element: guard("/servicesPage", <ServicesPage isFactura={false} />),
       },
       {
         path: "/seller-info",
-        element: (
-          <RoleGuard allowedRoles={["seller"]}>
-            <SellerInfoPageWrapper />
-          </RoleGuard>
-        ),
+        element: guard("/seller-info", <SellerInfoPageWrapper />),
       },
       {
         path: "/shop",
-        element: (
-          <RoleGuard allowedRoles={["seller"]}>
-            <Sales />
-          </RoleGuard>
-        ),
+        element: guard("/shop", <Sales />),
       },
       {
         path: "/cash",
-        element: (
-          <RoleGuard allowedRoles={["admin", "operator"]}>
-            <CashReconciliationPage />
-          </RoleGuard>
-        ),
+        element: guard("/cash", <CashReconciliationPage />),
       },
       {
         path: "/cierreCaja",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <CierreCajaPage />
-          </RoleGuard>
-        ),
+        element: guard("/cierreCaja", <CierreCajaPage />),
       },
       {
         path: "/branch",
-        element: (
-          <RoleGuard allowedRoles={["admin","seller", "operator"]}>
-            <BranchPage />
-          </RoleGuard>
-        ),
+        element: guard("/branch", <BranchPage />),
       },
       {
         path: "/sales-history",
-        element: (
-          <RoleGuard allowedRoles={["admin", "operator"]}>
-            <SalesHistoryPage />
-          </RoleGuard>
-        ),
+        element: guard("/sales-history", <SalesHistoryPage />),
       },
       {
         path: "/user",
-        element: (
-          <RoleGuard allowedRoles={["admin"]}>
-            <UsersPage />
-          </RoleGuard>
-        ),
+        element: guard("/user", <UsersPage />),
       },
       {
         path: "/shipping-guide",
-        element: (
-          <RoleGuard allowedRoles={["seller"]}>
-            <ShippingGuide/>
-          </RoleGuard>
-        )
+        element: guard("/shipping-guide", <ShippingGuide />),
       },
       {
         path: "*",

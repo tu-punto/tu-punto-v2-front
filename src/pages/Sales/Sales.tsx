@@ -220,6 +220,11 @@ export const Sales = () => {
   };
 
   const showSalesModal = () => {
+    if (!isAdmin && !isOperator) {
+      message.warning("Solo administradores u operadores pueden realizar ventas.");
+      return;
+    }
+
     if (selectedProducts.length === 0) {
       message.warning("Debes seleccionar al menos un producto para realizar una venta.");
       return;
@@ -625,7 +630,7 @@ export const Sales = () => {
 
                 <Col>
                   <Space wrap>
-                    {(isAdmin || !isOperator) && (
+                    {(isAdmin || isOperator) && (
                       <Button
                         onClick={showSalesModal}
                         type="primary"

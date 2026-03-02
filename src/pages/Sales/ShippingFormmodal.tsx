@@ -3,7 +3,6 @@ import { UserOutlined, PhoneOutlined, CommentOutlined, PlusOutlined, MinusOutlin
 import {useEffect, useMemo, useState} from 'react';
 import { registerShippingAPI, updateShippingAPI  } from '../../api/shipping';
 import { sendMessageAPI } from '../../api/whatsapp';
-import { updateSubvariantStockAPI } from '../../api/product';
 import { useWatch } from 'antd/es/form/Form';
 import { getSucursalsAPI } from "../../api/sucursal";
 import { COUNTRY_CODES } from '../../constants/countryCodes';
@@ -179,6 +178,7 @@ function ShippingFormModal({
                     utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
                     deposito_realizado: false,
                     variantes: p.variantes,
+                    variantKey: p.variantKey,
                     nombre_variante: `${p.producto}`,
                     stockActual: p.stockActual,
                     quien_paga_delivery: form.getFieldValue("quien_paga_delivery") || "comprador" // ✅ agregar esto
@@ -189,11 +189,6 @@ function ShippingFormModal({
             if (ventas.length > 0) {
                 //await handleDebt(ventas, response.newShipping.adelanto_cliente);
                 await handleSales(response.newShipping, ventas);
-
-                // RESTAR STOCK si el estado es "Entregado"
-                if (["Entregado", "En Espera"].includes(values.estado_pedido)) {
-                    await actualizarStock(ventas);
-                }
             }
 
             clearSelectedProducts();
@@ -216,39 +211,6 @@ function ShippingFormModal({
 
     const handleDecrement = (setter: React.Dispatch<React.SetStateAction<number>>, value: number) => {
         setter(prev => parseFloat((prev - value).toFixed(2)));
-    };
-    const actualizarStock = async (productos: any[]) => {
-        const sucursalId =  localStorage.getItem('sucursalId');
-
-        for (const prod of productos) {
-            if (prod.esTemporal) continue;
-
-            const { id_producto, cantidad, stockActual, variantes } = prod;
-
-            if (!variantes || typeof variantes !== 'object') {
-                console.warn("Sin variantes válidas para:", prod);
-                continue;
-            }
-
-            const nuevoStock = stockActual - cantidad;
-            if (nuevoStock < 0) continue;
-
-            try {
-                //console.log("Actualizando stock para:", id_producto, "en sucursal:", sucursalId," variantes ", variantes, "con stock:", nuevoStock);
-                const res = await updateSubvariantStockAPI({
-                    productId: id_producto,
-                    sucursalId: suc || localStorage.getItem("sucursalId"),
-                    variantes,
-                    stock: nuevoStock
-                });
-
-                if (!res.success) {
-                    message.error(`Error actualizando stock de ${id_producto}`);
-                }
-            } catch (err) {
-                console.error("Error al actualizar stock:", err);
-            }
-        }
     };
     useEffect(() => {
         const monto = saldoACobrar || 0;
@@ -666,3 +628,4 @@ function ShippingFormModal({
 }
 
 export default ShippingFormModal;
+

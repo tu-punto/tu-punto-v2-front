@@ -1,6 +1,6 @@
 export interface IUser {
     _id: string;
-    role: "admin" | "seller";
+    role: "admin" | "operator" | "seller";
     sucursalId?: string;
     email: string;
 }

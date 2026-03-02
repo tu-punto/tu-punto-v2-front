@@ -23,10 +23,10 @@ const Header = () => {
             message.success("Sesión cerrada correctamente");
 
             // 👇 Redirige según el rol
-            if (user?.role === "admin") {
-                navigate("/login-admin");
-            } else {
+            if (user?.role === "seller") {
                 navigate("/login-seller");
+            } else {
+                navigate("/login-admin");
             }
 
         } catch (error) {
