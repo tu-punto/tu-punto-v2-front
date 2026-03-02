@@ -6,6 +6,7 @@ import { Link, useLocation } from "react-router-dom";
 import plusIcon from "../../assets/plusIcon.svg";
 import minusIcon from "../../assets/minusIcon.svg";
 import "./bottom-menu.css";
+import { normalizeRole } from "../../utils/role";
 
 const BottomMenu = () => {
     const { user } = useContext(UserContext)!;
@@ -15,7 +16,8 @@ const BottomMenu = () => {
     const location = useLocation();
 
     useEffect(() => {
-        const filtered = menu.filter(i => i.roles.includes(user.role));
+        const role = normalizeRole(user?.role);
+        const filtered = menu.filter(i => i.roles.includes(role));
         const bottom: any[] = [];
         const plus: any[] = [];
         filtered.forEach(i => (["Pedidos","Stock","Vender"].includes(i.label) ? bottom : plus).push(i));
