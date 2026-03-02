@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getSucursalsAPI } from "../api/sucursal";
+import { getSucursalHeaderInfoAPI } from "../api/sucursal";
 
 interface BranchHeaderInfo {
   sucursalNombre: string;
@@ -28,10 +28,8 @@ export const useBranchHeaderInfo = () => {
       }
 
       try {
-        const branches = await getSucursalsAPI();
-        const branch = Array.isArray(branches)
-          ? branches.find((item: any) => String(item?._id) === String(sucursalId))
-          : null;
+        const response = await getSucursalHeaderInfoAPI(sucursalId);
+        const branch = response?.data;
 
         if (!branch || !mounted) return;
 

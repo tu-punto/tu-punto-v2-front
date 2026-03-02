@@ -55,6 +55,15 @@ export const getAllSucursalsAPI = async () => {
   }
 };
 
+export const getSucursalHeaderInfoAPI = async (sucursalId: string) => {
+  try {
+    const response = await apiClient.get(`/sucursal/${sucursalId}/header-info`);
+    return response.data;
+  } catch (error) {
+    return parseError(error as AxiosError);
+  }
+};
+
 export const uploadSucursalHeaderImageAPI = async (
   sucursalId: string,
   file: File
