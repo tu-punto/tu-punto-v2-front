@@ -40,9 +40,12 @@ export default function LoginForm({
       }
       const selectedBranch = branches.find((b) => b._id === values.sucursalId);
       const branchName = selectedBranch?.nombre || '';
+      const branchHeaderImage = selectedBranch?.imagen_header || "";
 
       localStorage.setItem("sucursalId", values.sucursalId);
       localStorage.setItem("sucursalNombre", branchName);
+      localStorage.setItem("sucursalImagenHeader", branchHeaderImage);
+      window.dispatchEvent(new Event("branch-header-updated"));
       setUser({
         ...userRes.data,
         role: normalizeRole(userRes.data?.role),

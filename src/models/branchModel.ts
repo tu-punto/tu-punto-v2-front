@@ -12,6 +12,7 @@ export interface IBranch {
   direccion: string;
   ciudad: string;
   telefono: number;
+  imagen_header?: string;
 
   producto_sucursal?: IProduct_Branch[];
   pedido?: Shipping;

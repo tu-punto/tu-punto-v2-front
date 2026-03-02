@@ -52,6 +52,12 @@ const LoginPage = () => {
         role: normalizeRole(userRes.data?.role),
       });
 
+      const selectedBranch = branches.find((b: any) => String(b._id) === String(values.sucursalId));
+      localStorage.setItem("sucursalId", values.sucursalId);
+      localStorage.setItem("sucursalNombre", selectedBranch?.nombre || "Sin sucursal");
+      localStorage.setItem("sucursalImagenHeader", selectedBranch?.imagen_header || "");
+      window.dispatchEvent(new Event("branch-header-updated"));
+
       if (normalizeRole(userRes.data?.role) === "seller") {
         navigate("/seller-info");
       } else {

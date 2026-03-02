@@ -54,3 +54,32 @@ export const getAllSucursalsAPI = async () => {
     };
   }
 };
+
+export const getSucursalHeaderInfoAPI = async (sucursalId: string) => {
+  try {
+    const response = await apiClient.get(`/sucursal/${sucursalId}/header-info`);
+    return response.data;
+  } catch (error) {
+    return parseError(error as AxiosError);
+  }
+};
+
+export const uploadSucursalHeaderImageAPI = async (
+  sucursalId: string,
+  file: File
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("imagen", file);
+
+    const response = await apiClient.post(`/sucursal/${sucursalId}/header-image`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    return parseError(error as AxiosError);
+  }
+};
