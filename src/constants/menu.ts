@@ -6,93 +6,86 @@ import financeFluxIcon from "../assets/financeFluxIcon.svg";
 import stockManagementIcon from "../assets/stockManagement.svg";
 import statsIcon from "../assets/statsIcon.svg";
 import branchIcon from "../assets/branchIcon.svg";
-import salesHistoryIcon from "../assets/historyIcono.png"; // ⚠️ usa un ícono adecuado o reutiliza uno existente
+import salesHistoryIcon from "../assets/historyIcono.png";
+import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
-  // {
-  //   path: "/product",
-  //   label: "Inventario",
-  //   icon: boxIcon,
-  //   roles: ["admin"],
-  // },
-  { 
-    path: "/seller", 
-    label: "Vendedores", 
-    icon: sellerIcon, 
-    roles: ["admin"] 
+  {
+    path: "/seller",
+    label: "Vendedores",
+    icon: sellerIcon,
+    roles: getAllowedRoles("/seller"),
   },
-  //{ path: "/sellerFactura", label: "Vendedores de Factura", icon: sellerIcon, roles: ["admin"] },
-  { 
-    path: "/sales", 
-    label: "Ventas", 
-    icon: cartIcon, 
-    roles: ["admin", "operator"] 
+  {
+    path: "/sales",
+    label: "Ventas",
+    icon: cartIcon,
+    roles: getAllowedRoles("/sales"),
   },
-  { 
-    path: "/shipping", 
-    label: "Pedidos", 
-    icon: shippingIcon, 
-    roles: ["admin", "seller", "operator"] 
+  {
+    path: "/shipping",
+    label: "Pedidos",
+    icon: shippingIcon,
+    roles: getAllowedRoles("/shipping"),
   },
   {
     path: "/financeFlux",
     label: "Flujo Financiero",
     icon: financeFluxIcon,
-    roles: ["admin"],
+    roles: getAllowedRoles("/financeFlux"),
   },
   {
     path: "/stock",
     label: "Stock",
     icon: stockManagementIcon,
-    roles: ["admin", "seller", "operator"],
+    roles: getAllowedRoles("/stock"),
   },
   {
     path: "/shop",
     label: "Vender",
     icon: cartIcon,
-    roles: ["seller"],
+    roles: getAllowedRoles("/shop"),
   },
   {
     path: "/seller-info",
-    label: "Mi Información",
+    label: "Mi Informacion",
     icon: sellerIcon,
-    roles: ["seller"],
+    roles: getAllowedRoles("/seller-info"),
   },
   {
     path: "/stats",
-    label: "Estadísticas",
+    label: "Estadisticas",
     icon: statsIcon,
-    roles: ["admin"],
+    roles: getAllowedRoles("/stats"),
   },
   {
     path: "/cash",
-    label: "Reconciliación de Caja",
+    label: "Reconciliacion de Caja",
     icon: boxIcon,
-    roles: ["admin", "operator"],
+    roles: getAllowedRoles("/cash"),
   },
-  //{ path: "/cierreCaja",label: "Reconciliación de Caja",icon: boxIcon,roles: ["admin"] },
   {
     path: "/branch",
     label: "Sucursales",
     icon: branchIcon,
-    roles: ["admin","seller", "operator"],
+    roles: getAllowedRoles("/branch"),
   },
   {
     path: "/sales-history",
     label: "Historial de Ventas",
     icon: salesHistoryIcon,
-    roles: ["admin", "operator"],
+    roles: getAllowedRoles("/sales-history"),
   },
   {
     path: "/user",
     label: "Usuarios",
     icon: sellerIcon,
-    roles: ["admin"],
+    roles: getAllowedRoles("/user"),
   },
   {
     path: "/shipping-guide",
-    label: "Guías de Envío",
+    label: "Guias de Envio",
     icon: shippingIcon,
-    roles: ["seller"]
-  }
+    roles: getAllowedRoles("/shipping-guide"),
+  },
 ];

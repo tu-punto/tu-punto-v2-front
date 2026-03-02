@@ -35,6 +35,7 @@ const useProductsFlat = (externalSucursalId?: string) => {
                 id_producto: item._id,
                 sucursalId: item.sucursalId.toString(),
                 variantes: item.variantes_obj || {},
+                variantKey: item.variantKey,
 
             }));
 

@@ -14,7 +14,6 @@ import useEditableTable from '../../hooks/useEditableTable';
 import { UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useWatch } from 'antd/es/form/Form';
 import EditProductsModal from './EditProductsModal';
-import { updateSubvariantStockAPI } from '../../api/product';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { getSellersAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
@@ -77,16 +76,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             setAdelantoVisible(pagoEstado === "adelanto");
         }
     }, [visible, shipping]);
-
-    const objetosIguales = (a: any, b: any) => {
-        const aOrdenado = JSON.stringify(Object.fromEntries(Object.entries(a).sort()));
-        const bOrdenado = JSON.stringify(Object.fromEntries(Object.entries(b).sort()));
-        return aOrdenado === bOrdenado;
-    };
-    const construirNombreVariante = (nombreProducto: string, variantes: Record<string, string>) => {
-        const valores = Object.values(variantes || {}).join(" / ");
-        return `${nombreProducto} - ${valores}`;
-    };
 
     const lugarEntrega = useWatch('lugar_entrega', internalForm);
     // Extraer nombre del lugar de origen desde el shipping usando el ID
@@ -312,91 +301,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             });
         });
     }, [data]);
-
-    const restaurarStock = async (productos: any[]) => {
-        const sucursalId = localStorage.getItem('sucursalId');
-        if (!data || !Array.isArray(data) || data.length === 0) {
-            console.warn("⚠️ data aún no está cargado o está vacío");
-            return;
-        }
-
-        //console.log(" Raw data:", data);
-
-        for (const prod of productos) {
-            if (prod.esTemporal) continue;
-
-            const id = prod.id_producto || prod.producto;
-            const nombreVariante = prod.nombre_variante;
-            if (!nombreVariante || !id) continue;
-
-
-            const productoCompleto = data.find((p: any) =>
-                String(p._id || p.id_producto) === String(id)
-            );
-            if (!productoCompleto) {
-                console.warn("⚠️ Producto no encontrado en data:", id);
-                continue;
-            }
-            if (!productoCompleto?.sucursales?.length) {
-                console.warn("⚠️ Producto sin sucursales:", id);
-                continue;
-            }
-            //console.log(" Raw data ver sucursales:", data);
-            const sucursalData = productoCompleto.sucursales?.find((s: any) =>
-                String(s.id_sucursal) === String(sucursalId)
-            );
-            if (!sucursalData?.combinaciones?.length) {
-                console.warn("⚠️ Sin combinaciones en sucursal:", sucursalId);
-                continue;
-            }
-
-            // Reconstruir variantes desde nombre_variante si no existen
-            let variantes = prod.variantes;
-
-            // Siempre reconstruimos las variantes desde el nombre_variante (más seguro)
-            const nombreBase = productoCompleto.nombre_producto;
-            const target = nombreVariante?.normalize("NFD").toLowerCase();
-
-            const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
-                const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
-                return nombreCombinacion === target;
-            });
-
-            if (!combinacionExacta) {
-                console.warn("❌ No se encontró combinación por nombre exacto:", nombreVariante);
-                continue;
-            }
-
-            variantes = combinacionExacta.variantes;
-
-            const combinacion = sucursalData.combinaciones.find((c: any) => {
-                return objetosIguales(c.variantes, variantes);
-            });
-            if (!combinacion) {
-                console.warn("❌ No se encontró combinación exacta para:", variantes);
-                continue;
-            }
-
-            const nuevoStock = (combinacion.stock || 0) + prod.cantidad;
-
-            try {
-                const res = await updateSubvariantStockAPI({
-                    productId: id,
-                    sucursalId,
-                    variantes,
-                    stock: nuevoStock
-                });
-
-                if (!res.success) {
-                    message.error(`No se pudo restaurar stock de ${nombreVariante}`);
-                } else {
-                    //console.log("✅ Stock restaurado:", nombreVariante, "→", nuevoStock);
-                }
-            } catch (err) {
-                console.error("Error al restaurar stock:", err);
-            }
-        }
-    };
     const handleGenerateShippingQR = async () => {
         if (!shipping?._id) return;
         setQrLoading(true);
@@ -573,41 +477,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     try {
                                         // Restaurar stock antes de eliminar
                                         //console.log("Restaurando stock de productos antes de eliminar la entrega...",products);
-                                        const enrichedForRestock = products.map((p) => {
-                                            const nombreVariante = p.nombre_variante || p.producto || '';
-                                            const productoCompleto = data.find(dp =>
-                                                dp._id === p.id_producto || dp.nombre_producto === p.producto?.split(" - ")[0]
-                                            );
-                                            if (!productoCompleto) {
-                                                console.warn("⚠️ Producto no encontrado en data:", p.producto);
-                                                return p;
-                                            }
-
-                                            const variantes = p.variantes && Object.keys(p.variantes).length > 0
-                                                ? p.variantes
-                                                : (() => {
-                                                    const partes = p.producto.split(" - ");
-                                                    const atributos = partes[1]?.split(" / ") || [];
-
-                                                    const ejemploComb = productoCompleto?.sucursales?.[0]?.combinaciones?.[0];
-                                                    const claves = Object.keys(ejemploComb?.variantes || {});
-                                                    const reconstruidas: Record<string, string> = {};
-                                                    claves.forEach((k, i) => {
-                                                        reconstruidas[k] = atributos[i] || '';
-                                                    });
-                                                    return reconstruidas;
-                                                })();
-
-                                            return {
-                                                ...p,
-                                                id_producto: p.id_producto || productoCompleto._id,
-                                                variantes,
-                                            };
-
-                                        });
-                                        //console.log("♻️ Restaurando con datos:", enrichedForRestock);
-
-                                        await restaurarStock(enrichedForRestock);
 
                                         const response = await deleteShippingAPI(shipping._id);
                                         if (response.success) {
@@ -1080,3 +949,4 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 }
 
 export default ShippingInfoModal;
+

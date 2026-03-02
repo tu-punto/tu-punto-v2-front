@@ -4,7 +4,7 @@ import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import EditProductsModal from '../Shipping/EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { deleteShippingAPI, updateShippingAPI } from '../../api/shipping';
-import { updateSubvariantStockAPI } from '../../api/product';
+import { deleteProductsByShippingAPI, updateProductsByShippingAPI } from '../../api/sales';
 import { getSellersAPI } from '../../api/seller.ts';
 import dayjs from "dayjs";
 
@@ -134,73 +134,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       setEfectivoInput(saldoACobrar - mitad);
     }
   }, [tipoPago, saldoACobrar]);
-
-  // Función para comparar variantes
-  const objetosIguales = (a: any, b: any) => {
-    if (!a || !b) return false;
-    const aOrdenado = JSON.stringify(Object.fromEntries(Object.entries(a).sort()));
-    const bOrdenado = JSON.stringify(Object.fromEntries(Object.entries(b).sort()));
-    return aOrdenado === bOrdenado;
-  };
-
-  // Reconstruye el nombre de variante
-  const construirNombreVariante = (nombreProducto: string, variantes: Record<string, string>) => {
-    const valores = Object.values(variantes || {}).join(" / ");
-    return `${nombreProducto} - ${valores}`;
-  };
-
-  // Restaurar stock de productos
-  const restaurarStock = async (productos: any[]) => {
-    const sucursalId = localStorage.getItem('sucursalId');
-    if (!data || !Array.isArray(data) || data.length === 0) return;
-
-    for (const prod of productos) {
-      if (prod.esTemporal) continue;
-
-      const id = prod.id_producto || prod.producto;
-      const nombreVariante = prod.nombre_variante;
-      if (!nombreVariante || !id) continue;
-
-      const productoCompleto = data.find((p: any) =>
-        String(p._id || p.id_producto) === String(id)
-      );
-      if (!productoCompleto) continue;
-
-      const sucursalData = productoCompleto.sucursales?.find((s: any) =>
-        String(s.id_sucursal) === String(sucursalId)
-      );
-      if (!sucursalData?.combinaciones?.length) continue;
-
-      let variantes = prod.variantes;
-      const nombreBase = productoCompleto.nombre_producto;
-      const target = nombreVariante?.normalize("NFD").toLowerCase();
-
-      const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
-        const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
-        return nombreCombinacion === target;
-      });
-
-      if (!combinacionExacta) continue;
-      variantes = combinacionExacta.variantes;
-
-      const combinacion = sucursalData.combinaciones.find((c: any) => objetosIguales(c.variantes, variantes));
-      if (!combinacion) continue;
-
-      const nuevoStock = (combinacion.stock || 0) + prod.cantidad;
-
-      try {
-        await updateSubvariantStockAPI({
-          productId: id,
-          sucursalId,
-          variantes,
-          stock: nuevoStock
-        });
-      } catch (err) {
-        console.error("Error al restaurar stock:", err);
-      }
-    }
-  };
-
   const enrichedProducts = useMemo(() => {
     const sucursalId = localStorage.getItem("sucursalId");
     if (!data) return [];
@@ -283,18 +216,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Preparar datos para actualizar
       const updateData = {
         ...shipping,
-        venta: products.map(p => ({
-          _id: p.id_venta,
-          id_producto: p.id_producto,
-          cantidad: p.cantidad,
-          precio_unitario: p.precio_unitario,
-          utilidad: p.utilidad,
-          nombre_variante: p.nombre_variante || p.producto,
-          variantes: p.variantes
-        })),
         tipo_de_pago: tipoPago,
         esta_pagado: estaPagado,
         adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
@@ -303,97 +226,50 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       };
 
       const res = await updateShippingAPI(updateData, shipping._id);
-
       if (!res.success) {
-        throw new Error("Error al actualizar el pedido");
+        throw new Error('Error al actualizar el pedido');
       }
 
-      // Actualizar el stock si hay cambios en productos
-      const sucursalId = localStorage.getItem('sucursalId');
       const originalMap = new Map();
-      originalProducts.forEach(p => {
+      originalProducts.forEach((p) => {
         originalMap.set(p.key, p);
       });
 
-      // Procesar cambios en el stock
-      for (const currentProduct of products) {
-        const originalProduct = originalMap.get(currentProduct.key);
+      const changedProducts = products.filter((p) => {
+        const original = originalMap.get(p.key);
+        if (!original) return false;
+        return (
+          Number(p.cantidad) !== Number(original.cantidad) ||
+          Number(p.precio_unitario) !== Number(original.precio_unitario) ||
+          Number(p.utilidad) !== Number(original.utilidad)
+        );
+      });
 
-        if (!originalProduct) {
-          // Producto nuevo - restar stock
-          await updateProductStock(currentProduct, -currentProduct.cantidad, sucursalId);
-        } else if (currentProduct.cantidad !== originalProduct.cantidad) {
-          // Cantidad modificada - ajustar stock
-          const diferencia = originalProduct.cantidad - currentProduct.cantidad;
-          await updateProductStock(currentProduct, diferencia, sucursalId);
-        }
+      if (changedProducts.length > 0) {
+        await updateProductsByShippingAPI(
+          shipping._id,
+          changedProducts.map((p) => ({
+            id_venta: p.id_venta,
+            cantidad: p.cantidad,
+            precio_unitario: p.precio_unitario,
+            utilidad: p.utilidad,
+            id_producto: p.id_producto,
+          }))
+        );
       }
 
-      // Procesar productos eliminados
-      for (const deletedId of deletedProducts) {
-        const deletedProduct = originalProducts.find(p => p.id_venta === deletedId);
-        if (deletedProduct) {
-          await updateProductStock(deletedProduct, deletedProduct.cantidad, sucursalId);
-        }
+      if (deletedProducts.length > 0) {
+        await deleteProductsByShippingAPI(shipping._id, deletedProducts);
       }
 
-      message.success("Pedido y stock actualizados con éxito");
+      message.success('Pedido actualizado con exito');
       onSave();
       onClose();
     } catch (error) {
-      console.error("Error al guardar:", error);
-      message.error("Ocurrió un error al guardar los cambios");
+      console.error('Error al guardar:', error);
+      message.error('Ocurrio un error al guardar los cambios');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateProductStock = async (product: any, cantidadCambio: number, sucursalId: string) => {
-    if (!product.id_producto || product.esTemporal) return;
-
-    const productoCompleto = data.find((p: any) =>
-      String(p._id || p.id_producto) === String(product.id_producto)
-    );
-
-    if (!productoCompleto) return;
-
-    const sucursalData = productoCompleto.sucursales?.find((s: any) =>
-      String(s.id_sucursal) === String(sucursalId)
-    );
-
-    if (!sucursalData?.combinaciones?.length) return;
-
-    let variantes = product.variantes;
-    const nombreBase = productoCompleto.nombre_producto;
-    const target = (product.nombre_variante || product.producto)?.normalize("NFD").toLowerCase();
-
-    // Encontrar la combinación exacta
-    const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
-      const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
-      return nombreCombinacion === target;
-    });
-
-    if (!combinacionExacta) return;
-
-    variantes = combinacionExacta.variantes;
-    const combinacion = sucursalData.combinaciones.find((c: any) =>
-      objetosIguales(c.variantes, variantes)
-    );
-
-    if (!combinacion) return;
-
-    const nuevoStock = (combinacion.stock || 0) + cantidadCambio;
-
-    try {
-      await updateSubvariantStockAPI({
-        productId: product.id_producto,
-        sucursalId,
-        variantes,
-        stock: nuevoStock
-      });
-    } catch (err) {
-      console.error("Error al actualizar stock:", err);
-      throw err;
     }
   };
 
@@ -509,32 +385,6 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                 cancelText: "Cancelar",
                 onOk: async () => {
                   try {
-                    // Enriquecer productos para restaurar stock
-                    const enrichedForRestock = products.map((p) => {
-                      const productoCompleto = data.find(dp =>
-                        dp._id === p.id_producto || dp.nombre_producto === p.producto?.split(" - ")[0]
-                      );
-                      if (!productoCompleto) return p;
-                      const variantes = p.variantes && Object.keys(p.variantes).length > 0
-                        ? p.variantes
-                        : (() => {
-                          const partes = p.producto.split(" - ");
-                          const atributos = partes[1]?.split(" / ") || [];
-                          const ejemploComb = productoCompleto?.sucursales?.[0]?.combinaciones?.[0];
-                          const claves = Object.keys(ejemploComb?.variantes || {});
-                          const reconstruidas: Record<string, string> = {};
-                          claves.forEach((k, i) => {
-                            reconstruidas[k] = atributos[i] || '';
-                          });
-                          return reconstruidas;
-                        })();
-                      return {
-                        ...p,
-                        id_producto: p.id_producto || productoCompleto._id,
-                        variantes,
-                      };
-                    });
-                    await restaurarStock(enrichedForRestock);
 
                     const response = await deleteShippingAPI(shipping._id);
                     if (response.success) {
@@ -765,3 +615,4 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
 };
 
 export default ModalSalesHistory;
+

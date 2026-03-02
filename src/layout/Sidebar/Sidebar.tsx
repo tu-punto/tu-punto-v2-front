@@ -5,6 +5,7 @@ import { UserContext } from "../../context/userContext";
 import { menu } from "../../constants/menu";
 import { Button, message } from "antd";
 import { logoutUserAPI } from "../../api/user";
+import { normalizeRole } from "../../utils/role";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const filteredMenuItems = menu.filter((item) =>
-    item.roles.includes(user?.role)
+    item.roles.includes(normalizeRole(user?.role))
   );
 
   return (
