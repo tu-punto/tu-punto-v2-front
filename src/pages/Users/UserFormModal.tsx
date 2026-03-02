@@ -89,6 +89,7 @@ const UserFormModal = ({
         >
           <Select size="large">
             <Select.Option value="admin">Administrador</Select.Option>
+            <Select.Option value="operator">Operador</Select.Option>
             <Select.Option value="seller">Vendedor</Select.Option>
           </Select>
         </Form.Item>

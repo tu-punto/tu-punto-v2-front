@@ -5,6 +5,7 @@ import { checkLoginAPI, getUserByCookieAPI } from "../api/user";
 import { getSucursalsAPI } from "../api/sucursal";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
+import { normalizeRole } from "../utils/role";
 
 export default function LoginForm({
   showBranchSelect,
@@ -42,7 +43,10 @@ export default function LoginForm({
 
       localStorage.setItem("sucursalId", values.sucursalId);
       localStorage.setItem("sucursalNombre", branchName);
-      setUser(userRes.data);
+      setUser({
+        ...userRes.data,
+        role: normalizeRole(userRes.data?.role),
+      });
       message.success("¡Bienvenido!");
       navigate(redirectTo);
     } catch {

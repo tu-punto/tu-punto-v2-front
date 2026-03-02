@@ -7,6 +7,7 @@ import { UserContext } from "../../context/userContext";
 import logoImg from "../../../public/logo.png";
 import { sendHelloAPI } from "../../api/whatsapp";
 import { getSucursalsAPI } from "../../api/sucursal"; // asegurate de tener este import
+import { normalizeRole } from "../../utils/role";
 
 const { Option } = Select;
 
@@ -46,9 +47,12 @@ const LoginPage = () => {
         return;
       }
 
-      setUser(userRes.data);
+      setUser({
+        ...userRes.data,
+        role: normalizeRole(userRes.data?.role),
+      });
 
-      if (userRes.data.role === "seller") {
+      if (normalizeRole(userRes.data?.role) === "seller") {
         navigate("/seller-info");
       } else {
         await sendHelloAPI("+59170186881");
