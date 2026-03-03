@@ -1,20 +1,16 @@
 import { useState, useContext } from "react";
 import { UserContext } from "../../context/userContext.tsx";
-import { Switch, Button } from 'antd';
 
 import ShippingTable from "./ShippingTable";
-import ExternalSalesTable from "./ExternalSalesTable.tsx";
 import ShippingQRScannerModal from "./ShippingQRScannerModal.tsx";
 
 
 const Shipping = () => {
-	const [refreshKey, setRefreshKey] = useState(0)
-	const [isExternalSalesMode, setIsExternalSalesMode] = useState(false);
+	const refreshKey = 0;
 	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
 	const { user }: any = useContext(UserContext);
-	const isAdmin = user?.role?.toLowerCase() === 'admin';
-	const isOperator = user?.role.toLowerCase() === 'operator';
+	const canScanOrders = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'operator';
 
 
 	return (
@@ -26,33 +22,12 @@ const Shipping = () => {
 						Pedidos
 					</h1>
 				</div>
-				{(isAdmin || isOperator) && (
-					<Button
-						type="primary"
-						className="text-mobile-sm xl:text-desktop-sm "
-						onClick={() => setIsQRModalOpen(true)}
-					>
-						Escaner de pedidos
-					</Button>
-				)}
 			</div>
 
-			{isAdmin || isOperator && (
-				<div className="px-5 py-4">
-					<Switch
-						checked={isExternalSalesMode}
-						onChange={(checked: boolean) => { setIsExternalSalesMode(checked) }}
-						checkedChildren="Ventas externas"
-						unCheckedChildren="Ventas internas"
-					/>
-				</div>
-			)}
-			{!isExternalSalesMode && (
-				<ShippingTable refreshKey={refreshKey} />
-			)}
-			{isExternalSalesMode && (
-				<ExternalSalesTable refreshKey={refreshKey} />
-			)}
+			<ShippingTable
+				refreshKey={refreshKey}
+				onOpenQR={canScanOrders ? () => setIsQRModalOpen(true) : undefined}
+			/>
 			<ShippingQRScannerModal
 				open={isQRModalOpen}
 				onClose={() => setIsQRModalOpen(false)}
