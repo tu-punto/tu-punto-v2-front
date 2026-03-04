@@ -16,8 +16,9 @@ import QRScanner from "./QRScanner.tsx";
 export const Sales = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const { user }: any = useContext(UserContext);
-  const isAdmin = user?.role === 'admin';
-  const isOperator = user?.role === 'operator';
+  const normalizedRole = String(user?.role || "").toLowerCase();
+  const isAdmin = normalizedRole === "admin";
+  const isOperator = normalizedRole === "operator";
   //console.log ("🚀 user en Sales:", user);
 
   const [modalType, setModalType] = useState<'sales' | 'shipping' | null>(null);
@@ -567,7 +568,7 @@ export const Sales = () => {
                     >
                       Añadir nuevo producto
                     </Button>
-                    {isAdmin && !isOperator && (
+                    {(isAdmin || isOperator) && (
                       <Select
                         placeholder="Selecciona un vendedor"
                         options={sellers.map((vendedor: any) => ({
