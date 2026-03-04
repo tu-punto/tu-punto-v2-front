@@ -125,7 +125,6 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           <Form.Item
             name="telefono_vendedor"
             label="Celular del vendedor"
-            rules={[{ required: true, message: "El celular es obligatorio" }]}
           >
             <Input
               placeholder="Ej: 7XXXXXXX"
