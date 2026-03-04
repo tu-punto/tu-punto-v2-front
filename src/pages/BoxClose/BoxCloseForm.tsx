@@ -162,7 +162,7 @@ const BoxCloseForm = ({
     if (mode !== "edit") {
       fetchSalesSummary();
     }
-  }, [mode]);
+  }, [mode, selectedDate?.valueOf(), lastClosingBalance?.efectivo_real]);
 
   useEffect(() => {
     if (mode !== "edit" || !initialData) return;

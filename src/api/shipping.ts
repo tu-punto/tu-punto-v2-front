@@ -132,11 +132,16 @@ const deleteShippingAPI = async (id: string) => {
     return { success: false };
   }
 };
-const getSalesHistoryAPI = async (date?: string, sucursalId?: string) => {
+const getSalesHistoryAPI = async (
+  date?: string,
+  sucursalId?: string,
+  options?: { fromLastClose?: boolean }
+) => {
   try {
     const params = new URLSearchParams();
     if (date) params.append("date", date);
     if (sucursalId) params.append("sucursalId", sucursalId);
+    if (options?.fromLastClose) params.append("fromLastClose", "true");
 
     const res = await apiClient.get(`/shipping/history/sales?${params.toString()}`);
     return { success: true, ...res.data };

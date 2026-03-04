@@ -10,7 +10,7 @@ export const getDailySummary = async (dateISO?: string): Promise<IDailySummary> 
   const sucursalId = localStorage.getItem("sucursalId");
   const date = dateISO || new Date().toISOString();
 
-  const response = await getSalesHistoryAPI(date, sucursalId);
+  const response = await getSalesHistoryAPI(date, sucursalId, { fromLastClose: true });
 
   if (response.success) {
     const { efectivo, qr } = response.totales;

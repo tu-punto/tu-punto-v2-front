@@ -43,8 +43,22 @@ const BoxClosePage = () => {
     setLoading(true);
     try {
       const boxCloses = await getBoxClosesAPI();
+      const currentSucursalId = localStorage.getItem("sucursalId");
+      const filteredBySucursal = (Array.isArray(boxCloses) ? boxCloses : [])
+        .filter((boxClose: any) => {
+          if (!currentSucursalId) return true;
+          const rawSucursalId =
+            typeof boxClose?.id_sucursal === "string"
+              ? boxClose.id_sucursal
+              : boxClose?.id_sucursal?._id;
+          return String(rawSucursalId || "") === String(currentSucursalId);
+        })
+        .sort(
+          (a: any, b: any) =>
+            dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf()
+        );
 
-      const formattedData = boxCloses.map((boxClose: IBoxClose | any) => {
+      const formattedData = filteredBySucursal.map((boxClose: IBoxClose | any) => {
         const efectivo = boxClose.efectivo_diario || [];
 
         const total_coins = efectivo
@@ -232,6 +246,7 @@ const BoxClosePage = () => {
                 : "Nuevo Cierre"
           }
           open={showForm}
+          destroyOnClose
           onCancel={() => {
             setShowForm(false);
             setSelectedReconciliation(null);
