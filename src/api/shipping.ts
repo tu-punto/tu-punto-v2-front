@@ -15,6 +15,28 @@ const getShippingsAPI = async () => {
   }
 };
 
+const getShippingsListAPI = async (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  from?: string;
+  to?: string;
+  originId?: string;
+  sellerId?: string;
+  client?: string;
+}) => {
+  try {
+    const res = await apiClient.get("/shipping/list", { params });
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
 const getShipingByIdsAPI = async (ids: number[]) => {
   try {
     const idsString = ids.join(",");
@@ -129,6 +151,7 @@ const getSalesHistoryAPI = async (date?: string, sucursalId?: string) => {
 
 export {
   getShippingsAPI,
+  getShippingsListAPI,
   registerShippingAPI,
   registerSalesToShippingAPI,
   updateShippingAPI,

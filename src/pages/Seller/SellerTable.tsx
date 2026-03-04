@@ -1,4 +1,4 @@
-import { Button, Table, Tooltip, Select, Space, Input } from "antd";
+import { Button, Table, Tooltip, Select, Space, Input, message } from "antd";
 import { useEffect, useState } from "react";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -7,7 +7,7 @@ import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellersAPI } from "../../api/seller";
+import { getSellersBasicAPI } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
@@ -32,6 +32,7 @@ export default function SellerTable({
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
 
@@ -177,43 +178,50 @@ export default function SellerTable({
 
   useEffect(() => {
     (async () => {
-      const res = await getSellersAPI();
-      const sellers: ISeller[] = res.data || res;
+      setLoading(true);
+      try {
+        const res = await getSellersBasicAPI();
+        const sellers: ISeller[] = (Array.isArray(res) ? res : []) as ISeller[];
 
-      const rows: SellerRow[] = await Promise.all(
-        sellers.map(async (seller) => {
-          const mensual = seller.pago_sucursales
-            .filter((p) => p.activo)
-            .reduce(
-              (t: number, p: ISucursalPago) =>
-                t +
-                Number(p.alquiler) +
-                Number(p.exhibicion) +
-                Number(p.delivery) +
-                Number(p.entrega_simple),
-              0
-            );
+        const rows: SellerRow[] = await Promise.all(
+          sellers.map(async (seller) => {
+            const mensual = seller.pago_sucursales
+              .filter((p) => p.activo)
+              .reduce(
+                (t: number, p: ISucursalPago) =>
+                  t +
+                  Number(p.alquiler) +
+                  Number(p.exhibicion) +
+                  Number(p.delivery) +
+                  Number(p.entrega_simple),
+                0
+              );
 
-          const saldoPendiente = seller.saldo_pendiente;
-          const deuda = seller.deuda;
-          const pagoPendiente = saldoPendiente - deuda;
+            const saldoPendiente = seller.saldo_pendiente;
+            const deuda = seller.deuda;
+            const pagoPendiente = saldoPendiente - deuda;
 
-          return {
-            ...seller,
-            key: seller._id,
-            nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
-            fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
-            fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
-            deuda: deuda,
-            pagoTotal: `Bs. ${pagoPendiente.toFixed(2)}`,
-            pagoTotalInt: pagoPendiente,
-            pago_mensual: `Bs. ${mensual}`,
-            saldo_pendiente: saldoPendiente,
-          };
-        })
-      );
+            return {
+              ...seller,
+              key: seller._id,
+              nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
+              fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
+              fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
+              deuda: deuda,
+              pagoTotal: `Bs. ${pagoPendiente.toFixed(2)}`,
+              pagoTotalInt: pagoPendiente,
+              pago_mensual: `Bs. ${mensual}`,
+              saldo_pendiente: saldoPendiente,
+            };
+          })
+        );
 
-      setSellers(rows);
+        setSellers(rows);
+      } catch (error) {
+        message.error("Error al cargar vendedores");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [refreshKey]);
 
@@ -298,6 +306,7 @@ export default function SellerTable({
       </Space>
 
       <Table
+        loading={loading}
         columns={columns}
         dataSource={filteredSellers}
         pagination={{

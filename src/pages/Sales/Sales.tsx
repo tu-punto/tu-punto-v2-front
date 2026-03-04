@@ -2,12 +2,12 @@ import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
-import { getSellerAPI, getSellersAPI } from "../../api/seller";
+import { getSellerAPI, getSellersBasicAPI } from "../../api/seller";
 import EmptySalesTable from "./EmptySalesTable";
 import useEditableTable from "../../hooks/useEditableTable";
 import { registerSalesToShippingAPI } from "../../api/shipping";
 import ShippingFormModal from "./ShippingFormmodal";
-import { getSucursalsAPI } from "../../api/sucursal";
+import { getSucursalsBasicAPI } from "../../api/sucursal";
 import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
@@ -159,16 +159,6 @@ export const Sales = () => {
     fetchSucursal();
   }, []);
   useEffect(() => {
-    const sucursalId = (isAdmin || isOperator)
-      ? localStorage.getItem("sucursalId")
-      : selectedBranchId;
-
-    if (!sucursalId) return;
-
-    fetchSellers();
-  }, [isAdmin, isOperator, selectedBranchId]);
-
-  useEffect(() => {
     if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
@@ -268,7 +258,8 @@ export const Sales = () => {
   const fetchSellers = async () => {
     setSellersLoading(true);
     try {
-      const response = await getSellersAPI();
+      const response = await getSellersBasicAPI();
+      const sellersList = Array.isArray(response) ? response : [];
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
@@ -283,7 +274,7 @@ export const Sales = () => {
         return;
       }
 
-      const sellersVigentes = response.filter((v: any) => {
+      const sellersVigentes = sellersList.filter((v: any) => {
         return v.pago_sucursales?.some((pago: any) => {
           const idSucursal = pago.id_sucursal?._id || pago.id_sucursal;
           const perteneceASucursal = String(idSucursal) === String(sucursalId);
@@ -312,8 +303,8 @@ export const Sales = () => {
 
   const fetchSucursal = async () => {
     try {
-      const response = await getSucursalsAPI()
-      setBranches(response)
+      const response = await getSucursalsBasicAPI()
+      setBranches(Array.isArray(response) ? response : [])
       if (isAdmin || isOperator) {
         const sucursalIdLogin = localStorage.getItem("sucursalId");
         if (sucursalIdLogin) {
@@ -352,11 +343,6 @@ export const Sales = () => {
       setInventoryLoading(false);
       setCartLoading(false);
     }
-  }, [branchIdForFetch]);
-
-  useEffect(() => {
-    if (!branchIdForFetch || branchIdForFetch === "undefined") return;
-    fetchProducts();
   }, [branchIdForFetch]);
 
   useEffect(() => {

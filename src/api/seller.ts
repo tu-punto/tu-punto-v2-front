@@ -81,3 +81,12 @@ export const getPaymentProofsBySellerIdAPI = async (sellerId: any) => {
 
     }
 }
+
+export const getSellersBasicAPI = async (params?: { sucursalId?: string }) => {
+    try {
+        const res = await apiClient.get(`/seller/basic`, { params });
+        return res.data;
+    } catch (error) {
+        parseError(error as AxiosError);
+    }
+}

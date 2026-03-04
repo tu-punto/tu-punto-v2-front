@@ -1,14 +1,14 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { Button, DatePicker, Input, message, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsAPI, getShippingByIdAPI } from '../../api/shipping';
-import { getExternalSaleByIdAPI, getExternalSalesAPI } from '../../api/externalSale';
+import { getShippingsListAPI, getShippingByIdAPI } from '../../api/shipping';
+import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
 import ExternalPackagesFormModal from './ExternalPackagesFormModal';
 import ExternalShippingInfoModal from './ExternalShippingInfoModal';
-import { getSucursalsAPI } from '../../api/sucursal';
-import { getSellersAPI } from "../../api/seller";
+import { getSucursalsBasicAPI } from '../../api/sucursal';
+import { getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 
@@ -44,6 +44,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
+    const [loadingTable, setLoadingTable] = useState(false);
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator;
@@ -87,16 +88,50 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const fetchShippings = async () => {
+        setLoadingTable(true);
         try {
+            const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
+            const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
+            const status = selectedStatus === "En Espera" ? "En Espera" : "Entregado";
+            const selectedOriginId = sucursal.find((s: any) => s.nombre === selectedOrigin)?._id;
+            const sellerIdToQuery =
+                selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
+                    ? selectedVendedor
+                    : (!isAdmin && !isOperator ? user?.id_vendedor : undefined);
+
             const [shippingApiData, externalApiData] = await Promise.all([
-                getShippingsAPI(),
-                canManageExternal ? getExternalSalesAPI() : Promise.resolve([]),
+                getShippingsListAPI({
+                    page: 1,
+                    limit: 300,
+                    status,
+                    from,
+                    to,
+                    originId: selectedOriginId,
+                    sellerId: sellerIdToQuery
+                }),
+                canManageExternal
+                    ? getExternalSalesListAPI({
+                        page: 1,
+                        limit: 300,
+                        status,
+                        from,
+                        to,
+                        sucursalId: selectedOriginId
+                    })
+                    : Promise.resolve({ rows: [] }),
             ]);
 
-            const internalShippings = Array.isArray(shippingApiData) ? shippingApiData : [];
-            const externalShippings = Array.isArray(externalApiData)
-                ? externalApiData.map((sale: any) => mapExternalToShipping(sale))
-                : [];
+            const internalShippings = Array.isArray(shippingApiData?.rows)
+                ? shippingApiData.rows
+                : Array.isArray(shippingApiData)
+                    ? shippingApiData
+                    : [];
+            const externalRows = Array.isArray(externalApiData?.rows)
+                ? externalApiData.rows
+                : Array.isArray(externalApiData)
+                    ? externalApiData
+                    : [];
+            const externalShippings = externalRows.map((sale: any) => mapExternalToShipping(sale));
 
             const sortedData = [...internalShippings, ...externalShippings].sort(
                 (a: any, b: any) => new Date(b.fecha_pedido).getTime() - new Date(a.fecha_pedido).getTime()
@@ -108,6 +143,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             setShippingData(dataWithKey);
         } catch (error) {
             console.error("Error fetching shipping data:", error);
+        } finally {
+            setLoadingTable(false);
         }
     };
     const toSimpleDate = (d: Date | null) =>
@@ -319,8 +356,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
     const fetchSucursal = async () => {
         try {
-            const response = await getSucursalsAPI();
-            setSucursal(response);
+            const response = await getSucursalsBasicAPI();
+            setSucursal(Array.isArray(response) ? response : []);
 
             if (isAdmin || isOperator) {
                 const sucursalId = localStorage.getItem("sucursalId");
@@ -341,9 +378,21 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     useEffect(() => {
-        fetchShippings();
         fetchSucursal();
-    }, [refreshKey, canManageExternal]);
+    }, []);
+
+    useEffect(() => {
+        fetchShippings();
+    }, [
+        refreshKey,
+        canManageExternal,
+        selectedStatus,
+        dateRange,
+        selectedOrigin,
+        selectedVendedor,
+        user?.id_vendedor,
+        sucursal.length
+    ]);
 
     useEffect(() => {
         setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En Espera'));
@@ -357,8 +406,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
-                const response = await getSellersAPI();
-                setVendedores(response);
+                const response = await getSellersBasicAPI();
+                setVendedores(Array.isArray(response) ? response : []);
             } catch (error) {
                 message.error("Error al obtener vendedores");
             }
@@ -429,7 +478,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     disabled={isAdmin || isOperator} // ← Bloquea si es admin
                 >
                     {sucursal.map((suc: any) => (
-                        <Option key={suc.id_sucursal} value={suc.nombre}>
+                        <Option key={suc._id || suc.id_sucursal} value={suc.nombre}>
                             {suc.nombre}
                         </Option>
                     ))}
@@ -447,7 +496,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 >
                     <Option value="other">Otro lugar</Option>
                     {sucursal.map((suc: any) => (
-                        <Option key={suc.id_sucursal} value={suc.nombre}>
+                        <Option key={suc._id || suc.id_sucursal} value={suc.nombre}>
                             {suc.nombre}
                         </Option>
                     ))}
@@ -608,9 +657,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             </div>
 
             <Table
+                loading={loadingTable}
                 columns={columns}
                 dataSource={selectedStatus === 'En Espera' ? filteredEsperaData : filteredEntregadoData}
-                pagination={false}
+                pagination={{
+                    pageSize: 30,
+                    showSizeChanger: true,
+                    pageSizeOptions: ["15", "30", "50", "100"]
+                }}
                 scroll={{ x: "max-content" }}
                 onRow={(record) => ({
                     onClick: async () => {

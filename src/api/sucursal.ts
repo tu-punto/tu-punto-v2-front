@@ -18,6 +18,15 @@ export const getSucursalsAPI = async () => {
   }
 };
 
+export const getSucursalsBasicAPI = async () => {
+  try {
+    const response = await apiClient.get("/sucursal/basic");
+    return response.data;
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
+
 export const registerSucursalAPI = async (newSucursal: any) => {
   try {
     const response = await apiClient.post("/sucursal", newSucursal);

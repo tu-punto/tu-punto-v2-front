@@ -45,14 +45,85 @@ export const getProductsAPI = async () => {
     }
 }
 
-export const getFlatProductListAPI = async (sucursalId?: string) => {
+export const getFlatProductListAPI = async (
+    input?: string | {
+        sucursalId?: string;
+        sellerId?: string;
+        sellerIds?: string[];
+        categoryId?: string;
+        q?: string;
+        inStock?: boolean;
+    }
+) => {
     try {
+        const rawParams =
+            typeof input === "string"
+                ? { sucursalId: input }
+                : (input || {});
+        const params = {
+            ...rawParams,
+            sellerIds: Array.isArray((rawParams as any)?.sellerIds)
+                ? (rawParams as any).sellerIds.join(",")
+                : undefined
+        };
         const res = await apiClient.get("/product/flat", {
-            params: { sucursalId }
+            params
         });
         return res.data;
     } catch (error) {
         console.error("❌ Error al obtener productos planos:", error);
+        return [];
+    }
+};
+
+export const getFlatProductListPageAPI = async (params?: {
+    sucursalId?: string;
+    sellerId?: string;
+    categoryId?: string;
+    q?: string;
+    inStock?: boolean;
+    page?: number;
+    limit?: number;
+}) => {
+    try {
+        const res = await apiClient.get("/product/flat/list", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener productos planos paginados:", error);
+        return { rows: [], total: 0, page: 1, limit: params?.limit || 10, pages: 1 };
+    }
+};
+
+export const getSellerInventoryPageAPI = async (params?: {
+    sucursalId?: string;
+    sellerId?: string;
+    categoryId?: string;
+    q?: string;
+    inStock?: boolean;
+    page?: number;
+    limit?: number;
+}) => {
+    try {
+        const res = await apiClient.get("/product/seller/inventory", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener inventario paginado de vendedor:", error);
+        return { rows: [], total: 0, page: 1, limit: params?.limit || 10, pages: 1 };
+    }
+};
+
+export const getSellerInventoryAllAPI = async (params?: {
+    sucursalId?: string;
+    sellerId?: string;
+    categoryId?: string;
+    q?: string;
+    inStock?: boolean;
+}) => {
+    try {
+        const res = await apiClient.get("/product/seller/inventory/all", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener inventario completo de vendedor:", error);
         return [];
     }
 };

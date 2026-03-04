@@ -4,14 +4,14 @@ import {Row, Col, message} from 'antd';
 import SellerList from './SellerList';
 import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
-import { getFlatProductListAPI, getProductsAPI, registerVariantAPI } from '../../api/product';
+import { getFlatProductListAPI, getSellerInventoryAllAPI, getProductsAPI } from '../../api/product';
 import { Button, Input, Select, Spin } from 'antd';
 import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 //import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
 import { getGroupByIdAPI, getGroupsAPI } from '../../api/group';
-import { getSellersAPI } from '../../api/seller';
+import { getSellersBasicAPI } from '../../api/seller';
 import { getCategoriesAPI } from '../../api/category';
 import { UserContext } from '../../context/userContext';
 import ConfirmProductsModal from './ConfirmProductsModal';
@@ -20,25 +20,22 @@ import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clear
 import ProductTableSeller from "./ProductTableSeller.tsx";
 import VariantQRBatchModal from "./VariantQRBatchModal.tsx";
 //test
+const SELLERS_PAGE_SIZE = 10;
+
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
     const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
     const [resetSignal, setResetSignal] = useState(false);
-    const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [selectedGroup, setSelectedGroup] = useState<{ product: any; name: string } | null>(null);
-    const [selectedSeller, setSelectedSeller] = useState<number | null>(null);
+    const [selectedSeller, setSelectedSeller] = useState<string | null>(null);
     const [infoModalVisible, setInfoModalVisible] = useState<boolean>(false);
     const [isProductFormVisible, setProductFormVisible] = useState<boolean>(false);
     const [isVariantModalVisible, setIsVariantModalVisible] = useState<boolean>(false);
     const [prevKey, setPrevKey] = useState(0);
-    const [criteriaFilter, setCriteriaFilter] = useState(0);
-    const [criteriaGroup, setCriteriaGroup] = useState(0);
     const [sucursalId, setSucursalId] = useState<string>("all");
     const [sellerSucursales, setSellerSucursales] = useState<any[]>([]);
-
-    const [options, setOptions] = useState<any[]>([{ option: "Vendedor", group: [], groupFunction: () => { } }]);
     const [productsToUpdate, setProductsToUpdate] = useState<{ [key: number]: number }>({});
     const [stock, setStock] = useState([]);
     const [newProducts, setNewProducts] = useState<any[]>([]);
@@ -53,11 +50,37 @@ const StockManagement = () => {
     const [categories, setCategories] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
     const [searchText, setSearchText] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [productosFull, setProductosFull] = useState([]);
     const [sellersVigentes, setSellersVigentes] = useState<any[]>([]);
-    const handleSellersLoaded = (listaVigente: any[]) => {
-        setSellersVigentes(listaVigente.filter(s => s._id));
+    const [inventoryPage, setInventoryPage] = useState(1);
+    const [inventoryTotal, setInventoryTotal] = useState(0);
+    const [hasMoreInventory, setHasMoreInventory] = useState(false);
+    const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+    const isSellerActiveInBranch = (seller: any, branchId: string) => {
+        if (!branchId) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return (seller?.pago_sucursales || []).some((pago: any) => {
+            const idSucursal = pago?.id_sucursal?._id || pago?.id_sucursal;
+            if (String(idSucursal) !== String(branchId)) return false;
+            const rawExit = pago?.fecha_salida || seller?.fecha_vigencia;
+            if (!rawExit) return true;
+            const exit = new Date(rawExit);
+            exit.setHours(0, 0, 0, 0);
+            return exit >= today;
+        });
+    };
+
+    const buildVigentesForBranch = (sellersList: any[], branchId: string) => {
+        const vigentes = (Array.isArray(sellersList) ? sellersList : [])
+            .filter((seller) => isSellerActiveInBranch(seller, branchId))
+            .map((seller) => ({
+                ...seller,
+                name: `${seller?.marca?.trim() || "Sin marca"} - ${seller?.nombre || ""} ${seller?.apellido || ""}`.trim()
+            }));
+        return [{ _id: null, name: "Todos" }, ...vigentes];
     };
 
 
@@ -124,71 +147,130 @@ const StockManagement = () => {
     };
 
     useEffect(() => {
-        if (isConfirmModalVisible) {
+        if (!isSeller && isConfirmModalVisible) {
             fetchFullProducts();
         }
-    }, [isConfirmModalVisible]);
+    }, [isConfirmModalVisible, isSeller]);
 
     useEffect(() => {
+        const timeout = setTimeout(() => {
+            setDebouncedSearch(searchText.trim());
+        }, 300);
+        return () => clearTimeout(timeout);
+    }, [searchText]);
 
-
-        fetchData();
-    }, [sucursalId]);
-
-    const fetchData = async () => {
-
+    const fetchStaticData = async () => {
         try {
-            const sellersResponse = await getSellersAPI();
             const categoriesResponse = await getCategoriesAPI();
-            const groupsResponse = await getGroupsAPI();
-
-            let productsResponse = [];
+            setCategories(Array.isArray(categoriesResponse) ? categoriesResponse : []);
 
             if (isSeller) {
-                // VENDEDOR → usa getProductsAPI() y filtra
-                const allProducts = await getProductsAPI();
-
-                const filtered = allProducts.filter(p =>
-                    p.id_vendedor?.toString() === user.id_vendedor &&
-                    (sucursalId === "all" || p.sucursales?.some(s => s.id_sucursal?.toString() === sucursalId))
-                );
-
-                productsResponse = filtered;
-
-                // Extraer sucursales del vendedor desde sus productos
-                const sucursalesMap = new Map();
-                filtered.forEach(prod => {
-                    (prod.sucursales || []).forEach(suc => {
-                        if (suc?.id_sucursal) {
-                            sucursalesMap.set(suc.id_sucursal, {
-                                id_sucursal: suc.id_sucursal,
-                                nombre: suc.nombre || suc.id_sucursal
-                            });
-                        }
-                    });
-                });
-                setSellerSucursales(Array.from(sucursalesMap.values()));
+                const sellerBasic = await getSellersBasicAPI();
+                const seller = Array.isArray(sellerBasic) && sellerBasic.length > 0 ? sellerBasic[0] : null;
+                const sucursales = (seller?.pago_sucursales || []).map((p: any) => ({
+                    _id: String(p.id_sucursal?._id || p.id_sucursal),
+                    nombre: p.sucursalName || "Sucursal"
+                }));
+                setSellerSucursales(sucursales);
             } else {
-                const idToUse = localStorage.getItem("sucursalId");
-                if (!idToUse || idToUse.length !== 24) {
-                    console.warn("❌ ID de sucursal inválido o ausente:", idToUse);
-                    message.error("Sucursal no seleccionada o inválida.");
-                    setProducts([]);
-                    return;
+                const [sellersResponse, groupsResponse] = await Promise.all([
+                    getSellersBasicAPI(),
+                    getGroupsAPI()
+                ]);
+                const branchId = String(localStorage.getItem("sucursalId") || "");
+                const sellersList = Array.isArray(sellersResponse) ? sellersResponse : [];
+                const sellersVigentesList = buildVigentesForBranch(sellersList, branchId);
+                setSellers(sellersVigentesList);
+                setSellersVigentes(sellersVigentesList.filter((s: any) => s?._id));
+                if (
+                    selectedSeller &&
+                    !sellersVigentesList.some((s: any) => String(s?._id) === String(selectedSeller))
+                ) {
+                    setSelectedSeller(null);
                 }
+                setGroups(Array.isArray(groupsResponse) ? groupsResponse : []);
+            }
+        } catch (error) {
+            console.error("Error al cargar datos base:", error);
+            message.error("No se pudieron cargar los datos base del inventario.");
+        }
+    };
 
-                productsResponse = await getFlatProductListAPI(idToUse);
+    const fetchInventoryPage = async (reset = false) => {
+        try {
+            setIsLoadingInventory(true);
+
+            if (isSeller) {
+                const rows = await getSellerInventoryAllAPI({
+                    sucursalId: sucursalId && sucursalId !== "all" ? sucursalId : undefined,
+                    categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
+                    q: debouncedSearch || undefined
+                });
+                const safeRows = Array.isArray(rows) ? rows : [];
+                setProducts(safeRows);
+                setInventoryPage(1);
+                setInventoryTotal(safeRows.length);
+                setHasMoreInventory(false);
+                return;
             }
 
+            const branchId =
+                sucursalId && sucursalId !== "all"
+                    ? sucursalId
+                    : String(localStorage.getItem("sucursalId") || "");
+            if (!branchId || branchId.length !== 24) {
+                console.warn("ID de sucursal invalido o ausente:", branchId);
+                message.error("Sucursal no seleccionada o invalida.");
+                setProducts([]);
+                setHasMoreInventory(false);
+                return;
+            }
 
-            setSellers(sellersResponse);
-            setCategories(categoriesResponse);
-            setGroups(groupsResponse);
-            setProducts(productsResponse);
-            setFilteredProducts(productsResponse);
+            if (selectedSeller) {
+                const rows = await getFlatProductListAPI({
+                    sucursalId: branchId,
+                    sellerId: String(selectedSeller),
+                    categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
+                    q: debouncedSearch || undefined
+                });
+                const safeRows = Array.isArray(rows) ? rows : [];
+                setProducts(safeRows);
+                setInventoryPage(1);
+                setInventoryTotal(1);
+                setHasMoreInventory(false);
+                return;
+            }
+
+            const sellerIds = sellersVigentes.map((s: any) => String(s._id));
+            const nextPage = reset ? 1 : inventoryPage + 1;
+            const sliceStart = (nextPage - 1) * SELLERS_PAGE_SIZE;
+            const batchSellerIds = sellerIds.slice(sliceStart, sliceStart + SELLERS_PAGE_SIZE);
+            if (batchSellerIds.length === 0) {
+                if (reset) {
+                    setProducts([]);
+                }
+                setHasMoreInventory(false);
+                setInventoryTotal(sellerIds.length);
+                return;
+            }
+
+            const rows = await getFlatProductListAPI({
+                sucursalId: branchId,
+                sellerIds: batchSellerIds,
+                categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
+                q: debouncedSearch || undefined
+            });
+            const safeRows = Array.isArray(rows) ? rows : [];
+            const nextRows = reset ? safeRows : [...products, ...safeRows];
+            setProducts(nextRows);
+            setInventoryPage(nextPage);
+            setInventoryTotal(sellerIds.length);
+            setHasMoreInventory(nextPage * SELLERS_PAGE_SIZE < sellerIds.length);
         } catch (error) {
-            console.error("Error al cargar los datos:", error);
-            message.error("Ocurrió un error al cargar los datos.");
+            console.error("Error al cargar inventario:", error);
+            message.error("Ocurrio un error al cargar el inventario.");
+        } finally {
+            setIsLoadingInventory(false);
         }
     };
 
@@ -196,58 +278,35 @@ const StockManagement = () => {
         clearTempStock();
         clearTempProducts();
         clearTempVariants();
-        fetchData();
-        fetchFullProducts(); // ← cargamos el listado completo al inicio
-    }, []);
-
-    useEffect(() => {
-        filter();
-    }, [selectedSeller]);
-
-    useEffect(() => {
-        fetchData();
-    }, [prevKey]);
-
-    useEffect(() => {
-        const newOptions = [
-            {
-                option: 'Categoria',
-                filter: filterByCategoria,
-                group: categories,
-                groupFunction: (category, products) =>
-                    products.filter((product) => product.id_categoria == category._id)
-            },
-            {
-                option: 'Grupo',
-                filter: filterByGroup,
-                group: groups,
-                groupFunction: (group, products) =>
-                    products.filter((product) => product.groupId == group._id)
-            }
-        ];
-
+        fetchStaticData();
         if (!isSeller) {
-            newOptions.unshift({
-                option: 'Vendedor',
-                filter: filterBySeller,
-                group: sellers,
-                groupFunction: (seller, products) =>
-                    products.filter((product) => product.id_vendedor == seller._id)
-            });
+            fetchFullProducts();
         }
+    }, [isSeller]);
 
-        setOptions(newOptions);
+    useEffect(() => {
+        if (!isSeller && (!sucursalId || sucursalId === "all")) return;
+        if (!isSeller && !selectedSeller && sellersVigentes.length === 0) return;
+        fetchInventoryPage(true);
+    }, [isSeller, sucursalId, selectedSeller, selectedCategory, debouncedSearch, prevKey, sellersVigentes]);
 
-        // NUEVO: aplicar filtro por defecto cuando se cargan
-        setTimeout(() => filter(), 100);
-    }, [sellers, categories, groups]);
+    useEffect(() => {
+        if (!isSeller || sellerSucursales.length === 0) return;
+        const current = String(sucursalId || "");
+        const exists = sellerSucursales.some((s: any) => String(s._id) === current);
+        if (!exists) {
+            setSucursalId(String(sellerSucursales[0]._id));
+        }
+    }, [isSeller, sellerSucursales, sucursalId]);
 
-    const finalProductList = isSeller
-        ? products.filter(product => product.id_vendedor?.toString() === user.id_vendedor)
-        : filteredProducts;
+    const handleLoadMoreInventory = async () => {
+        if (isLoadingInventory || !hasMoreInventory) return;
+        await fetchInventoryPage(false);
+    };
+    const finalProductList = products;
 
     //console.log("Productos originales:", products);
-    //console.log("🧪 Productos filtrados:", finalProductList);
+    //console.log("?? Productos filtrados:", finalProductList);
     const showVariantModal = async (product: any) => {
         if (!product) return;
 
@@ -272,8 +331,7 @@ const StockManagement = () => {
     };
 
     const closeConfirmProduct = async () => {
-        await fetchData();
-        setFilteredProducts(products);
+        await fetchInventoryPage(true);
         clearTempProducts();
         clearTempVariants();
         setProductsToUpdate({});
@@ -287,7 +345,6 @@ const StockManagement = () => {
 
     const succesAddVariant = async (newVariant) => {
         setProducts([...products, newVariant.product]);
-        setFilteredProducts([...filteredProducts, newVariant.product]);
         setNewVariants([...newVariants, newVariant]);
         closeModal();
     };
@@ -304,46 +361,9 @@ const StockManagement = () => {
         setIsVariantModalVisible(false);
     };
 
-    const filterBySeller = (product, sellerId) => {
-        const sucursalId = localStorage.getItem("sucursalId");
-
-        return sellerId === null || product.id_vendedor === sellerId;
-    };
-    const filterByCategoria = (product, sellerId) => {
-        return sellerId === null || product.id_categoria === sellerId;
-    };
-
-    const filterByGroup = (product, sellerId) => {
-        return sellerId === null || product.groupId === sellerId;
-    };
-
-    const handleSelectSeller = (sellerId: any) => {
+    const handleSelectSeller = (sellerId: string | null) => {
         setSelectedSeller(sellerId);
     };
-
-    const filter = () => {
-
-        const selectedOption = options[criteriaFilter];
-        if (!selectedOption || !selectedOption.filter) return;
-
-        const vendedoresPermitidos = sellersVigentes.map(v => String(v._id)); // esto viene del paso 2
-
-        const newList = products
-            .filter(product => vendedoresPermitidos.includes(String(product.id_vendedor))) // ✅ solo vendedores vigentes
-            .filter(product => selectedOption.filter(product, selectedSeller)); // ✅ aplicar filtro actual (grupo, categoría o vendedor)
-
-        setFilteredProducts(newList);
-        setProductsToUpdate({});
-        setStockListForConfirmModal([]);
-    };
-    const handleChangeFilter = (index: number) => {
-        setCriteriaFilter(index);
-    };
-
-    const handleChangeGroup = (index: number) => {
-        setCriteriaGroup(index);
-    };
-
     const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {
         const newProduct = {
             productData,
@@ -371,7 +391,7 @@ const StockManagement = () => {
     const [isMoveModalVisible, setIsMoveModalVisible] = useState(false);
 
     const handleMoveSuccess = () => {
-        fetchData();
+        fetchInventoryPage(true);
         setIsMoveModalVisible(false);
     };
 
@@ -421,9 +441,9 @@ const StockManagement = () => {
                     <Row gutter={[16, 16]} align="middle" justify="center">
                         <Col xs={24} sm={12} lg={6}>
                             <SellerList
-                                filterSelected={criteriaFilter}
+                                sellers={sellers}
+                                selectedSeller={selectedSeller}
                                 onSelectSeller={handleSelectSeller}
-                                onSellersLoaded={handleSellersLoaded}
                             />
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
@@ -545,15 +565,22 @@ const StockManagement = () => {
             {isSeller ? (
                 <ProductTableSeller
                     productsList={finalProductList}
-                    onUpdateProducts={fetchData}
+                    loading={isLoadingInventory}
+                    onUpdateProducts={() => fetchInventoryPage(true)}
                     sucursalId={sucursalId}
                     setSucursalId={setSucursalId}
+                    branches={sellerSucursales}
+                    categories={categories}
+                    searchText={searchText}
+                    setSearchText={setSearchText}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
                 />
             ) : (
                 <ProductTable
                     productsList={finalProductList}
-                    groupList={options[criteriaFilter]?.group || []}
-                    onUpdateProducts={fetchData}
+                    groupList={groups || []}
+                    onUpdateProducts={() => fetchInventoryPage(true)}
                     setStockListForConfirmModal={setStockListForConfirmModal}
                     resetSignal={resetSignal}
                     searchText={searchText}
@@ -565,6 +592,19 @@ const StockManagement = () => {
                     sellersVigentes={sellersVigentes}
                 />
 
+            )}
+            {!isSeller && !selectedSeller && (
+                <div className="flex justify-center">
+                    <Button
+                        onClick={handleLoadMoreInventory}
+                        loading={isLoadingInventory}
+                        disabled={!hasMoreInventory}
+                    >
+                        {hasMoreInventory
+                            ? `Ver ${SELLERS_PAGE_SIZE} vendedores mas`
+                            : `No hay mas vendedores (${inventoryTotal})`}
+                    </Button>
+                </div>
             )}
 
             {/*infoModalVisible && (
@@ -580,7 +620,7 @@ const StockManagement = () => {
                     visible={isProductFormVisible}
                     onCancel={() => setProductFormVisible(false)}
                     onSuccess={async () => {
-                        await fetchData(); // Recarga productos desde backend
+                        await fetchInventoryPage(true);
                         setProductFormVisible(false); // Cierra modal
                     }}
                     selectedSeller={sellers.find(s => s._id === selectedSeller)}
@@ -650,3 +690,5 @@ const StockManagement = () => {
 };
 
 export default StockManagement;
+
+

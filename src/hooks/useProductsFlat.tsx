@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { getFlatProductListAPI } from "../api/product";
 
 // Tipado base (opcional)
@@ -21,11 +21,14 @@ const useProductsFlat = (externalSucursalId?: string) => {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const all = await getFlatProductListAPI(externalSucursalId);
+            const all = await getFlatProductListAPI({
+                sucursalId: externalSucursalId,
+                inStock: true
+            });
             // Solo productos con stock > 0
             const withStock = all.filter((p: any) => p.stock > 0);
 
-            const mapped = all.map((item: any, index: number) => ({
+            const mapped = withStock.map((item: any, index: number) => ({
                 key: `${item._id}-${index}`,
                 producto: `${item.nombre_producto} - ${item.variante}`,
                 precio: item.precio,
@@ -47,11 +50,6 @@ const useProductsFlat = (externalSucursalId?: string) => {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        if (!externalSucursalId || externalSucursalId === "undefined") return;
-        fetchProducts();
-    }, [externalSucursalId]);
 
     return { data, fetchProducts, loading };
 };

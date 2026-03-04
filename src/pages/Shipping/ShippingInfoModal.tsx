@@ -15,7 +15,7 @@ import { UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined, DeleteOutli
 import { useWatch } from 'antd/es/form/Form';
 import EditProductsModal from './EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
-import { getSellersAPI } from "../../api/seller.ts";
+import { getSellersBasicAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
 import { generateShippingLabelQRAPI } from '../../api/qr.ts';
@@ -119,10 +119,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     // useEffect para cargarlos si no lo estás haciendo ya
     useEffect(() => {
         const fetchSellers = async () => {
-            const res = await getSellersAPI();
+            const res = await getSellersBasicAPI();
+            const sellersList = Array.isArray(res) ? res : [];
             const hoy = new Date().setHours(0, 0, 0, 0);
 
-            const vigentes = res.filter((v: any) => {
+            const vigentes = sellersList.filter((v: any) => {
                 if (!v.fecha_vigencia) return true;
                 const fecha = new Date(v.fecha_vigencia).getTime();
                 return fecha >= hoy;
