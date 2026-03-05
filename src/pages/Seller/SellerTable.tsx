@@ -97,7 +97,7 @@ export default function SellerTable({
       },
     },
     {
-      title: "Pago total",
+      title: "Pago pendiente",
       dataIndex: "pagoTotal",
       key: "pagoTotal",
       sorter: (a: any, b: any) => a.pagoTotalInt - b.pagoTotalInt,
@@ -197,9 +197,12 @@ export default function SellerTable({
                 0
               );
 
-            const saldoPendiente = seller.saldo_pendiente;
-            const deuda = seller.deuda;
-            const pagoPendiente = saldoPendiente - deuda;
+            const saldoPendiente = Number((seller as any).saldo_pendiente ?? 0);
+            const deuda = Number((seller as any).deuda ?? 0);
+            const pagoPendienteFromApi = Number((seller as any).pago_pendiente);
+            const pagoPendiente = Number.isFinite(pagoPendienteFromApi)
+              ? pagoPendienteFromApi
+              : saldoPendiente - deuda;
 
             return {
               ...seller,
@@ -208,8 +211,8 @@ export default function SellerTable({
               fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
               fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
               deuda: deuda,
-              pagoTotal: `Bs. ${pagoPendiente.toFixed(2)}`,
-              pagoTotalInt: pagoPendiente,
+              pagoTotal: `Bs. ${Number.isFinite(pagoPendiente) ? pagoPendiente.toFixed(2) : "0.00"}`,
+              pagoTotalInt: Number.isFinite(pagoPendiente) ? pagoPendiente : 0,
               pago_mensual: `Bs. ${mensual}`,
               saldo_pendiente: saldoPendiente,
             };

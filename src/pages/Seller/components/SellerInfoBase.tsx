@@ -235,14 +235,24 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   /* ─────────── render ─────────── */
+  const saldoPendienteValue = Number((seller as any)?.saldo_pendiente ?? 0);
+  const deudaValue = Number((seller as any)?.deuda ?? 0);
+  const pagoPendienteFromApi = Number((seller as any)?.pago_pendiente);
+  const pagoPendienteFromTable = Number((seller as any)?.pagoTotalInt);
+  const pagoPendienteValue = Number.isFinite(pagoPendienteFromApi)
+    ? pagoPendienteFromApi
+    : Number.isFinite(pagoPendienteFromTable)
+      ? pagoPendienteFromTable
+      : saldoPendienteValue - deudaValue;
+
   return (
     <div>
       <SellerHeader name={seller.nombre} />
 
       <StatsCards
-        pagoPendiente={seller.pago_pendiente}
-        deuda={seller.deuda}
-        saldoPendiente={seller.saldo_pendiente}
+        pagoPendiente={pagoPendienteValue}
+        deuda={deudaValue}
+        saldoPendiente={saldoPendienteValue}
       />
 
       <Form
