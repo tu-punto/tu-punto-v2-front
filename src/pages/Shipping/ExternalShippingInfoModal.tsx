@@ -10,6 +10,8 @@ interface ExternalShippingInfoModalProps {
   isAdmin: boolean;
 }
 
+const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+
 const ExternalShippingInfoModal = ({
   visible,
   onClose,
@@ -26,10 +28,78 @@ const ExternalShippingInfoModal = ({
   );
 
   const paidStatus = Form.useWatch("esta_pagado", form);
-  const saldoACobrar = paidStatus === "si" ? 0 : packagePrice;
+  const montoPagaVendedor = Number(Form.useWatch("monto_paga_vendedor", form) || 0);
+  const montoPagaComprador = Number(Form.useWatch("monto_paga_comprador", form) || 0);
+  const saldoACobrar = useMemo(() => {
+    if (paidStatus === "si") return 0;
+    if (paidStatus === "mixto") return Math.max(0, roundCurrency(montoPagaComprador));
+    return packagePrice;
+  }, [paidStatus, packagePrice, montoPagaComprador, montoPagaVendedor]);
+
+  const applyPaymentMode = (mode: "si" | "no" | "mixto", notifyPriceRequired = false) => {
+    if (packagePrice <= 0 && mode !== "no") {
+      if (notifyPriceRequired) message.warning("Primero ingresa un precio del paquete valido");
+      form.setFieldValue("esta_pagado", "no");
+      form.setFieldValue("monto_paga_vendedor", 0);
+      form.setFieldValue("monto_paga_comprador", 0);
+      return;
+    }
+
+    if (mode === "si") {
+      form.setFieldValue("monto_paga_vendedor", 0);
+      form.setFieldValue("monto_paga_comprador", roundCurrency(packagePrice));
+      return;
+    }
+
+    if (mode === "no") {
+      form.setFieldValue("monto_paga_vendedor", 0);
+      form.setFieldValue("monto_paga_comprador", 0);
+      return;
+    }
+
+    const half = roundCurrency(packagePrice / 2);
+    form.setFieldValue("monto_paga_vendedor", half);
+    form.setFieldValue("monto_paga_comprador", roundCurrency(packagePrice - half));
+  };
+
+  const handleMixedSellerChange = (value: number | null) => {
+    if (paidStatus !== "mixto") return;
+    if (packagePrice <= 0) {
+      form.setFieldValue("monto_paga_vendedor", 0);
+      form.setFieldValue("monto_paga_comprador", 0);
+      return;
+    }
+    let seller = roundCurrency(Number(value || 0));
+    if (seller < 0) seller = 0;
+    if (seller > packagePrice) seller = packagePrice;
+
+    form.setFieldValue("monto_paga_vendedor", seller);
+    form.setFieldValue("monto_paga_comprador", roundCurrency(packagePrice - seller));
+  };
 
   useEffect(() => {
     if (!visible || !externalShipping) return;
+    const initialStatus = (externalShipping.esta_pagado || "no") as "si" | "no" | "mixto";
+    const initialVendedor = roundCurrency(Number(externalShipping.monto_paga_vendedor || 0));
+    const initialComprador = roundCurrency(Number(externalShipping.monto_paga_comprador || 0));
+    let montoVendedor = initialVendedor;
+    let montoComprador = initialComprador;
+
+    if (initialStatus === "si") {
+      montoVendedor = 0;
+      montoComprador = roundCurrency(packagePrice);
+    } else if (initialStatus === "no") {
+      montoVendedor = 0;
+      montoComprador = 0;
+    } else {
+      const mixedSum = roundCurrency(initialVendedor + initialComprador);
+      if (mixedSum <= 0 || Math.abs(mixedSum - packagePrice) > 0.01) {
+        const half = roundCurrency(packagePrice / 2);
+        montoVendedor = half;
+        montoComprador = roundCurrency(packagePrice - half);
+      }
+    }
+
     form.setFieldsValue({
       carnet_vendedor: externalShipping.carnet_vendedor || "",
       vendedor: externalShipping.vendedor || "",
@@ -38,20 +108,48 @@ const ExternalShippingInfoModal = ({
       telefono_comprador: externalShipping.telefono_comprador || "",
       descripcion_paquete: externalShipping.descripcion_paquete || "",
       precio_paquete: packagePrice,
-      esta_pagado: externalShipping.esta_pagado || "no",
+      esta_pagado: initialStatus,
+      monto_paga_vendedor: montoVendedor,
+      monto_paga_comprador: montoComprador,
       estado_pedido: externalShipping.estado_pedido || "En Espera",
       saldo_cobrar: Number(externalShipping.saldo_cobrar ?? saldoACobrar),
     });
-  }, [externalShipping, form, packagePrice, saldoACobrar, visible]);
+  }, [externalShipping, form, packagePrice, visible]);
 
   const handleSave = async (values: any) => {
     if (!externalShipping?._id) return;
     setLoading(true);
     try {
+      if (values.esta_pagado === "mixto") {
+        const precio = roundCurrency(Number(values.precio_paquete || packagePrice || 0));
+        const pagoVendedor = roundCurrency(Number(values.monto_paga_vendedor || 0));
+        const pagoComprador = roundCurrency(Number(values.monto_paga_comprador || 0));
+        const sumaMixta = roundCurrency(pagoVendedor + pagoComprador);
+
+        if (precio <= 0) {
+          message.error("Para pago mixto el precio del paquete debe ser mayor a 0");
+          return;
+        }
+        if (pagoVendedor <= 0 || pagoComprador <= 0) {
+          message.error("En pago mixto ambos deben pagar un monto mayor a 0");
+          return;
+        }
+        if (pagoVendedor >= precio || pagoComprador >= precio) {
+          message.error("En pago mixto ninguna parte puede pagar todo el paquete");
+          return;
+        }
+        if (Math.abs(sumaMixta - precio) > 0.01) {
+          message.error("En pago mixto la suma debe ser igual al precio del paquete");
+          return;
+        }
+      }
+
       const payload = {
         esta_pagado: values.esta_pagado,
+        monto_paga_vendedor: Number(values.monto_paga_vendedor || 0),
+        monto_paga_comprador: Number(values.monto_paga_comprador || 0),
         estado_pedido: values.estado_pedido,
-        saldo_cobrar: values.esta_pagado === "si" ? 0 : packagePrice,
+        saldo_cobrar: saldoACobrar,
         delivered: values.estado_pedido === "Entregado",
       };
 
@@ -135,13 +233,39 @@ const ExternalShippingInfoModal = ({
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item name="esta_pagado" label="Esta pagado" rules={[{ required: true }]}>
-                <Radio.Group disabled={!isAdmin}>
+                <Radio.Group
+                  disabled={!isAdmin}
+                  onChange={(event) => applyPaymentMode(event.target.value, true)}
+                >
                   <Radio.Button value="si">Si</Radio.Button>
                   <Radio.Button value="no">No</Radio.Button>
+                  <Radio.Button value="mixto">Mixto</Radio.Button>
                 </Radio.Group>
               </Form.Item>
             </Col>
           </Row>
+          {paidStatus === "mixto" && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="monto_paga_vendedor" label="Cuanto paga vendedor">
+                  <InputNumber
+                    min={0}
+                    max={Math.max(0, roundCurrency(packagePrice - 0.01))}
+                    precision={2}
+                    prefix="Bs."
+                    style={{ width: "100%" }}
+                    disabled={!isAdmin}
+                    onChange={handleMixedSellerChange}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="monto_paga_comprador" label="Cuanto paga comprador">
+                  <InputNumber min={0} precision={2} prefix="Bs." style={{ width: "100%" }} disabled />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item name="estado_pedido" label="Estado del pedido" rules={[{ required: true }]}>

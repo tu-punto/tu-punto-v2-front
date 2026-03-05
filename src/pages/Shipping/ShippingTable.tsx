@@ -55,8 +55,12 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     );
 
     const mapExternalToShipping = (externalSale: any) => {
-        const estaPagado = externalSale?.esta_pagado === "si" ? "si" : "no";
+        const estaPagado =
+            externalSale?.esta_pagado === "mixto"
+                ? "mixto"
+                : (externalSale?.esta_pagado === "si" ? "si" : "no");
         const precioPaquete = Number(externalSale?.precio_paquete ?? externalSale?.precio_total ?? 0);
+        const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
         const estadoPedido = externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : "En Espera");
         const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
         const sucursalOrigen = typeof externalSale?.sucursal === "object" ? externalSale.sucursal : null;
@@ -76,7 +80,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             sucursal: sucursalOrigen,
             estado_pedido: estadoPedido,
             esta_pagado: estaPagado,
-            saldo_cobrar: Number(externalSale?.saldo_cobrar ?? (estaPagado === "si" ? 0 : precioPaquete)),
+            saldo_cobrar: Number(
+                externalSale?.saldo_cobrar ?? (estaPagado === "si" ? 0 : estaPagado === "mixto" ? pagaComprador : precioPaquete)
+            ),
             observaciones: externalSale?.descripcion_paquete || "",
             venta: [],
             productos_temporales: [],
