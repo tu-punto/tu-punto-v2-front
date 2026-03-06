@@ -1,0 +1,170 @@
+import { SERVER_URL } from "../config/config";
+
+declare global {
+  interface Window {
+    qz?: any;
+  }
+}
+
+const QZ_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js";
+
+let qzScriptPromise: Promise<any> | null = null;
+let qzSecurityConfigured = false;
+let qzSigningChecked = false;
+let qzSigningAvailable = false;
+
+const isQzReady = () => typeof window !== "undefined" && Boolean(window.qz);
+const serverBase = String(SERVER_URL || "").replace(/\/+$/, "");
+const qzCertificateUrl = `${serverBase}/qr/certificate`;
+const qzSignUrl = `${serverBase}/qr/sign`;
+
+const ensureQzSecurity = async (qz: any) => {
+  if (qzSecurityConfigured) return;
+
+  if (!qzSigningChecked) {
+    qzSigningChecked = true;
+    try {
+      const response = await fetch(qzCertificateUrl, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store"
+      });
+      qzSigningAvailable = response.ok;
+      if (!response.ok) {
+        console.warn(`[QZ] certificate endpoint unavailable (${response.status})`);
+      }
+    } catch {
+      qzSigningAvailable = false;
+      console.warn("[QZ] certificate endpoint unreachable");
+    }
+  }
+
+  if (!qzSigningAvailable) return;
+
+  qz.security.setSignatureAlgorithm("SHA512");
+  qz.security.setCertificatePromise(async () => {
+    const response = await fetch(qzCertificateUrl, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      throw new Error(`No se pudo obtener certificado QZ (${response.status})`);
+    }
+    return response.text();
+  });
+  qz.security.setSignaturePromise(async (toSign: string) => {
+    const response = await fetch(qzSignUrl, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: String(toSign ?? "")
+    });
+    if (!response.ok) {
+      throw new Error(`No se pudo firmar payload QZ (${response.status})`);
+    }
+    return response.text();
+  });
+  qzSecurityConfigured = true;
+};
+
+export const ensureQzLoaded = async (): Promise<any> => {
+  if (isQzReady()) {
+    return window.qz;
+  }
+
+  if (qzScriptPromise) {
+    return qzScriptPromise;
+  }
+
+  qzScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${QZ_SCRIPT_URL}"]`) as
+      | HTMLScriptElement
+      | null;
+
+    if (existing) {
+      existing.addEventListener("load", () => {
+        if (!window.qz) {
+          reject(new Error("QZ Tray script cargado pero no disponible"));
+          return;
+        }
+        resolve(window.qz);
+      });
+      existing.addEventListener("error", () => reject(new Error("No se pudo cargar QZ Tray")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = QZ_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => {
+      if (!window.qz) {
+        reject(new Error("QZ Tray script cargado pero no disponible"));
+        return;
+      }
+      resolve(window.qz);
+    };
+    script.onerror = () => reject(new Error("No se pudo cargar QZ Tray"));
+    document.head.appendChild(script);
+  });
+
+  return qzScriptPromise;
+};
+
+export const connectQz = async (): Promise<any> => {
+  const qz = await ensureQzLoaded();
+  await ensureQzSecurity(qz);
+  if (!qz.websocket.isActive()) {
+    await qz.websocket.connect({
+      retries: 2,
+      delay: 1
+    });
+  }
+  return qz;
+};
+
+export const disconnectQz = async (): Promise<void> => {
+  const qz = await ensureQzLoaded();
+  if (qz.websocket.isActive()) {
+    await qz.websocket.disconnect();
+  }
+};
+
+export const findQzPrinters = async (): Promise<string[]> => {
+  const qz = await connectQz();
+  const printers = await qz.printers.find();
+  if (Array.isArray(printers)) return printers;
+  if (typeof printers === "string") return [printers];
+  return [];
+};
+
+export const createEscPosConfig = async (printerName: string) => {
+  const qz = await connectQz();
+  return qz.configs.create(printerName, {
+    encoding: "CP437",
+    spool: {
+      end: "\n"
+    }
+  });
+};
+
+export const createPixelConfig = async (printerName: string) => {
+  const qz = await connectQz();
+  return qz.configs.create(printerName);
+};
+
+export const qzPrint = async (config: any, data: any[]) => {
+  const qz = await connectQz();
+  return qz.print(config, data);
+};
+
+export const isQzConnected = async (): Promise<boolean> => {
+  try {
+    const qz = await ensureQzLoaded();
+    return Boolean(qz?.websocket?.isActive?.());
+  } catch {
+    return false;
+  }
+};
