@@ -16,10 +16,11 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
-import { BarChartOutlined, EyeOutlined, FileExcelOutlined } from "@ant-design/icons";
+import { BarChartOutlined, EyeOutlined, FileExcelOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
 import {
   downloadClientesActivos3MesesXlsx,
@@ -227,14 +228,7 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
     { title: "Rank", dataIndex: "rank", width: 90 },
   ],
   topGlobal: [
-    {
-      title: "Cliente/Vendedor",
-      dataIndex: "cliente",
-      render: (_: any, r: any) => r.cliente ?? r.vendedor ?? "-",
-    },
-    { title: "Pedidos", dataIndex: "pedidos", width: 100 },
-    { title: "Monto (Bs.)", dataIndex: "monto_bs", width: 130 },
-    { title: "Ticket Prom. (Bs.)", dataIndex: "ticket_promedio_bs", width: 160 },
+    { title: "Cliente/Vendedor", dataIndex: "cliente" },
   ],
   deliveryPromedioPorSucursal: [
     { title: "Sucursal", dataIndex: "sucursal" },
@@ -270,6 +264,32 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
     { title: "Monto (Bs.)", dataIndex: "monto_bs", width: 140 },
   ],
 };
+
+function getOperacionColumns(reportKey: OperacionReportKey, modoTop?: "clientes" | "vendedores") {
+  if (reportKey !== "topGlobal") return columnsByOperacionKey[reportKey] || [];
+
+  if (modoTop === "vendedores") {
+    return [
+      {
+        title: "Vendedor",
+        dataIndex: "vendedor",
+        render: (_: any, r: any) => r.vendedor ?? r.cliente ?? "-",
+      },
+      { title: "Monto (Bs.)", dataIndex: "monto_bs", width: 130 },
+    ];
+  }
+
+  return [
+    {
+      title: "Cliente",
+      dataIndex: "cliente",
+      render: (_: any, r: any) => r.cliente ?? "-",
+    },
+    { title: "Pedidos", dataIndex: "pedidos", width: 100 },
+    { title: "Monto (Bs.)", dataIndex: "monto_bs", width: 130 },
+    { title: "Ticket Prom. (Bs.)", dataIndex: "ticket_promedio_bs", width: 160 },
+  ];
+}
 
 function formatBs(value: any) {
   const num = typeof value === "number" ? value : Number(value || 0);
@@ -351,7 +371,25 @@ export default function ReportsLauncher() {
       return null;
     }
 
-    return vals;
+    const normalizedSucursales = req.sucursales
+      ? ((vals.sucursales && vals.sucursales.length > 0)
+          ? vals.sucursales
+          : sucOptions.map((option) => String(option.value)))
+      : vals.sucursales;
+
+    if (req.sucursales && (!normalizedSucursales || normalizedSucursales.length === 0)) {
+      message.error("No hay sucursales disponibles para este reporte");
+      return null;
+    }
+
+    if (req.sucursales && (!vals.sucursales || vals.sucursales.length === 0)) {
+      form.setFieldValue("sucursales", normalizedSucursales);
+    }
+
+    return {
+      ...vals,
+      sucursales: normalizedSucursales,
+    };
   };
 
   const handlePreview = async () => {
@@ -378,6 +416,7 @@ export default function ReportsLauncher() {
         setPreview({
           mode: "operacion",
           reportKey: selectedReport.operacionKey,
+          modoTop: vals.modoTop,
           rows: Array.isArray(data?.[selectedReport.operacionKey]) ? data[selectedReport.operacionKey] : [],
           data,
         });
@@ -478,6 +517,11 @@ export default function ReportsLauncher() {
           title: "Delivery promedio global",
           value: formatBs(data.deliveryPromedioGlobal.promedio_bs),
           subtitle: `Envios: ${data.deliveryPromedioGlobal.envios ?? 0}`,
+        },
+        {
+          title: "Delivery promedio global sin 0",
+          value: formatBs(data.deliveryPromedioGlobal.promedio_sin_ceros_bs),
+          subtitle: "Solo considera costos mayores a 0 Bs.",
         },
       ];
     }
@@ -604,7 +648,7 @@ export default function ReportsLauncher() {
                         allowClear
                         loading={loadingSucursales}
                         options={sucOptions}
-                        placeholder="Si no eliges, usa todas/default"
+                        placeholder="Si no eliges, se usaran todas las sucursales activas"
                       />
                     </Form.Item>
                   </Col>
@@ -680,11 +724,32 @@ export default function ReportsLauncher() {
                   </Row>
                 )}
 
+                {preview.reportKey === "deliveryPromedioPorSucursal" && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      background: "rgba(245, 158, 11, 0.08)",
+                      border: "1px solid rgba(245, 158, 11, 0.18)",
+                    }}
+                  >
+                    <Tooltip title="Sin 0 excluye envios cuyo costo delivery fue 0 Bs. para mostrar un promedio mas representativo cuando hubo costo real.">
+                      <InfoCircleOutlined style={{ color: "#c2410c" }} />
+                    </Tooltip>
+                    <Text type="secondary" style={{ margin: 0 }}>
+                      "Sin 0" excluye los deliveries con costo 0 Bs. del promedio.
+                    </Text>
+                  </div>
+                )}
+
                 <Table
                   size="small"
                   rowKey={(_, i) => `row-${String(i)}`}
                   dataSource={preview.rows || []}
-                  columns={columnsByOperacionKey[preview.reportKey] || []}
+                  columns={getOperacionColumns(preview.reportKey, preview.modoTop)}
                   pagination={{
                     defaultPageSize: 10,
                     showSizeChanger: true,
