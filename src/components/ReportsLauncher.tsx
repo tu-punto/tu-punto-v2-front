@@ -27,11 +27,15 @@ import {
   downloadClientesStatusXlsx,
   downloadComisiones3MesesXlsx,
   downloadIngresos3MesesXlsx,
+  getClientesActivosMesesAPI,
+  getComisionesMesesAPI,
+  getIngresosMesesAPI,
   downloadOperacionMensualXlsx,
   downloadStockProductosXlsx,
   downloadVentasQrXlsx,
   downloadVentasVendedores4mXlsx,
   getOperacionMensualAPI,
+  getVentasVendedoresMesesAPI,
   getVentasQrAPI,
 } from "../api/reports";
 import { getAllSucursalsAPI } from "../api/sucursal";
@@ -42,8 +46,10 @@ type OperacionReportKey =
   | "deliveryPromedioPorSucursal"
   | "costoEntregaPromedioPorSucursal"
   | "clientesPorHoraMensual"
+  | "ticketPromedioPorSucursal"
   | "ticketPromedioClientesPorSucursal"
   | "clientesActivosPorSucursal"
+  | "clientesNuevosPorSucursal"
   | "ventasMensualPorSucursal";
 
 type ReportId =
@@ -63,7 +69,7 @@ type ReportDefinition = {
   title: string;
   description: string;
   category: ReportCategory;
-  previewMode: "operacion" | "ventasQr" | "none";
+  previewMode: "operacion" | "ventasQr" | "comisiones" | "ingresos" | "clientesActivosServicio" | "ventasVendedores" | "none";
   requires: {
     meses?: boolean;
     mesFin?: boolean;
@@ -133,21 +139,39 @@ const REPORTS: ReportDefinition[] = [
   },
   {
     id: "ticketPromedioClientesPorSucursal",
-    title: "Ticket promedio cliente",
-    description: "Ticket promedio de clientes por sucursal y global.",
+    title: "Pago promedio de un cliente por compra",
+    description: "Promedio pagado por compra, por sucursal y global.",
     category: "Operacion mensual",
     previewMode: "operacion",
     requires: { meses: true, sucursales: true },
     operacionKey: "ticketPromedioClientesPorSucursal",
   },
   {
+    id: "ticketPromedioPorSucursal",
+    title: "Ticket promedio por vendedor",
+    description: "Promedio de servicios pagados por los vendedores activos.",
+    category: "Operacion mensual",
+    previewMode: "operacion",
+    requires: { meses: true, sucursales: true },
+    operacionKey: "ticketPromedioPorSucursal",
+  },
+  {
     id: "clientesActivosPorSucursal",
     title: "Numero de clientes activos",
-    description: "Clientes activos por sucursal y global.",
+    description: "Clientes de servicio activos por sucursal y global.",
     category: "Operacion mensual",
     previewMode: "operacion",
     requires: { meses: true, sucursales: true },
     operacionKey: "clientesActivosPorSucursal",
+  },
+  {
+    id: "clientesNuevosPorSucursal",
+    title: "Clientes nuevos",
+    description: "Clientes de servicio que ingresaron por mes y sucursal.",
+    category: "Operacion mensual",
+    previewMode: "operacion",
+    requires: { meses: true, sucursales: true },
+    operacionKey: "clientesNuevosPorSucursal",
   },
   {
     id: "ventasMensualPorSucursal",
@@ -168,35 +192,35 @@ const REPORTS: ReportDefinition[] = [
   },
   {
     id: "comisiones3m",
-    title: "Comisiones 3M",
-    description: "Solo descarga XLSX.",
+    title: "Comisiones por meses",
+    description: "Vista previa y descarga XLSX.",
     category: "Reportes adicionales",
-    previewMode: "none",
-    requires: { mesFin: true, sucursales: true },
+    previewMode: "comisiones",
+    requires: { meses: true, sucursales: true },
   },
   {
     id: "ingresos3m",
-    title: "Ingresos 3M",
-    description: "Solo descarga XLSX.",
+    title: "Ingresos por meses",
+    description: "Vista previa y descarga XLSX.",
     category: "Reportes adicionales",
-    previewMode: "none",
-    requires: { mesFin: true, incluirDeuda: true },
+    previewMode: "ingresos",
+    requires: { meses: true, incluirDeuda: true },
   },
   {
     id: "clientesActivos3m",
-    title: "Clientes activos 3M",
-    description: "Solo descarga XLSX.",
+    title: "Clientes activos por meses",
+    description: "Clientes de servicio activos con vista previa y XLSX.",
     category: "Reportes adicionales",
-    previewMode: "none",
-    requires: { mesFin: true },
+    previewMode: "clientesActivosServicio",
+    requires: { meses: true },
   },
   {
     id: "ventasVendedores4m",
-    title: "Ventas vendedores 4M",
-    description: "Solo descarga XLSX.",
+    title: "Ventas vendedores por meses",
+    description: "Vista previa y descarga XLSX.",
     category: "Reportes adicionales",
-    previewMode: "none",
-    requires: {},
+    previewMode: "ventasVendedores",
+    requires: { meses: true },
   },
   {
     id: "ventasQr",
@@ -247,6 +271,13 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
     { title: "Hora", dataIndex: "hora", width: 100 },
     { title: "Clientes atendidos", dataIndex: "clientes_atendidos", width: 160 },
   ],
+  ticketPromedioPorSucursal: [
+    { title: "Mes", dataIndex: "mes", width: 110 },
+    { title: "Sucursal", dataIndex: "sucursal" },
+    { title: "Clientes activos", dataIndex: "vendedores_activos", width: 140 },
+    { title: "Total servicios (Bs.)", dataIndex: "total_servicios_bs", width: 170 },
+    { title: "Ticket Prom. (Bs.)", dataIndex: "ticket_promedio_bs", width: 150 },
+  ],
   ticketPromedioClientesPorSucursal: [
     { title: "Sucursal", dataIndex: "sucursal" },
     { title: "Pedidos", dataIndex: "pedidos", width: 100 },
@@ -256,6 +287,11 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
   clientesActivosPorSucursal: [
     { title: "Sucursal", dataIndex: "sucursal" },
     { title: "Clientes activos", dataIndex: "clientes_activos", width: 160 },
+  ],
+  clientesNuevosPorSucursal: [
+    { title: "Mes", dataIndex: "mes", width: 110 },
+    { title: "Sucursal", dataIndex: "sucursal" },
+    { title: "Clientes nuevos", dataIndex: "clientes_nuevos", width: 160 },
   ],
   ventasMensualPorSucursal: [
     { title: "Mes", dataIndex: "mes", width: 110 },
@@ -434,6 +470,34 @@ export default function ReportsLauncher() {
           mode: "ventasQr",
           data,
         });
+        return;
+      }
+
+      if (selectedReport.previewMode === "comisiones") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getComisionesMesesAPI({ meses, sucursales: vals.sucursales });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
+      if (selectedReport.previewMode === "ingresos") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getIngresosMesesAPI({ meses, incluirDeuda: !!vals.incluirDeuda });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
+      if (selectedReport.previewMode === "clientesActivosServicio") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getClientesActivosMesesAPI({ meses });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
+      if (selectedReport.previewMode === "ventasVendedores") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getVentasVendedoresMesesAPI({ meses });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
       }
     } catch (error) {
       console.error(error);
@@ -450,6 +514,7 @@ export default function ReportsLauncher() {
     try {
       setLoading(true);
       const mesFin = vals.mesFin?.format("YYYY-MM") || "";
+      const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
 
       switch (selectedReport.id) {
         case "topProductosPorSucursal":
@@ -457,10 +522,11 @@ export default function ReportsLauncher() {
         case "deliveryPromedioPorSucursal":
         case "costoEntregaPromedioPorSucursal":
         case "clientesPorHoraMensual":
+        case "ticketPromedioPorSucursal":
         case "ticketPromedioClientesPorSucursal":
         case "clientesActivosPorSucursal":
+        case "clientesNuevosPorSucursal":
         case "ventasMensualPorSucursal": {
-          const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
           await downloadOperacionMensualXlsx({
             meses,
             sucursales: vals.sucursales,
@@ -473,19 +539,18 @@ export default function ReportsLauncher() {
           await downloadStockProductosXlsx(vals.sucursalId as string);
           break;
         case "comisiones3m":
-          await downloadComisiones3MesesXlsx({ mesFin, sucursales: vals.sucursales });
+          await downloadComisiones3MesesXlsx({ meses, mesFin, sucursales: vals.sucursales });
           break;
         case "ingresos3m":
-          await downloadIngresos3MesesXlsx(mesFin, !!vals.incluirDeuda);
+          await downloadIngresos3MesesXlsx({ meses, mesFin, incluirDeuda: !!vals.incluirDeuda });
           break;
         case "clientesActivos3m":
-          await downloadClientesActivos3MesesXlsx(mesFin);
+          await downloadClientesActivos3MesesXlsx({ meses, mesFin });
           break;
         case "ventasVendedores4m":
-          await downloadVentasVendedores4mXlsx();
+          await downloadVentasVendedores4mXlsx({ meses, mesFin });
           break;
         case "ventasQr": {
-          const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
           await downloadVentasQrXlsx({ meses, sucursales: vals.sucursales });
           break;
         }
@@ -536,6 +601,16 @@ export default function ReportsLauncher() {
       ];
     }
 
+    if (key === "ticketPromedioPorSucursal" && data.ticketPromedioGlobal) {
+      return [
+        {
+          title: "Ticket promedio global por vendedor",
+          value: formatBs(data.ticketPromedioGlobal.ticket_promedio_bs),
+          subtitle: `Clientes activos: ${data.ticketPromedioGlobal.vendedores_activos ?? 0}`,
+        },
+      ];
+    }
+
     if (key === "ticketPromedioClientesPorSucursal" && data.ticketPromedioClientesGlobal) {
       return [
         {
@@ -556,7 +631,86 @@ export default function ReportsLauncher() {
       ];
     }
 
+    if (key === "clientesNuevosPorSucursal" && data.clientesNuevosGlobal) {
+      return [
+        {
+          title: "Clientes nuevos global",
+          value: `${data.clientesNuevosGlobal.clientes_nuevos ?? 0}`,
+          subtitle: "Total unico del periodo",
+        },
+      ];
+    }
+
     return [];
+  }, [preview]);
+
+  const additionalPreview = useMemo(() => {
+    if (!preview || preview.mode !== "additional") return null;
+
+    const data = preview.data || {};
+
+    if (preview.reportId === "comisiones3m") {
+      return {
+        cards: [
+          {
+            title: "Comision total",
+            value: formatBs(data?.totalGeneral?.comision_bs),
+            subtitle: `Sucursales: ${data?.totalGeneral?.sucursales ?? 0}`,
+          },
+        ],
+        tables: [
+          { title: "Comisiones por mes y sucursal", rows: data.rows || [] },
+          { title: "Totales por mes", rows: data.totalesPorMes || [] },
+        ],
+      };
+    }
+
+    if (preview.reportId === "ingresos3m") {
+      return {
+        cards: [
+          {
+            title: "Ingresos totales",
+            value: formatBs(data?.totalGlobal?.monto_bs),
+            subtitle: `Movimientos: ${data?.totalGlobal?.movimientos ?? 0}`,
+          },
+        ],
+        tables: [
+          { title: "Totales por mes", rows: data.totalesPorMes || [] },
+          { title: "Detalle", rows: data.detalle || [] },
+        ],
+      };
+    }
+
+    if (preview.reportId === "clientesActivos3m") {
+      return {
+        cards: [
+          {
+            title: "Clientes activos",
+            value: `${data?.resumen?.clientes_activos ?? 0}`,
+            subtitle: `Monto del periodo: ${formatBs(data?.resumen?.total_periodo_bs)}`,
+          },
+        ],
+        tables: [{ title: "Detalle de clientes", rows: data.rows || [] }],
+      };
+    }
+
+    if (preview.reportId === "ventasVendedores4m") {
+      return {
+        cards: [
+          {
+            title: "Vendedores en resumen",
+            value: `${Array.isArray(data?.resumen) ? data.resumen.length : 0}`,
+            subtitle: `Meses: ${Array.isArray(data?.meses) ? data.meses.length : 0}`,
+          },
+        ],
+        tables: [
+          { title: "Resumen por vendedor", rows: data.resumen || [] },
+          { title: "Detalle", rows: data.detalle || [] },
+        ],
+      };
+    }
+
+    return null;
   }, [preview]);
 
   return (
@@ -757,6 +911,41 @@ export default function ReportsLauncher() {
                   }}
                   scroll={{ x: 900 }}
                 />
+              </Space>
+            ) : preview.mode === "additional" ? (
+              <Space direction="vertical" className="w-full" size="middle">
+                {additionalPreview?.cards?.length ? (
+                  <Row gutter={[12, 12]}>
+                    {additionalPreview.cards.map((item) => (
+                      <Col xs={24} md={8} key={item.title}>
+                        <Card size="small">
+                          <Text type="secondary">{item.title}</Text>
+                          <Title level={4} style={{ margin: "6px 0" }}>
+                            {item.value}
+                          </Title>
+                          <Text type="secondary">{item.subtitle}</Text>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                ) : null}
+
+                {(additionalPreview?.tables || []).map((table) => (
+                  <Card size="small" key={table.title} title={table.title}>
+                    <Table
+                      size="small"
+                      rowKey={(_, i) => `${table.title}-${String(i)}`}
+                      dataSource={table.rows || []}
+                      columns={buildColumnsFromRows(table.rows || [])}
+                      pagination={{
+                        defaultPageSize: 10,
+                        showSizeChanger: true,
+                        pageSizeOptions: ["10", "20", "50", "100"],
+                      }}
+                      scroll={{ x: 900 }}
+                    />
+                  </Card>
+                ))}
               </Space>
             ) : (
               <Space direction="vertical" className="w-full" size="middle">

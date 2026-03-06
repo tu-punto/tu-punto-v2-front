@@ -17,7 +17,9 @@ export async function getOperacionMensualAPI(params: ReportParams) {
 }
 
 type MesFinParams = {
-  mesFin: string;
+  mes?: string;
+  meses?: string[];
+  mesFin?: string;
   sucursales?: string[];
 };
 
@@ -98,41 +100,85 @@ export async function downloadStockProductosXlsx(idSucursal: string) {
 }
 
 export async function downloadComisiones3MesesXlsx(params: MesFinParams) {
+  const nombreMeses =
+    params.meses && params.meses.length > 1
+      ? `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`
+      : params.meses?.[0] || params.mes || params.mesFin || "sin_mes";
   await downloadXlsxFromGet(
     "/reports/comisiones-3m/xlsx",
     {
+      mes: params.mes,
+      meses: params.meses?.join(","),
       mesFin: params.mesFin,
       sucursales: params.sucursales?.join(","),
     },
-    `comisiones_3m_hasta_${params.mesFin}.xlsx`,
+    `comisiones_${nombreMeses}.xlsx`,
   );
 }
 
-export async function downloadIngresos3MesesXlsx(mesFin: string, incluirDeuda = false) {
+export async function downloadIngresos3MesesXlsx(params: { mes?: string; meses?: string[]; mesFin?: string; incluirDeuda?: boolean }) {
+  const nombreMeses =
+    params.meses && params.meses.length > 1
+      ? `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`
+      : params.meses?.[0] || params.mes || params.mesFin || "sin_mes";
   await downloadXlsxFromGet(
     "/reports/ingresos-3m/xlsx",
     {
-      mesFin,
-      incluirDeuda,
+      mes: params.mes,
+      meses: params.meses?.join(","),
+      mesFin: params.mesFin,
+      incluirDeuda: !!params.incluirDeuda,
     },
-    `ingresos_flujo_3m_hasta_${mesFin}.xlsx`,
+    `ingresos_flujo_${nombreMeses}.xlsx`,
   );
 }
 
-export async function downloadClientesActivos3MesesXlsx(mesFin: string) {
+export async function downloadClientesActivos3MesesXlsx(params: { mes?: string; meses?: string[]; mesFin?: string }) {
+  const nombreMeses =
+    params.meses && params.meses.length > 1
+      ? `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`
+      : params.meses?.[0] || params.mes || params.mesFin || "sin_mes";
   await downloadXlsxFromGet(
     "/reports/clientes-activos/xlsx",
-    { mesFin },
-    `clientes_activos_hasta_${mesFin}.xlsx`,
+    { mes: params.mes, meses: params.meses?.join(","), mesFin: params.mesFin },
+    `clientes_activos_${nombreMeses}.xlsx`,
   );
 }
 
-export async function downloadVentasVendedores4mXlsx() {
+export async function downloadVentasVendedores4mXlsx(params?: { mes?: string; meses?: string[]; mesFin?: string }) {
+  const nombreMeses =
+    params?.meses && params.meses.length > 1
+      ? `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`
+      : params?.meses?.[0] || params?.mes || params?.mesFin || "sin_mes";
   await downloadXlsxFromGet(
     "/reports/ventas-vendedores-4m/xlsx",
-    undefined,
-    "ventas_vendedores_4m.xlsx",
+    {
+      mes: params?.mes,
+      meses: params?.meses?.join(","),
+      mesFin: params?.mesFin,
+    },
+    `ventas_vendedores_${nombreMeses}.xlsx`,
   );
+}
+
+export async function getComisionesMesesAPI(params: { mes?: string; meses?: string[]; sucursales?: string[] }) {
+  const { data } = await apiClient.post("/reports/comisiones", params, { withCredentials: true });
+  return data;
+}
+
+export async function getIngresosMesesAPI(params: { mes?: string; meses?: string[]; mesFin?: string; incluirDeuda?: boolean }) {
+  const { data } = await apiClient.post("/reports/ingresos", params, { withCredentials: true });
+  return data;
+}
+
+export async function getClientesActivosMesesAPI(params: { mes?: string; meses?: string[]; mesFin?: string }) {
+  const { data } = await apiClient.post("/reports/clientes-activos", params, { withCredentials: true });
+  return data;
+}
+
+export async function getVentasVendedoresMesesAPI(params: { mes?: string; meses?: string[]; mesFin?: string }) {
+  const { data } = await apiClient.post("/reports/ventas-vendedores", params, { withCredentials: true });
+  return data;
 }
 
 export async function getVentasQrAPI(params: { mes?: string; meses?: string[]; sucursales?: string[] }) {
