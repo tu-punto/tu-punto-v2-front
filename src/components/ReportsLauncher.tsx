@@ -291,6 +291,12 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
   clientesNuevosPorSucursal: [
     { title: "Mes", dataIndex: "mes", width: 110 },
     { title: "Sucursal", dataIndex: "sucursal" },
+    {
+      title: "Tipo",
+      dataIndex: "tipo",
+      width: 130,
+      render: (value: string) => (value === "ampliacion" ? "Ampliación" : "Nuevo"),
+    },
     { title: "Clientes nuevos", dataIndex: "clientes_nuevos", width: 160 },
   ],
   ventasMensualPorSucursal: [
@@ -606,7 +612,7 @@ export default function ReportsLauncher() {
         {
           title: "Ticket promedio global por vendedor",
           value: formatBs(data.ticketPromedioGlobal.ticket_promedio_bs),
-          subtitle: `Clientes activos: ${data.ticketPromedioGlobal.vendedores_activos ?? 0}`,
+          subtitle: `Sucursales: ${data.ticketPromedioGlobal.sucursales ?? 0}`,
         },
       ];
     }
@@ -637,6 +643,11 @@ export default function ReportsLauncher() {
           title: "Clientes nuevos global",
           value: `${data.clientesNuevosGlobal.clientes_nuevos ?? 0}`,
           subtitle: "Total unico del periodo",
+        },
+        {
+          title: "Clientes que ampliaron",
+          value: `${data.clientesNuevosGlobal.clientes_ampliaron ?? 0}`,
+          subtitle: "Clientes antiguos que tomaron otra sucursal",
         },
       ];
     }

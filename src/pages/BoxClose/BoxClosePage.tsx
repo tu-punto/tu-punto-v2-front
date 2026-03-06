@@ -147,43 +147,44 @@ const BoxClosePage = () => {
         },
       ],
     },
-    {
-      title: "Bancario",
-      children: [
-        {
-          title: "Inicial",
-          dataIndex: "bancario_inicial",
-          key: "bancario_inicial",
-          render: (amount: number) => `Bs. ${round(amount)}`,
-        },
-        {
-          title: "Ingresos",
-          dataIndex: "ventas_qr",
-          key: "ventas_qr",
-          render: (amount: number) => `Bs. ${round(amount)}`,
-        },
-        {
-          title: "Final",
-          dataIndex: "bancario_real",
-          key: "bancario_real",
-          render: (amount: number) => `Bs. ${round(amount)}`,
-        },
-        {
-          title: "Diferencia",
-          dataIndex: "diferencia_bancario",
-          key: "diferencia_bancario",
-          render: (amount: number) => {
-            const color = amount === 0 ? "success" : amount > 0 ? "warning" : "error";
-            const icon = amount === 0 ? <CheckCircleOutlined /> : <WarningOutlined />;
-            return (
-              <Tooltip title={amount === 0 ? "Cuadrado" : "Descuadre"}>
-                <Tag icon={icon} color={color}>Bs. {round(amount)}</Tag>
-              </Tooltip>
-            );
-          },
-        },
-      ],
-    },
+    // Control bancario deshabilitado temporalmente por negocio.
+    // {
+    //   title: "Bancario",
+    //   children: [
+    //     {
+    //       title: "Inicial",
+    //       dataIndex: "bancario_inicial",
+    //       key: "bancario_inicial",
+    //       render: (amount: number) => `Bs. ${round(amount)}`,
+    //     },
+    //     {
+    //       title: "Ingresos",
+    //       dataIndex: "ventas_qr",
+    //       key: "ventas_qr",
+    //       render: (amount: number) => `Bs. ${round(amount)}`,
+    //     },
+    //     {
+    //       title: "Final",
+    //       dataIndex: "bancario_real",
+    //       key: "bancario_real",
+    //       render: (amount: number) => `Bs. ${round(amount)}`,
+    //     },
+    //     {
+    //       title: "Diferencia",
+    //       dataIndex: "diferencia_bancario",
+    //       key: "diferencia_bancario",
+    //       render: (amount: number) => {
+    //         const color = amount === 0 ? "success" : amount > 0 ? "warning" : "error";
+    //         const icon = amount === 0 ? <CheckCircleOutlined /> : <WarningOutlined />;
+    //         return (
+    //           <Tooltip title={amount === 0 ? "Cuadrado" : "Descuadre"}>
+    //             <Tag icon={icon} color={color}>Bs. {round(amount)}</Tag>
+    //           </Tooltip>
+    //         );
+    //       },
+    //     },
+    //   ],
+    // },
     {
       title: "Observaciones",
       dataIndex: "observaciones",

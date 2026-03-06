@@ -10,7 +10,8 @@ import {
   Col,
   message,
   Select,
-  Modal
+  Modal,
+  Radio,
 } from "antd";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -20,7 +21,7 @@ import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
 const { Title } = Typography;
 type Metodo = "efectivo" | "qr";
-type TipoOperacion = "delivery" | "gasto_profit" | "pago_cliente";
+type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_cliente";
 
 interface OperacionAdicional {
   tipo: TipoOperacion;
@@ -29,6 +30,22 @@ interface OperacionAdicional {
   metodo: Metodo;
   monto: number;
 }
+
+const getOperationSign = (tipo: TipoOperacion) =>
+  tipo === "gasto" || tipo === "gasto_profit" ? -1 : 1;
+
+const mapTipoToApi = (tipo: TipoOperacion): "delivery" | "gasto_profit" | "pago_cliente" => {
+  if (tipo === "ingreso") return "delivery";
+  if (tipo === "gasto") return "gasto_profit";
+  return tipo;
+};
+
+const tipoLabel = (tipo: string) => {
+  if (tipo === "gasto" || tipo === "gasto_profit") return "Gastos (Salidas)";
+  return "Ingresos (Entradas)";
+};
+
+const metodoLabel = (metodo: string) => (metodo === "qr" ? "QR/Bancario" : "Efectivo");
 
 interface Props {
   onSuccess: () => void;
@@ -70,7 +87,7 @@ const BoxCloseForm = ({
     let cambiosExternos = 0; // visible en el UI si quieres mantenerlo
 
     for (const o of ops) {
-      const sign = o.tipo === "gasto_profit" ? -1 : 1; // gasto -> resta, delivery/pago_cliente -> suma
+      const sign = getOperationSign(o.tipo);
       if (o.metodo === "efectivo") deltaEf += sign * o.monto;
       else                         deltaQr += sign * o.monto;
 
@@ -281,6 +298,10 @@ const BoxCloseForm = ({
           cantidad: qty || 0,
         })),
       ];
+      const operationsPayload = operations.map((op) => ({
+        ...op,
+        tipo: mapTipoToApi(op.tipo),
+      }));
 
       if (mode === "edit" && initialData?._id) {
         const updatePayload = {
@@ -288,7 +309,7 @@ const BoxCloseForm = ({
           diferencia_efectivo: form.getFieldValue("diferencia_efectivo"),
           observaciones: form.getFieldValue("observaciones") || "",
           efectivo_diario,
-          operaciones_adicionales: operations,
+          operaciones_adicionales: operationsPayload,
         };
 
         await updateBoxCloseAPI(initialData._id, updatePayload);
@@ -305,7 +326,7 @@ const BoxCloseForm = ({
           ventas_qr:       salesSummary?.bank ?? 0,
           id_sucursal: localStorage.getItem("sucursalId"),
           efectivo_diario,
-          operaciones_adicionales: operations,
+          operaciones_adicionales: operationsPayload,
         };
 
         await registerBoxCloseAPI(newBoxClose);
@@ -341,8 +362,8 @@ const BoxCloseForm = ({
             <Table
                 dataSource={operations}
                 columns={[
-                  { title: "Tipo", dataIndex: "tipo", key: "tipo" },
-                  { title: "Método", dataIndex: "metodo", key: "metodo" },
+                  { title: "Tipo", dataIndex: "tipo", key: "tipo", render: (v) => tipoLabel(String(v || "")) },
+                  { title: "Método", dataIndex: "metodo", key: "metodo", render: (v) => metodoLabel(String(v || "")) },
                   { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v) => v || "-" },
                   { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
                   { title: "Monto", dataIndex: "monto", key: "monto", render: (monto) => `Bs. ${Number(monto).toFixed(2)}` },
@@ -370,25 +391,29 @@ const BoxCloseForm = ({
         >
           <Form form={operationForm} layout="vertical">
             <Form.Item name="tipo" label="Tipo" rules={[{ required: true }]}>
-              <Select
-                  options={[
-                    { value: "delivery",     label: "Delivery (Entrada)" },
-                    { value: "gasto_profit", label: "Gasto Profit (Salida)" },
-                    { value: "pago_cliente", label: "Pago de Cliente (Entrada)" },
-                  ]}
-              />
+              <Radio.Group buttonStyle="solid" className="w-full">
+                <Radio.Button value="ingreso" style={{ width: "50%", textAlign: "center" }}>
+                  Ingresos (Entradas)
+                </Radio.Button>
+                <Radio.Button value="gasto" style={{ width: "50%", textAlign: "center" }}>
+                  Gastos (Salidas)
+                </Radio.Button>
+              </Radio.Group>
             </Form.Item>
 
             <Form.Item name="metodo" label="Método" rules={[{ required: true }]}>
-              <Select
-                  options={[
-                    { value: "efectivo", label: "Efectivo" },
-                    { value: "qr",       label: "QR/Bancario" },
-                  ]}
-              />
+              <Radio.Group buttonStyle="solid" className="w-full">
+                <Radio.Button value="efectivo" style={{ width: "50%", textAlign: "center" }}>
+                  Efectivo
+                </Radio.Button>
+                <Radio.Button value="qr" style={{ width: "50%", textAlign: "center" }}>
+                  QR/Bancario
+                </Radio.Button>
+              </Radio.Group>
             </Form.Item>
 
-            <Form.Item shouldUpdate noStyle>
+            {/* Campo cliente temporalmente deshabilitado al simplificar Tipo en Ingreso/Gasto */}
+            {/* <Form.Item shouldUpdate noStyle>
               {() => {
                 const t = operationForm.getFieldValue("tipo");
                 return t === "pago_cliente" ? (
@@ -397,7 +422,7 @@ const BoxCloseForm = ({
                     </Form.Item>
                 ) : null;
               }}
-            </Form.Item>
+            </Form.Item> */}
 
             <Form.Item name="descripcion" label="Descripción" rules={[{ required: true }]}>
               <Input />
@@ -472,7 +497,8 @@ const BoxCloseForm = ({
                 />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            {/* Control bancario temporalmente deshabilitado */}
+            {/* <Col span={6}>
               <Form.Item label="Bancario">
                 <InputNumber
                     value={salesSummary?.bank}
@@ -491,7 +517,7 @@ const BoxCloseForm = ({
                     className="w-full bg-gray-200 text-gray-700"
                 />
               </Form.Item>
-            </Col>
+            </Col> */}
             <Col span={6}>
               <Form.Item
                   label="Cambios Externos"
@@ -650,6 +676,7 @@ const BoxCloseForm = ({
           </Col>
         </Row>
 
+        {/* Control bancario temporalmente deshabilitado
         <Card>
           <Title level={5}>Recuento Bancario</Title>
           <Row gutter={16}>
@@ -692,6 +719,7 @@ const BoxCloseForm = ({
             </Col>
           </Row>
         </Card>
+        */}
 
         <Card>
           <Title level={5}>Observaciones</Title>
