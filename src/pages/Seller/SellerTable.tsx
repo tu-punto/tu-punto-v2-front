@@ -7,7 +7,7 @@ import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellersBasicAPI } from "../../api/seller";
+import { getSellersAPI } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
@@ -180,7 +180,7 @@ export default function SellerTable({
     (async () => {
       setLoading(true);
       try {
-        const res = await getSellersBasicAPI();
+        const res = await getSellersAPI();
         const sellers: ISeller[] = (Array.isArray(res) ? res : []) as ISeller[];
 
         const rows: SellerRow[] = await Promise.all(
