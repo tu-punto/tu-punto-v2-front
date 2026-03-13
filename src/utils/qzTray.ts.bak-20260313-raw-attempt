@@ -140,14 +140,10 @@ export const findQzPrinters = async (): Promise<string[]> => {
   return [];
 };
 
-export const createEscPosConfig = async (
-  printerName: string,
-  options?: { forceRaw?: boolean }
-) => {
+export const createEscPosConfig = async (printerName: string) => {
   const qz = await connectQz();
   return qz.configs.create(printerName, {
     encoding: "CP437",
-    forceRaw: Boolean(options?.forceRaw),
     spool: {
       end: "\n"
     }

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Collapse, Modal, Select, Switch, Typography, message } from "antd";
-import { QrcodeOutlined } from "@ant-design/icons";
 import { batchGenerateVariantQRAPI, listVariantQRAPI } from "../../api/qr";
 import { SERVER_URL } from "../../config/config";
 import { getSucursalsAPI } from "../../api/sucursal";
@@ -346,8 +345,8 @@ const buildDirectLabelImageData = async (
   });
 
   const widthPx = mmToPx(options.ticketWidthMm);
-  const topMarginPx = 0;
-  const bottomMarginPx = mmToPx(0.25 * qrScale);
+  const topMarginPx = mmToPx(0.2 * qrScale);
+  const bottomMarginPx = mmToPx(0.4 * qrScale);
   const sideMarginPx = mmToPx(0.8 * qrScale);
   const gapPx = mmToPx(1.2 * qrScale);
   const qrPx = Math.max(mmToPx(options.qrSizeMm), 24);
@@ -428,7 +427,7 @@ const VariantQRBatchModal = ({
     localStorage.getItem("sucursalId") || undefined
   );
   const [ticketWidthMm, setTicketWidthMm] = useState<number>(40);
-  const [qrSizeMm, setQrSizeMm] = useState<number>(16);
+  const [qrSizeMm, setQrSizeMm] = useState<number>(12);
   const [printDelayMs, setPrintDelayMs] = useState<number>(500);
   const [onlyMissing, setOnlyMissing] = useState(true);
   const [forceRegenerate, setForceRegenerate] = useState(false);
@@ -705,126 +704,50 @@ const VariantQRBatchModal = ({
       destroyOnClose
     >
       <div className="space-y-3">
-        <div
-          style={{
-            border: "1px solid #f0d8bd",
-            borderRadius: 14,
-            background: "linear-gradient(180deg, #fffaf4 0%, #fff 100%)",
-            padding: 14
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <div>
-              <Text strong style={{ fontSize: 15 }}>
-                Filtros de generacion
-              </Text>
-              <div style={{ color: "#8c6b45", fontSize: 12, marginTop: 2 }}>
-                Busca vendedor, filtra sucursal y define si quieres generar o solo revisar QRs.
-              </div>
-            </div>
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "#fff1de",
-                color: "#c77822",
-                fontSize: 20,
-                flexShrink: 0
-              }}
-            >
-              <QrcodeOutlined />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3.5">
-            <div>
-              <Text strong>Vendedor</Text>
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                className="w-full mt-1"
-                value={sellerId}
-                onChange={(value) => setSellerId(value)}
-                options={sellerOptions}
-                placeholder="Buscar vendedor"
-                filterOption={(input, option) =>
-                  String(option?.label || "")
-                    .toLowerCase()
-                    .includes(String(input || "").toLowerCase())
-                }
-              />
-            </div>
-            <div>
-              <Text strong>Sucursal</Text>
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                className="w-full mt-1"
-                value={sucursalId}
-                onChange={(value) => setSucursalId(value)}
-                options={branchOptions}
-                placeholder="Todas las sucursales"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-3">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 12px",
-                borderRadius: 12,
-                background: "#ffffff",
-                border: "1px solid #f1e2cf"
-              }}
-            >
-              <div>
-                <Text>Generar solo faltantes</Text>
-                <div style={{ fontSize: 12, color: "#8c8c8c" }}>Solo crea QR donde aun no existe.</div>
-              </div>
-              <Switch
-                checked={onlyMissing}
-                onChange={(value) => {
-                  setOnlyMissing(value);
-                  if (value) setForceRegenerate(false);
-                }}
-              />
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 12px",
-                borderRadius: 12,
-                background: "#ffffff",
-                border: "1px solid #f1e2cf"
-              }}
-            >
-              <div>
-                <Text>Forzar regeneracion</Text>
-                <div style={{ fontSize: 12, color: "#8c8c8c" }}>Reemplaza QRs existentes por nuevos.</div>
-              </div>
-              <Switch
-                checked={forceRegenerate}
-                onChange={(value) => {
-                  setForceRegenerate(value);
-                  if (value) setOnlyMissing(false);
-                }}
-              />
-            </div>
-          </div>
+        <div>
+          <Text strong>Vendedor</Text>
+          <Select
+            allowClear
+            className="w-full mt-1"
+            value={sellerId}
+            onChange={(value) => setSellerId(value)}
+            options={sellerOptions}
+            placeholder="Todos los vendedores"
+          />
+        </div>
+        <div>
+          <Text strong>Sucursal</Text>
+          <Select
+            allowClear
+            className="w-full mt-1"
+            value={sucursalId}
+            onChange={(value) => setSucursalId(value)}
+            options={branchOptions}
+            placeholder="Todas las sucursales"
+          />
         </div>
 
+        <div className="flex items-center justify-between">
+          <Text>Generar solo faltantes</Text>
+          <Switch
+            checked={onlyMissing}
+            onChange={(value) => {
+              setOnlyMissing(value);
+              if (value) setForceRegenerate(false);
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Text>Forzar regeneracion</Text>
+          <Switch
+            checked={forceRegenerate}
+            onChange={(value) => {
+              setForceRegenerate(value);
+              if (value) setOnlyMissing(false);
+            }}
+          />
+        </div>
         {forceRegenerate && (
           <Alert
             type="warning"
@@ -838,13 +761,8 @@ const VariantQRBatchModal = ({
           <Button onClick={handleShowExisting} loading={loadingList}>
             Mostrar QRs
           </Button>
-          <Button
-            type="primary"
-            onClick={handleGenerate}
-            loading={loadingGenerate}
-            icon={<QrcodeOutlined />}
-          >
-            QR
+          <Button type="primary" onClick={handleGenerate} loading={loadingGenerate}>
+            Generar QRs
           </Button>
         </div>
 

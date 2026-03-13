@@ -388,6 +388,7 @@ export default function ReportsLauncher() {
       options: REPORTS.filter((r) => r.category === category).map((r) => ({
         value: r.id,
         label: r.title,
+        searchText: `${r.title} ${r.description} ${r.category}`.toLowerCase(),
       })),
     }));
   }, []);
@@ -701,7 +702,10 @@ export default function ReportsLauncher() {
             subtitle: `Monto del periodo: ${formatBs(data?.resumen?.total_periodo_bs)}`,
           },
         ],
-        tables: [{ title: "Detalle de clientes", rows: data.rows || [] }],
+        tables: [
+          { title: "Clientes activos por mes", rows: data.totalesPorMes || [] },
+          { title: "Detalle de clientes", rows: data.rows || [] },
+        ],
       };
     }
 
@@ -767,8 +771,13 @@ export default function ReportsLauncher() {
                     <Select
                       showSearch
                       optionFilterProp="label"
+                      filterOption={(input, option) =>
+                        String((option as { searchText?: string; label?: string } | undefined)?.searchText || (option as { label?: string } | undefined)?.label || "")
+                          .toLowerCase()
+                          .includes(input.toLowerCase())
+                      }
                       options={reportSelectOptions}
-                      placeholder="Selecciona un reporte"
+                      placeholder="Busca o selecciona un reporte"
                     />
                   </Form.Item>
                 </Col>

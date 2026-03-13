@@ -6,7 +6,7 @@ import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
 import { getFlatProductListAPI, getSellerInventoryAllAPI, getProductsAPI } from '../../api/product';
 import { Button, Input, Select, Spin } from 'antd';
-import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, PlusOutlined, QrcodeOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 //import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';

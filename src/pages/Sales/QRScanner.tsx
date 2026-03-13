@@ -17,6 +17,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   const feedbackTimeoutRef = useRef<number | null>(null);
   const isProcessingRef = useRef(false);
   const lastReadRef = useRef<{ payload: string; ts: number }>({ payload: "", ts: 0 });
+  const trackRef = useRef<MediaStreamTrack | null>(null);
 
   const [isScanning, setIsScanning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(15);
@@ -52,6 +53,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   };
 
   const stopCamera = () => {
+    trackRef.current = null;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -89,22 +91,81 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     }, 1000);
   };
 
+  const improveTrackSettings = async (track: MediaStreamTrack) => {
+    const anyTrack = track as MediaStreamTrack & {
+      getCapabilities?: () => Record<string, any>;
+      applyConstraints?: (constraints: MediaTrackConstraints) => Promise<void>;
+    };
+
+    const capabilities = anyTrack.getCapabilities?.();
+    if (!capabilities || !anyTrack.applyConstraints) return;
+
+    const advanced: Record<string, any> = {};
+
+    if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("continuous")) {
+      advanced.focusMode = "continuous";
+    }
+
+    if (typeof capabilities.zoom?.max === "number" && capabilities.zoom.max >= 1.5) {
+      advanced.zoom = Math.min(2, capabilities.zoom.max);
+    }
+
+    if (capabilities.torch) {
+      advanced.torch = false;
+    }
+
+    if (!Object.keys(advanced).length) return;
+
+    try {
+      await anyTrack.applyConstraints({
+        advanced: [advanced]
+      });
+    } catch (error) {
+      console.debug("No se pudieron aplicar mejoras de enfoque al scanner", error);
+    }
+  };
+
+  const tryDecode = (
+    context: CanvasRenderingContext2D,
+    width: number,
+    height: number
+  ) => {
+    const fullFrame = context.getImageData(0, 0, width, height);
+    const directCode = jsQR(fullFrame.data, fullFrame.width, fullFrame.height, {
+      inversionAttempts: "attemptBoth"
+    });
+    if (directCode?.data) {
+      return directCode.data;
+    }
+
+    const cropWidth = Math.floor(width * 0.72);
+    const cropHeight = Math.floor(height * 0.72);
+    const offsetX = Math.floor((width - cropWidth) / 2);
+    const offsetY = Math.floor((height - cropHeight) / 2);
+    const croppedFrame = context.getImageData(offsetX, offsetY, cropWidth, cropHeight);
+    const croppedCode = jsQR(croppedFrame.data, croppedFrame.width, croppedFrame.height, {
+      inversionAttempts: "attemptBoth"
+    });
+
+    return croppedCode?.data || null;
+  };
+
   const scanQrCode = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState !== 4) return;
 
-    const context = canvas.getContext("2d");
+    const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) return;
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    context.imageSmoothingEnabled = false;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    const code = tryDecode(context, canvas.width, canvas.height);
 
-    if (code?.data) {
-      void handleProductRequest(code.data);
+    if (code) {
+      void handleProductRequest(code);
     }
   };
 
@@ -122,16 +183,24 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          aspectRatio: { ideal: 1.7777777778 }
         },
         audio: false
       });
 
       streamRef.current = mediaStream;
+      const [videoTrack] = mediaStream.getVideoTracks();
+      trackRef.current = videoTrack || null;
+      if (videoTrack) {
+        await improveTrackSettings(videoTrack);
+      }
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.setAttribute("autoplay", "true");
+        videoRef.current.setAttribute("playsinline", "true");
       }
       startScanning();
     } catch (error) {
