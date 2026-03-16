@@ -395,6 +395,19 @@ const StockManagement = () => {
         setIsMoveModalVisible(false);
     };
 
+    const actionButtonStyle: React.CSSProperties = {
+        height: 44,
+        borderRadius: 12,
+        fontWeight: 600
+    };
+
+    const generateActionButtonStyle: React.CSSProperties = {
+        ...actionButtonStyle,
+        background: "linear-gradient(135deg, #ff9b45 0%, #ff7f2a 100%)",
+        borderColor: "#ff8b34",
+        color: "#ffffff"
+    };
+
 
 
 
@@ -437,41 +450,79 @@ const StockManagement = () => {
             )}
 
             {!isSeller && (
-                <div className="bg-white rounded-xl px-5 py-4 shadow-md mb-4">
-                    <Row gutter={[16, 16]} align="middle" justify="center">
-                        <Col xs={24} sm={12} lg={6}>
+                <div
+                    className="bg-white rounded-xl px-4 py-4 shadow-md mb-4"
+                    style={{ border: "1px solid #f1ece4" }}
+                >
+                    <div data-stock-filters="true">
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: 10,
+                                flexWrap: "wrap",
+                                marginBottom: 12
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontSize: 16, fontWeight: 700, color: "#1f1f1f" }}>
+                                    Filtros
+                                </div>
+                            </div>
+                            <div
+                                style={{
+                                    padding: "4px 10px",
+                                    borderRadius: 999,
+                                    background: selectedSeller ? "#f6ffed" : "#fafafa",
+                                    color: selectedSeller ? "#237804" : "#8c8c8c",
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    border: selectedSeller ? "1px solid #b7eb8f" : "1px solid #e8e8e8"
+                                }}
+                            >
+                                {selectedSeller ? "Vendedor seleccionado" : "Selecciona vendedor para editar stock"}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        <div>
                             <SellerList
                                 sellers={sellers}
                                 selectedSeller={selectedSeller}
                                 onSelectSeller={handleSelectSeller}
                             />
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
+                        </div>
+                        <div>
                             <Button
                                 onClick={() => setProductFormVisible(true)}
-                                type="primary"
+                                type="default"
+                                icon={<PlusOutlined />}
                                 block
                                 disabled={!selectedSeller}
                                 title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
                                 className="text-mobile-base xl:text-mobile-base"
+                                style={actionButtonStyle}
                             >
-                                Agregar Producto
+                                Agregar producto
                             </Button>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
+                        </div>
+                        <div>
                             <Button
                                 onClick={() => {
                                     setQrModalProductIds([]);
                                     setQrModalAutoGenerate(false);
                                     setIsQRBatchModalVisible(true);
                                 }}
+                                type="primary"
+                                icon={<QrcodeOutlined />}
                                 block
                                 className="text-mobile-base xl:text-mobile-base"
+                                style={generateActionButtonStyle}
                             >
-                                Generar QRs Variantes
+                                Generar
                             </Button>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
+                        </div>
+                        <div>
                             <Button
                                 onClick={() => {
                                     const stockMapped = stockListForConfirmModal.map(item => ({
@@ -490,24 +541,28 @@ const StockManagement = () => {
                                 disabled={!selectedSeller}
                                 title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
                                 className="text-mobile-base xl:text-mobile-base"
+                                icon={<ReloadOutlined />}
+                                style={actionButtonStyle}
                             >
-                                Actualizar Stock
+                                Actualizar stock
                             </Button>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
+                        </div>
+                        <div>
                             <Input.Search
                                 placeholder="Buscar producto o variante..."
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
                                 allowClear
                                 className="w-full"
+                                size="large"
                             />
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
+                        </div>
+                        <div>
                             <Select
                                 value={selectedCategory}
                                 onChange={setSelectedCategory}
                                 className="w-full"
+                                size="large"
                             >
                                 <Select.Option value="all">Todas las categorías</Select.Option>
                                 {categories.map((cat) => (
@@ -516,8 +571,9 @@ const StockManagement = () => {
                                     </Select.Option>
                                 ))}
                             </Select>
-                        </Col>
-                    </Row>
+                        </div>
+                        </div>
+                    </div>
                 </div>
             )}
             <Row gutter={[16, 16]} justify="center" align="middle" style={{ marginBottom: "16px" }}>

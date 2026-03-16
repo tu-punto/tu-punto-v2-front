@@ -149,7 +149,7 @@ export const createEscPosConfig = async (
     encoding: "CP437",
     forceRaw: Boolean(options?.forceRaw),
     spool: {
-      end: "\n"
+      end: ""   
     }
   });
 };
@@ -174,7 +174,8 @@ export const createPixelConfig = async (
       bottom: 0,
       left: 0
     },
-    orientation: "portrait"
+    orientation: "portrait",
+    colorType: "blackwhite",
   });
 };
 

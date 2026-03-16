@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Collapse, Modal, Select, Switch, Typography, message } from "antd";
-import { QrcodeOutlined } from "@ant-design/icons";
+import { EyeOutlined, InboxOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { batchGenerateVariantQRAPI, listVariantQRAPI } from "../../api/qr";
 import { SERVER_URL } from "../../config/config";
 import { getSucursalsAPI } from "../../api/sucursal";
+import VariantQRGroupManagerModal from "./VariantQRGroupManagerModal";
 import {
   connectQz,
   createEscPosConfig,
@@ -33,6 +34,14 @@ interface Props {
   selectedSellerId?: string | null;
   initialProductIds?: string[];
   autoGenerateOnOpen?: boolean;
+}
+
+interface DirectPreviewItem {
+  id: string;
+  productName: string;
+  variantLabel: string;
+  dataUrl: string;
+  heightMm: number;
 }
 
 const escapeHtml = (value: string) =>
@@ -347,7 +356,7 @@ const buildDirectLabelImageData = async (
 
   const widthPx = mmToPx(options.ticketWidthMm);
   const topMarginPx = 0;
-  const bottomMarginPx = mmToPx(0.25 * qrScale);
+  const bottomMarginPx = 0;
   const sideMarginPx = mmToPx(0.8 * qrScale);
   const gapPx = mmToPx(1.2 * qrScale);
   const qrPx = Math.max(mmToPx(options.qrSizeMm), 24);
@@ -385,8 +394,7 @@ const buildDirectLabelImageData = async (
 
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, widthPx, heightPx);
-
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   const qrY = Math.round((heightPx - qrPx) / 2);
   ctx.drawImage(qrImg, sideMarginPx, qrY, qrPx, qrPx);
 
@@ -435,12 +443,16 @@ const VariantQRBatchModal = ({
   const [loadingGenerate, setLoadingGenerate] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [qzBusy, setQzBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [qzConnected, setQzConnected] = useState(false);
   const [qzPrinters, setQzPrinters] = useState<string[]>([]);
   const [selectedQzPrinter, setSelectedQzPrinter] = useState<string | undefined>(
     localStorage.getItem("qzPrinterName") || undefined
   );
+  const [directPreviewVisible, setDirectPreviewVisible] = useState(false);
+  const [directPreviewItems, setDirectPreviewItems] = useState<DirectPreviewItem[]>([]);
   const [result, setResult] = useState<any>(null);
+  const [groupManagerVisible, setGroupManagerVisible] = useState(false);
   const autoRunDoneRef = useRef(false);
   const [branches, setBranches] = useState<any[]>([]);
 
@@ -482,6 +494,7 @@ const VariantQRBatchModal = ({
   const isListMode = typeof result?.count === "number" && !hasMetrics;
   const hasInitialProductIds = initialProductIds.length > 0;
   const effectiveProductIds = hasInitialProductIds ? initialProductIds : undefined;
+  const hasScopedSelection = Boolean(sellerId) || Boolean(effectiveProductIds?.length);
   const groupedPrintableItems = useMemo(
     () => groupItemsBySeller(printableItems, resolveSellerLabel),
     [printableItems, sellerNameById]
@@ -510,6 +523,10 @@ const VariantQRBatchModal = ({
     forceRegenerate?: boolean;
     skipConfirm?: boolean;
   }) => {
+    if (!hasScopedSelection) {
+      message.warning("Selecciona un vendedor o entra con productos concretos antes de generar.");
+      return;
+    }
     const onlyMissingParam = options?.onlyMissing ?? onlyMissing;
     const forceRegenerateParam = options?.forceRegenerate ?? forceRegenerate;
     if (forceRegenerateParam && !options?.skipConfirm) {
@@ -534,6 +551,10 @@ const VariantQRBatchModal = ({
   };
 
   const handleShowExisting = async () => {
+    if (!hasScopedSelection) {
+      message.warning("Selecciona un vendedor o entra con productos concretos antes de listar QRs.");
+      return;
+    }
     setLoadingList(true);
     setResult(null);
     try {
@@ -604,18 +625,16 @@ const VariantQRBatchModal = ({
     setQzBusy(true);
     try {
       const targetItems = isTest ? [items[0]] : items;
-      const rawConfig = await createEscPosConfig(selectedQzPrinter);
-      const GS = "\x1D";
 
-      // Enviar etiqueta y corte una por una para asegurar 1x1 real en TM-L90.
       for (const [index, item] of targetItems.entries()) {
         const labelImage = await buildDirectLabelImageData(item, {
           ticketWidthMm,
           qrSizeMm
         });
+
         const pixelConfig = await createPixelConfig(selectedQzPrinter, {
           widthMm: ticketWidthMm,
-          heightMm: Math.max(labelImage.heightMm, qrSizeMm + 2)
+          heightMm: labelImage.heightMm
         });
 
         await qzPrint(pixelConfig, [
@@ -624,13 +643,9 @@ const VariantQRBatchModal = ({
             format: "image",
             flavor: "base64",
             data: toBase64Png(labelImage.dataUrl),
-            options: {
-              interpolation: "nearest-neighbor"
-            }
+            options: { interpolation: "nearest-neighbor" }
           }
         ]);
-
-        await qzPrint(rawConfig, [`${GS}V${String.fromCharCode(0)}`]);
 
         if (printDelayMs > 0 && index < targetItems.length - 1) {
           await waitMs(printDelayMs);
@@ -647,6 +662,42 @@ const VariantQRBatchModal = ({
       message.error("Error en impresion directa. Revisa QZ Tray o impresora.");
     } finally {
       setQzBusy(false);
+    }
+  };
+
+  const handleOpenDirectPreview = async (items: QRItem[], isTest = false) => {
+    if (!items.length) {
+      message.warning("No hay etiquetas para previsualizar");
+      return;
+    }
+
+    setPreviewBusy(true);
+    try {
+      const targetItems = isTest ? [items[0]] : items;
+      const previewItems = await Promise.all(
+        targetItems.map(async (item) => {
+          const labelImage = await buildDirectLabelImageData(item, {
+            ticketWidthMm,
+            qrSizeMm
+          });
+
+          return {
+            id: `${item.productId}-${item.variantKey}-${item.qrCode}`,
+            productName: item.productName || item.productId || "Producto",
+            variantLabel: item.variantLabel || item.variantKey || "Variante",
+            dataUrl: labelImage.dataUrl,
+            heightMm: labelImage.heightMm
+          };
+        })
+      );
+
+      setDirectPreviewItems(previewItems);
+      setDirectPreviewVisible(true);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo generar la vista previa 1x1.");
+    } finally {
+      setPreviewBusy(false);
     }
   };
 
@@ -834,17 +885,44 @@ const VariantQRBatchModal = ({
           />
         )}
 
-        <div className="flex gap-2">
-          <Button onClick={handleShowExisting} loading={loadingList}>
+        {!hasScopedSelection && (
+          <Alert
+            type="info"
+            showIcon
+            message="Alcance requerido"
+            description="Para evitar una generacion masiva accidental, primero selecciona un vendedor o abre este modal desde productos concretos."
+          />
+        )}
+
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={handleShowExisting}
+            loading={loadingList}
+            style={{ borderRadius: 12, height: 40 }}
+          >
             Mostrar QRs
+          </Button>
+          <Button
+            icon={<InboxOutlined />}
+            onClick={() => setGroupManagerVisible(true)}
+            style={{ borderRadius: 12, height: 40 }}
+          >
+            Grupos QR
           </Button>
           <Button
             type="primary"
             onClick={handleGenerate}
             loading={loadingGenerate}
             icon={<QrcodeOutlined />}
+            style={{
+              borderRadius: 12,
+              height: 40,
+              background: "linear-gradient(135deg, #ff9b45 0%, #ff7f2a 100%)",
+              borderColor: "#ff8b34",
+              boxShadow: "0 10px 20px rgba(255, 127, 42, 0.22)"
+            }}
           >
-            QR
+            Generar
           </Button>
         </div>
 
@@ -935,11 +1013,11 @@ const VariantQRBatchModal = ({
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             onClick={() => handlePrintDirect(printableItems, true)}
             loading={qzBusy}
-            disabled={!qzConnected || !selectedQzPrinter || printableItems.length === 0}
+            disabled={!qzConnected || !selectedQzPrinter || printableItems.length === 0 || previewBusy}
           >
             Probar 1 etiqueta (corte)
           </Button>
@@ -947,9 +1025,17 @@ const VariantQRBatchModal = ({
             type="primary"
             onClick={() => handlePrintDirect(printableItems, false)}
             loading={qzBusy}
-            disabled={!qzConnected || !selectedQzPrinter || printableItems.length === 0}
+            disabled={!qzConnected || !selectedQzPrinter || printableItems.length === 0 || previewBusy}
           >
             Imprimir 1x1 con corte
+          </Button>
+          <Button
+            icon={<EyeOutlined />}
+            onClick={() => void handleOpenDirectPreview(printableItems, false)}
+            loading={previewBusy}
+            disabled={printableItems.length === 0 || qzBusy}
+          >
+            Ver render 1x1
           </Button>
         </div>
 
@@ -1095,10 +1181,71 @@ const VariantQRBatchModal = ({
           />
         )}
       </div>
+
+      <Modal
+        open={directPreviewVisible}
+        onCancel={() => setDirectPreviewVisible(false)}
+        footer={null}
+        width={760}
+        title="Vista previa exacta de Imprimir 1x1 con corte"
+        destroyOnClose
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: "70vh", overflowY: "auto" }}>
+          <Alert
+            type="info"
+            showIcon
+            message="Este preview usa el mismo render PNG que se manda a QZ Tray"
+            description="Si aqui no aparece blanco arriba, entonces el espacio extra no lo esta agregando esta imagen sino el flujo de impresion o la impresora."
+          />
+
+          {directPreviewItems.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                border: "1px solid #e8e8e8",
+                borderRadius: 12,
+                padding: 12,
+                background: "#fafafa"
+              }}
+            >
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                {item.productName} | {item.variantLabel} | alto render: {item.heightMm} mm
+              </div>
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px dashed #d9d9d9",
+                  borderRadius: 10,
+                  padding: 8,
+                  overflowX: "auto"
+                }}
+              >
+                <img
+                  src={item.dataUrl}
+                  alt={`${item.productName} ${item.variantLabel}`}
+                  style={{
+                    display: "block",
+                    width: `${ticketWidthMm}mm`,
+                    maxWidth: "100%",
+                    height: "auto",
+                    background: "#fff"
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      <VariantQRGroupManagerModal
+        open={groupManagerVisible}
+        onClose={() => setGroupManagerVisible(false)}
+        sellers={sellers}
+        selectedSellerId={sellerId}
+        selectedSucursalId={sucursalId}
+      />
     </Modal>
   );
 };
 
 export default VariantQRBatchModal;
-
-
