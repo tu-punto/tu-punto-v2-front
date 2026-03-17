@@ -521,37 +521,37 @@ const VariantQRBatchModal = ({
   const getItemPrintQuantity = (item: QRItem) => {
     const stored = printQuantities[itemPrintKey(item)];
     if (Number.isFinite(stored)) return Math.max(0, Number(stored));
-    return 1;
+    return undefined;
   };
   const printableQueue = useMemo(
     () =>
       printableItems.flatMap((item) => {
-        const quantity = getItemPrintQuantity(item);
+        const quantity = getItemPrintQuantity(item) ?? 0;
         if (quantity <= 0) return [];
         return Array.from({ length: quantity }, () => item);
       }),
     [printableItems, printQuantities, stockByItemKey]
   );
   const totalPrintQuantity = useMemo(
-    () => printableItems.reduce((acc, item) => acc + getItemPrintQuantity(item), 0),
+    () => printableItems.reduce((acc, item) => acc + (getItemPrintQuantity(item) ?? 0), 0),
     [printableItems, printQuantities, stockByItemKey]
   );
   const getGroupPrintQuantity = (group: GroupSummaryResultItem) => {
     const stored = groupPrintQuantities[group.id];
     if (Number.isFinite(stored)) return Math.max(0, Number(stored));
-    return 0;
+    return undefined;
   };
   const printableGroupQueue = useMemo(
     () =>
       resultGroups.flatMap((group) => {
-        const quantity = getGroupPrintQuantity(group);
+        const quantity = getGroupPrintQuantity(group) ?? 0;
         if (quantity <= 0) return [];
         return Array.from({ length: quantity }, () => group);
       }),
     [resultGroups, groupPrintQuantities]
   );
   const totalGroupPrintQuantity = useMemo(
-    () => resultGroups.reduce((acc, group) => acc + getGroupPrintQuantity(group), 0),
+    () => resultGroups.reduce((acc, group) => acc + (getGroupPrintQuantity(group) ?? 0), 0),
     [resultGroups, groupPrintQuantities]
   );
 
@@ -622,10 +622,20 @@ const VariantQRBatchModal = ({
   };
 
   const handleQuantityChange = (item: QRItem, value?: number | null) => {
-    const next = Math.max(0, Math.floor(Number(value || 0)));
+    const key = itemPrintKey(item);
+    if (value === null || value === undefined) {
+      setPrintQuantities((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+
+    const next = Math.max(0, Math.floor(Number(value)));
     setPrintQuantities((current) => ({
       ...current,
-      [itemPrintKey(item)]: next
+      [key]: next
     }));
   };
 
@@ -634,7 +644,16 @@ const VariantQRBatchModal = ({
   };
 
   const handleGroupQuantityChange = (groupId: string, value?: number | null) => {
-    const next = Math.max(0, Math.floor(Number(value || 0)));
+    if (value === null || value === undefined) {
+      setGroupPrintQuantities((current) => {
+        const next = { ...current };
+        delete next[groupId];
+        return next;
+      });
+      return;
+    }
+
+    const next = Math.max(0, Math.floor(Number(value)));
     setGroupPrintQuantities((current) => ({
       ...current,
       [groupId]: next

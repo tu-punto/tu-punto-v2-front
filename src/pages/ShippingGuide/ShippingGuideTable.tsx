@@ -14,7 +14,9 @@ const ShippingGuideTable = (
     const [isImageVisible, setIsImageVisible] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
 
-    const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const normalizedRole = String(user?.role || "").toLowerCase();
+    const isAdmin = normalizedRole === "admin";
+    const isOperator = normalizedRole === "operator";
 
     useEffect(() => {
         if (!isFilterBySeller && !isFilterByBranch) {
@@ -159,7 +161,7 @@ const ShippingGuideTable = (
                                 />
                             </Tooltip>
                         )}
-                        {isAdmin && (
+                        {(isAdmin || isOperator) && (
                             <Tooltip title="Confirmar entrega">
                                 <Button
                                     size="small"
