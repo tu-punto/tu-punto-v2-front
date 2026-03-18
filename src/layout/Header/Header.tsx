@@ -10,7 +10,7 @@ import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
 const Header = () => {
   const { user, setUser } = useContext(UserContext)!;
   const navigate = useNavigate();
-  const { sucursalNombre, sucursalImagenHeader } = useBranchHeaderInfo();
+  const { sucursalNombre, sucursalImagenHeader, pillLabel } = useBranchHeaderInfo();
 
   const cardStyle = sucursalImagenHeader
     ? {
@@ -49,7 +49,7 @@ const Header = () => {
           <h1 className="tp-brand-card__title">TU PUNTO</h1>
           <div className="tp-branch-pill">
             <span className="tp-branch-pill__dot" />
-            <span className="tp-branch-pill__label"></span>
+            <span className="tp-branch-pill__label">{pillLabel}</span>
             <span className="tp-branch-pill__name">{sucursalNombre}</span>
           </div>
         </div>

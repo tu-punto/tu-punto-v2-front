@@ -288,15 +288,38 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     : Number.isFinite(pagoPendienteFromTable)
       ? pagoPendienteFromTable
       : saldoPendienteValue - deudaValue;
+  const ultimaFechaPago = paymentProofs.reduce<dayjs.Dayjs | null>(
+    (latestProofDate, proof) => {
+      const rawDate = proof?.createdAt ?? proof?.fecha_emision;
+      if (!rawDate) return latestProofDate;
+
+      const currentProofDate = dayjs(rawDate);
+      if (!currentProofDate.isValid()) return latestProofDate;
+
+      if (!latestProofDate || currentProofDate.isAfter(latestProofDate)) {
+        return currentProofDate;
+      }
+
+      return latestProofDate;
+    },
+    null
+  );
+  const ultimaFechaPagoLabel = ultimaFechaPago
+    ? ultimaFechaPago.format("DD/MM/YYYY")
+    : null;
+  const sellerHeaderName = isSeller
+    ? String(user?.nombre_vendedor || seller.nombre || "").trim()
+    : seller.nombre;
 
   return (
     <div>
-      <SellerHeader name={seller.nombre} />
+      <SellerHeader name={sellerHeaderName} isSeller={isSeller} />
 
       <StatsCards
         pagoPendiente={pagoPendienteValue}
         deuda={deudaValue}
         saldoPendiente={saldoPendienteValue}
+        ultimaFechaPago={ultimaFechaPagoLabel}
       />
 
       <Form
