@@ -1,42 +1,86 @@
 import { useState, useEffect } from 'react';
-import { Input, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
+import { AutoComplete, Input, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 
 const VariantInputs = ({
                            combinations,
                            setCombinations,
                            readOnlyCombinations = [],
+                           startEmpty = false,
+                           variantSuggestions = [],
+                           subvariantSuggestions = {},
+                           resetKey,
                        }: any) => {
     const [variants, setVariants] = useState<any[]>([]);
-    const [initialized, setInitialized] = useState(false);
     const [inputValues, setInputValues] = useState<string[]>([]);
     const [showBulkApply, setShowBulkApply] = useState(false);
     const [bulkPrice, setBulkPrice] = useState<number | null>(null);
 
     useEffect(() => {
-        if (!initialized && readOnlyCombinations.length) {
-            const variantMap: Record<string, Set<string>> = {};
-            readOnlyCombinations.forEach(combo => {
-                let i = 0;
-                while (combo[`varName${i}`] && combo[`var${i}`]) {
-                    const name = combo[`varName${i}`];
-                    const value = combo[`var${i}`];
-                    if (!variantMap[name]) variantMap[name] = new Set();
-                    variantMap[name].add(value);
-                    i++;
-                }
-            });
+        if (resetKey === undefined) return;
 
-            const formatted = Object.entries(variantMap).map(([name, set]) => ({
-                name,
-                subvariants: Array.from(set),
-                readOnly: true,
-            }));
+        setVariants([]);
+        setInputValues([]);
+        setShowBulkApply(false);
+        setBulkPrice(null);
+        setCombinations([]);
+    }, [resetKey, setCombinations]);
 
-            setVariants(formatted);
-            setInitialized(true);
-        }
-    }, [readOnlyCombinations, initialized]);
+    useEffect(() => {
+        if (startEmpty || resetKey !== undefined) return;
+        if (!readOnlyCombinations.length) return;
+
+        const variantMap: Record<string, Set<string>> = {};
+        readOnlyCombinations.forEach((combo: any) => {
+            let i = 0;
+            while (combo[`varName${i}`] && combo[`var${i}`]) {
+                const name = combo[`varName${i}`];
+                const value = combo[`var${i}`];
+                if (!variantMap[name]) variantMap[name] = new Set();
+                variantMap[name].add(value);
+                i++;
+            }
+        });
+
+        const formatted = Object.entries(variantMap).map(([name, set]) => ({
+            name,
+            subvariants: Array.from(set),
+            readOnly: true,
+        }));
+
+        setVariants(formatted);
+        setInputValues(formatted.map(() => ""));
+    }, [readOnlyCombinations, resetKey, startEmpty]);
+
+    const normalizeText = (value: string) => value.trim().toLowerCase();
+
+    const getVariantNameOptions = (index: number) => {
+        const currentValue = normalizeText(variants[index]?.name || '');
+        const usedByOthers = new Set(
+            variants
+                .map((variant, variantIndex) =>
+                    variantIndex === index ? '' : normalizeText(variant.name || '')
+                )
+                .filter(Boolean)
+        );
+
+        return variantSuggestions
+            .filter((name: string) => {
+                const normalized = normalizeText(name);
+                return !usedByOthers.has(normalized) || normalized === currentValue;
+            })
+            .map((name: string) => ({ value: name }));
+    };
+
+    const getSuggestedSubvariants = (variantName: string, variantIndex: number) => {
+        const key = normalizeText(variantName);
+        const suggestions = subvariantSuggestions[key] || [];
+        const currentValues = new Set(
+            (variants[variantIndex]?.subvariants || []).map((value: string) => normalizeText(value))
+        );
+
+        return suggestions.filter((value: string) => !currentValues.has(normalizeText(value)));
+    };
 
     const addVariant = () => {
         setVariants([...variants, { name: '', subvariants: [], readOnly: false }]);
@@ -46,6 +90,9 @@ const VariantInputs = ({
         const updated = [...variants];
         updated.splice(index, 1);
         setVariants(updated);
+        const updatedInputs = [...inputValues];
+        updatedInputs.splice(index, 1);
+        setInputValues(updatedInputs);
     };
 
     const updateVariantName = (index: number, name: string) => {
@@ -55,9 +102,15 @@ const VariantInputs = ({
     };
 
     const addSubvariant = (variantIndex: number, value: string) => {
+        const trimmedValue = value.trim();
+        if (!trimmedValue) return;
+
         const updated = [...variants];
-        if (!updated[variantIndex].subvariants.includes(value)) {
-            updated[variantIndex].subvariants.push(value);
+        const existingValues = updated[variantIndex].subvariants.map((subvariant: string) =>
+            normalizeText(subvariant)
+        );
+        if (!existingValues.includes(normalizeText(trimmedValue))) {
+            updated[variantIndex].subvariants.push(trimmedValue);
         }
         setVariants(updated);
     };
@@ -93,7 +146,8 @@ const VariantInputs = ({
         if (variants.length > 0 && variants.every(v => v.subvariants.length && v.name)) {
             generateCombinations(0, [], result);
         }
-        const normalizedReadOnly = readOnlyCombinations.map(combo => {
+
+        const normalizedReadOnly = startEmpty ? [] : readOnlyCombinations.map((combo: any) => {
             const key = Object.entries(combo)
                 .filter(([k]) => k.startsWith('varName'))
                 .map((_, i) => `${combo[`varName${i}`]}-${combo[`var${i}`]}`)
@@ -105,14 +159,25 @@ const VariantInputs = ({
             };
         });
 
-        const lockedKeys = new Set(normalizedReadOnly.map(c => c.key));
-        const finalCombinations = [
-            ...normalizedReadOnly,
-            ...result.filter(c => !lockedKeys.has(c.key))
-        ];
+        setCombinations((previousCombinations: any[]) => {
+            const previousByKey = new Map(
+                (previousCombinations || [])
+                    .filter((combo: any) => !combo.disabled)
+                    .map((combo: any) => [combo.key, combo])
+            );
+            const lockedKeys = new Set(normalizedReadOnly.map((combo: any) => combo.key));
+            const generatedCombinations = result
+                .filter(combo => !lockedKeys.has(combo.key))
+                .map(combo => {
+                    const previous = previousByKey.get(combo.key);
+                    return previous ? { ...combo, stock: previous.stock, price: previous.price } : combo;
+                });
 
-        setCombinations(finalCombinations);
-    }, [variants]);
+            return startEmpty
+                ? generatedCombinations
+                : [...normalizedReadOnly, ...generatedCombinations];
+        });
+    }, [variants, readOnlyCombinations, setCombinations, startEmpty]);
 
     const handleChange = (key: string, field: 'stock' | 'price', value: number) => {
         const updated = combinations.map((combo: any) =>
@@ -168,16 +233,35 @@ const VariantInputs = ({
                 <div key={index} style={{ marginBottom: 16 }}>
                     <Space direction="vertical" style={{ width: '100%' }}>
                         <Space wrap>
-                            <Input
-                                placeholder="Nombre de la variante (ej: Color)"
+                            <AutoComplete
+                                style={{ width: 260 }}
+                                options={getVariantNameOptions(index)}
                                 value={variant.name}
-                                onChange={(e) => updateVariantName(index, e.target.value)}
+                                onChange={(value) => updateVariantName(index, value)}
                                 disabled={variant.readOnly}
+                                placeholder="Nombre de la variante (ej: Color)"
+                                filterOption={(inputValue, option) =>
+                                    String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
+                                }
                             />
                             {!variant.readOnly && (
                                 <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
                             )}
                         </Space>
+                        {!variant.readOnly && getVariantNameOptions(index).length > 0 && (
+                            <Space wrap size={[4, 4]}>
+                                <Typography.Text type="secondary">Sugeridas:</Typography.Text>
+                                {getVariantNameOptions(index).map((option: any) => (
+                                    <Tag
+                                        key={option.value}
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => updateVariantName(index, option.value)}
+                                    >
+                                        {option.value}
+                                    </Tag>
+                                ))}
+                            </Space>
+                        )}
                         <Space wrap>
                             {variant.subvariants.map((sv: string) => (
                                 <Tag
@@ -189,26 +273,56 @@ const VariantInputs = ({
                                 </Tag>
                             ))}
                         </Space>
-                        <Input.Search
-                            style={{ maxWidth: 300 }}
-                            value={inputValues[index] || ""}
-                            onChange={(e) => {
-                                const updated = [...inputValues];
-                                updated[index] = e.target.value;
-                                setInputValues(updated);
-                            }}
-                            onSearch={(val) => {
-                                if (val) {
-                                    addSubvariant(index, val);
+                        {!variant.readOnly && getSuggestedSubvariants(variant.name, index).length > 0 && (
+                            <Space wrap size={[4, 4]}>
+                                <Typography.Text type="secondary">Subvariantes sugeridas:</Typography.Text>
+                                {getSuggestedSubvariants(variant.name, index).map((suggestion: string) => (
+                                    <Tag
+                                        key={`${variant.name}-${suggestion}`}
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => addSubvariant(index, suggestion)}
+                                    >
+                                        {suggestion}
+                                    </Tag>
+                                ))}
+                            </Space>
+                        )}
+                        <Space.Compact style={{ width: '100%', maxWidth: 420 }}>
+                            <AutoComplete
+                                style={{ width: '100%' }}
+                                value={inputValues[index] || ""}
+                                options={getSuggestedSubvariants(variant.name, index).map((value: string) => ({
+                                    value
+                                }))}
+                                onChange={(value) => {
                                     const updated = [...inputValues];
-                                    updated[index] = ""; // limpiar campo
+                                    updated[index] = value;
                                     setInputValues(updated);
+                                }}
+                                onSelect={(value) => {
+                                    addSubvariant(index, value);
+                                    const updated = [...inputValues];
+                                    updated[index] = "";
+                                    setInputValues(updated);
+                                }}
+                                placeholder={`Agregar subvariante a ${variant.name || 'Variante'}`}
+                                disabled={!variant.name}
+                                filterOption={(inputValue, option) =>
+                                    String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
                                 }
-                            }}
-                            placeholder={`Agregar subvariante a ${variant.name || 'Variante'}`}
-                            enterButton={<PlusOutlined />}
-                                                        disabled={!variant.name}
-                        />
+                            />
+                            <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                disabled={!variant.name || !String(inputValues[index] || '').trim()}
+                                onClick={() => {
+                                    addSubvariant(index, inputValues[index] || '');
+                                    const updated = [...inputValues];
+                                    updated[index] = "";
+                                    setInputValues(updated);
+                                }}
+                            />
+                        </Space.Compact>
                     </Space>
                 </div>
             ))}
