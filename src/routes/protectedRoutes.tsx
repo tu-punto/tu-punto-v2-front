@@ -18,6 +18,7 @@ import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
 import FindShipping from "../pages/Shipping/FindShipping";
 import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
+import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoPage";
 import { getAllowedRoles } from "../constants/accessControl";
 
 const guard = (path: string, element: JSX.Element) => (
@@ -104,6 +105,10 @@ const protectedRoutes = [
       {
         path: "/shipping-guide",
         element: guard("/shipping-guide", <ShippingGuide />),
+      },
+      {
+        path: "/seller-product-info",
+        element: guard("/seller-product-info", <SellerProductInfoPage />),
       },
       {
         path: "*",

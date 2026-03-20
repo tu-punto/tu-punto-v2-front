@@ -127,6 +127,34 @@ export const getSellerInventoryAllAPI = async (params?: {
         return [];
     }
 };
+
+export const getSellerProductInfoPageAPI = async (params?: {
+    sucursalId?: string;
+    categoryId?: string;
+    q?: string;
+    inStock?: boolean;
+    hasPromotion?: boolean;
+    hasImages?: boolean;
+    hasDescription?: boolean;
+    page?: number;
+    limit?: number;
+    sortOrder?: "asc" | "desc";
+}) => {
+    try {
+        const res = await apiClient.get("/product/seller/product-info", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener informacion de productos del vendedor:", error);
+        return {
+            success: false,
+            rows: [],
+            total: 0,
+            page: Number(params?.page || 1),
+            limit: Number(params?.limit || 10),
+            pages: 1
+        };
+    }
+};
 export const getProductByIdAPI = async (idProduct) => {
     try {
         const res = await apiClient.get(`/product/${idProduct}`)

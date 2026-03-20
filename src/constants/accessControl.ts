@@ -21,6 +21,7 @@ export const routeRoleMap: Record<string, string[]> = {
   "/sales-history": [ADMIN, OPERATOR],
   "/user": [ADMIN],
   "/shipping-guide": [SELLER],
+  "/seller-product-info": [SELLER],
 };
 
 export const getAllowedRoles = (path: string): string[] => routeRoleMap[path] || [];

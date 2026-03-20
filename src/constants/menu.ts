@@ -88,4 +88,10 @@ export const menu = [
     icon: shippingIcon,
     roles: getAllowedRoles("/shipping-guide"),
   },
+  {
+    path: "/seller-product-info",
+    label: "Informacion Productos",
+    icon: stockManagementIcon,
+    roles: getAllowedRoles("/seller-product-info"),
+  },
 ];
