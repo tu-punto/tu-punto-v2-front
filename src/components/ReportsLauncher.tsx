@@ -26,9 +26,11 @@ import {
   downloadClientesActivos3MesesXlsx,
   downloadClientesStatusXlsx,
   downloadComisiones3MesesXlsx,
+  downloadInventarioActualXlsx,
   downloadIngresos3MesesXlsx,
   getClientesActivosMesesAPI,
   getComisionesMesesAPI,
+  getInventarioActualAPI,
   getIngresosMesesAPI,
   downloadOperacionMensualXlsx,
   downloadStockProductosXlsx,
@@ -39,6 +41,7 @@ import {
   getVentasQrAPI,
 } from "../api/reports";
 import { getAllSucursalsAPI } from "../api/sucursal";
+import { getSellersBasicAPI } from "../api/seller";
 
 type OperacionReportKey =
   | "topProductosPorSucursal"
@@ -55,6 +58,7 @@ type OperacionReportKey =
 type ReportId =
   | OperacionReportKey
   | "stockProductos"
+  | "inventarioActual"
   | "comisiones3m"
   | "ingresos3m"
   | "clientesActivos3m"
@@ -69,12 +73,13 @@ type ReportDefinition = {
   title: string;
   description: string;
   category: ReportCategory;
-  previewMode: "operacion" | "ventasQr" | "comisiones" | "ingresos" | "clientesActivosServicio" | "ventasVendedores" | "none";
+  previewMode: "operacion" | "ventasQr" | "comisiones" | "ingresos" | "clientesActivosServicio" | "ventasVendedores" | "inventario" | "none";
   requires: {
     meses?: boolean;
     mesFin?: boolean;
     sucursales?: boolean;
     sucursalId?: boolean;
+    sellerId?: boolean;
     modoTop?: boolean;
     incluirDeuda?: boolean;
   };
@@ -87,6 +92,7 @@ type LauncherFormValues = {
   mesFin?: Dayjs;
   sucursales?: string[];
   sucursalId?: string;
+  sellerId?: string;
   modoTop?: "clientes" | "vendedores";
   incluirDeuda?: boolean;
 };
@@ -189,6 +195,14 @@ const REPORTS: ReportDefinition[] = [
     category: "Reportes adicionales",
     previewMode: "none",
     requires: { sucursalId: true },
+  },
+  {
+    id: "inventarioActual",
+    title: "Inventario actual por sucursal",
+    description: "Stock actual por sucursal incluyendo productos en entregas en espera.",
+    category: "Reportes adicionales",
+    previewMode: "inventario",
+    requires: { sucursalId: true, sellerId: true },
   },
   {
     id: "comisiones3m",
@@ -350,6 +364,8 @@ export default function ReportsLauncher() {
   const [preview, setPreview] = useState<any | null>(null);
   const [sucursales, setSucursales] = useState<{ _id: string; nombre: string }[]>([]);
   const [loadingSucursales, setLoadingSucursales] = useState(false);
+  const [sellers, setSellers] = useState<{ _id: string; nombre?: string; apellido?: string }[]>([]);
+  const [loadingSellers, setLoadingSellers] = useState(false);
 
   const reportId = Form.useWatch("reportId", form) as ReportId | undefined;
   const selectedReport = useMemo(() => REPORTS.find((r) => r.id === reportId), [reportId]);
@@ -363,11 +379,20 @@ export default function ReportsLauncher() {
   }, []);
 
   useEffect(() => {
+    setLoadingSellers(true);
+    getSellersBasicAPI()
+      .then((r: any) => setSellers(r?.data ?? []))
+      .catch(() => message.warning("No se pudo cargar la lista de vendedores"))
+      .finally(() => setLoadingSellers(false));
+  }, []);
+
+  useEffect(() => {
     form.setFieldsValue({
       reportId: "topProductosPorSucursal",
       meses: [],
       modoTop: "clientes",
       sucursales: [],
+      sellerId: undefined,
       incluirDeuda: false,
     });
   }, [form]);
@@ -379,6 +404,15 @@ export default function ReportsLauncher() {
   const sucOptions = useMemo(
     () => sucursales.map((s) => ({ value: s._id, label: s.nombre })),
     [sucursales],
+  );
+
+  const sellerOptions = useMemo(
+    () =>
+      sellers.map((s) => ({
+        value: s._id,
+        label: `${s.nombre || ""} ${s.apellido || ""}`.trim() || s._id,
+      })),
+    [sellers],
   );
 
   const reportSelectOptions = useMemo(() => {
@@ -505,6 +539,15 @@ export default function ReportsLauncher() {
         const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
         const data = await getVentasVendedoresMesesAPI({ meses });
         setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
+      if (selectedReport.previewMode === "inventario") {
+        const data = await getInventarioActualAPI({
+          idSucursal: vals.sucursalId as string,
+          sellerId: vals.sellerId,
+        });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
       }
     } catch (error) {
       console.error(error);
@@ -544,6 +587,12 @@ export default function ReportsLauncher() {
         }
         case "stockProductos":
           await downloadStockProductosXlsx(vals.sucursalId as string);
+          break;
+        case "inventarioActual":
+          await downloadInventarioActualXlsx({
+            idSucursal: vals.sucursalId as string,
+            sellerId: vals.sellerId,
+          });
           break;
         case "comisiones3m":
           await downloadComisiones3MesesXlsx({ meses, mesFin, sucursales: vals.sucursales });
@@ -709,6 +758,29 @@ export default function ReportsLauncher() {
       };
     }
 
+    if (preview.reportId === "inventarioActual") {
+      return {
+        cards: [
+          {
+            title: "Productos",
+            value: `${data?.resumen?.productos ?? 0}`,
+            subtitle: `Stock actual: ${data?.resumen?.stock_actual ?? 0}`,
+          },
+          {
+            title: "Unidades en espera",
+            value: `${data?.resumen?.unidades_en_espera ?? 0}`,
+            subtitle: "Reservadas en entregas en espera",
+          },
+          {
+            title: "Stock total reportado",
+            value: `${data?.resumen?.stock_total_reportado ?? 0}`,
+            subtitle: "Stock actual + unidades en espera",
+          },
+        ],
+        tables: [{ title: "Inventario actual", rows: data.rows || [] }],
+      };
+    }
+
     if (preview.reportId === "ventasVendedores4m") {
       return {
         cards: [
@@ -836,6 +908,21 @@ export default function ReportsLauncher() {
                         loading={loadingSucursales}
                         options={sucOptions}
                         placeholder="Selecciona sucursal"
+                      />
+                    </Form.Item>
+                  </Col>
+                )}
+
+                {selectedReport?.requires.sellerId && (
+                  <Col xs={24} md={8}>
+                    <Form.Item name="sellerId" label="Vendedor (opcional)">
+                      <Select
+                        allowClear
+                        showSearch
+                        loading={loadingSellers}
+                        options={sellerOptions}
+                        placeholder="Si no eliges, se usaran todos"
+                        optionFilterProp="label"
                       />
                     </Form.Item>
                   </Col>

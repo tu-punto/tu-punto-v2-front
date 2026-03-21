@@ -99,6 +99,21 @@ export async function downloadStockProductosXlsx(idSucursal: string) {
   );
 }
 
+export async function getInventarioActualAPI(params: { idSucursal: string; sellerId?: string }) {
+  const { data } = await apiClient.post("/reports/inventario-actual", params, {
+    withCredentials: true,
+  });
+  return data;
+}
+
+export async function downloadInventarioActualXlsx(params: { idSucursal: string; sellerId?: string }) {
+  await downloadXlsxFromGet(
+    "/reports/inventario-actual/xlsx",
+    params,
+    `inventario_actual_${params.idSucursal}${params.sellerId ? `_${params.sellerId}` : "_todos"}.xlsx`,
+  );
+}
+
 export async function downloadComisiones3MesesXlsx(params: MesFinParams) {
   const nombreMeses =
     params.meses && params.meses.length > 1
