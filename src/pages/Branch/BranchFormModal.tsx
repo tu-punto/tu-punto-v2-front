@@ -1,19 +1,18 @@
-import { UploadOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Upload, message } from "antd";
-import React, { useEffect, useState } from "react";
-import {
-  registerSucursalAPI,
-  updateSucursalAPI,
-  uploadSucursalHeaderImageAPI,
-} from "../../api/sucursal";
+import { useEffect, useState } from "react";
+import { Form, Input, message } from "antd";
+import { EditOutlined, EnvironmentOutlined, HomeOutlined, PhoneOutlined } from "@ant-design/icons";
+import { registerSucursalAPI, updateSucursalAPI, uploadSucursalHeaderImageAPI, } from "../../api/sucursal";
+import FormModal from "../../components/FormModal";
 import { IBranch } from "../../models/branchModel";
 
-const BranchFormModal: React.FC<{
+type BranchFormModalProps = {
   visible: boolean;
   onClose: () => void;
   onSubmit: () => void;
   branch: IBranch | null;
-}> = ({ visible, onClose, onSubmit, branch }) => {
+}
+
+const BranchFormModal = ({ visible, onClose, onSubmit, branch }: BranchFormModalProps) => {
   const [form] = Form.useForm();
   const [headerFile, setHeaderFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -126,81 +125,63 @@ const BranchFormModal: React.FC<{
   }, [visible, branch, form]);
 
   return (
-    <Modal
+    <FormModal
       title={branch ? "Editar Sucursal" : "Agregar Sucursal"}
       open={visible}
-      onCancel={onClose}
-      footer={null}
-      destroyOnClose
+      onClose={onClose}
+      submitTitle={branch ? "Actualizar" : "Agregar"}
+      onFinish={branch ? handleEdit : handleCreate}
+      form={form}
     >
-      <Form layout="vertical" form={form} onFinish={branch ? handleEdit : handleCreate}>
-        <Form.Item
-          className="text-mobile-sm xl:text-desktop-sm"
-          name="nombre"
-          label="Nombre"
-          rules={[{ required: true, message: "Por favor ingrese el nombre" }]}
-        >
-          <Input />
-        </Form.Item>
-        <Form.Item
-          className="text-mobile-sm xl:text-desktop-sm"
-          name="direccion"
-          label="Direccion"
-          rules={[{ required: true, message: "Por favor ingrese la direccion" }]}
-        >
-          <Input />
-        </Form.Item>
-        <Form.Item
-          className="text-mobile-sm xl:text-desktop-sm"
-          name="ciudad"
-          label="Ciudad"
-          rules={[{ required: true, message: "Por favor ingrese la ciudad" }]}
-        >
-          <Input />
-        </Form.Item>
-        <Form.Item
-          className="text-mobile-sm xl:text-desktop-sm"
-          name="telefono"
-          label="Telefono"
-          rules={[
-            { required: true, message: "Por favor ingrese el telefono" },
-            { pattern: /^[0-9]+$/, message: "Solo se permiten numeros" },
-          ]}
-        >
-          <Input className="w-full" type="tel" maxLength={13} />
-        </Form.Item>
-
-        <Form.Item className="text-mobile-sm xl:text-desktop-sm" label="Imagen de header (AWS)">
-          <Upload
-            beforeUpload={beforeUploadHeader}
-            onRemove={() => {
-              setHeaderFile(null);
-              setPreviewUrl(branch?.imagen_header || "");
-            }}
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            maxCount={1}
-            listType="text"
-          >
-            <Button icon={<UploadOutlined />}>Seleccionar imagen</Button>
-          </Upload>
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt="Preview header sucursal"
-              className="mt-3 h-20 w-full rounded-md object-cover border border-gray-200"
-            />
-          ) : (
-            <p className="mt-2 text-xs text-gray-500">Sin imagen cargada.</p>
-          )}
-        </Form.Item>
-
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={saving}>
-            {branch ? "Actualizar" : "Agregar"}
-          </Button>
-        </Form.Item>
-      </Form>
-    </Modal>
+      <Form.Item
+        className="text-mobile-sm xl:text-desktop-sm"
+        name="nombre"
+        label="Nombre"
+        rules={[{ required: true, message: "Por favor ingrese el nombre!" }]}
+      >
+        <Input
+          prefix={<EditOutlined />}
+        />
+      </Form.Item>
+      <Form.Item
+        className="text-mobile-sm xl:text-desktop-sm"
+        name="direccion"
+        label="Dirección"
+        rules={[
+          { required: true, message: "Por favor ingrese la dirección!" },
+        ]}
+      >
+        <Input
+          prefix={<HomeOutlined />}
+        />
+      </Form.Item>
+      <Form.Item
+        className="text-mobile-sm xl:text-desktop-sm"
+        name="ciudad"
+        label="Ciudad"
+        rules={[{ required: true, message: "Por favor ingrese la ciudad!" }]}
+      >
+        <Input
+          prefix={<EnvironmentOutlined />}
+        />
+      </Form.Item>
+      <Form.Item
+        className="text-mobile-sm xl:text-desktop-sm"
+        name="telefono"
+        label="Teléfono"
+        rules={[
+          { required: true, message: "Por favor ingrese el teléfono!" },
+          { pattern: /^[0-9]+$/, message: "Solo se permiten números" },
+        ]}
+      >
+        <Input
+          className="w-full"
+          type="tel"
+          maxLength={13}
+          prefix={<PhoneOutlined />}
+        />
+      </Form.Item>
+    </FormModal>
   );
 };
 

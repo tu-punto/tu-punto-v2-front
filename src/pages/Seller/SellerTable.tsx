@@ -1,14 +1,13 @@
-import { Button, Table, Tooltip, Select, Space, Input, message } from "antd";
 import { useEffect, useState } from "react";
+import { Button, Table, Tooltip, Select, Space, Input, message } from "antd";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
+import SucursalDrawer from "./components/SucursalDrawer";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
-import SucursalDrawer from "./components/SucursalDrawer";
-
 import { getSellersAPI } from "../../api/seller";
-
+import TableActionButton from "../../components/TableActionButton";
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
 type SellerRow = ISeller & {
@@ -18,11 +17,12 @@ type SellerRow = ISeller & {
   pago_mensual: string;
 };
 
-export default function SellerTable({
-  refreshKey,
-  setRefreshKey,
-  isFactura,
-}: any) {
+interface SellerTableProps {
+  refreshKey: number,
+  setRefreshKey: (arg: number) => void
+}
+
+export default function SellerTable({ refreshKey, setRefreshKey }: SellerTableProps) {
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
@@ -157,18 +157,15 @@ export default function SellerTable({
       render: (_: any, row: SellerRow) => (
         <div className="flex gap-2 justify-end">
           <PayDebtButton seller={row} onSuccess={refresh} />
-          <Tooltip title="Renovar vendedor">
-            <Button
-              type="primary"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelected(row);
-                setDebtModal(true);
-              }}
-            />
-          </Tooltip>
+          <TableActionButton
+            title="Renovar vendedor"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelected(row);
+              setDebtModal(true);
+            }}
+            icon={<EditOutlined />}
+          />
         </div>
       ),
       width: 150,
@@ -275,20 +272,20 @@ export default function SellerTable({
 
   return (
     <>
-      <Space direction="horizontal" size="middle" className="mb-4">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 mb-4 flex-wrap">
         <Input
           placeholder="Buscar vendedor..."
           prefix={<SearchOutlined />}
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ width: 250 }}
+          className="flex-1 min-w-[250px] md:min-w-[250px]"
           allowClear
         />
 
         <Select
           value={estadoFilter}
           onChange={setEstadoFilter}
-          style={{ width: 200 }}
+          className="flex-1 min-w-[200px] md:w-[200px]"
           options={[
             { value: "todos", label: "Todos" },
             { value: "Activo", label: "Activos" },
@@ -299,14 +296,14 @@ export default function SellerTable({
         <Select
           value={pagoFilter}
           onChange={setPagoFilter}
-          style={{ width: 200 }}
+          className="flex-1 min-w-[200px] md:w-[200px]"
           options={[
             { value: "todos", label: "Todos" },
             { value: "con deuda", label: "Pago Pendiente" },
             { value: "sin deuda", label: "Sin Pago Pendiente" },
           ]}
         />
-      </Space>
+      </div>
 
       <Table
         loading={loading}

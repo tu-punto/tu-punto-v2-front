@@ -1,38 +1,20 @@
-import {
-  Modal,
-  Form,
-  DatePicker,
-  InputNumber,
-  Button,
-  Col,
-  Row,
-  message,
-  Radio,
-  Card,
-} from "antd";
-import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
+import { Form, DatePicker, InputNumber, Col, Row, message, Radio } from "antd";
 import dayjs from "dayjs";
-
-import { getSucursalsAPI } from "../../api/sucursal";
 import { renewSellerAPI } from "../../api/seller";
-
-import BranchFields from "./components/BranchFields";
+import { getSucursalsAPI } from "../../api/sucursal";
 import { ISucursalPago } from "../../models/sellerModels";
+import FormModal from "../../components/FormModal";
+import DynamicBranchSection from "../../components/DynamicBranchSection";
 
-interface Props {
+interface DebtModalProps {
   visible: boolean;
   onCancel: () => void;
   onSuccess: () => void;
-  seller: any; // SellerRow
+  seller: any;
 }
 
-export default function DebtModal({
-  visible,
-  onCancel,
-  onSuccess,
-  seller,
-}: Props) {
+export default function DebtModal({ visible, onCancel, onSuccess, seller }: DebtModalProps) {
   const [loading, setLoading] = useState(false);
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
   const [form] = Form.useForm();
@@ -141,81 +123,52 @@ export default function DebtModal({
   };
 
   return (
-    <Modal
+    <FormModal
       title="Renovar vendedor"
       open={visible}
-      footer={null}
-      onCancel={onCancel}
+      onClose={onCancel}
+      submitLoading={loading}
+      onFinish={onFinish}
       width={850}
+      form={form}
     >
-      <Form form={form} layout="vertical" onFinish={onFinish}>
-        <Form.Item name="isDebt" label="¿Es deuda?">
-          <Radio.Group>
-            <Radio.Button value={true}>SI</Radio.Button>
-            <Radio.Button value={false}>NO</Radio.Button>
-          </Radio.Group>
-        </Form.Item>
+      <Form.Item name="isDebt" label="¿Es deuda?">
+        <Radio.Group>
+          <Radio.Button value={true}>SI</Radio.Button>
+          <Radio.Button value={false}>NO</Radio.Button>
+        </Radio.Group>
+      </Form.Item>
 
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="fecha_vigencia"
-              label="Fecha final del servicio"
-              rules={[{ required: true }]}
-            >
-              <DatePicker className="w-full" format="DD/MM/YYYY" />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item
+            name="fecha_vigencia"
+            label="Fecha final del servicio"
+            rules={[{ required: true }]}
+          >
+            <DatePicker className="w-full" format="DD/MM/YYYY" />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item name="comision_porcentual" label="Comisión %">
-              <InputNumber className="w-full" min={0} max={100} suffix="%" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item name="comision_fija" label="Comisión fija">
-              <InputNumber className="w-full" prefix="Bs." />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item name="comision_porcentual" label="Comisión %">
+            <InputNumber className="w-full" min={0} max={100} suffix="%" />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item name="comision_fija" label="Comisión fija">
+            <InputNumber className="w-full" prefix="Bs." />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        {/* Sucursales dinámicas */}
-        <Row justify="space-between" align="middle">
-          <Col>
-            <h3>Sucursales</h3>
-          </Col>
-          <Col>
-            <Button type="dashed" icon={<PlusOutlined />} onClick={addBranch}>
-              Añadir sucursal
-            </Button>
-          </Col>
-        </Row>
-
-        <Form.List name="sucursales">
-          {(fields, { remove }) => (
-            <>
-              {fields.map((field) => (
-                <Card key={field.key} style={{ marginTop: 16 }}>
-                  <BranchFields
-                    field={field}
-                    remove={remove}
-                    sucursalOptions={sucursalOptions}
-                    form={form}
-                  />
-                </Card>
-              ))}
-            </>
-          )}
-        </Form.List>
-
-        <Form.Item className="mt-6">
-          <Button type="primary" htmlType="submit" loading={loading}>
-            Guardar
-          </Button>
-        </Form.Item>
-      </Form>
-    </Modal>
-  );
+      <DynamicBranchSection
+        form={form}
+        branchOptions={sucursalOptions}
+        handleAddBranch={addBranch}
+      />
+    </FormModal>
+  )
 }

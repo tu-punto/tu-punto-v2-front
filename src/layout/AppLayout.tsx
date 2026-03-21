@@ -1,11 +1,11 @@
-import { Layout } from "antd";
 import { useEffect, useState } from "react";
-import Sidebar from "./Sidebar/Sidebar";
-import Header from "./Header/Header";
 import { Outlet } from "react-router-dom";
-import HeaderXS from "./Header/HeaderXS";
+import { Layout } from "antd";
 import Sider from "antd/es/layout/Sider";
+import Header from "./Header/Header";
+import HeaderXS from "./Header/HeaderXS";
 import BottomMenu from "./MobileMenu/BottomMenu";
+import Sidebar from "./Sidebar/Sidebar";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const { Content } = Layout;
@@ -33,14 +33,7 @@ const AppLayout = () => {
   return (
       <Layout className="flex min-h-screen w-full">
         {!isMobile && (
-            <Sider
-              trigger={null}
-              collapsible
-              collapsed={!isOpen}
-              width={200}
-              collapsedWidth={80}
-              style={{ background: "#094f89" }}
-            >
+            <Sider trigger={null} collapsible collapsed={!isOpen}>
               <Sidebar
                   isOpen={isOpen}
                   toggleSidebar={toggleSidebar}
@@ -61,7 +54,7 @@ const AppLayout = () => {
                     }`}
                 />
                 <div
-                    className={`fixed inset-y-0 left-0 z-50 w-[200px] max-w-[85%] bg-blue transform transition-transform ${
+                    className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85%] transform transition-transform ${
                         isOpen ? "translate-x-0" : "-translate-x-full"
                     }`}
                 >

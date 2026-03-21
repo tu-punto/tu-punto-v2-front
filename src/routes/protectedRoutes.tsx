@@ -3,7 +3,6 @@ import AppLayout from "../layout/AppLayout";
 import RoleGuard from "./RoleGuard";
 import FinanceFlux from "../pages/FinanceFlux/FinanceFlux";
 import Product from "../pages/Product/Product";
-import Sales from "../pages/Sales/Sales";
 import Seller from "../pages/Seller/Seller";
 import Shipping from "../pages/Shipping/Shipping";
 import StockManagement from "../pages/StockManagement/StockManagement";
@@ -17,12 +16,13 @@ import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
 import UsersPage from "../pages/Users/UsersPage";
 import ServicesPage from "../pages/Service/ServicePanelPage";
 import FindShipping from "../pages/Shipping/FindShipping";
-import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
+import ShippingGuide from "../pages/ShippingGuide/ShippingGuide";
 import { getAllowedRoles } from "../constants/accessControl";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
 );
+import SalesPage from "../pages/Sales/SalesPage";
 
 const protectedRoutes = [
   {
@@ -43,7 +43,11 @@ const protectedRoutes = [
       },
       {
         path: "/sales",
-        element: guard("/sales", <Sales />),
+        element: (
+          <RoleGuard allowedRoles={["admin", "operator"]}>
+            <SalesPage />
+          </RoleGuard>
+        ),
       },
       {
         path: "/shipping",
@@ -79,7 +83,11 @@ const protectedRoutes = [
       },
       {
         path: "/shop",
-        element: guard("/shop", <Sales />),
+        element: (
+          <RoleGuard allowedRoles={["seller"]}>
+            <SalesPage />
+          </RoleGuard>
+        ),
       },
       {
         path: "/cash",

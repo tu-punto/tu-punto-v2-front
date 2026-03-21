@@ -1,110 +1,91 @@
-import { useEffect, useState } from "react";
-import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
-import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Divider, Modal, Table, Typography, message } from "antd";
 import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { getSignedURL } from "../../helpers/s3Helper";
 import moment from "moment-timezone";
+import TableActionButton from "../../components/TableActionButton";
+import { getSignedURL } from "../../helpers/s3Helper";
+import useShippingGuide from "../../hooks/useShippingGuide";
+import { useUserRole } from "../../hooks/useUserRole";
+import { IShippingGuide } from "../../interfaces/shipping_guide.interfaces";
 
-const ShippingGuideTable = (
-    { refreshKey, user, isFilterBySeller, isFilterByBranch, search_id }:
-        { refreshKey: number, user: any, isFilterBySeller?: boolean, isFilterByBranch?: boolean, search_id: string }) => {
-    const [guidesList, setGuidesList] = useState([]);
-    const [imageUrl, setImageUrl] = useState<string | null>();
-    const [imageDesc, setImageDesc] = useState<string | null>();
-    const [isImageVisible, setIsImageVisible] = useState(false);
-    const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
+interface ShippingGuideTableProps {
+    filterData: 'all' | 'seller' | 'branch',
+    search_id?: string,
+    refreshKey?: number
+}
 
-    const normalizedRole = String(user?.role || "").toLowerCase();
-    const isAdmin = normalizedRole === "admin";
-    const isOperator = normalizedRole === "operator";
+function ShippingGuideTab({ filterData, search_id, refreshKey = 0 }: ShippingGuideTableProps) {
+    const [isImageVisible, setIsImageVisible] = useState(false)
+    const [imageUrl, setImageUrl] = useState<string | null>()
+    const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend')
+    const { isAdmin } = useUserRole()
+    const { guidesList, fetchAllGuides, fetchGuidesByBranch, fetchGuidesBySeller, checkShippingDelivered } = useShippingGuide()
 
     useEffect(() => {
-        if (!isFilterBySeller && !isFilterByBranch) {
-            fetchAllGuides();
-        } else if (isFilterBySeller) {
-            fetchGuidesBySeller();
-        } else if (isFilterByBranch) {
-            fetchGuidesByBranch();
-        }
-    }, [refreshKey])
+        fetchGuides()
+    }, [filterData, refreshKey, search_id])
 
-    const fetchAllGuides = async () => {
-        try {
-            const apiData = await getShippingGuidesAPI();
-            const sortedData = apiData.sort(
-                (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
-            );
-            setGuidesList(sortedData)
-        } catch (error) {
-            console.error("Error al obtener Guías de Envío: ", error)
-            message.error("Error al cargar Guías de Envío")
-        }
-    }
-    const fetchGuidesBySeller = async () => {
-        try {
-            const apiData = await getShippingGuidesBySellerAPI(search_id);
-            const sortedData = apiData.sort(
-                (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
-            );
-            setGuidesList(sortedData)
-        } catch (error) {
-            console.error("Error al obtener Guías de Envío por vendedor: ", error)
-            message.error("Error al cargar Guías de Envío")
-        }
-    };
-
-    const fetchGuidesByBranch = async () => {
-        try {
-            const apiData = await getShippingByBranchAPI(search_id);
-            const sortedData = apiData.sort(
-                (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
-            );
-            setGuidesList(sortedData)
-        } catch (error) {
-            console.error("Error al obtener Guías de Envío por vendedor: ", error)
-            message.error("Error al cargar Guías de Envío")
+    const fetchGuides = () => {
+        if (filterData == 'all') {
+            fetchAllGuides()
+        } else {
+            if (!search_id) {
+                console.error("Para el filtrado por Vendedor o Sucursal debe ingresar el ID de dicho recurso en el prop search_id")
+                return
+            }
+            if (filterData == 'seller') {
+                fetchGuidesBySeller(search_id)
+            } else if (filterData == 'branch') {
+                fetchGuidesByBranch(search_id)
+            }
         }
     }
 
-    const handleShowImage = async (record: any) => {
+    const imageView = useMemo(() => {
+        return (
+            <Modal
+                open={isImageVisible}
+                onCancel={() => setIsImageVisible(false)}
+                footer={null}
+            >
+                <Typography.Title level={4}>Guía de Envío - Foto</Typography.Title>
+                <Divider />
+                {imageUrl && <img src={imageUrl} alt="Imagen" style={{ width: '100%' }} />}
+            </Modal>
+        )
+    }, [isImageVisible])
+
+    const handleShowImage = async (record: IShippingGuide) => {
         if (record.imagen_key) {
             const image_url = await getSignedURL(record.imagen_key);
             setImageUrl(image_url);
             setIsImageVisible(true);
-            setImageDesc(record.descripcion)
         }
     }
 
-    const handleCheckShipping = async (record: any) => {
+    const handleCheckShipping = async (record: IShippingGuide) => {
         if (record.isRecogido) {
             message.info("Esta guía ya fue marcada como recogida")
             return
         }
-        try {
-            const res = await markAsDelivered(record._id);
-            if (res.success) {
-                message.success("El estado de la guía se ha actualizado correctamente")
-            } else {
-                message.error("Error al actualizar el estado de la guía")
-            }
-        } catch (error) {
-            console.error("Erorr al actualizar el estado entregado de Guía de Envío: ", error)
-            message.error("Error al actualizar el estado de la guía")
+        const res = await checkShippingDelivered(record._id)
+        if (res.success) {
+            fetchGuides()
+            message.success("Guía actualizada correctamente")
+        } else {
+            message.error("Ha ocurrido un error al actualizar esta guía")
         }
     }
 
     const columns = [
         {
             title: '¿Recogido?',
-            dataIndex: 'isRecogido',
-            key: 'isRecogido',
+            dataIndex: 'is_recogido',
+            key: 'is_recogido',
             width: 100,
             render: (_: any, record: any) => {
-                const color = record.isRecogido ? 'bg-green-500' : 'bg-red-500';
                 return {
-                    children: <div
-                        className={`w-4 h-4 rounded-full ${color}`}
-                    />,
+                    children: <div className={`w-4 h-4 rounded-full ${record.isRecogido ? 'bg-green-500' : 'bg-red-500'}`} />
                 }
             }
         },
@@ -137,13 +118,7 @@ const ShippingGuideTable = (
             title: 'Descripción',
             dataIndex: 'descripcion',
             key: 'descripcion',
-            render: (_: any, record: any) => {
-                if (record.descripcion == "undefined") {
-                    return "Sin descripción"
-                } else {
-                    return record.descripcion
-                }
-            }
+            render: (_: any, record: any) => record.descripcion !== "undefined" ? record.descripcion : 'Sin descripción'
         },
         {
             title: 'Acciones',
@@ -153,27 +128,24 @@ const ShippingGuideTable = (
                 return (
                     <>
                         {record.imagen_key && (
-                            <Tooltip title="Ver foto">
-                                <Button
-                                    size="small"
-                                    icon={<FileImageOutlined />}
-                                    onClick={() => { handleShowImage(record) }}
-                                />
-                            </Tooltip>
+                            <TableActionButton
+                                title="Ver foto"
+                                onClick={() => { handleShowImage(record) }}
+                                icon={<FileImageOutlined />}
+                            />
                         )}
-                        {(isAdmin || isOperator) && (
-                            <Tooltip title="Confirmar entrega">
-                                <Button
-                                    size="small"
-                                    icon={<CheckCircleOutlined />}
-                                    onClick={() => { handleCheckShipping(record) }} />
-                            </Tooltip>
+                        {isAdmin && (
+                            <TableActionButton
+                                title="Confirmar entrega"
+                                onClick={() => { handleCheckShipping(record) }}
+                                icon={<CheckCircleOutlined />}
+                            />
                         )}
                     </>
                 )
             }
         }
-    ];
+    ]
 
     return (
         <>
@@ -182,32 +154,9 @@ const ShippingGuideTable = (
                 dataSource={guidesList}
                 scroll={{ x: "max-content" }}
             />
-
-            <Modal
-                open={isImageVisible}
-                onCancel={() => {
-                    setIsImageVisible(false)
-                    setImageUrl(null)
-                    setImageDesc(null)
-                }}
-                footer={null}
-            >
-                <Card title="Foto - Guía de Envío" bordered={false}>
-                    <Row gutter={16}>
-                        {imageUrl && <img src={imageUrl} alt="Imagen" style={{ width: '100%' }} />}
-                    </Row>
-                    <div className="py-4">
-                        <Row gutter={16}>
-                            <Col>
-                                {imageDesc}
-                            </Col>
-                        </Row>
-                    </div>
-                </Card>
-
-            </Modal>
+            {imageView}
         </>
-    )
+    );
 }
 
-export default ShippingGuideTable;
+export default ShippingGuideTab;

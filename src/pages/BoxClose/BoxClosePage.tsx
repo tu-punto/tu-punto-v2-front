@@ -1,28 +1,14 @@
 import { useState, useEffect } from "react";
-import {
-  Table,
-  Card,
-  Button,
-  DatePicker,
-  Tag,
-  Tooltip,
-  Modal,
-  Col,
-  Row,
-  message,
-} from "antd";
+import { Table, Card, Button, DatePicker, Tag, Tooltip, Modal, Col, Row, message } from "antd";
+import { PlusOutlined, CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
-import {
-  PlusOutlined,
-  CheckCircleOutlined,
-  WarningOutlined,
-} from "@ant-design/icons";
-import { getBoxClosesAPI } from "../../api/boxClose";
-import { IBoxClose } from "../../models/boxClose";
 import BoxCloseForm from "./BoxCloseForm";
 import BoxCloseView from "./BoxCloseView";
+import { getBoxClosesAPI } from "../../api/boxClose";
+import { IBoxClose } from "../../models/boxClose";
+import PageTemplate from "../../components/PageTemplate";
 
 function round(num: number) {
   return Math.round(num * 100) / 100;
@@ -201,16 +187,7 @@ const BoxClosePage = () => {
   };
 
   return (
-    <>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-          <img src="/cierre-caja-icon.png" alt="Cierre de Caja" className="w-8 h-8" />
-          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-            Cierre de Caja
-          </h1>
-        </div>
-      </div>
-
+    <PageTemplate title="Cierre de Caja" iconSrc="/cierre-caja-icon.png">
       <Card>
         <Row gutter={16} className="mb-4">
           <Col xs={24} sm={12}>
@@ -223,64 +200,23 @@ const BoxClosePage = () => {
             />
           </Col>
           <Col xs={24} sm={12}>
-            <Button
-              onClick={() => {
-                setFormMode("create");
-                setSelectedReconciliation(null);
-                setShowForm(true);
-              }}
-              type="primary"
-              icon={<PlusOutlined />}
-              block
-            >
+            <Button onClick={() => setShowForm(true)} type="primary" icon={<PlusOutlined />} block>
               Nuevo Cierre
             </Button>
           </Col>
         </Row>
 
         <Modal
-          title={
-            formMode === "edit"
-              ? "Editar Cierre"
-              : formMode === "view"
-                ? "Ver Cierre"
-                : "Nuevo Cierre"
-          }
+          title={selectedReconciliation ? "Ver Cierre" : "Nuevo Cierre"}
           open={showForm}
-          destroyOnClose
           onCancel={() => {
             setShowForm(false);
             setSelectedReconciliation(null);
-            setFormMode("create");
           }}
           footer={null}
           width={1000}
         >
-          {formMode === "view" && selectedReconciliation && (
-            <div className="flex justify-end mb-4">
-              {(() => {
-                const isToday = dayjs(selectedReconciliation.created_at).isSame(dayjs(), "day");
-                return (
-                  <Tooltip title={!isToday ? "Solo se pueden editar cierres del día actual" : ""}>
-                    <Button
-                      type="primary"
-                      onClick={() => {
-                        if (isToday) {
-                          setFormMode("edit");
-                        } else {
-                          message.warning("Solo se pueden editar cierres de caja del día actual");
-                        }
-                      }}
-                      disabled={!isToday}
-                    >
-                      Editar
-                    </Button>
-                  </Tooltip>
-                );
-              })()}
-            </div>
-          )}
-          {formMode === "view" && selectedReconciliation ? (
+          {selectedReconciliation ? (
             <BoxCloseView boxClose={selectedReconciliation} />
           ) : (
             <BoxCloseForm
@@ -288,12 +224,9 @@ const BoxClosePage = () => {
               onCancel={() => {
                 setShowForm(false);
                 setSelectedReconciliation(null);
-                setFormMode("create");
               }}
               lastClosingBalance={boxClosings[boxClosings.length - 1] || {}}
               selectedDate={selectedDate}
-              mode={formMode}
-              initialData={selectedReconciliation || undefined}
             />
           )}
         </Modal>
@@ -306,7 +239,6 @@ const BoxClosePage = () => {
           onRow={(record) => ({
             onClick: () => {
               setSelectedReconciliation(record);
-              setFormMode("view");
               setShowForm(true);
             },
             style: { cursor: "pointer" },
@@ -319,7 +251,7 @@ const BoxClosePage = () => {
           scroll={{ x: "max-content" }}
         />
       </Card>
-    </>
+    </PageTemplate>
   );
 };
 

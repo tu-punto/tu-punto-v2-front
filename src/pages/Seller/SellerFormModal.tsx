@@ -1,62 +1,45 @@
-//  src/pages/Seller/SellerFormModal.tsx
-import {
-  Modal,
-  Form,
-  Input,
-  InputNumber,
-  DatePicker,
-  Button,
-  Row,
-  Col,
-  Radio,
-  Card,
-  message,
-} from "antd";
-import {
-  PhoneOutlined,
-  UserOutlined,
-  MailOutlined,
-  HomeOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
 import { useEffect, useState } from "react";
-import dayjs from "dayjs";
-
+import { Form, Input, InputNumber, DatePicker, Row, Col, Radio, message } from "antd";
+import { PhoneOutlined, UserOutlined, MailOutlined, HomeOutlined } from "@ant-design/icons";
 import { registerSellerAPI } from "../../api/seller";
-import { registerUserAPI } from "../../api/user";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { registerUserAPI } from "../../api/user";
 import { roles } from "../../constants/roles";
-import BranchFields from "./components/BranchFields";
-
+import dayjs from "dayjs";
+import FormModal from "../../components/FormModal";
+import DynamicBranchSection from "../../components/DynamicBranchSection";
 const { SELLER } = roles;
 
-export default function SellerFormModal({
-  visible,
-  onCancel,
-  onSuccess,
-}: {
-  visible: boolean;
-  onCancel: () => void;
-  onSuccess: () => void;
-}) {
+interface SellerFormModalProps {
+  visible: boolean,
+  onCancel: () => void,
+  onSuccess: () => void,
+}
+
+export default function SellerFormModal({ visible, onCancel, onSuccess }: SellerFormModalProps) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
 
-  /* cargar sucursales al abrir */
   useEffect(() => {
-    if (visible) {
-      (async () => {
-        const res = await getSucursalsAPI();
-        setSucursalOptions(res || []);
-        form.resetFields();
-        form.setFieldsValue({ sucursales: [{}] });
-      })();
-    }
+    if (!visible) return
+
+    fetchBranches()
+    form.resetFields()
+    form.setFieldsValue({ sucursales: [{}] });
   }, [visible]);
 
-  /* añadir card */
-  const addBranch = () => {
+  const fetchBranches = async () => {
+    const res = await getSucursalsAPI();
+    if (!res) {
+      message.error("Ha ocurrido un error al recuperar las sucursales.")
+      setSucursalOptions([])
+      return
+    }
+    setSucursalOptions(res)
+  }
+
+  const handleAddBranch = () => {
     const list = form.getFieldValue("sucursales") || [];
     if (list.length >= sucursalOptions.length) {
       return message.warning("Ya agregaste todas las sucursales");
@@ -111,173 +94,103 @@ export default function SellerFormModal({
   };
 
   return (
-    <Modal
-      open={visible}
-      onCancel={onCancel}
-      footer={null}
-      width={900}
-      destroyOnClose
+    <FormModal
       title="Agregar vendedor"
+      open={visible}
+      onClose={onCancel}
+      submitLoading={loading}
+      onFinish={onFinish}
+      width={900}
+      form={form}
     >
-      <Form layout="vertical" form={form} onFinish={onFinish}>
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Nombres"
-              name="nombre"
-              rules={[{ required: true }]}
-            >
-              <Input prefix={<UserOutlined />} />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Apellidos"
-              name="apellido"
-              rules={[{ required: true }]}
-            >
-              <Input prefix={<UserOutlined />} />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item label="Nombres" name="nombre" rules={[{ required: true }]}>
+            <Input prefix={<UserOutlined />} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item label="Apellidos" name="apellido" rules={[{ required: true }]}>
+            <Input prefix={<UserOutlined />} />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item label="Marca" name="marca">
-              <Input />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Teléfono"
-              name="telefono"
-              rules={[{ required: true }]}
-            >
-              <Input prefix={<PhoneOutlined />} />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item label="Marca" name="marca">
+            <Input />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item label="Teléfono" name="telefono" rules={[{ required: true }]} >
+            <Input prefix={<PhoneOutlined />} />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="¿Emite factura?"
-              name="emite_factura"
-              rules={[{ required: true }]}
-            >
-              <Radio.Group>
-                <Radio.Button value={true}>SI</Radio.Button>
-                <Radio.Button value={false}>NO</Radio.Button>
-              </Radio.Group>
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item label="¿Emite factura?" name="emite_factura" rules={[{ required: true }]} >
+            <Radio.Group>
+              <Radio.Button value={true}>SI</Radio.Button>
+              <Radio.Button value={false}>NO</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col xs={24} md={6}>
-            <Form.Item
-              label="Carnet"
-              name="carnet"
-              tooltip="El número de carnet será la contraseña"
-              rules={[{ required: true }]}
-            >
-              <InputNumber className="w-full" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={18}>
-            <Form.Item label="Dirección" name="direccion">
-              <Input prefix={<HomeOutlined />} />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={6}>
+          <Form.Item label="Carnet" name="carnet" tooltip="El número de carnet será la contraseña" rules={[{ required: true }]}>
+            <InputNumber className="w-full" />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={18}>
+          <Form.Item label="Dirección" name="direccion">
+            <Input prefix={<HomeOutlined />} />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              label="Mail"
-              name="mail"
-              rules={[{ required: true, type: "email" }]}
-            >
-              <Input prefix={<MailOutlined />} />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col span={24}>
+          <Form.Item label="Mail" name="mail" rules={[{ required: true, type: "email" }]} >
+            <Input prefix={<MailOutlined />} />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item label="Comisión porcentual" name="comision_porcentual">
-              <InputNumber
-                min={0}
-                max={100}
-                formatter={(v) => `${v}%`}
-                className="w-full"
-              />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item label="Comisión porcentual" name="comision_porcentual">
+            <InputNumber min={0} max={100} formatter={(v) => `${v}%`} className="w-full" />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item label="Comentario" name="comentario">
-              <Input.TextArea rows={1} />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col span={24}>
+          <Form.Item label="Comentario" name="comentario">
+            <Input.TextArea rows={1} />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Fecha final de servicio"
-              name="fecha_vigencia"
-              rules={[{ required: true }]}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
-          </Col>
-        </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item label="Fecha final de servicio" name="fecha_vigencia" rules={[{ required: true }]} >
+            <DatePicker className="w-full" />
+          </Form.Item>
+        </Col>
+      </Row>
 
-        <Row justify="space-between" align="middle">
-          <Col>
-            <h3>Sucursales</h3>
-          </Col>
-          <Col>
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={addBranch}
-              disabled={
-                (form.getFieldValue("sucursales") || []).length >=
-                sucursalOptions.length
-              }
-            >
-              Añadir sucursal
-            </Button>
-          </Col>
-        </Row>
-
-        <Form.List name="sucursales">
-          {(fields, { remove }) => (
-            <>
-              {fields.map((field) => (
-                <Card key={field.key} style={{ marginTop: 16 }}>
-                  <BranchFields
-                    field={field}
-                    remove={remove}
-                    sucursalOptions={sucursalOptions}
-                    form={form}
-                  />
-                </Card>
-              ))}
-            </>
-          )}
-        </Form.List>
-
-        <Form.Item className="mt-6">
-          <Button type="primary" htmlType="submit" loading={loading}>
-            Guardar
-          </Button>
-        </Form.Item>
-      </Form>
-    </Modal>
+      <DynamicBranchSection
+        form={form}
+        branchOptions={sucursalOptions}
+        handleAddBranch={handleAddBranch}
+        disabled={ (form.getFieldValue("sucursales") || []).length >= sucursalOptions.length }
+      />
+    </FormModal>
   );
 }

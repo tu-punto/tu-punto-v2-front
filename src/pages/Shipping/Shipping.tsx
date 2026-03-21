@@ -3,6 +3,7 @@ import { UserContext } from "../../context/userContext.tsx";
 
 import ShippingTable from "./ShippingTable";
 import ShippingQRScannerModal from "./ShippingQRScannerModal.tsx";
+import PageTemplate from "../../components/PageTemplate";
 
 
 const Shipping = () => {

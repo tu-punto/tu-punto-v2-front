@@ -1,0 +1,1 @@
+export const BASIC_CELL = "text-mobile-sm xl:text-desktop-sm";

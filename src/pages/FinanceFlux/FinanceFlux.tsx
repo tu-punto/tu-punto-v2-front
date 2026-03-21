@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
+import { PlusOutlined } from "@ant-design/icons";
 import FinanceFluxTable from "./FinanceFluxTable"
 import FinanceFluxFormModal from "./FinanceFluxFormModal";
-import { Button } from "antd";
 import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
+import PageTemplate, { FunctionButtonProps } from "../../components/PageTemplate";
 
 const FinanceFlux = () => {
     const [isModalVisible, setIsModalVisible] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const [editingFlux, setEditingFlux] = useState(null);
     const fetchFluxCategory = useFinanceFluxCategoryStore(
-    (state) => state.fetchFluxCategory
+        (state) => state.fetchFluxCategory
     );
 
     useEffect(() => {
@@ -38,24 +39,21 @@ const FinanceFlux = () => {
         setRefreshKey(prevKey => prevKey + 1)
     }
 
-    return (
-        <div className="p-4">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-                    <img src="/finance-icon1.png" alt="Gastos e Ingresos" className="w-8 h-8" />
-                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-                        Gastos e Ingresos
-                    </h1>
-                </div>
-                <Button
-                    onClick={showModal}
-                    type="primary"
-                    className="text-mobile-sm xl:text-desktop-sm"
-                >
-                    Agregar Gasto o Ingreso
-                </Button>
-            </div>
+    const actions: FunctionButtonProps[] = [
+        {
+            visible: true,
+            title: "Agregar Gasto o Ingreso",
+            onClick: showModal,
+            icon: <PlusOutlined />
+        }
+    ]
 
+    return (
+        <PageTemplate
+            title="Gastos e Ingresos"
+            iconSrc="/finance-icon1.png"
+            actions={actions}
+        >
             <FinanceFluxTable refreshKey={refreshKey} onEdit={handleEdit} />
             <FinanceFluxFormModal
                 visible={isModalVisible}
@@ -64,9 +62,8 @@ const FinanceFlux = () => {
                 onSuccess={handleSuccess}
                 editingFlux={editingFlux}
             />
-        </div>
+        </PageTemplate>
     )
-
 }
 
 export default FinanceFlux

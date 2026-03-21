@@ -1,58 +1,50 @@
 import { useContext, useEffect, useState } from "react";
-import { Button, Modal, Table, Tooltip } from "antd";
-import { IBranch } from "../../models/branchModel";
-import { EditOutlined, WhatsAppOutlined, FileDoneOutlined  } from "@ant-design/icons";
-import { UserContext } from "../../context/userContext";
+import { Table } from "antd";
+import { EditOutlined, WhatsAppOutlined, FileDoneOutlined } from "@ant-design/icons";
 import { getSellerAPI } from "../../api/seller";
-import ShippingGuideTable from "../ShippingGuide/ShippingGuideTable";
+import { UserContext } from "../../context/userContext";
+import { BASIC_CELL } from "../../constants/tableCells";
+import { useUserRole } from "../../hooks/useUserRole";
+import { IBranch } from "../../models/branchModel";
+import { openChat } from "../../utils/whatsAppUtils";
+import TableActionButton from "../../components/TableActionButton";
 
 interface BranchTableProps {
   refreshKey: number;
   branches: IBranch[];
   showEditModal: (branch: IBranch) => void;
+  showGuideModal: (branch: IBranch) => void
 }
 
-const BranchTable: React.FC<BranchTableProps> = ({
-  refreshKey,
-  branches,
-  showEditModal,
-}) => {
+const BranchTable = ({ refreshKey, branches, showEditModal, showGuideModal }: BranchTableProps) => {
   const { user } = useContext(UserContext);
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
-  const isOperator = user?.role.toLowerCase() === 'operator';
-  const [showGuideModal, setShowGuideModal] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState<IBranch>();
+  const { isAdmin, isOperator, isSeller } = useUserRole();
   const [filteredBranches, setFilteredBranches] = useState<IBranch[]>(branches);
-  const [tableColumns, setTableColumns] = useState<any>([]);
-
-  const handleChatBranch = (branch: IBranch) => {
-    const phoneNumber = branch.telefono;
-    const whatsappUrl = `https://wa.me/${phoneNumber}`;
-    window.open(whatsappUrl, '_blank');
-  }
+  const [tableColumns, setTableColumns] = useState<any[]>([]);
 
   useEffect(() => {
     if (isAdmin || isOperator) {
       setFilteredBranches(branches);
-    } else if (user.role == "seller") {
+    } else if (isSeller) {
       filterSellerBranchs();
     }
-  }, [branches]);
+  }, [branches, isAdmin, isOperator, isSeller]);
 
   const filterSellerBranchs = async () => {
     const sellerData = await getSellerAPI(user.id_vendedor);
     const branchData = sellerData.pago_sucursales;
-    const activeBranchIDs: Set<number> = new Set();
+    const activeBranchIDs: Set<string> = new Set();
     const sellerFinalDate = new Date(sellerData.fecha_vigencia);
-    branchData.forEach((branch) => {
-      if (isActiveSellerBranch(branch, sellerFinalDate)) {
-        activeBranchIDs.add(branch.id_sucursal);
+
+    branchData.forEach((branch: Partial<IBranch>) => {
+      if (isActiveSellerBranch(branch, sellerFinalDate) && branch.id_sucursal) {
+        activeBranchIDs.add(branch.id_sucursal + '');
       }
     });
 
     const filteredBranches: IBranch[] = [];
     branches.forEach((branch: IBranch) => {
-      if (activeBranchIDs.has(branch._id)) {
+      if (branch._id && activeBranchIDs.has(branch._id)) {
         filteredBranches.push(branch);
       }
     })
@@ -73,39 +65,18 @@ const BranchTable: React.FC<BranchTableProps> = ({
   useEffect(() => {
     if (isAdmin || isOperator) {
       setTableColumns([...cols, ...adminCols]);
-    }else if (user.role == "seller") {
+    } else if (isSeller) {
       setTableColumns([...cols, ...sellerCols])
-    }else {
+    } else {
       setTableColumns(cols)
     }
-  },[user]);
-
+  }, [user, isAdmin, isOperator, isSeller]);
 
   const cols = [
-    {
-      title: "Nombre",
-      dataIndex: "nombre",
-      key: "nombre",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    },
-    {
-      title: "Dirección",
-      dataIndex: "direccion",
-      key: "direccion",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    },
-    {
-      title: "Ciudad",
-      dataIndex: "ciudad",
-      key: "ciudad",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    },
-    {
-      title: "Telefono",
-      dataIndex: "telefono",
-      key: "telefono",
-      className: "text-mobile-sm xl:text-desktop-sm",
-    }
+    { title: "Nombre", dataIndex: "nombre", key: "nombre", className: BASIC_CELL },
+    { title: "Dirección", dataIndex: "direccion", key: "direccion", className: BASIC_CELL },
+    { title: "Ciudad", dataIndex: "ciudad", key: "ciudad", className: BASIC_CELL },
+    { title: "Telefono", dataIndex: "telefono", key: "telefono", className: BASIC_CELL }
   ];
 
   const adminCols = [
@@ -113,31 +84,22 @@ const BranchTable: React.FC<BranchTableProps> = ({
       title: "Acciones",
       key: "actions",
       width: "10%",
-      className: "text-mobile-sm xl:text-desktop-sm",
+      className: BASIC_CELL,
       render: (_: any, branch: IBranch) => (
         <>
-          <Tooltip title="Editar sucursal">
-            <Button
-              type="default"
-              onClick={(e) => {
-                e.stopPropagation();
-                showEditModal(branch);
-              }}
-              icon={<EditOutlined />}
-              className="text-mobile-sm xl:text-desktop-sm"
-            />
-          </Tooltip>
-          <Tooltip title="Mostrar Guías de Envío">
-            <Button
-              type="default"
-              onClick={() => {
-                setSelectedBranch(branch);
-                setShowGuideModal(true);
-              }}
-              icon={<FileDoneOutlined  />}
-              className="text-mobile-sm xl:text-desktop-sm"
-            />
-          </Tooltip>
+          <TableActionButton
+            title="Editar sucursal"
+            onClick={(e) => {
+              e.stopPropagation();
+              showEditModal(branch);
+            }}
+            icon={<EditOutlined />}
+          />
+          <TableActionButton
+            title="Ver Guías de Envío"
+            onClick={() => { showGuideModal(branch) }}
+            icon={<FileDoneOutlined />}
+          />
         </>
       )
     }
@@ -148,50 +110,32 @@ const BranchTable: React.FC<BranchTableProps> = ({
       title: "Contactar",
       key: "contact",
       width: "10%",
-      className: "text-mobile-sm xl:text-desktop-sm",
+      className: BASIC_CELL,
       render: (_: any, branch: IBranch) => (
-        <Tooltip title="Escribir por WhatsApp">
-          <Button
-            type="default"
-            onClick={() => handleChatBranch(branch)}
-            icon={<WhatsAppOutlined />}
-            style={{
-              backgroundColor: '#25D366',
-              color: 'white'
-            }}
-          />
-        </Tooltip>
+        <TableActionButton
+          title="Escribir por WhatsApp"
+          onClick={() => handleChatBranch(branch)}
+          icon={<WhatsAppOutlined />}
+          backgroundColor="#25D366"
+          color="white"
+        />
       )
     }
   ];
 
+  const handleChatBranch = (branch: IBranch) => {
+    const phoneNumber = branch.telefono;
+    openChat(phoneNumber)
+  }
+
   return (
-    <>
-      <Table
-        key={refreshKey}
-        columns={tableColumns}
-        dataSource={filteredBranches}
-        pagination={{ pageSize: 10 }}
-        scroll={{ x: "max-content" }}
-      />
-      {showGuideModal && (
-        <Modal 
-          title='Guías de Envío'
-          footer={false} 
-          open={showGuideModal}
-          width={1000}
-          onCancel={() => {
-            setShowGuideModal(false);
-          }}>
-          <ShippingGuideTable
-            refreshKey={refreshKey}
-            user={user}
-            isFilterByBranch
-            search_id={selectedBranch?._id || ""}
-          />
-        </Modal>
-      )}
-    </>
+    <Table
+      key={refreshKey}
+      columns={tableColumns}
+      dataSource={filteredBranches}
+      pagination={{ pageSize: 10 }}
+      scroll={{ x: "max-content" }}
+    />
   );
 };
 

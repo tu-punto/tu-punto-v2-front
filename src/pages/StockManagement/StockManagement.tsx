@@ -19,6 +19,7 @@ import { createProductsFromGroup } from '../../services/createProducts';
 import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
 import VariantQRBatchModal from "./VariantQRBatchModal.tsx";
+import PageTemplate from '../../components/PageTemplate.tsx';
 //test
 const SELLERS_PAGE_SIZE = 10;
 
@@ -414,40 +415,34 @@ const StockManagement = () => {
 
 
     return (
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-                    <img src="/inventory-icon.png" alt="Inventario" className="w-8 h-8" />
-                    <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-                        Gestión de Inventario
-                    </h1>
-                </div>
-            </div>
-
-            {isSeller ? (
-                <h2 style={{ fontSize: "1.5rem", textAlign: "center", marginBottom: 24, fontWeight: 600 }}>
-                    Productos de {user?.nombre_vendedor || 'Vendedor'}
-                </h2>
-            ) : (
-                <div className="block xl:flex justify-center">
-                    <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de Productos</h2>
-                    {/*
-                    <Select
-                        style={{ width: 200 }}
-                        placeholder="Select an option"
-                        onChange={handleChangeFilter}
-                        defaultValue={0}
-                    >
-                        {options.map((option, index) => (
-                            <Select.Option key={option.option} value={index}>
-                                {option.option}
-                            </Select.Option>
-                        ))}
-                    </Select>
-                    */}
-                </div>
-            )}
+        <PageTemplate
+            title="Gestión de Inventario"
+            iconSrc="/inventory-icon.png"
+        >
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {isSeller ? (
+                    <h2 style={{ fontSize: "1.5rem", textAlign: "center", marginBottom: 24, fontWeight: 600 }}>
+                        Productos de {user?.nombre_vendedor || 'Vendedor'}
+                    </h2>
+                ) : (
+                    <div className="block xl:flex justify-center">
+                        <h2 className='text-mobile-3xl xl:text-mobile-3xl mr-4'>Lista de Productos</h2>
+                        {/*
+                        <Select
+                            style={{ width: 200 }}
+                            placeholder="Select an option"
+                            onChange={handleChangeFilter}
+                            defaultValue={0}
+                        >
+                            {options.map((option, index) => (
+                                <Select.Option key={option.option} value={index}>
+                                    {option.option}
+                                </Select.Option>
+                            ))}
+                        </Select>
+                        */}
+                    </div>
+                )}
 
             {!isSeller && (
                 <div
@@ -663,13 +658,13 @@ const StockManagement = () => {
                 </div>
             )}
 
-            {/*infoModalVisible && (
-                <ProductInfoModal
-                    visible={infoModalVisible}
-                    onClose={closeModal}
-                    product={selectedProduct}
-                />
-            )*/}
+                {/*infoModalVisible && (
+                    <ProductInfoModal
+                        visible={infoModalVisible}
+                        onClose={closeModal}
+                        product={selectedProduct}
+                    />
+                )*/}
 
             {isProductFormVisible && (
                 <ProductFormModal
@@ -683,14 +678,14 @@ const StockManagement = () => {
                 />
             )}
 
-            {isVariantModalVisible && (
-                <AddVariantModal
-                    group={selectedGroup}
-                    onAdd={succesAddVariant}
-                    onCancel={closeModal}
-                    visible={isVariantModalVisible}
-                />
-            )}
+                {isVariantModalVisible && (
+                    <AddVariantModal
+                        group={selectedGroup}
+                        onAdd={succesAddVariant}
+                        onCancel={closeModal}
+                        visible={isVariantModalVisible}
+                    />
+                )}
 
             {isConfirmModalVisible && (
                 <ConfirmProductsModal
@@ -741,7 +736,7 @@ const StockManagement = () => {
                 autoGenerateOnOpen={qrModalAutoGenerate}
             />
         </div>
-
+        </PageTemplate>
     );
 };
 
