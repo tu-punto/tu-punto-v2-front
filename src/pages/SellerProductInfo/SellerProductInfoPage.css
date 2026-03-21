@@ -7,9 +7,13 @@
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
+.seller-product-info-filters .ant-card-body {
+  padding: 18px 20px;
+}
+
 .seller-product-info-top-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 0.95fr) minmax(520px, 1.25fr);
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -20,28 +24,41 @@
 
 .seller-product-info-filters-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-columns: minmax(240px, 1.45fr) minmax(180px, 1fr) minmax(180px, 1fr);
   gap: 12px;
 }
 
 .seller-product-info-toggle-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 12px 16px;
   margin-top: 16px;
   align-items: center;
 }
 
+.seller-product-info-toggle-row .ant-space {
+  width: 100%;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid #edf2f7;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
 .seller-product-info-legend-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.2fr);
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 18px;
   align-items: start;
 }
 
 .seller-product-info-legend-card {
   border: 1px solid #e7edf3;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.seller-product-info-legend-card .ant-card-body {
+  padding: 16px;
 }
 
 .seller-product-info-legend-card-compact {
@@ -62,15 +79,16 @@
 .seller-product-info-legend-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .seller-product-info-legend-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 8px;
   color: #4f5d6b;
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.45;
 }
 
 .seller-product-info-dot {
@@ -113,8 +131,8 @@
 .seller-product-info-legend-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .seller-product-info-table-card {
@@ -158,6 +176,10 @@
   }
 
   .seller-product-info-filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-product-info-toggle-row {
     grid-template-columns: 1fr;
   }
 

@@ -28,6 +28,7 @@ import { getSellerProductInfoPageAPI } from "../../api/product";
 import { getCategoriesAPI } from "../../api/category";
 import { getSellerAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
+import SellerProductInfoEditModal from "./SellerProductInfoEditModal";
 
 import "./SellerProductInfoPage.css";
 
@@ -49,10 +50,12 @@ type SellerProductInfoRow = {
   nombreProducto: string;
   variantLabel?: string | null;
   descripcion?: string | null;
+  uso?: string | null;
   imagenes?: { url: string; key?: string }[];
   imagenesCount?: number;
   hasImages?: boolean;
   hasDescription?: boolean;
+  hasUsage?: boolean;
   hasPromotion?: boolean;
   promocionTitulo?: string | null;
   promocionDescripcion?: string | null;
@@ -82,6 +85,7 @@ const formatDate = (value?: string | null) => {
 
 const getCompletionStatus = (row: SellerProductInfoRow): CompletionStatus => {
   const hasDescription = hasText(row.descripcion);
+  const hasUsage = hasText(row.uso);
   const hasImages = Number(row.imagenesCount || 0) > 0;
   const hasAnyPromotionData =
     hasText(row.promocionTitulo) ||
@@ -89,16 +93,9 @@ const getCompletionStatus = (row: SellerProductInfoRow): CompletionStatus => {
     hasDate(row.promocionFechaInicio) ||
     hasDate(row.promocionFechaFin);
 
-  if (!hasDescription && !hasImages && !hasAnyPromotionData) return "empty";
-  if (hasDescription && hasImages) return "complete";
+  if (!hasDescription && !hasUsage && !hasImages && !hasAnyPromotionData) return "empty";
+  if (hasDescription && hasUsage && hasImages) return "complete";
   return "partial";
-};
-
-const getCompletionLabel = (row: SellerProductInfoRow) => {
-  const status = getCompletionStatus(row);
-  if (status === "empty") return "Sin completar";
-  if (status === "partial") return "Incompleto";
-  return "Completo";
 };
 
 const SellerProductInfoPage = () => {
@@ -123,6 +120,9 @@ const SellerProductInfoPage = () => {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState<{ url: string; key?: string }[]>([]);
   const [selectedImagesTitle, setSelectedImagesTitle] = useState("");
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<SellerProductInfoRow | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -209,6 +209,7 @@ const SellerProductInfoPage = () => {
     page,
     limit,
     sortOrder,
+    refreshTick,
   ]);
 
   const categoryOptions = useMemo(
@@ -318,6 +319,22 @@ const SellerProductInfoPage = () => {
         ),
     },
     {
+      title: "Uso",
+      dataIndex: "uso",
+      key: "uso",
+      width: 260,
+      render: (value) =>
+        value ? (
+          <Typography.Paragraph style={{ marginBottom: 0 }} ellipsis={{ rows: 3 }}>
+            {value}
+          </Typography.Paragraph>
+        ) : (
+          <Tag bordered={false} color="default">
+            Sin uso
+          </Tag>
+        ),
+    },
+    {
       title: "Imagenes",
       dataIndex: "imagenesCount",
       key: "imagenesCount",
@@ -388,11 +405,14 @@ const SellerProductInfoPage = () => {
       width: 110,
       fixed: "right",
       align: "center",
-      render: () => (
-        <Tooltip title="Edicion disponible en el siguiente paso">
+      render: (_value, record) => (
+        <Tooltip title="Editar informacion">
           <Button
             icon={<EditOutlined />}
-            onClick={() => message.info("La edicion se agrega en el siguiente paso.")}
+            onClick={() => {
+              setEditingRecord(record);
+              setEditModalOpen(true);
+            }}
           />
         </Tooltip>
       ),
@@ -421,7 +441,7 @@ const SellerProductInfoPage = () => {
           <div className="seller-product-info-filters-grid">
             <Input
               prefix={<SearchOutlined />}
-              placeholder="Buscar producto, variante o promocion..."
+              placeholder="Buscar producto, variante, uso o promocion..."
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               allowClear
@@ -514,15 +534,15 @@ const SellerProductInfoPage = () => {
               <div className="seller-product-info-legend-list">
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-swatch seller-product-info-swatch-red" />
-                  <span>Rojo: no tiene descripcion ni imagenes cargadas</span>
+                  <span>Rojo: no tiene descripcion, uso ni imagenes cargadas</span>
                 </div>
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-swatch seller-product-info-swatch-yellow" />
-                  <span>Amarillo: tiene algo cargado, pero le falta descripcion o imagenes</span>
+                  <span>Amarillo: tiene algo cargado, pero le falta descripcion, uso o imagenes</span>
                 </div>
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-swatch seller-product-info-swatch-green" />
-                  <span>Verde: ya tiene descripcion e imagenes; promocion es opcional</span>
+                  <span>Verde: ya tiene descripcion, uso e imagenes; promocion es opcional</span>
                 </div>
               </div>
               <div className="seller-product-info-legend-summary">
@@ -596,6 +616,18 @@ const SellerProductInfoPage = () => {
           <Empty description="No hay imagenes para mostrar." image={Empty.PRESENTED_IMAGE_SIMPLE} />
         )}
       </Modal>
+
+      <SellerProductInfoEditModal
+        visible={editModalOpen}
+        record={editingRecord}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditingRecord(null);
+        }}
+        onSuccess={async () => {
+          setRefreshTick((current) => current + 1);
+        }}
+      />
     </div>
   );
 };

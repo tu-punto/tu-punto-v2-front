@@ -1,5 +1,5 @@
 import { AxiosError } from "axios"
-import { apiClient } from "./apiClient"
+import { apiClient, apiClientNoJSON } from "./apiClient"
 import { parseError } from "./util"
 
 const handleError = (error) => {
@@ -153,6 +153,46 @@ export const getSellerProductInfoPageAPI = async (params?: {
             limit: Number(params?.limit || 10),
             pages: 1
         };
+    }
+};
+
+export const updateSellerProductInfoByVariantAPI = async ({
+    productId,
+    variantKey,
+    descripcion,
+    uso,
+    promocion,
+    clearImages,
+    imageFiles,
+}: {
+    productId: string;
+    variantKey: string;
+    descripcion?: string;
+    uso?: string;
+    promocion?: {
+        titulo?: string;
+        descripcion?: string;
+        fechaInicio?: string | null;
+        fechaFin?: string | null;
+    };
+    clearImages?: boolean;
+    imageFiles?: File[];
+}) => {
+    try {
+        const formData = new FormData();
+        if (descripcion !== undefined) formData.append("descripcion", descripcion);
+        if (uso !== undefined) formData.append("uso", uso);
+        if (promocion !== undefined) formData.append("promocion", JSON.stringify(promocion));
+        if (clearImages) formData.append("clearImages", "true");
+        (imageFiles || []).forEach((file) => formData.append("imagenes", file));
+
+        const res = await apiClientNoJSON.patch(
+            `/product/seller/product-info/${productId}/variant/${variantKey}`,
+            formData
+        );
+        return res.data;
+    } catch (error) {
+        return handleError(error);
     }
 };
 export const getProductByIdAPI = async (idProduct) => {
