@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Table, Select, Space, Input } from "antd";
+import { Button, Table, Tooltip, Select, Space, Input, message } from "antd";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
@@ -32,6 +32,7 @@ export default function SellerTable({ refreshKey, setRefreshKey }: SellerTablePr
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
 
@@ -96,7 +97,7 @@ export default function SellerTable({ refreshKey, setRefreshKey }: SellerTablePr
       },
     },
     {
-      title: "Pago total",
+      title: "Pago pendiente",
       dataIndex: "pagoTotal",
       key: "pagoTotal",
       sorter: (a: any, b: any) => a.pagoTotalInt - b.pagoTotalInt,
@@ -174,43 +175,53 @@ export default function SellerTable({ refreshKey, setRefreshKey }: SellerTablePr
 
   useEffect(() => {
     (async () => {
-      const res = await getSellersAPI();
-      const sellers: ISeller[] = res.data || res;
+      setLoading(true);
+      try {
+        const res = await getSellersAPI();
+        const sellers: ISeller[] = (Array.isArray(res) ? res : []) as ISeller[];
 
-      const rows: SellerRow[] = await Promise.all(
-        sellers.map(async (seller) => {
-          const mensual = seller.pago_sucursales
-            .filter((p) => p.activo)
-            .reduce(
-              (t: number, p: ISucursalPago) =>
-                t +
-                Number(p.alquiler) +
-                Number(p.exhibicion) +
-                Number(p.delivery) +
-                Number(p.entrega_simple),
-              0
-            );
+        const rows: SellerRow[] = await Promise.all(
+          sellers.map(async (seller) => {
+            const mensual = seller.pago_sucursales
+              .filter((p) => p.activo)
+              .reduce(
+                (t: number, p: ISucursalPago) =>
+                  t +
+                  Number(p.alquiler) +
+                  Number(p.exhibicion) +
+                  Number(p.delivery) +
+                  Number(p.entrega_simple),
+                0
+              );
 
-          const saldoPendiente = seller.saldo_pendiente;
-          const deuda = seller.deuda;
-          const pagoPendiente = saldoPendiente - deuda;
+            const saldoPendiente = Number((seller as any).saldo_pendiente ?? 0);
+            const deuda = Number((seller as any).deuda ?? 0);
+            const pagoPendienteFromApi = Number((seller as any).pago_pendiente);
+            const pagoPendiente = Number.isFinite(pagoPendienteFromApi)
+              ? pagoPendienteFromApi
+              : saldoPendiente - deuda;
 
-          return {
-            ...seller,
-            key: seller._id,
-            nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
-            fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
-            fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
-            deuda: deuda,
-            pagoTotal: `Bs. ${pagoPendiente.toFixed(2)}`,
-            pagoTotalInt: pagoPendiente,
-            pago_mensual: `Bs. ${mensual}`,
-            saldo_pendiente: saldoPendiente,
-          };
-        })
-      );
+            return {
+              ...seller,
+              key: seller._id,
+              nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
+              fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
+              fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
+              deuda: deuda,
+              pagoTotal: `Bs. ${Number.isFinite(pagoPendiente) ? pagoPendiente.toFixed(2) : "0.00"}`,
+              pagoTotalInt: Number.isFinite(pagoPendiente) ? pagoPendiente : 0,
+              pago_mensual: `Bs. ${mensual}`,
+              saldo_pendiente: saldoPendiente,
+            };
+          })
+        );
 
-      setSellers(rows);
+        setSellers(rows);
+      } catch (error) {
+        message.error("Error al cargar vendedores");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [refreshKey]);
 
@@ -295,6 +306,7 @@ export default function SellerTable({ refreshKey, setRefreshKey }: SellerTablePr
       </div>
 
       <Table
+        loading={loading}
         columns={columns}
         dataSource={filteredSellers}
         pagination={{

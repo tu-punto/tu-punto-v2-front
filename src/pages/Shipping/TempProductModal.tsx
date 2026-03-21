@@ -1,6 +1,6 @@
 import { Modal, Form, Input, InputNumber, Select, Button } from 'antd';
 import { useEffect, useState } from 'react';
-import { getSellersAPI } from '../../api/seller';
+import { getSellersBasicAPI } from '../../api/seller';
 
 const TempProductModal = ({ visible, onCancel, onAddProduct }: any) => {
     const [form] = Form.useForm();
@@ -9,8 +9,8 @@ const TempProductModal = ({ visible, onCancel, onAddProduct }: any) => {
 
     useEffect(() => {
         if (visible) {
-            getSellersAPI().then((data: any) => {
-                setSellers(data);
+            getSellersBasicAPI().then((data: any) => {
+                setSellers(Array.isArray(data) ? data : []);
             });
         }
     }, [visible]);

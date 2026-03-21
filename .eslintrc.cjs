@@ -16,4 +16,8 @@ module.exports = {
     ],
     '@typescript-eslint/no-explicit-any': 'off',
   },
+  globals: {
+    window: "readonly",
+    URL: "readonly"
+  }
 };

@@ -1,13 +1,13 @@
 
 import { useState, useEffect } from 'react';
-import { getSellersAPI } from '../api/seller';
+import { getSellersBasicAPI } from '../api/seller';
 
 const useSellers = () => {
     const [sellers, setSellers] = useState([]);
 
     const fetchSellers = async () => {
-        const response = await getSellersAPI();
-        setSellers(response);
+        const response = await getSellersBasicAPI();
+        setSellers(Array.isArray(response) ? response : []);
     };
 
     useEffect(() => {

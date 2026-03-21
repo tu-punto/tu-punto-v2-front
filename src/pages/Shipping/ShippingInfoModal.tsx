@@ -14,11 +14,11 @@ import useEditableTable from '../../hooks/useEditableTable';
 import { UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useWatch } from 'antd/es/form/Form';
 import EditProductsModal from './EditProductsModal';
-import { updateSubvariantStockAPI } from '../../api/product';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
-import { getSellersAPI } from "../../api/seller.ts";
+import { getSellersBasicAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
+import { generateShippingLabelQRAPI } from '../../api/qr.ts';
 import moment from "moment-timezone";
 import { updateProductsByShippingAPI } from "../../api/sales.ts";
 
@@ -44,6 +44,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [showWarning, setShowWarning] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [qrLoading, setQrLoading] = useState(false);
     const { rawProducts: data } = useRawProducts(); const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
     const adelantoCliente = useWatch('adelanto_cliente', internalForm);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
@@ -75,16 +76,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             setAdelantoVisible(pagoEstado === "adelanto");
         }
     }, [visible, shipping]);
-
-    const objetosIguales = (a: any, b: any) => {
-        const aOrdenado = JSON.stringify(Object.fromEntries(Object.entries(a).sort()));
-        const bOrdenado = JSON.stringify(Object.fromEntries(Object.entries(b).sort()));
-        return aOrdenado === bOrdenado;
-    };
-    const construirNombreVariante = (nombreProducto: string, variantes: Record<string, string>) => {
-        const valores = Object.values(variantes || {}).join(" / ");
-        return `${nombreProducto} - ${valores}`;
-    };
 
     const lugarEntrega = useWatch('lugar_entrega', internalForm);
     // Extraer nombre del lugar de origen desde el shipping usando el ID
@@ -128,10 +119,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     // useEffect para cargarlos si no lo estás haciendo ya
     useEffect(() => {
         const fetchSellers = async () => {
-            const res = await getSellersAPI();
+            const res = await getSellersBasicAPI();
+            const sellersList = Array.isArray(res) ? res : [];
             const hoy = new Date().setHours(0, 0, 0, 0);
 
-            const vigentes = res.filter((v: any) => {
+            const vigentes = sellersList.filter((v: any) => {
                 if (!v.fecha_vigencia) return true;
                 const fecha = new Date(v.fecha_vigencia).getTime();
                 return fecha >= hoy;
@@ -310,89 +302,23 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             });
         });
     }, [data]);
-
-    const restaurarStock = async (productos: any[]) => {
-        const sucursalId = localStorage.getItem('sucursalId');
-        if (!data || !Array.isArray(data) || data.length === 0) {
-            console.warn("⚠️ data aún no está cargado o está vacío");
-            return;
-        }
-
-        //console.log(" Raw data:", data);
-
-        for (const prod of productos) {
-            if (prod.esTemporal) continue;
-
-            const id = prod.id_producto || prod.producto;
-            const nombreVariante = prod.nombre_variante;
-            if (!nombreVariante || !id) continue;
-
-
-            const productoCompleto = data.find((p: any) =>
-                String(p._id || p.id_producto) === String(id)
-            );
-            if (!productoCompleto) {
-                console.warn("⚠️ Producto no encontrado en data:", id);
-                continue;
+    const handleGenerateShippingQR = async () => {
+        if (!shipping?._id) return;
+        setQrLoading(true);
+        try {
+            const response = await generateShippingLabelQRAPI(shipping._id);
+            const qrPath = response?.qrData?.shippingQrImagePath;
+            if (!response?.success || !qrPath) {
+                message.error("No se pudo generar QR de entrega");
+                return;
             }
-            if (!productoCompleto?.sucursales?.length) {
-                console.warn("⚠️ Producto sin sucursales:", id);
-                continue;
-            }
-            //console.log(" Raw data ver sucursales:", data);
-            const sucursalData = productoCompleto.sucursales?.find((s: any) =>
-                String(s.id_sucursal) === String(sucursalId)
-            );
-            if (!sucursalData?.combinaciones?.length) {
-                console.warn("⚠️ Sin combinaciones en sucursal:", sucursalId);
-                continue;
-            }
-
-            // Reconstruir variantes desde nombre_variante si no existen
-            let variantes = prod.variantes;
-
-            // Siempre reconstruimos las variantes desde el nombre_variante (más seguro)
-            const nombreBase = productoCompleto.nombre_producto;
-            const target = nombreVariante?.normalize("NFD").toLowerCase();
-
-            const combinacionExacta = sucursalData.combinaciones.find((c: any) => {
-                const nombreCombinacion = construirNombreVariante(nombreBase, c.variantes).normalize("NFD").toLowerCase();
-                return nombreCombinacion === target;
-            });
-
-            if (!combinacionExacta) {
-                console.warn("❌ No se encontró combinación por nombre exacto:", nombreVariante);
-                continue;
-            }
-
-            variantes = combinacionExacta.variantes;
-
-            const combinacion = sucursalData.combinaciones.find((c: any) => {
-                return objetosIguales(c.variantes, variantes);
-            });
-            if (!combinacion) {
-                console.warn("❌ No se encontró combinación exacta para:", variantes);
-                continue;
-            }
-
-            const nuevoStock = (combinacion.stock || 0) + prod.cantidad;
-
-            try {
-                const res = await updateSubvariantStockAPI({
-                    productId: id,
-                    sucursalId,
-                    variantes,
-                    stock: nuevoStock
-                });
-
-                if (!res.success) {
-                    message.error(`No se pudo restaurar stock de ${nombreVariante}`);
-                } else {
-                    //console.log("✅ Stock restaurado:", nombreVariante, "→", nuevoStock);
-                }
-            } catch (err) {
-                console.error("Error al restaurar stock:", err);
-            }
+            window.open(qrPath, "_blank");
+            message.success("QR de entrega generado");
+        } catch (error) {
+            console.error(error);
+            message.error("Error generando QR de entrega");
+        } finally {
+            setQrLoading(false);
         }
     };
     const handleCancelChanges = () => {
@@ -552,41 +478,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     try {
                                         // Restaurar stock antes de eliminar
                                         //console.log("Restaurando stock de productos antes de eliminar la entrega...",products);
-                                        const enrichedForRestock = products.map((p) => {
-                                            const nombreVariante = p.nombre_variante || p.producto || '';
-                                            const productoCompleto = data.find(dp =>
-                                                dp._id === p.id_producto || dp.nombre_producto === p.producto?.split(" - ")[0]
-                                            );
-                                            if (!productoCompleto) {
-                                                console.warn("⚠️ Producto no encontrado en data:", p.producto);
-                                                return p;
-                                            }
-
-                                            const variantes = p.variantes && Object.keys(p.variantes).length > 0
-                                                ? p.variantes
-                                                : (() => {
-                                                    const partes = p.producto.split(" - ");
-                                                    const atributos = partes[1]?.split(" / ") || [];
-
-                                                    const ejemploComb = productoCompleto?.sucursales?.[0]?.combinaciones?.[0];
-                                                    const claves = Object.keys(ejemploComb?.variantes || {});
-                                                    const reconstruidas: Record<string, string> = {};
-                                                    claves.forEach((k, i) => {
-                                                        reconstruidas[k] = atributos[i] || '';
-                                                    });
-                                                    return reconstruidas;
-                                                })();
-
-                                            return {
-                                                ...p,
-                                                id_producto: p.id_producto || productoCompleto._id,
-                                                variantes,
-                                            };
-
-                                        });
-                                        //console.log("♻️ Restaurando con datos:", enrichedForRestock);
-
-                                        await restaurarStock(enrichedForRestock);
 
                                         const response = await deleteShippingAPI(shipping._id);
                                         if (response.success) {
@@ -604,6 +495,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             });
                         }}
                     />
+                </div>
+            )}
+            {isAdmin && shipping?._id && (
+                <div style={{ marginBottom: 12, textAlign: "right", marginTop: 6 }}>
+                    <Button onClick={handleGenerateShippingQR} loading={qrLoading}>
+                        Generar / Ver QR de Entrega
+                    </Button>
                 </div>
             )}
             <Form
@@ -1052,3 +950,4 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 }
 
 export default ShippingInfoModal;
+

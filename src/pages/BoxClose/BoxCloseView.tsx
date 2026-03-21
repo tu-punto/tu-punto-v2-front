@@ -20,6 +20,12 @@ interface Props {
 }
 
 const BoxCloseView = ({ boxClose }: Props) => {
+    const tipoLabel = (tipo: string) => {
+        if (tipo === "gasto" || tipo === "gasto_profit") return "Gastos (Salidas)";
+        return "Ingresos (Entradas)";
+    };
+    const metodoLabel = (metodo: string) => (metodo === "qr" ? "QR/Bancario" : "Efectivo");
+
     const {
         fecha,
         responsible,
@@ -109,9 +115,10 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 <Form.Item label="Efectivo">
                                     <InputNumber value={ventas_efectivo} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
-                                <Form.Item label="QR/Bancario">
+                                {/* Control bancario temporalmente deshabilitado */}
+                                {/* <Form.Item label="QR/Bancario">
                                     <InputNumber value={ventas_qr} readOnly style={{ width: "100%" }} prefix="Bs." />
-                                </Form.Item>
+                                </Form.Item> */}
                                 <Form.Item label="Cambios Externos">
                                     <InputNumber
                                         value={boxClose.cambios_externos}
@@ -164,6 +171,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
                             </Form>
                         </Card>
 
+                        {/* Control bancario temporalmente deshabilitado
                         <Card className="mb-4">
                             <Form layout="vertical">
                                 <Form.Item label="Bancario esperado">
@@ -185,6 +193,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 </Form.Item>
                             </Form>
                         </Card>
+                        */}
 
                         <Card className="mb-4">
                             <Title level={5}>Monedas</Title>
@@ -221,12 +230,12 @@ const BoxCloseView = ({ boxClose }: Props) => {
                 </Row>
                 <Card className="mt-4">
                     <Title level={5}>Operaciones adicionales</Title>
-                    <Table
-                        dataSource={(boxClose.operaciones_adicionales || []).map((op: any, idx: number) => ({ ...op, key: idx }))}
-                        columns={[
-                            { title: "Tipo", dataIndex: "tipo", key: "tipo" },
-                            { title: "Método", dataIndex: "metodo", key: "metodo" },
-                            { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v: any) => v || "-" },
+                        <Table
+                            dataSource={(boxClose.operaciones_adicionales || []).map((op: any, idx: number) => ({ ...op, key: idx }))}
+                            columns={[
+                                { title: "Tipo", dataIndex: "tipo", key: "tipo", render: (v: any) => tipoLabel(String(v || "")) },
+                                { title: "Método", dataIndex: "metodo", key: "metodo", render: (v: any) => metodoLabel(String(v || "")) },
+                                { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v: any) => v || "-" },
                             { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
                             { title: "Monto", dataIndex: "monto", key: "monto", render: (v: any) => `Bs. ${Number(v || 0).toFixed(2)}` },
                         ]}

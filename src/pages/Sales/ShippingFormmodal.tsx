@@ -2,8 +2,8 @@ import { Modal, Form, Input, InputNumber, Button, Radio, Col, Row, DatePicker, T
 import { UserOutlined, PhoneOutlined, CommentOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useState } from 'react';
 import { registerShippingAPI, updateShippingAPI } from '../../api/shipping';
-import { sendMessageAPI } from '../../api/whatsapp';
 import { updateSubvariantStockAPI } from '../../api/product';
+import { sendMessageAPI } from '../../api/whatsapp';
 import { useWatch } from 'antd/es/form/Form';
 import { getSucursalsAPI } from "../../api/sucursal";
 import { COUNTRY_CODES } from '../../constants/countryCodes';
@@ -180,6 +180,7 @@ function ShippingFormModal({
                     utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
                     deposito_realizado: false,
                     variantes: p.variantes,
+                    variantKey: p.variantKey,
                     nombre_variante: `${p.producto}`,
                     stockActual: p.stockActual,
                     quien_paga_delivery: form.getFieldValue("quien_paga_delivery") || "comprador" // ✅ agregar esto
@@ -190,11 +191,6 @@ function ShippingFormModal({
             if (ventas.length > 0) {
                 //await handleDebt(ventas, response.newShipping.adelanto_cliente);
                 await handleSales(response.newShipping, ventas);
-
-                // RESTAR STOCK si el estado es "Entregado"
-                if (["Entregado", "En Espera"].includes(values.estado_pedido)) {
-                    await actualizarStock(ventas);
-                }
             }
 
             clearSelectedProducts();
@@ -666,3 +662,4 @@ function ShippingFormModal({
 }
 
 export default ShippingFormModal;
+

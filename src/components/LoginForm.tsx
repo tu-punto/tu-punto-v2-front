@@ -6,6 +6,7 @@ import { getSucursalsAPI } from "../api/sucursal";
 import { checkLoginAPI, getUserByCookieAPI } from "../api/user";
 import { UserContext } from "../context/userContext";
 import { IBranch } from "../models/branchModel";
+import { normalizeRole } from "../utils/role";
 
 type LoginFormProps = {
   showBranchSelect: boolean;
@@ -52,10 +53,16 @@ export default function LoginForm({ showBranchSelect, redirectTo }: LoginFormPro
       }
       const selectedBranch = branches.find((b) => b._id === values.sucursalId);
       const branchName = selectedBranch?.nombre || '';
+      const branchHeaderImage = selectedBranch?.imagen_header || "";
 
       localStorage.setItem("sucursalId", values.sucursalId);
       localStorage.setItem("sucursalNombre", branchName);
-      setUser(userRes.data);
+      localStorage.setItem("sucursalImagenHeader", branchHeaderImage);
+      window.dispatchEvent(new Event("branch-header-updated"));
+      setUser({
+        ...userRes.data,
+        role: normalizeRole(userRes.data?.role),
+      });
       message.success("¡Bienvenido!");
       navigate(redirectTo);
     } catch {

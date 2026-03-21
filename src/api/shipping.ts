@@ -15,6 +15,28 @@ const getShippingsAPI = async () => {
   }
 };
 
+const getShippingsListAPI = async (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  from?: string;
+  to?: string;
+  originId?: string;
+  sellerId?: string;
+  client?: string;
+}) => {
+  try {
+    const res = await apiClient.get("/shipping/list", { params });
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
 const getShipingByIdsAPI = async (ids: number[]) => {
   try {
     const idsString = ids.join(",");
@@ -110,11 +132,16 @@ const deleteShippingAPI = async (id: string) => {
     return { success: false };
   }
 };
-const getSalesHistoryAPI = async (date?: string, sucursalId?: string) => {
+const getSalesHistoryAPI = async (
+  date?: string,
+  sucursalId?: string,
+  options?: { fromLastClose?: boolean }
+) => {
   try {
     const params = new URLSearchParams();
     if (date) params.append("date", date);
     if (sucursalId) params.append("sucursalId", sucursalId);
+    if (options?.fromLastClose) params.append("fromLastClose", "true");
 
     const res = await apiClient.get(`/shipping/history/sales?${params.toString()}`);
     return { success: true, ...res.data };
@@ -129,6 +156,7 @@ const getSalesHistoryAPI = async (date?: string, sucursalId?: string) => {
 
 export {
   getShippingsAPI,
+  getShippingsListAPI,
   registerShippingAPI,
   registerSalesToShippingAPI,
   updateShippingAPI,

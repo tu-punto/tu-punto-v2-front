@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useState, useEffect } from "react";
 import { getUserByCookieAPI } from "../api/user";
+import { normalizeRole } from "../utils/role";
 
 export const UserContext = createContext<any>(null);
 
@@ -12,8 +13,10 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
       try {
         const res = await getUserByCookieAPI();
         if (res?.success) {
-          //console.log("✅ Usuario desde /info:", res.data);
-          setUser(res.data);
+          setUser({
+            ...res.data,
+            role: normalizeRole(res.data?.role),
+          });
         }
       } catch (e) {
         console.error("Error fetching user:", e);

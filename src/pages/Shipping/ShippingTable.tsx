@@ -1,17 +1,22 @@
-import { DatePicker, Input, message, Select, Table } from 'antd';
+import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
+import { Button, DatePicker, Input, message, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsAPI, getShippingByIdAPI } from '../../api/shipping';
+import { getShippingsListAPI, getShippingByIdAPI } from '../../api/shipping';
+import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
-import { getSucursalsAPI } from '../../api/sucursal';
-import { getSellersAPI } from "../../api/seller";
+import ExternalPackagesFormModal from './ExternalPackagesFormModal';
+import ExternalShippingInfoModal from './ExternalShippingInfoModal';
+import { getSucursalsBasicAPI } from '../../api/sucursal';
+import { getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 
-const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
+const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?: () => void }) => {
     const { user }: any = useContext(UserContext);
     const [shippingData, setShippingData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
@@ -23,6 +28,9 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isModaStatelVisible, setIsModalStateVisible] = useState(false);
     const [selectedShipping, setSelectedShipping] = useState(null);
+    const [selectedExternalShipping, setSelectedExternalShipping] = useState<any>(null);
+    const [isExternalInfoVisible, setIsExternalInfoVisible] = useState(false);
+    const [isExternalCreateVisible, setIsExternalCreateVisible] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState('');
     const [selectedOrigin, setSelectedOrigin] = useState('');
     const [otherLocation, setOtherLocation] = useState('');
@@ -36,79 +44,152 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
+    const [loadingTable, setLoadingTable] = useState(false);
 
     const [isMobile, setIsMobile] = useState(false);
+    const canManageExternal = isAdmin || isOperator;
+    const currentSucursalId = localStorage.getItem("sucursalId") || "";
+    const currentSucursal = sucursal.find((s: any) =>
+        String(s._id) === String(currentSucursalId) ||
+        String(s.id_sucursal) === String(currentSucursalId)
+    );
+
+    const mapExternalToShipping = (externalSale: any) => {
+        const estaPagado =
+            externalSale?.esta_pagado === "mixto"
+                ? "mixto"
+                : (externalSale?.esta_pagado === "si" ? "si" : "no");
+        const precioPaquete = Number(externalSale?.precio_paquete ?? externalSale?.precio_total ?? 0);
+        const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
+        const estadoPedido = externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : "En Espera");
+        const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
+        const sucursalOrigen = typeof externalSale?.sucursal === "object" ? externalSale.sucursal : null;
+        const sucursalNombre = sucursalOrigen?.nombre || externalSale?.lugar_entrega || "Externo";
+
+        return {
+            ...externalSale,
+            key: `external-${externalSale._id}`,
+            is_external: true,
+            cliente: externalSale?.comprador || "Sin comprador",
+            telefono_cliente: externalSale?.telefono_comprador || "",
+            hora_entrega_acordada: fechaBase,
+            hora_entrega_real: externalSale?.hora_entrega_real || fechaBase,
+            lugar_origen: sucursalOrigen,
+            lugar_entrega: sucursalNombre,
+            id_sucursal: sucursalOrigen?._id || externalSale?.sucursal || externalSale?.id_sucursal,
+            sucursal: sucursalOrigen,
+            estado_pedido: estadoPedido,
+            esta_pagado: estaPagado,
+            saldo_cobrar: Number(
+                externalSale?.saldo_cobrar ?? (estaPagado === "si" ? 0 : estaPagado === "mixto" ? pagaComprador : precioPaquete)
+            ),
+            observaciones: externalSale?.descripcion_paquete || "",
+            venta: [],
+            productos_temporales: [],
+        };
+    };
+
+    const toggleStatus = () => {
+        setSelectedStatus(prev => prev === 'En Espera' ? 'entregado' : 'En Espera');
+    };
 
     const fetchShippings = async () => {
+        setLoadingTable(true);
         try {
-            const apiData = await getShippingsAPI();
-            const sortedData = apiData.sort(
+            const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
+            const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
+            const status = selectedStatus === "En Espera" ? "En Espera" : "Entregado";
+            const selectedOriginId = sucursal.find((s: any) => s.nombre === selectedOrigin)?._id;
+            const sellerIdToQuery =
+                selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
+                    ? selectedVendedor
+                    : (!isAdmin && !isOperator ? user?.id_vendedor : undefined);
+
+            const [shippingApiData, externalApiData] = await Promise.all([
+                getShippingsListAPI({
+                    page: 1,
+                    limit: 300,
+                    status,
+                    from,
+                    to,
+                    originId: selectedOriginId,
+                    sellerId: sellerIdToQuery
+                }),
+                canManageExternal
+                    ? getExternalSalesListAPI({
+                        page: 1,
+                        limit: 300,
+                        status,
+                        from,
+                        to,
+                        sucursalId: selectedOriginId
+                    })
+                    : Promise.resolve({ rows: [] }),
+            ]);
+
+            const internalShippings = Array.isArray(shippingApiData?.rows)
+                ? shippingApiData.rows
+                : Array.isArray(shippingApiData)
+                    ? shippingApiData
+                    : [];
+            const externalRows = Array.isArray(externalApiData?.rows)
+                ? externalApiData.rows
+                : Array.isArray(externalApiData)
+                    ? externalApiData
+                    : [];
+            const externalShippings = externalRows.map((sale: any) => mapExternalToShipping(sale));
+
+            const sortedData = [...internalShippings, ...externalShippings].sort(
                 (a: any, b: any) => new Date(b.fecha_pedido).getTime() - new Date(a.fecha_pedido).getTime()
             );
             const dataWithKey = sortedData.map((pedido: any) => ({
                 ...pedido,
-                key: pedido._id
+                key: pedido.is_external ? `external-${pedido._id}` : pedido._id
             }));
             setShippingData(dataWithKey);
         } catch (error) {
             console.error("Error fetching shipping data:", error);
+        } finally {
+            setLoadingTable(false);
         }
     };
     const toSimpleDate = (d: Date | null) =>
         d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
 
     const getVendedoresConEntregas = () => {
-        const vendedoresConEntregasSet = new Set();
+        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        const vendedoresConEntregasSet = new Set<string>();
 
-        // Obtener vendedores de pedidos en espera
-        esperaData.forEach((pedido: any) => {
-            // Buscar en las ventas del pedido
+        sourceData.forEach((pedido: any) => {
             (pedido.venta || []).forEach((venta: any) => {
                 if (venta.vendedor) {
-                    // Si vendedor es un objeto, usar su _id; si es string, usarlo directamente
-                    const vendedorId = typeof venta.vendedor === 'object'
-                        ? venta.vendedor._id
-                        : venta.vendedor;
-                    vendedoresConEntregasSet.add(vendedorId);
+                    const vendedorId =
+                        typeof venta.vendedor === 'object'
+                            ? venta.vendedor._id
+                            : venta.vendedor;
+                    if (vendedorId) vendedoresConEntregasSet.add(String(vendedorId));
+                }
+                if (venta.id_vendedor) {
+                    vendedoresConEntregasSet.add(String(venta.id_vendedor));
                 }
             });
 
-            // Buscar en productos temporales si existen
             (pedido.productos_temporales || []).forEach((producto: any) => {
                 if (producto.id_vendedor) {
-                    vendedoresConEntregasSet.add(producto.id_vendedor);
+                    vendedoresConEntregasSet.add(String(producto.id_vendedor));
                 }
             });
         });
 
-        // Obtener vendedores de pedidos entregados
-        entregadoData.forEach((pedido: any) => {
-            // Buscar en las ventas del pedido
-            (pedido.venta || []).forEach((venta: any) => {
-                if (venta.vendedor) {
-                    // Si vendedor es un objeto, usar su _id; si es string, usarlo directamente
-                    const vendedorId = typeof venta.vendedor === 'object'
-                        ? venta.vendedor._id
-                        : venta.vendedor;
-                    vendedoresConEntregasSet.add(vendedorId);
-                }
-            });
-
-            // Buscar en productos temporales si existen
-            (pedido.productos_temporales || []).forEach((producto: any) => {
-                if (producto.id_vendedor) {
-                    vendedoresConEntregasSet.add(producto.id_vendedor);
-                }
-            });
-        });
-
-        // Filtrar vendedores que están en los datos de entregas
-        const resultado = vendedores.filter(vendedor =>
-            vendedoresConEntregasSet.has(vendedor._id)
+        return vendedores.filter((vendedor: any) =>
+            vendedoresConEntregasSet.has(String(vendedor._id))
         );
-
-        return resultado;
     };
+    const hasExternalInCurrentStatus = () => {
+        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        return sourceData.some((pedido: any) => !!pedido.is_external);
+    };
+
 
     const filterByLocationAndDate = (data: any) => {
         const nombreSucursalToIdMap = new Map(
@@ -116,38 +197,47 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         );
         return data.filter((pedido: any) => {
             const isOtherLocation = selectedLocation === 'other';
-            const matchesOrigin =
-                !selectedOrigin ||
-                pedido.lugar_origen?._id?.toString() === nombreSucursalToIdMap.get(selectedOrigin);
+            const isExternal = !!pedido.is_external;
+            const lugarEntregaLower = String(pedido.lugar_entrega || "").toLowerCase();
+            const origenId = pedido.lugar_origen?._id?.toString() ||
+                pedido.sucursal?._id?.toString() ||
+                String(pedido.id_sucursal || "");
+            const selectedOriginId = nombreSucursalToIdMap.get(selectedOrigin);
+            const matchesOrigin = !selectedOrigin || origenId === selectedOriginId;
 
-            const matchesLocation = isOtherLocation
-                ? !sucursal.some((suc) => suc.nombre.toLowerCase() === pedido.lugar_entrega.toLowerCase()) &&
-                (!otherLocation || pedido.lugar_entrega.toLowerCase().includes(otherLocation.toLowerCase()))
-                : !selectedLocation || pedido.lugar_entrega.toLowerCase().includes(selectedLocation.toLowerCase());
+            const matchesLocation = isExternal
+                ? (isOtherLocation
+                    ? (!otherLocation || lugarEntregaLower.includes(otherLocation.toLowerCase()))
+                    : (!selectedLocation || lugarEntregaLower.includes(selectedLocation.toLowerCase())))
+                : (isOtherLocation
+                    ? !sucursal.some((suc) => suc.nombre.toLowerCase() === lugarEntregaLower) &&
+                    (!otherLocation || lugarEntregaLower.includes(otherLocation.toLowerCase()))
+                    : !selectedLocation || lugarEntregaLower.includes(selectedLocation.toLowerCase()));
             const matchesDateRange =
                 dateRange[0] && dateRange[1]
                     ? toSimpleDate(new Date(pedido.hora_entrega_acordada)) >= toSimpleDate(dateRange[0]) &&
                     toSimpleDate(new Date(pedido.hora_entrega_acordada)) <= toSimpleDate(dateRange[1])
                     : true;
             // Lógica actualizada para el filtro de vendedor
-            const matchesVendedor = isAdmin || isOperator
-                ? (selectedVendedor === "Todos" || !selectedVendedor || // Si es "Todos" o vacío, mostrar todos
-                    pedido.venta?.some((v: any) => {
-                        const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
-                        return vendedorId === selectedVendedor || v.id_vendedor === selectedVendedor;
-                    }) ||
-                    pedido.productos_temporales?.some((p: any) =>
-                        p.id_vendedor === selectedVendedor
-                    ))
-                : (
+            const matchesVendedor = (isAdmin || isOperator)
+                ? (isExternal
+                    ? (selectedVendedor === EXTERNAL_VENDOR_FILTER || selectedVendedor === "Todos" || !selectedVendedor)
+                    : (selectedVendedor === "Todos" || !selectedVendedor
+                        ? true
+                        : selectedVendedor === EXTERNAL_VENDOR_FILTER
+                            ? false
+                            : (pedido.venta?.some((v: any) => {
+                                const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
+                                return vendedorId === selectedVendedor || v.id_vendedor === selectedVendedor;
+                            }) ||
+                                pedido.productos_temporales?.some((p: any) => p.id_vendedor === selectedVendedor))))
+                : (!isExternal && (
                     pedido.venta?.some((v: any) => {
                         const vendedorId = typeof v.vendedor === 'object' ? v.vendedor._id : v.vendedor;
                         return v.id_vendedor === user?.id_vendedor || vendedorId === user?.id_vendedor;
                     }) ||
-                    pedido.productos_temporales?.some((p: any) =>
-                        p.id_vendedor === user?.id_vendedor
-                    )
-                );
+                    pedido.productos_temporales?.some((p: any) => p.id_vendedor === user?.id_vendedor)
+                ));
 
             // Nuevo filtro por cliente
             const matchesCliente = !searchCliente ||
@@ -222,6 +312,10 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
             dataIndex: 'vendedor',
             key: 'vendedor',
             render: (_: any, record: any) => {
+                if (record.is_external) {
+                    return <span style={{ color: '#cf1322', fontWeight: 700 }}>Externo</span>;
+                }
+
                 const vendedoresUnicos = new Map();
 
                 // 1. De ventas normales
@@ -266,31 +360,10 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
         },
     ];
 
-    // const handleCancel = () => {
-    //     setIsModalExternalVisible(false)
-    // };
-
-    // const handleIconClick = (order: any) => {
-    //     if (order.estado_pedido === "Entregado") return;
-    //     setSelectedShipping(order);
-    //     setIsModalStateVisible(true);
-    // };
-
-    // const handleRowClick = async (record: any) => {
-    //     try {
-    //         const shipping = await getShippingByIdAPI(record._id); // ✅ este endpoint debe devolver solo UN pedido
-    //         console.log("📦 Pedido individual para el modal:", shipping);
-    //         setSelectedShipping(shipping);
-    //         setIsModalVisible(true);
-    //     } catch (error) {
-    //         console.error("Error al obtener pedido por ID:", error);
-    //         message.error("Error al cargar el pedido");
-    //     }
-    // };
     const fetchSucursal = async () => {
         try {
-            const response = await getSucursalsAPI();
-            setSucursal(response);
+            const response = await getSucursalsBasicAPI();
+            setSucursal(Array.isArray(response) ? response : []);
 
             if (isAdmin || isOperator) {
                 const sucursalId = localStorage.getItem("sucursalId");
@@ -311,9 +384,21 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     };
 
     useEffect(() => {
-        fetchShippings();
         fetchSucursal();
-    }, [refreshKey]);
+    }, []);
+
+    useEffect(() => {
+        fetchShippings();
+    }, [
+        refreshKey,
+        canManageExternal,
+        selectedStatus,
+        dateRange,
+        selectedOrigin,
+        selectedVendedor,
+        user?.id_vendedor,
+        sucursal.length
+    ]);
 
     useEffect(() => {
         setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En Espera'));
@@ -327,8 +412,8 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
-                const response = await getSellersAPI();
-                setVendedores(response);
+                const response = await getSellersBasicAPI();
+                setVendedores(Array.isArray(response) ? response : []);
             } catch (error) {
                 message.error("Error al obtener vendedores");
             }
@@ -338,15 +423,31 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
     //console.log("Rol", user?.role?.toLowerCase());
     return (
         <div>
-            <div className="flex justify-center flex-wrap gap-2 mb-4">
-                {isAdmin || isOperator && (
+            <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                {(isAdmin || isOperator) && (
                     <Select
-                        style={{ width: 200, margin: 8 }}
+                        style={{ width: 200, margin: 0 }}
                         placeholder="Vendedores"
                         value={selectedVendedor || undefined}
                         onChange={(value) => setSelectedVendedor(value || "")}
                         allowClear
+                        showSearch
+                        filterOption={(input, option) => {
+                            const label =
+                                (option?.children ??
+                                    // por si en algún momento usas `options` en vez de `<Option>`
+                                    (option as any)?.label ??
+                                    "");
+
+                            return String(label)
+                                .toLowerCase()
+                                .includes(input.toLowerCase());
+                        }}
                     >
+                        {hasExternalInCurrentStatus() && (
+                            <Option value={EXTERNAL_VENDOR_FILTER}>Externo</Option>
+                        )}
                         {getVendedoresConEntregas().map((vendedor: any) => (
                             <Option key={vendedor._id} value={vendedor._id}>
                                 {vendedor.nombre} {vendedor.apellido}
@@ -354,15 +455,15 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         ))}
                     </Select>
                 )}
-
                 <Input
-                    style={{ width: 200, margin: 8 }}
+                    style={{ width: 200, margin: 0 }}
                     placeholder="Buscar cliente..."
                     value={searchCliente}
                     onChange={(e) => setSearchCliente(e.target.value)}
                     allowClear
                 />
-                
+                {
+                /*
                 <Select
                     style={{ width: 200, margin: 8 }}
                     placeholder="Estado del pedido"
@@ -372,22 +473,24 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     <Option value="En Espera">En Espera</Option>
                     <Option value="entregado">Entregado</Option>
                 </Select>
+
+                */}
                 <Select
                     placeholder="Sucursal de Origen"
-                    style={{ width: 200, margin: 8 }}
+                    style={{ width: 200, margin: 0 }}
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
                     allowClear={!isAdmin && !isOperator}
                     disabled={isAdmin || isOperator} // ← Bloquea si es admin
                 >
                     {sucursal.map((suc: any) => (
-                        <Option key={suc.id_sucursal} value={suc.nombre}>
+                        <Option key={suc._id || suc.id_sucursal} value={suc.nombre}>
                             {suc.nombre}
                         </Option>
                     ))}
                 </Select>
                 <Select
-                    style={{ width: 200, margin: 8 }}
+                    style={{ width: 200, margin: 0 }}
                     placeholder="Sucursal De Destino"
                     onChange={(value) => {
                         setSelectedLocation(value || '');
@@ -399,14 +502,14 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 >
                     <Option value="other">Otro lugar</Option>
                     {sucursal.map((suc: any) => (
-                        <Option key={suc.id_sucursal} value={suc.nombre}>
+                        <Option key={suc._id || suc.id_sucursal} value={suc.nombre}>
                             {suc.nombre}
                         </Option>
                     ))}
                 </Select>
                 {selectedLocation === 'other' && (
                     <Input
-                        style={{ width: 200, marginBottom: 16 }}
+                        style={{ width: 200, marginBottom: 0 }}
                         placeholder="Especificar otro lugar"
                         value={otherLocation}
                         onChange={(e) => setOtherLocation(e.target.value)}
@@ -440,7 +543,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 ) : (
                     <RangePicker
                         className="mt-2"
-                        style={{ width: 240, margin: 8 }}
+                        style={{ width: 240, margin: 0 }}
                         value={[
                             dateRange[0] ? moment(dateRange[0]) : null,
                             dateRange[1] ? moment(dateRange[1]) : null,
@@ -454,9 +557,30 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         }}
                     />
                 )}
+                {canManageExternal && (
+                    <Tooltip title="Registrar entrega externa">
+                        <Button
+                            type="primary"
+                            icon={<span className="inline-flex items-center gap-0.5"><InboxOutlined /><ArrowRightOutlined /></span>}
+                            onClick={() => setIsExternalCreateVisible(true)}
+                            style={{ width: 46, height: 46, borderRadius: 10, fontSize: 18 }}
+                        />
+                    </Tooltip>
+                )}
+                {onOpenQR && (
+                    <Tooltip title="Escanear QR de pedidos">
+                        <Button
+                            type="default"
+                            icon={<QrcodeOutlined />}
+                            onClick={onOpenQR}
+                            style={{ width: 46, height: 46, borderRadius: 10, fontSize: 18 }}
+                        />
+                    </Tooltip>
+                )}
+                </div>
             </div>
 
-            {selectedStatus === 'En Espera' && (
+            {/*selectedStatus === 'En Espera' && (
                 <>
                     <h2 className="text-mobile-sm xl:text-desktop-3xl text-center mb-4 font-bold">En Espera</h2>
                     <Table
@@ -474,9 +598,9 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         })}
                     />
                 </>
-            )}
+            )*/}
 
-            {selectedStatus === 'entregado' && (
+            {/*selectedStatus === 'entregado' && (
                 <>
                     <h2 className="text-mobile-sm xl:text-desktop-3xl text-center mb-4 font-bold">Entregado</h2>
                     <Table
@@ -494,7 +618,80 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                         })}
                     />
                 </>
-            )}
+            )*/}
+
+            <div className="flex items-center justify-center gap-3 mb-4">
+                <h2
+                    className={`
+            text-mobile-sm xl:text-desktop-3xl font-bold
+            transition-all duration-300
+            ${selectedStatus === 'En Espera' ? 'text-blue-700' : 'text-green-700'}
+        `}
+                >
+                    {selectedStatus === 'En Espera' ? 'En Espera' : 'Entregado'}
+                </h2>
+
+                <button
+                    type="button"
+                    onClick={toggleStatus}
+                    className={`
+            relative flex items-center gap-1 rounded-full border px-3 py-1
+            text-xs xl:text-sm font-medium
+            transition-all duration-300
+            shadow-sm
+            ${selectedStatus === 'En Espera'
+                        ? 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100'
+                        : 'bg-green-50 border-green-300 text-green-600 hover:bg-green-100'
+                    }
+        `}
+                >
+        <span
+            className={`
+                inline-flex items-center justify-center w-5 h-5 rounded-full
+                bg-white/80
+                text-[10px]
+                transition-transform duration-300
+                ${selectedStatus === 'En Espera' ? '' : 'rotate-180'}
+            `}
+        >
+            ⇆
+        </span>
+                    <span>
+            {selectedStatus === 'En Espera' ? 'Ver entregados' : 'Ver en espera'}
+        </span>
+                </button>
+            </div>
+
+            <Table
+                loading={loadingTable}
+                columns={columns}
+                dataSource={selectedStatus === 'En Espera' ? filteredEsperaData : filteredEntregadoData}
+                pagination={{
+                    pageSize: 30,
+                    showSizeChanger: true,
+                    pageSizeOptions: ["15", "30", "50", "100"]
+                }}
+                scroll={{ x: "max-content" }}
+                onRow={(record) => ({
+                    onClick: async () => {
+                        if ((record as any).is_external) {
+                            const fullExternal = await getExternalSaleByIdAPI((record as any)._id);
+                            if (fullExternal?.success === false) {
+                                message.error(fullExternal.message || "No se pudo cargar la entrega externa");
+                                return;
+                            }
+                            setSelectedExternalShipping(fullExternal);
+                            setIsExternalInfoVisible(true);
+                            return;
+                        }
+                        const fullShipping = await getShippingByIdAPI(record._id);
+                        console.log("📦 Pedido completo con ventas:", fullShipping);
+                        setSelectedShipping(fullShipping);
+                        setIsModalVisible(true);
+                    },
+                })}
+            />
+
 
             <ShippingInfoModal
                 visible={isModalVisible && !isModaStatelVisible}
@@ -505,7 +702,7 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                     setIsModalVisible(false);
                     fetchShippings();
                 }}
-                isAdmin={user?.role?.toLowerCase() === 'admin'}
+                isAdmin={canManageExternal}
 
             />
 
@@ -522,8 +719,34 @@ const ShippingTable = ({ refreshKey }: { refreshKey: number }) => {
                 }}
                 shipping={selectedShipping}
             />
+
+            <ExternalPackagesFormModal
+                visible={isExternalCreateVisible}
+                currentSucursal={currentSucursal}
+                onClose={() => setIsExternalCreateVisible(false)}
+                onCreated={() => {
+                    setIsExternalCreateVisible(false);
+                    fetchShippings();
+                }}
+            />
+
+            <ExternalShippingInfoModal
+                visible={isExternalInfoVisible}
+                externalShipping={selectedExternalShipping}
+                isAdmin={canManageExternal}
+                onClose={() => {
+                    setIsExternalInfoVisible(false);
+                    setSelectedExternalShipping(null);
+                }}
+                onSaved={() => {
+                    setIsExternalInfoVisible(false);
+                    setSelectedExternalShipping(null);
+                    fetchShippings();
+                }}
+            />
         </div>
     );
 };
 
 export default ShippingTable;
+

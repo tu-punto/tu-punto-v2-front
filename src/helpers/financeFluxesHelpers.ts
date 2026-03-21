@@ -1,71 +1,55 @@
-import { getFinancesFluxAPI } from "../api/financeFlux";
-import { FinanceFlux } from "../models/financeFluxModel";
-import { FLUX_TYPES, DATE_TAGS } from "../constants/fluxes";
-import { getShippingsAPI } from "../api/shipping";
-import { Shipping } from "../models/shippingModel";
+import { getFinancialSummaryAPI } from "../api/financeFlux";
+import { DATE_TAGS } from "../constants/fluxes";
 import dayjs from "dayjs";
 
 export const getFilteredStats = async (filter: string, dateRange: any = []) => {
-  const fluxes: FinanceFlux[] = await getFinancesFluxAPI();
-  const shippings: Shipping[] = await getShippingsAPI();
-  let income = 0,
-    expenses = 0,
-    deliveryIncome = 0,
-    deliveryExpenses = 0;
-
-  let startDate: Date | null = null;
-  let endDate: Date | null = new Date();
+  let from: string | undefined;
+  let to: string | undefined;
+  let range: string | undefined;
 
   switch (filter) {
     case DATE_TAGS.LAST_7_DAYS:
-      startDate = dayjs().subtract(7, "day").toDate();
+      range = "7d";
       break;
     case DATE_TAGS.LAST_30_DAYS:
-      startDate = dayjs().subtract(30, "day").toDate();
+      range = "30d";
       break;
     case DATE_TAGS.LAST_90_DAYS:
-      startDate = dayjs().subtract(90, "day").toDate();
+      range = "90d";
       break;
     case DATE_TAGS.LAST_YEAR:
-      startDate = dayjs().startOf("year").toDate();
+      range = "365d";
       break;
     case DATE_TAGS.CUSTOM:
-      [startDate, endDate] = dateRange;
+      if (dateRange && dateRange.length === 2) {
+        from = dateRange[0]
+          ? dayjs(dateRange[0]).startOf("day").format("YYYY-MM-DD")
+          : undefined;
+        to = dateRange[1]
+          ? dayjs(dateRange[1]).endOf("day").format("YYYY-MM-DD")
+          : undefined;
+        range = "custom";
+      }
       break;
     case DATE_TAGS.ALL_TIME:
     default:
-      startDate = null; // Sin restricción de fecha
+      range = undefined;
       break;
   }
 
-  for (const flux of fluxes) {
-    if (flux.esDeuda) continue;
-    const fluxDate = new Date(flux.fecha);
-    if ((!startDate || fluxDate >= startDate) && fluxDate <= endDate!) {
-      if (flux.tipo.toLowerCase() === FLUX_TYPES.GASTO.toLowerCase()) {
-        expenses += Number(flux.monto);
-      }
-      if (flux.tipo.toLowerCase() === FLUX_TYPES.INGRESO.toLowerCase()) {
-        income += Number(flux.monto);
-      }
-    }
-  }
+  const summary = await getFinancialSummaryAPI({ range, from, to });
+  const deliveryIncome = Number(summary?.deliveryIncome ?? 0);
+  const deliveryExpenses = Number(summary?.deliveryExpenses ?? 0);
+  const deliveryBalance = summary?.balanceDelivery ?? deliveryIncome - deliveryExpenses;
 
-  for (const shipping of shippings) {
-    const shippingDate = new Date(shipping.fecha_pedido);
-    if ((!startDate || shippingDate >= startDate) && shippingDate <= endDate!) {
-      deliveryIncome += shipping.cargo_delivery;
-      deliveryExpenses += shipping.costo_delivery;
-    }
-  }
-
-  const stats = {
-    expenses: expenses,
-    income: income,
-    utility: income - expenses,
+  return {
+    income: summary?.ingresos ?? 0,
+    expenses: summary?.gastos ?? 0,
+    investments: summary?.inversiones ?? 0,
+    utility: summary?.utilidad ?? 0,
     deliveryIncome: deliveryIncome,
     deliveryExpenses: deliveryExpenses,
+    deliveryBalance: deliveryBalance,
+    caja: summary?.caja ?? 0,
   };
-
-  return stats;
 };

@@ -5,10 +5,10 @@ import { updateSubvariantStockAPI } from '../../api/product';
 import { registerShippingAPI } from '../../api/shipping';
 
 const tipoPagoMap: Record<number, string> = {
-    1: 'Transferencia o QR',
-    2: 'Efectivo',
-    3: 'Pagado al dueño',
-    4: 'Efectivo + QR'
+  1: "Transferencia o QR",
+  2: "Efectivo",
+  3: "Pagado al dueno",
+  4: "Efectivo + QR",
 };
 
 function SalesFormModal({
@@ -41,105 +41,110 @@ function SalesFormModal({
 
         const monto = parseFloat(totalAmount || 0);
 
-        if (tipoPago === "1") {
-            setQrInput(monto);
-            form.setFieldsValue({ subtotal_qr: monto });
-        }
+    if (tipoPago === "1") {
+      setQrInput(monto);
+      form.setFieldsValue({ subtotal_qr: monto });
+    }
 
-        if (tipoPago === "2" || tipoPago === "3") {
-            setEfectivoInput(monto);
-            form.setFieldsValue({ subtotal_efectivo: monto });
-        }
+    if (tipoPago === "2" || tipoPago === "3") {
+      setEfectivoInput(monto);
+      form.setFieldsValue({ subtotal_efectivo: monto });
+    }
 
-        if (tipoPago === "4") {
-            const mitad = parseFloat((monto / 2).toFixed(2));
-            setQrInput(mitad);
-            setEfectivoInput(mitad);
-            form.setFieldsValue({ subtotal_qr: mitad, subtotal_efectivo: mitad });
-        }
-    }, [tipoPago, totalAmount, form]);
-    useEffect(() => {
-        const monto = parseFloat(totalAmount || 0);
-        const suma = (qrInput || 0) + (efectivoInput || 0);
-        if (form.getFieldValue("tipoDePago") === "4") {
-            setShowWarning(suma !== monto);
-        } else {
-            setShowWarning(false);
-        }
-    }, [qrInput, efectivoInput, form, totalAmount]);
+    if (tipoPago === "4") {
+      const mitad = parseFloat((monto / 2).toFixed(2));
+      setQrInput(mitad);
+      setEfectivoInput(mitad);
+      form.setFieldsValue({ subtotal_qr: mitad, subtotal_efectivo: mitad });
+    }
+  }, [tipoPago, totalAmount, form]);
 
-    const handleFinish = async (values: any) => {
-        setLoading(true);
-        if (showWarning) {
-            message.error("La suma QR + Efectivo no es válida. Verifica los montos.");
-            setLoading(false);
-            return;
-        }
+  useEffect(() => {
+    const monto = parseFloat(totalAmount || 0);
+    const suma = (qrInput || 0) + (efectivoInput || 0);
+    if (form.getFieldValue("tipoDePago") === "4") {
+      setShowWarning(suma !== monto);
+    } else {
+      setShowWarning(false);
+    }
+  }, [qrInput, efectivoInput, form, totalAmount]);
 
-        const tipoPagoSeleccionado = parseInt(values.tipoDePago);
+  const handleFinish = async (values: any) => {
+    setLoading(true);
+    if (showWarning) {
+      message.error("La suma QR + Efectivo no es valida. Verifica los montos.");
+      setLoading(false);
+      return;
+    }
 
-        const apiShippingData = {
-            tipo_de_pago: tipoPagoMap[tipoPagoSeleccionado],
-            estado_pedido: "interno", // 🟡 invisible
-            adelanto_cliente: 0,
-            pagado_al_vendedor: tipoPagoSeleccionado === 3,
-            subtotal_qr: tipoPagoSeleccionado === 1 || tipoPagoSeleccionado === 4 ? (qrInput || totalAmount / 2) : 0,
-            subtotal_efectivo: tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4 ? (efectivoInput || totalAmount / 2) : 0,
-            sucursal: branchIdFromProps,
-            lugar_origen: branchIdFromProps,
-            cliente: "Sin nombre",
-            telefono_cliente: "00000000",
-            lugar_entrega: "No aplica",
-            observaciones: "Pedido generado automáticamente desde una venta directa",
-            costo_delivery: 0,
-            cargo_delivery: 0,
-        };
-
-        const response = await registerShippingAPI(apiShippingData);
-        if (!response.success) {
-            message.error("Error al registrar pedido interno");
-            setLoading(false);
-            return;
-        }
-
-        const ventas = selectedProducts.map((p: any) => {
-            const vendedor = p.id_vendedor || p.vendedor;
-            const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
-            const utilidad = parseFloat(p.utilidad);
-            const utilidadCalculada = parseFloat(((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2));
-
-            return {
-                id_producto: p.key.split("-")[0],
-                producto: p.key.split("-")[0],
-                id_vendedor: vendedor,
-                vendedor,
-                id_pedido: response.newShipping._id,
-                sucursal: branchIdFromProps,
-                cantidad: p.cantidad,
-                precio_unitario: p.precio_unitario,
-                utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
-                deposito_realizado: false,
-                variantes: p.variantes,
-                nombre_variante: `${p.producto}`,
-                stockActual: p.stockActual,
-            };
-        });
-
-        if (ventas.length > 0) {
-            //await handleDebt(ventas, response.newShipping.adelanto_cliente);
-            await handleSales(response.newShipping, ventas);
-            await actualizarStock(ventas);
-        }
-
-
-        clearSelectedProducts();
-        form.resetFields();
-        setTipoPago(null);
-        setQrInput(0);
-        setEfectivoInput(0);
-        onSuccess();
-        setLoading(false);
+    const tipoPagoSeleccionado = parseInt(values.tipoDePago);
+    const apiShippingData = {
+      tipo_de_pago: tipoPagoMap[tipoPagoSeleccionado],
+      estado_pedido: "interno",
+      adelanto_cliente: 0,
+      pagado_al_vendedor: tipoPagoSeleccionado === 3,
+      subtotal_qr:
+        tipoPagoSeleccionado === 1 || tipoPagoSeleccionado === 4
+          ? qrInput || totalAmount / 2
+          : 0,
+      subtotal_efectivo:
+        tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4
+          ? efectivoInput || totalAmount / 2
+          : 0,
+      sucursal: branchIdFromProps,
+      lugar_origen: branchIdFromProps,
+      cliente: "Sin nombre",
+      telefono_cliente: "00000000",
+      lugar_entrega: "No aplica",
+      observaciones: "Pedido generado automaticamente desde una venta directa",
+      costo_delivery: 0,
+      cargo_delivery: 0,
     };
+
+    const response = await registerShippingAPI(apiShippingData);
+    if (!response.success) {
+      message.error("Error al registrar pedido interno");
+      setLoading(false);
+      return;
+    }
+
+    const ventas = selectedProducts.map((p: any) => {
+      const vendedor = p.id_vendedor || p.vendedor;
+      const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
+      const utilidad = parseFloat(p.utilidad);
+      const utilidadCalculada = parseFloat(
+        ((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2)
+      );
+
+      return {
+        id_producto: p.key.split("-")[0],
+        producto: p.key.split("-")[0],
+        id_vendedor: vendedor,
+        vendedor,
+        id_pedido: response.newShipping._id,
+        sucursal: branchIdFromProps,
+        cantidad: p.cantidad,
+        precio_unitario: p.precio_unitario,
+        utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
+        deposito_realizado: false,
+        variantes: p.variantes,
+        variantKey: p.variantKey,
+        nombre_variante: `${p.producto}`,
+      };
+    });
+
+    if (ventas.length > 0) {
+      await handleSales(response.newShipping, ventas);
+    }
+
+    clearSelectedProducts();
+    form.resetFields();
+    setTipoPago(null);
+    setQrInput(0);
+    setEfectivoInput(0);
+    onSuccess();
+    setLoading(false);
+  };
 
     const actualizarStock = async (productos: any[]) => {
         for (const prod of productos) {
@@ -273,3 +278,4 @@ function SalesFormModal({
 }
 
 export default SalesFormModal;
+

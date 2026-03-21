@@ -1,21 +1,32 @@
-import { Input } from "antd";
 import "./Header.css";
 import logoImg from "../../../public/logo-no-letter-dark-bg.png";
-
-const { Search } = Input;
+import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
 
 const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
+  const { sucursalNombre, sucursalImagenHeader } = useBranchHeaderInfo();
+
+  const cardStyle = sucursalImagenHeader
+    ? {
+        backgroundImage: `linear-gradient(92deg, rgba(8,46,84,0.96) 0%, rgba(8,46,84,0.88) 56%, rgba(8,46,84,0.18) 100%), url(${sucursalImagenHeader})`,
+      }
+    : undefined;
+
   return (
-    <div className="flex justify-between items-center p-4 bg-blue h-16 border-light-gray">
-      <button
-        className="text-light-blue text-2xl p-4 bg-transparent flex items-center"
-        onClick={toggleSidebar}
-      >
+    <div className="flex items-center gap-2 py-2 px-3 bg-blue border-light-gray">
+      <button className="tp-menu-btn" onClick={toggleSidebar} aria-label="Abrir menu">
         &#9776;
       </button>
-      <img src={logoImg} alt="logo" className="w-10 h-auto" />
-      <div className="ml-auto">
-        <Search placeholder="Buscar" className="max-w-xs" style={{ width: 200 }} />
+
+      <div className="tp-brand-card tp-brand-card--mobile" style={cardStyle}>
+        <img src={logoImg} alt="logo" className="tp-brand-card__logo tp-brand-card__logo--xs" />
+        <div className="tp-brand-card__text">
+          <h1 className="tp-brand-card__title tp-brand-card__title--xs">TU PUNTO</h1>
+          <div className="tp-branch-pill tp-branch-pill--xs">
+            <span className="tp-branch-pill__dot" />
+            <span className="tp-branch-pill__label">Sucursal</span>
+            <span className="tp-branch-pill__name">{sucursalNombre}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

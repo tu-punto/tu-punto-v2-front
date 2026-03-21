@@ -11,24 +11,31 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   pagoPendiente,
   deuda,
   saldoPendiente,
-}) => (
-  <div className="flex flex-col xl:flex-row justify-between mb-4">
-    <StatCard
-      title="PAGO PENDIENTE"
-      value={`Bs. ${Number(pagoPendiente).toFixed(2)}`}
-      color="#007bff"
-    />
-    <StatCard
-      title="Deuda no pagada"
-      value={`Bs. ${deuda}`}
-      color="#1976d2"
-    />
-    <StatCard
-      title="Saldo Pendiente"
-      value={`Bs. ${Number(saldoPendiente).toFixed(2)}`}
-      color="#1976d2"
-    />
-  </div>
-);
+}) => {
+  const formatMoney = (value: number | string) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  };
+
+  return (
+    <div className="flex flex-col xl:flex-row justify-between mb-4">
+      <StatCard
+        title="PAGO PENDIENTE"
+        value={`Bs. ${formatMoney(pagoPendiente)}`}
+        color="#007bff"
+      />
+      <StatCard
+        title="Deuda no pagada"
+        value={`Bs. ${formatMoney(deuda)}`}
+        color="#1976d2"
+      />
+      <StatCard
+        title="Saldo Pendiente"
+        value={`Bs. ${formatMoney(saldoPendiente)}`}
+        color="#1976d2"
+      />
+    </div>
+  );
+};
 
 export default StatsCards;

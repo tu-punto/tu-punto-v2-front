@@ -31,7 +31,12 @@ import {
   deleteSaleByIdAPI,
   updateSaleByIdAPI,
 } from "../../../api/sales";
-import { getPaymentProofsBySellerIdAPI, getSellerDebtsAPI, updateSellerAPI } from "../../../api/seller";
+import {
+  getPaymentProofsBySellerIdAPI,
+  getSellerAPI,
+  getSellerDebtsAPI,
+  updateSellerAPI,
+} from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
 
@@ -63,6 +68,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [deletedEntryData, setDeletedEntryData] = useState<any[]>([]);
   const [paymentProofs, setPaymentProofs] = useState<any[]>([]);
   const [sellerDebts, setSellerDebts] = useState<any[]>([]);
+  const [sellerMetrics, setSellerMetrics] = useState<{
+    saldo_pendiente: number;
+    deuda: number;
+    pago_pendiente: number;
+  } | null>(null);
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
@@ -80,6 +90,34 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       fetchSellerDebts(seller.key);
     }
   }, [sucursalesLoaded, refreshKey]);
+
+  useEffect(() => {
+    const fetchSellerMetrics = async () => {
+      if (!seller?.key) return;
+      try {
+        const detail = await getSellerAPI(String(seller.key));
+        if (!detail) {
+          setSellerMetrics(null);
+          return;
+        }
+
+        const saldoPendiente = Number(detail.saldo_pendiente ?? 0);
+        const deuda = Number(detail.deuda ?? 0);
+        const pagoPendiente = Number(detail.pago_pendiente ?? saldoPendiente - deuda);
+
+        setSellerMetrics({
+          saldo_pendiente: Number.isFinite(saldoPendiente) ? saldoPendiente : 0,
+          deuda: Number.isFinite(deuda) ? deuda : 0,
+          pago_pendiente: Number.isFinite(pagoPendiente) ? pagoPendiente : 0,
+        });
+      } catch (e) {
+        console.error("Error al cargar metricas del vendedor", e);
+        setSellerMetrics(null);
+      }
+    };
+
+    fetchSellerMetrics();
+  }, [seller?.key, refreshKey]);
 
   /* ─────────── solicitudes ─────────── */
   const fetchSucursales = async () => {
@@ -235,14 +273,30 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   };
 
   /* ─────────── render ─────────── */
+  const saldoPendienteValue = Number(
+    sellerMetrics?.saldo_pendiente ?? (seller as any)?.saldo_pendiente ?? 0
+  );
+  const deudaValue = Number(
+    sellerMetrics?.deuda ?? (seller as any)?.deuda ?? 0
+  );
+  const pagoPendienteFromApi = Number(
+    sellerMetrics?.pago_pendiente ?? (seller as any)?.pago_pendiente
+  );
+  const pagoPendienteFromTable = Number((seller as any)?.pagoTotalInt);
+  const pagoPendienteValue = Number.isFinite(pagoPendienteFromApi)
+    ? pagoPendienteFromApi
+    : Number.isFinite(pagoPendienteFromTable)
+      ? pagoPendienteFromTable
+      : saldoPendienteValue - deudaValue;
+
   return (
     <div>
       <SellerHeader name={seller.nombre} />
 
       <StatsCards
-        pagoPendiente={seller.pago_pendiente}
-        deuda={seller.deuda}
-        saldoPendiente={seller.saldo_pendiente}
+        pagoPendiente={pagoPendienteValue}
+        deuda={deudaValue}
+        saldoPendiente={saldoPendienteValue}
       />
 
       <Form
