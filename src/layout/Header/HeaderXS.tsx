@@ -3,7 +3,7 @@ import logoImg from "../../../public/logo-no-letter-dark-bg.png";
 import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
 
 const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
-  const { sucursalNombre, sucursalImagenHeader } = useBranchHeaderInfo();
+  const { sucursalNombre, sucursalImagenHeader, pillLabel } = useBranchHeaderInfo();
 
   const cardStyle = sucursalImagenHeader
     ? {
@@ -23,7 +23,7 @@ const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
           <h1 className="tp-brand-card__title tp-brand-card__title--xs">TU PUNTO</h1>
           <div className="tp-branch-pill tp-branch-pill--xs">
             <span className="tp-branch-pill__dot" />
-            <span className="tp-branch-pill__label">Sucursal</span>
+            <span className="tp-branch-pill__label">{pillLabel}</span>
             <span className="tp-branch-pill__name">{sucursalNombre}</span>
           </div>
         </div>

@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Collapse, Modal, Select, Switch, Typography, message } from "antd";
-import { EyeOutlined, InboxOutlined, QrcodeOutlined } from "@ant-design/icons";
-import { batchGenerateVariantQRAPI, listVariantQRAPI } from "../../api/qr";
+import { Alert, Button, InputNumber, Modal, Select, Switch, Typography, message } from "antd";
+import { CheckCircleFilled, EyeOutlined, InboxOutlined, QrcodeOutlined } from "@ant-design/icons";
+import { batchGenerateVariantQRAPI, listVariantQRAPI, listVariantQRGroupAPI } from "../../api/qr";
 import { SERVER_URL } from "../../config/config";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { getFlatProductListAPI } from "../../api/product";
 import VariantQRGroupManagerModal from "./VariantQRGroupManagerModal";
 import {
+  buildDirectGroupLabelImageData,
+  PrintableGroupItem,
+  toBase64Png as toBase64GroupPng
+} from "./variantQRGroupPrint";
+import {
   connectQz,
-  createEscPosConfig,
   createPixelConfig,
   findQzPrinters,
   isQzConnected,
@@ -15,7 +20,6 @@ import {
 } from "../../utils/qzTray";
 
 const { Text } = Typography;
-const ESC = "\x1B";
 
 interface QRItem {
   productId: string;
@@ -38,10 +42,15 @@ interface Props {
 
 interface DirectPreviewItem {
   id: string;
-  productName: string;
-  variantLabel: string;
+  title: string;
+  subtitle: string;
+  kind: "variant" | "group";
   dataUrl: string;
   heightMm: number;
+}
+
+interface GroupSummaryResultItem extends PrintableGroupItem {
+  groupCode?: string;
 }
 
 const escapeHtml = (value: string) =>
@@ -209,7 +218,7 @@ const printWithIframeFallback = (html: string) => {
   }, 350);
 };
 
-const openPrintWindow = (
+export const openPrintWindow = (
   items: QRItem[],
   resolveSellerLabel: (sellerId?: string) => string,
   options: { ticketWidthMm: number; qrSizeMm: number }
@@ -451,6 +460,12 @@ const VariantQRBatchModal = ({
   );
   const [directPreviewVisible, setDirectPreviewVisible] = useState(false);
   const [directPreviewItems, setDirectPreviewItems] = useState<DirectPreviewItem[]>([]);
+  const [stockByItemKey, setStockByItemKey] = useState<Record<string, number>>({});
+  const [printQuantities, setPrintQuantities] = useState<Record<string, number>>({});
+  const [groupPrintQuantities, setGroupPrintQuantities] = useState<Record<string, number>>({});
+  const [loadingStocks, setLoadingStocks] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [resultGroups, setResultGroups] = useState<GroupSummaryResultItem[]>([]);
   const [result, setResult] = useState<any>(null);
   const [groupManagerVisible, setGroupManagerVisible] = useState(false);
   const autoRunDoneRef = useRef(false);
@@ -477,7 +492,7 @@ const VariantQRBatchModal = ({
   const sellerNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const seller of sellers || []) {
-      map.set(String(seller._id), `${seller.nombre} ${seller.apellido}`.trim());
+      map.set(String(seller._id), `${seller.nombre || ""} ${seller.apellido || ""}`.trim());
     }
     return map;
   }, [sellers]);
@@ -491,17 +506,53 @@ const VariantQRBatchModal = ({
   const listedItems: QRItem[] = (result?.items || []) as QRItem[];
   const printableItems: QRItem[] = listedItems.length > 0 ? listedItems : generatedItems;
   const hasMetrics = typeof result?.products === "number";
-  const isListMode = typeof result?.count === "number" && !hasMetrics;
   const hasInitialProductIds = initialProductIds.length > 0;
   const effectiveProductIds = hasInitialProductIds ? initialProductIds : undefined;
   const hasScopedSelection = Boolean(sellerId) || Boolean(effectiveProductIds?.length);
-  const groupedPrintableItems = useMemo(
-    () => groupItemsBySeller(printableItems, resolveSellerLabel),
-    [printableItems, sellerNameById]
-  );
   const qzPrinterOptions = useMemo(
     () => qzPrinters.map((name) => ({ value: name, label: name })),
     [qzPrinters]
+  );
+  const itemPrintKey = (item: QRItem) => `${item.productId}::${item.variantKey}`;
+  const getItemSystemStock = (item: QRItem) => {
+    const value = stockByItemKey[itemPrintKey(item)];
+    return Number.isFinite(value) ? Math.max(0, Number(value)) : 0;
+  };
+  const getItemPrintQuantity = (item: QRItem) => {
+    const stored = printQuantities[itemPrintKey(item)];
+    if (Number.isFinite(stored)) return Math.max(0, Number(stored));
+    return undefined;
+  };
+  const printableQueue = useMemo(
+    () =>
+      printableItems.flatMap((item) => {
+        const quantity = getItemPrintQuantity(item) ?? 0;
+        if (quantity <= 0) return [];
+        return Array.from({ length: quantity }, () => item);
+      }),
+    [printableItems, printQuantities, stockByItemKey]
+  );
+  const totalPrintQuantity = useMemo(
+    () => printableItems.reduce((acc, item) => acc + (getItemPrintQuantity(item) ?? 0), 0),
+    [printableItems, printQuantities, stockByItemKey]
+  );
+  const getGroupPrintQuantity = (group: GroupSummaryResultItem) => {
+    const stored = groupPrintQuantities[group.id];
+    if (Number.isFinite(stored)) return Math.max(0, Number(stored));
+    return undefined;
+  };
+  const printableGroupQueue = useMemo(
+    () =>
+      resultGroups.flatMap((group) => {
+        const quantity = getGroupPrintQuantity(group) ?? 0;
+        if (quantity <= 0) return [];
+        return Array.from({ length: quantity }, () => group);
+      }),
+    [resultGroups, groupPrintQuantities]
+  );
+  const totalGroupPrintQuantity = useMemo(
+    () => resultGroups.reduce((acc, group) => acc + (getGroupPrintQuantity(group) ?? 0), 0),
+    [resultGroups, groupPrintQuantities]
   );
 
   const confirmForceRegeneration = async (): Promise<boolean> => {
@@ -567,6 +618,192 @@ const VariantQRBatchModal = ({
       setResult(response?.result || null);
     } finally {
       setLoadingList(false);
+    }
+  };
+
+  const handleQuantityChange = (item: QRItem, value?: number | null) => {
+    const key = itemPrintKey(item);
+    if (value === null || value === undefined) {
+      setPrintQuantities((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+
+    const next = Math.max(0, Math.floor(Number(value)));
+    setPrintQuantities((current) => ({
+      ...current,
+      [key]: next
+    }));
+  };
+
+  const applySystemStockToItem = (item: QRItem) => {
+    handleQuantityChange(item, getItemSystemStock(item));
+  };
+
+  const handleGroupQuantityChange = (groupId: string, value?: number | null) => {
+    if (value === null || value === undefined) {
+      setGroupPrintQuantities((current) => {
+        const next = { ...current };
+        delete next[groupId];
+        return next;
+      });
+      return;
+    }
+
+    const next = Math.max(0, Math.floor(Number(value)));
+    setGroupPrintQuantities((current) => ({
+      ...current,
+      [groupId]: next
+    }));
+  };
+
+  const applySystemStockToAll = () => {
+    if (!printableItems.length) {
+      message.warning("No hay QRs en resultado para ajustar");
+      return;
+    }
+
+    const nextState = printableItems.reduce<Record<string, number>>((acc, item) => {
+      acc[itemPrintKey(item)] = getItemSystemStock(item);
+      return acc;
+    }, {});
+
+    setPrintQuantities((current) => ({
+      ...current,
+      ...nextState
+    }));
+    message.success("Se cargo el stock actual como cantidad de impresion");
+  };
+
+  const loadPrintableStocks = async () => {
+    if (!printableItems.length) {
+      setStockByItemKey({});
+      return;
+    }
+
+    setLoadingStocks(true);
+    try {
+      const rows = await getFlatProductListAPI({
+        sucursalId: sucursalId || undefined,
+        sellerId: sellerId || undefined
+      });
+
+      const requestedKeys = new Set(printableItems.map((item) => itemPrintKey(item)));
+      const nextMap = (Array.isArray(rows) ? rows : []).reduce<Record<string, number>>((acc, row: any) => {
+        const key = `${String(row?._id || "")}::${String(row?.variantKey || "")}`;
+        if (!requestedKeys.has(key)) return acc;
+        acc[key] = Math.max(0, Number(row?.stock || 0));
+        return acc;
+      }, {});
+
+      setStockByItemKey(nextMap);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo consultar el stock actual para los QRs listados");
+      setStockByItemKey({});
+    } finally {
+      setLoadingStocks(false);
+    }
+  };
+
+  const loadResultGroups = async () => {
+    if (!sellerId) {
+      setResultGroups([]);
+      setGroupPrintQuantities({});
+      return;
+    }
+
+    setLoadingGroups(true);
+    try {
+      const response = await listVariantQRGroupAPI({
+        sellerId,
+        active: true,
+        limit: 100
+      });
+      const groups = Array.isArray(response?.result?.items) ? response.result.items : [];
+      const normalized = groups
+        .filter((group: any) => group?.qrImagePath)
+        .map((group: any) => ({
+          id: String(group.id),
+          name: group.name || "Grupo QR",
+          sellerLabel: resolveSellerLabel(String(group.sellerId || sellerId)),
+          itemCount: Number(group.totalItems || 0),
+          qrImagePath: String(group.qrImagePath),
+          groupCode: group.groupCode ? String(group.groupCode) : undefined
+        }));
+
+      setResultGroups(normalized);
+      setGroupPrintQuantities((current) =>
+        normalized.reduce<Record<string, number>>((acc, group) => {
+          acc[group.id] = current[group.id] ?? 0;
+          return acc;
+        }, {})
+      );
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudieron cargar los grupos QR del vendedor");
+      setResultGroups([]);
+      setGroupPrintQuantities({});
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handlePrintResultDirect = async () => {
+    if (!printableQueue.length) {
+      message.warning("Define al menos una cantidad a imprimir");
+      return;
+    }
+    await handlePrintDirect(printableQueue, false);
+  };
+
+  const handlePrintGroupsDirect = async () => {
+    if (!selectedQzPrinter) {
+      message.warning("Selecciona una impresora para impresion directa");
+      return;
+    }
+    if (!printableGroupQueue.length) {
+      message.warning("Define al menos una cantidad para los grupos");
+      return;
+    }
+
+    setQzBusy(true);
+    try {
+      for (const [index, group] of printableGroupQueue.entries()) {
+        const labelImage = await buildDirectGroupLabelImageData(group, {
+          ticketWidthMm,
+          qrSizeMm
+        });
+
+        const pixelConfig = await createPixelConfig(selectedQzPrinter, {
+          widthMm: ticketWidthMm,
+          heightMm: labelImage.heightMm
+        });
+
+        await qzPrint(pixelConfig, [
+          {
+            type: "pixel",
+            format: "image",
+            flavor: "base64",
+            data: toBase64GroupPng(labelImage.dataUrl),
+            options: { interpolation: "nearest-neighbor" }
+          }
+        ]);
+
+        if (printDelayMs > 0 && index < printableGroupQueue.length - 1) {
+          await waitMs(printDelayMs);
+        }
+      }
+
+      message.success(`Impresion de grupos completada: ${printableGroupQueue.length} etiqueta(s)`);
+    } catch (error) {
+      console.error(error);
+      message.error("Error al imprimir grupos QR. Revisa QZ Tray o la impresora.");
+    } finally {
+      setQzBusy(false);
     }
   };
 
@@ -665,16 +902,22 @@ const VariantQRBatchModal = ({
     }
   };
 
-  const handleOpenDirectPreview = async (items: QRItem[], isTest = false) => {
-    if (!items.length) {
+  const handleOpenDirectPreview = async (
+    items: QRItem[],
+    groups: GroupSummaryResultItem[] = [],
+    isTest = false
+  ) => {
+    if (!items.length && !groups.length) {
       message.warning("No hay etiquetas para previsualizar");
       return;
     }
 
     setPreviewBusy(true);
     try {
-      const targetItems = isTest ? [items[0]] : items;
-      const previewItems = await Promise.all(
+      const targetItems = isTest ? items.slice(0, 1) : items;
+      const targetGroups = isTest && !targetItems.length ? groups.slice(0, 1) : groups;
+
+      const variantPreviewItems = await Promise.all(
         targetItems.map(async (item) => {
           const labelImage = await buildDirectLabelImageData(item, {
             ticketWidthMm,
@@ -683,15 +926,34 @@ const VariantQRBatchModal = ({
 
           return {
             id: `${item.productId}-${item.variantKey}-${item.qrCode}`,
-            productName: item.productName || item.productId || "Producto",
-            variantLabel: item.variantLabel || item.variantKey || "Variante",
+            title: item.productName || item.productId || "Producto",
+            subtitle: item.variantLabel || item.variantKey || "Variante",
+            kind: "variant" as const,
             dataUrl: labelImage.dataUrl,
             heightMm: labelImage.heightMm
           };
         })
       );
 
-      setDirectPreviewItems(previewItems);
+      const groupPreviewItems = await Promise.all(
+        targetGroups.map(async (group) => {
+          const labelImage = await buildDirectGroupLabelImageData(group, {
+            ticketWidthMm,
+            qrSizeMm
+          });
+
+          return {
+            id: `group-${group.id}`,
+            title: group.name || "Grupo QR",
+            subtitle: `${group.itemCount} variante(s)`,
+            kind: "group" as const,
+            dataUrl: labelImage.dataUrl,
+            heightMm: labelImage.heightMm
+          };
+        })
+      );
+
+      setDirectPreviewItems([...variantPreviewItems, ...groupPreviewItems]);
       setDirectPreviewVisible(true);
     } catch (error) {
       console.error(error);
@@ -747,6 +1009,25 @@ const VariantQRBatchModal = ({
     void syncQzStatus();
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible) return;
+    if (!printableItems.length) {
+      setStockByItemKey({});
+      setPrintQuantities({});
+      return;
+    }
+    void loadPrintableStocks();
+  }, [visible, printableItems, sellerId, sucursalId]);
+
+  useEffect(() => {
+    if (!visible || !result) {
+      setResultGroups([]);
+      setGroupPrintQuantities({});
+      return;
+    }
+    void loadResultGroups();
+  }, [visible, result, sellerId, groupManagerVisible]);
+
   return (
     <Modal
       open={visible}
@@ -754,6 +1035,7 @@ const VariantQRBatchModal = ({
       title="Generacion Masiva de QRs por Variante"
       footer={null}
       destroyOnClose
+      width={760}
     >
       <div className="space-y-3">
         <div
@@ -926,259 +1208,318 @@ const VariantQRBatchModal = ({
           </Button>
         </div>
 
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <Text strong>Ancho ticket</Text>
-            <Select
-              className="w-full mt-1"
-              value={ticketWidthMm}
-              onChange={(value) => setTicketWidthMm(Number(value))}
-              options={[
-                { value: 40, label: "40 mm (papel pequeno)" },
-                { value: 58, label: "58 mm" },
-                { value: 80, label: "80 mm" }
-              ]}
-            />
+        <div
+          style={{
+            border: "1px solid #eadfce",
+            borderRadius: 14,
+            background: "#fffdfa",
+            padding: 14,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12
+          }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Text strong>Ancho ticket</Text>
+              <Select
+                className="w-full mt-1"
+                value={ticketWidthMm}
+                onChange={(value) => setTicketWidthMm(Number(value))}
+                options={[
+                  { value: 40, label: "40 mm (papel pequeno)" },
+                  { value: 58, label: "58 mm" },
+                  { value: 80, label: "80 mm" }
+                ]}
+              />
+            </div>
+            <div>
+              <Text strong>Tamano QR</Text>
+              <Select
+                className="w-full mt-1"
+                value={qrSizeMm}
+                onChange={(value) => setQrSizeMm(Number(value))}
+                options={[
+                  { value: 8, label: "8 mm (nano)" },
+                  { value: 9, label: "9 mm (mini)" },
+                  { value: 10, label: "10 mm (micro)" },
+                  { value: 12, label: "12 mm" },
+                  { value: 14, label: "14 mm (muy compacto)" },
+                  { value: 16, label: "16 mm" },
+                  { value: 18, label: "18 mm" },
+                  { value: 20, label: "20 mm" },
+                  { value: 22, label: "22 mm" }
+                ]}
+              />
+            </div>
+            <div>
+              <Text strong>Pausa</Text>
+              <Select
+                className="w-full mt-1"
+                value={printDelayMs}
+                onChange={(value) => setPrintDelayMs(Number(value))}
+                options={[
+                  { value: 0, label: "Sin pausa" },
+                  { value: 250, label: "250 ms" },
+                  { value: 500, label: "500 ms (recomendado)" },
+                  { value: 800, label: "800 ms" },
+                  { value: 1200, label: "1200 ms" }
+                ]}
+              />
+            </div>
           </div>
-          <div className="flex-1">
-            <Text strong>Tamaño QR</Text>
-            <Select
-              className="w-full mt-1"
-              value={qrSizeMm}
-              onChange={(value) => setQrSizeMm(Number(value))}
-              options={[
-                { value: 8, label: "8 mm (nano)" },
-                { value: 9, label: "9 mm (mini)" },
-                { value: 10, label: "10 mm (micro)" },
-                { value: 12, label: "12 mm" },
-                { value: 14, label: "14 mm (muy compacto)" },
-                { value: 16, label: "16 mm" },
-                { value: 18, label: "18 mm" },
-                { value: 20, label: "20 mm" },
-                { value: 22, label: "22 mm" }
-              ]}
-            />
+
+          <div className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr] gap-2 items-end">
+            <div>
+              <Text strong>Conexion</Text>
+              <div className="flex gap-2 mt-1 items-center flex-wrap">
+                <Button onClick={handleConnectQz} loading={qzBusy} style={{ borderRadius: 12 }}>
+                  {qzConnected ? "Reconectar QZ" : "Conectar QZ"}
+                </Button>
+                {qzConnected ? (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      color: "#389e0d",
+                      fontWeight: 600,
+                      fontSize: 13
+                    }}
+                  >
+                    <CheckCircleFilled />
+                    Conectado
+                  </span>
+                ) : (
+                  <span style={{ color: "#8c8c8c", fontSize: 12 }}>Sin conexion</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Text strong>Impresoras</Text>
+              <div className="mt-1">
+                <Button
+                  onClick={handleLoadQzPrinters}
+                  loading={qzBusy}
+                  disabled={!qzConnected}
+                  style={{ borderRadius: 12 }}
+                >
+                  Buscar impresoras
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <Text strong>Impresora directa</Text>
+              <Select
+                className="w-full mt-1"
+                value={selectedQzPrinter}
+                onChange={(value) => {
+                  setSelectedQzPrinter(value);
+                  localStorage.setItem("qzPrinterName", value);
+                }}
+                options={qzPrinterOptions}
+                placeholder="Selecciona una impresora (EPSON TM-L90...)"
+                showSearch
+                optionFilterProp="label"
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <Text strong>Pausa entre etiquetas</Text>
-          <Select
-            className="w-full mt-1"
-            value={printDelayMs}
-            onChange={(value) => setPrintDelayMs(Number(value))}
-            options={[
-              { value: 0, label: "Sin pausa" },
-              { value: 250, label: "250 ms" },
-              { value: 500, label: "500 ms (recomendado)" },
-              { value: 800, label: "800 ms" },
-              { value: 1200, label: "1200 ms" }
-            ]}
-          />
-        </div>
-
-        <Alert
-          type={qzConnected ? "success" : "warning"}
-          showIcon
-          message="Impresion directa 1x1 (QZ Tray + TM-L90)"
-          description={
-            qzConnected
-              ? "QZ Tray conectado. Puedes imprimir y cortar etiqueta por etiqueta."
-              : "QZ Tray no conectado. Abre QZ Tray y usa el boton Conectar."
-          }
-        />
-
-        <div className="flex gap-2">
-          <Button onClick={handleConnectQz} loading={qzBusy}>
-            {qzConnected ? "Reconectar QZ" : "Conectar QZ"}
-          </Button>
-          <Button onClick={handleLoadQzPrinters} loading={qzBusy} disabled={!qzConnected}>
-            Buscar impresoras
-          </Button>
-        </div>
-
-        <div>
-          <Text strong>Impresora directa</Text>
-          <Select
-            className="w-full mt-1"
-            value={selectedQzPrinter}
-            onChange={(value) => {
-              setSelectedQzPrinter(value);
-              localStorage.setItem("qzPrinterName", value);
-            }}
-            options={qzPrinterOptions}
-            placeholder="Selecciona una impresora (EPSON TM-L90...)"
-            showSearch
-            optionFilterProp="label"
-          />
-        </div>
-
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            onClick={() => handlePrintDirect(printableItems, true)}
-            loading={qzBusy}
-            disabled={!qzConnected || !selectedQzPrinter || printableItems.length === 0 || previewBusy}
-          >
-            Probar 1 etiqueta (corte)
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => handlePrintDirect(printableItems, false)}
-            loading={qzBusy}
-            disabled={!qzConnected || !selectedQzPrinter || printableItems.length === 0 || previewBusy}
-          >
-            Imprimir 1x1 con corte
-          </Button>
-          <Button
-            icon={<EyeOutlined />}
-            onClick={() => void handleOpenDirectPreview(printableItems, false)}
-            loading={previewBusy}
-            disabled={printableItems.length === 0 || qzBusy}
-          >
-            Ver render 1x1
-          </Button>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button
+              icon={<EyeOutlined />}
+              onClick={() => void handleOpenDirectPreview(printableItems, resultGroups, false)}
+              loading={previewBusy}
+              disabled={(printableItems.length === 0 && resultGroups.length === 0) || qzBusy}
+              style={{ borderRadius: 12 }}
+            >
+              Vista previa
+            </Button>
+          </div>
         </div>
 
         {result && (
-          <Alert
-            type="info"
-            showIcon
-            message="Resultado"
-            description={
+          <div
+            style={{
+              border: "1px solid #d9e6f5",
+              borderRadius: 14,
+              background: "linear-gradient(180deg, #f7fbff 0%, #ffffff 100%)",
+              padding: 14,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
-                {hasMetrics && (
-                  <>
-                    <div>Productos: {result.products || 0}</div>
-                    <div>Variantes procesadas: {result.variantsProcessed || 0}</div>
-                    <div>Generados: {result.generated || 0}</div>
-                    <div>Omitidos: {result.skipped || 0}</div>
-                    <div>Errores: {(result.errors || []).length}</div>
-                  </>
-                )}
+                <Text strong style={{ fontSize: 15 }}>Resultado</Text>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                  {hasMetrics
+                    ? `Procesadas ${result.variantsProcessed || 0} variantes | generadas ${result.generated || 0}`
+                    : `QRs disponibles: ${result.count || 0}`}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {hasMetrics && <div style={{ fontSize: 12, color: "#6b7280" }}>Errores: {(result.errors || []).length}</div>}
+                <Button onClick={applySystemStockToAll} disabled={!printableItems.length || loadingStocks} style={{ borderRadius: 12 }}>
+                  Stock actual en todos
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={() => void handlePrintResultDirect()}
+                  loading={qzBusy}
+                  disabled={!qzConnected || !selectedQzPrinter || totalPrintQuantity === 0 || previewBusy}
+                  style={{
+                    borderRadius: 12,
+                    background: "linear-gradient(135deg, #ff9b45 0%, #ff7f2a 100%)",
+                    borderColor: "#ff8b34"
+                  }}
+                >
+                  Impresion directa 1x1
+                </Button>
+              </div>
+            </div>
 
-                {isListMode && (
-                  <div>QRs existentes: {result.count || 0}</div>
-                )}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, color: "#4b5563" }}>
+              {hasMetrics && <span>Productos: {result.products || 0}</span>}
+              {hasMetrics && <span>Omitidos: {result.skipped || 0}</span>}
+              <span>Total a imprimir: {totalPrintQuantity}</span>
+              <span>{loadingStocks ? "Consultando stock actual..." : "Stock actual cargado"}</span>
+            </div>
 
-                {printableItems.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ marginBottom: 8 }}>
-                      <Button
-                        onClick={() =>
-                          openPrintWindow(printableItems, resolveSellerLabel, {
-                            ticketWidthMm,
-                            qrSizeMm
-                          })
-                        }
-                        size="small"
-                      >
-                        Imprimir todos / Guardar PDF
+            {printableItems.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {printableItems.slice(0, 20).map((item: QRItem) => {
+                  const label = item.variantLabel || item.variantKey;
+                  const productName = item.productName || item.productId;
+                  const systemStock = getItemSystemStock(item);
+                  return (
+                    <div
+                      key={`${item.productId}-${item.variantKey}-${item.qrCode}`}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1.5fr) auto auto",
+                        gap: 12,
+                        alignItems: "center",
+                        padding: "12px 14px",
+                        borderRadius: 12,
+                        background: "#ffffff",
+                        border: "1px solid #e7eef7"
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <a href={item.qrImagePath} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+                          {productName} - {label}
+                        </a>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
+                          Stock sistema: {systemStock}
+                        </div>
+                      </div>
+                      <InputNumber
+                        min={0}
+                        value={getItemPrintQuantity(item)}
+                        onChange={(value) => handleQuantityChange(item, value)}
+                        style={{ width: 92 }}
+                      />
+                      <Button size="small" onClick={() => applySystemStockToItem(item)} disabled={loadingStocks}>
+                        Usar stock
                       </Button>
                     </div>
-
-                    <Text strong>
-                      {isListMode ? "QRs existentes (primeros 20):" : "Etiquetas generadas (primeras 20):"}
-                    </Text>
-                    {!sellerId && groupedPrintableItems.length > 1 ? (
-                      <div style={{ marginTop: 8 }}>
-                        <Collapse
-                          size="small"
-                          defaultActiveKey={groupedPrintableItems.map((group) => group.key)}
-                          items={groupedPrintableItems.map((group) => ({
-                            key: group.key,
-                            label: (
-                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                                <span>{group.label} ({group.items.length})</span>
-                                <Button
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handlePrintDirect(group.items, false);
-                                  }}
-                                  disabled={!qzConnected || !selectedQzPrinter || group.items.length === 0}
-                                >
-                                  Directo vendedor
-                                </Button>
-                              </div>
-                            ),
-                            children: (
-                              <div>
-                                {group.items.slice(0, 20).map((item: QRItem) => {
-                                  const label = item.variantLabel || item.variantKey;
-                                  const productName = item.productName || item.productId;
-                                  return (
-                                    <div
-                                      key={`${item.productId}-${item.variantKey}-${item.qrCode}`}
-                                      style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}
-                                    >
-                                      <a href={item.qrImagePath} target="_blank" rel="noreferrer">
-                                        {productName} - {label}
-                                      </a>
-                                      <Button
-                                        size="small"
-                                        onClick={() =>
-                                          openPrintWindow([item], resolveSellerLabel, {
-                                            ticketWidthMm,
-                                            qrSizeMm
-                                          })
-                                        }
-                                      >
-                                        Imprimir
-                                      </Button>
-                                      <Button
-                                        size="small"
-                                        onClick={() => void handlePrintDirect([item], false)}
-                                        disabled={!qzConnected || !selectedQzPrinter}
-                                      >
-                                        Directo 1x1
-                                      </Button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )
-                          }))}
-                        />
-                      </div>
-                    ) : (
-                      printableItems.slice(0, 20).map((item: QRItem) => {
-                        const label = item.variantLabel || item.variantKey;
-                        const productName = item.productName || item.productId;
-                        return (
-                          <div
-                            key={`${item.productId}-${item.variantKey}-${item.qrCode}`}
-                            style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}
-                          >
-                            <a href={item.qrImagePath} target="_blank" rel="noreferrer">
-                              {productName} - {label}
-                            </a>
-                            <Button
-                              size="small"
-                              onClick={() =>
-                                openPrintWindow([item], resolveSellerLabel, {
-                                  ticketWidthMm,
-                                  qrSizeMm
-                                })
-                              }
-                            >
-                              Imprimir
-                            </Button>
-                            <Button
-                              size="small"
-                              onClick={() => void handlePrintDirect([item], false)}
-                              disabled={!qzConnected || !selectedQzPrinter}
-                            >
-                              Directo 1x1
-                            </Button>
-                          </div>
-                        );
-                      })
-                    )}
+                  );
+                })}
+                {printableItems.length > 20 && (
+                  <div style={{ fontSize: 12, color: "#8c8c8c" }}>
+                    Se muestran las primeras 20 variantes del resultado.
                   </div>
                 )}
               </div>
-            }
-          />
+            ) : (
+              <div style={{ fontSize: 13, color: "#8c8c8c" }}>No hay QRs en resultado.</div>
+            )}
+
+            <div
+              style={{
+                borderTop: "1px solid #e7eef7",
+                paddingTop: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <Text strong style={{ fontSize: 14 }}>Grupos QR</Text>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                    {sellerId
+                      ? "Etiquetas de grupos guardados para este vendedor."
+                      : "Selecciona un vendedor para listar grupos QR."}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#4b5563" }}>
+                    Total grupos a imprimir: {totalGroupPrintQuantity}
+                  </span>
+                  <Button
+                    type="primary"
+                    onClick={() => void handlePrintGroupsDirect()}
+                    loading={qzBusy}
+                    disabled={!qzConnected || !selectedQzPrinter || totalGroupPrintQuantity === 0 || loadingGroups}
+                    style={{
+                      borderRadius: 12,
+                      background: "linear-gradient(135deg, #ff9b45 0%, #ff7f2a 100%)",
+                      borderColor: "#ff8b34"
+                    }}
+                  >
+                    Imprimir grupos 1x1
+                  </Button>
+                </div>
+              </div>
+
+              {loadingGroups ? (
+                <div style={{ fontSize: 12, color: "#6b7280" }}>Cargando grupos QR...</div>
+              ) : resultGroups.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {resultGroups.map((group) => (
+                    <div
+                      key={group.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1.5fr) auto",
+                        gap: 12,
+                        alignItems: "center",
+                        padding: "12px 14px",
+                        borderRadius: 12,
+                        background: "#ffffff",
+                        border: "1px solid #e7eef7"
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <a href={group.qrImagePath} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+                          {group.name}
+                        </a>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
+                          {group.groupCode ? `${group.groupCode} | ` : ""}
+                          {group.itemCount} variante(s)
+                        </div>
+                      </div>
+                      <InputNumber
+                        min={0}
+                        value={getGroupPrintQuantity(group)}
+                        onChange={(value) => handleGroupQuantityChange(group.id, value)}
+                        style={{ width: 92 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#8c8c8c" }}>
+                  {sellerId ? "No hay grupos QR activos con imagen para este vendedor." : "Sin vendedor seleccionado."}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -1187,7 +1528,7 @@ const VariantQRBatchModal = ({
         onCancel={() => setDirectPreviewVisible(false)}
         footer={null}
         width={760}
-        title="Vista previa exacta de Imprimir 1x1 con corte"
+        title="Vista previa 1x1"
         destroyOnClose
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: "70vh", overflowY: "auto" }}>
@@ -1208,8 +1549,24 @@ const VariantQRBatchModal = ({
                 background: "#fafafa"
               }}
             >
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
-                {item.productName} | {item.variantLabel} | alto render: {item.heightMm} mm
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  <span style={{ fontWeight: 600, color: "#344054" }}>{item.title}</span>
+                  <span> | {item.subtitle}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  {item.kind === "group" ? "Grupo QR" : "QR variante"} | alto render: {item.heightMm} mm
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: item.kind === "group" ? "#8d5c1e" : "#4f46e5",
+                  marginBottom: 8
+                }}
+              >
+                {item.kind === "group" ? "Etiqueta de grupo" : "Etiqueta de variante"}
               </div>
               <div
                 style={{
@@ -1222,7 +1579,7 @@ const VariantQRBatchModal = ({
               >
                 <img
                   src={item.dataUrl}
-                  alt={`${item.productName} ${item.variantLabel}`}
+                  alt={`${item.title} ${item.subtitle}`}
                   style={{
                     display: "block",
                     width: `${ticketWidthMm}mm`,
