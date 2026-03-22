@@ -156,16 +156,21 @@ export const getSellerProductInfoPageAPI = async (params?: {
     }
 };
 
-export const updateSellerProductInfoByVariantAPI = async ({
+export const updateVariantExtrasBySellerAPI = async ({
     productId,
+    sucursalId,
     variantKey,
     descripcion,
     uso,
     promocion,
     clearImages,
+    retainedImages,
+    imageOrder,
+    newImageUids,
     imageFiles,
 }: {
     productId: string;
+    sucursalId: string;
     variantKey: string;
     descripcion?: string;
     uso?: string;
@@ -176,6 +181,13 @@ export const updateSellerProductInfoByVariantAPI = async ({
         fechaFin?: string | null;
     };
     clearImages?: boolean;
+    retainedImages?: {
+        uid?: string;
+        url: string;
+        key?: string;
+    }[];
+    imageOrder?: string[];
+    newImageUids?: string[];
     imageFiles?: File[];
 }) => {
     try {
@@ -184,10 +196,13 @@ export const updateSellerProductInfoByVariantAPI = async ({
         if (uso !== undefined) formData.append("uso", uso);
         if (promocion !== undefined) formData.append("promocion", JSON.stringify(promocion));
         if (clearImages) formData.append("clearImages", "true");
+        if (retainedImages !== undefined) formData.append("retainedImages", JSON.stringify(retainedImages));
+        if (imageOrder !== undefined) formData.append("imageOrder", JSON.stringify(imageOrder));
+        if (newImageUids !== undefined) formData.append("newImageUids", JSON.stringify(newImageUids));
         (imageFiles || []).forEach((file) => formData.append("imagenes", file));
 
         const res = await apiClientNoJSON.patch(
-            `/product/seller/product-info/${productId}/variant/${variantKey}`,
+            `/product/${productId}/sucursal/${sucursalId}/variant/${variantKey}/extras`,
             formData
         );
         return res.data;

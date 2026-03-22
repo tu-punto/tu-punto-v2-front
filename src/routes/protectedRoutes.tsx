@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+import { useContext } from "react";
 import AppLayout from "../layout/AppLayout";
 import RoleGuard from "./RoleGuard";
 import FinanceFlux from "../pages/FinanceFlux/FinanceFlux";
@@ -20,10 +21,22 @@ import FindShipping from "../pages/Shipping/FindShipping";
 import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
 import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoPage";
 import { getAllowedRoles } from "../constants/accessControl";
+import { UserContext } from "../context/userContext";
+import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
 );
+
+const SellerProductInfoRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!canAccessSellerProductInfo(user)) {
+    return <Navigate to="/sales" replace />;
+  }
+
+  return <SellerProductInfoPage />;
+};
 
 const protectedRoutes = [
   {
@@ -108,7 +121,7 @@ const protectedRoutes = [
       },
       {
         path: "/seller-product-info",
-        element: guard("/seller-product-info", <SellerProductInfoPage />),
+        element: guard("/seller-product-info", <SellerProductInfoRoute />),
       },
       {
         path: "*",

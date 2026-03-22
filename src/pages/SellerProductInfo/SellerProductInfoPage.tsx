@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   Empty,
-  Image,
   Input,
   Modal,
   Select,
@@ -18,6 +17,8 @@ import {
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import type { SorterResult } from "antd/es/table/interface";
 import {
+  CaretDownOutlined,
+  CaretRightOutlined,
   EditOutlined,
   FileImageOutlined,
   ReloadOutlined,
@@ -29,6 +30,7 @@ import { getCategoriesAPI } from "../../api/category";
 import { getSellerAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
 import SellerProductInfoEditModal from "./SellerProductInfoEditModal";
+import infoProductIcon from "../../assets/infoProductIcon.svg";
 
 import "./SellerProductInfoPage.css";
 
@@ -94,7 +96,7 @@ const getCompletionStatus = (row: SellerProductInfoRow): CompletionStatus => {
     hasDate(row.promocionFechaFin);
 
   if (!hasDescription && !hasUsage && !hasImages && !hasAnyPromotionData) return "empty";
-  if (hasDescription && hasUsage && hasImages) return "complete";
+  if (hasDescription && hasImages) return "complete";
   return "partial";
 };
 
@@ -123,6 +125,7 @@ const SellerProductInfoPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<SellerProductInfoRow | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [expandedPromotionKeys, setExpandedPromotionKeys] = useState<Array<string | number>>([]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -275,6 +278,12 @@ const SellerProductInfoPage = () => {
     }
   };
 
+  const togglePromotionRow = (rowKey: string | number) => {
+    setExpandedPromotionKeys((current) =>
+      current.includes(rowKey) ? current.filter((key) => key !== rowKey) : [...current, rowKey]
+    );
+  };
+
   const columns: ColumnsType<SellerProductInfoRow> = [
     {
       title: "Producto",
@@ -354,50 +363,34 @@ const SellerProductInfoPage = () => {
     },
     {
       title: "Promocion",
-      children: [
-        {
-          title: "Titulo",
-          dataIndex: "promocionTitulo",
-          key: "promocionTitulo",
-          width: 180,
-          render: (value) =>
-            value || (
-              <Tag bordered={false} color="default">
-                Sin titulo
+      key: "promocion",
+      width: 200,
+      render: (_value, record) => {
+        if (!record.hasPromotion) {
+          return (
+            <Tag bordered={false} color="default">
+              Sin promocion
+            </Tag>
+          );
+        }
+
+        const expanded = expandedPromotionKeys.includes(record.key);
+
+        return (
+          <Button
+            type="text"
+            className="seller-product-info-promotion-toggle"
+            onClick={() => togglePromotionRow(record.key)}
+          >
+            <Space size={8}>
+              {expanded ? <CaretDownOutlined /> : <CaretRightOutlined />}
+              <Tag color="blue" bordered={false} style={{ marginInlineEnd: 0 }}>
+                Tiene promocion
               </Tag>
-            ),
-        },
-        {
-          title: "Descripcion",
-          dataIndex: "promocionDescripcion",
-          key: "promocionDescripcion",
-          width: 220,
-          render: (value) =>
-            value ? (
-              <Typography.Paragraph style={{ marginBottom: 0 }} ellipsis={{ rows: 3 }}>
-                {value}
-              </Typography.Paragraph>
-            ) : (
-              <Tag bordered={false} color="default">
-                Sin descripcion
-              </Tag>
-            ),
-        },
-        {
-          title: "Fecha Inicio",
-          dataIndex: "promocionFechaInicio",
-          key: "promocionFechaInicio",
-          width: 140,
-          render: (value) => formatDate(value),
-        },
-        {
-          title: "Fecha Fin",
-          dataIndex: "promocionFechaFin",
-          key: "promocionFechaFin",
-          width: 140,
-          render: (value) => formatDate(value),
-        },
-      ],
+            </Space>
+          </Button>
+        );
+      },
     },
     {
       title: "Actualizar",
@@ -421,11 +414,11 @@ const SellerProductInfoPage = () => {
 
   return (
     <div className="seller-product-info-page p-4">
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-          <img src="/box-icon.png" alt="Informacion Productos" className="w-8 h-8" />
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+          <img src={infoProductIcon} alt="Informacion Productos" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-            Informacion Productos
+            Información Productos
           </h1>
         </div>
 
@@ -441,7 +434,7 @@ const SellerProductInfoPage = () => {
           <div className="seller-product-info-filters-grid">
             <Input
               prefix={<SearchOutlined />}
-              placeholder="Buscar producto, variante, uso o promocion..."
+              placeholder="Buscar producto, descripcion, uso o promocion..."
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               allowClear
@@ -491,7 +484,7 @@ const SellerProductInfoPage = () => {
               />
             </Space>
             <Space>
-              <span>Con imagenes</span>
+              <span>Con imágenes</span>
               <Switch
                 checked={filterHasImages}
                 onChange={(checked) => {
@@ -520,11 +513,11 @@ const SellerProductInfoPage = () => {
               <div className="seller-product-info-legend-list">
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-dot seller-product-info-dot-green" />
-                  <span>Variante con stock disponible</span>
+                  <span>Stock disponible</span>
                 </div>
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-dot seller-product-info-dot-red" />
-                  <span>Variante sin stock disponible</span>
+                  <span>Sin stock disponible</span>
                 </div>
               </div>
             </div>
@@ -534,15 +527,15 @@ const SellerProductInfoPage = () => {
               <div className="seller-product-info-legend-list">
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-swatch seller-product-info-swatch-red" />
-                  <span>Rojo: no tiene descripcion, uso ni imagenes cargadas</span>
+                  <span>Rojo: no tiene descripcion ni imagenes cargadas</span>
                 </div>
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-swatch seller-product-info-swatch-yellow" />
-                  <span>Amarillo: tiene algo cargado, pero le falta descripcion, uso o imagenes</span>
+                  <span>Amarillo: le falta descripcion o imagenes</span>
                 </div>
                 <div className="seller-product-info-legend-item">
                   <span className="seller-product-info-swatch seller-product-info-swatch-green" />
-                  <span>Verde: ya tiene descripcion, uso e imagenes; promocion es opcional</span>
+                  <span>Verde: completo (uso y promocion son opcionales)</span>
                 </div>
               </div>
               <div className="seller-product-info-legend-summary">
@@ -561,9 +554,39 @@ const SellerProductInfoPage = () => {
           columns={columns}
           dataSource={rows}
           loading={loading}
-          scroll={{ x: 1500 }}
+          scroll={{ x: 1280 }}
           rowClassName={(record) => `seller-product-info-row-${getCompletionStatus(record)}`}
           onChange={handleTableChange}
+          expandable={{
+            expandedRowKeys: expandedPromotionKeys,
+            rowExpandable: (record) => Boolean(record.hasPromotion),
+            showExpandColumn: false,
+            expandedRowRender: (record) => (
+              <div className="seller-product-info-promotion-panel">
+                <div className="seller-product-info-promotion-grid">
+                  <div className="seller-product-info-promotion-item">
+                    <span className="seller-product-info-promotion-label">Titulo</span>
+                    <span>{record.promocionTitulo || "Sin titulo"}</span>
+                  </div>
+                  <div className="seller-product-info-promotion-item">
+                    <span className="seller-product-info-promotion-label">Fecha inicio</span>
+                    <span>{formatDate(record.promocionFechaInicio)}</span>
+                  </div>
+                  <div className="seller-product-info-promotion-item">
+                    <span className="seller-product-info-promotion-label">Descripcion</span>
+                    <Typography.Paragraph style={{ marginBottom: 0 }}>
+                      {record.promocionDescripcion || "Sin descripcion"}
+                    </Typography.Paragraph>
+                  </div>
+                  <div className="seller-product-info-promotion-item">
+                    <span className="seller-product-info-promotion-label">Fecha fin</span>
+                    <span>{formatDate(record.promocionFechaFin)}</span>
+                  </div>
+                </div>
+              </div>
+            ),
+            onExpandedRowsChange: (keys) => setExpandedPromotionKeys(keys),
+          }}
           locale={{
             emptyText: (
               <Empty
@@ -595,22 +618,31 @@ const SellerProductInfoPage = () => {
         width={900}
       >
         {selectedImages.length ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 16,
-            }}
-          >
-            {selectedImages.map((image, index) => (
-              <Card key={`${image.key || image.url}-${index}`} bodyStyle={{ padding: 12 }}>
-                <Image
-                  src={image.url}
-                  alt={`Imagen variante ${index + 1}`}
-                  style={{ width: "100%", borderRadius: 8, objectFit: "cover" }}
-                />
-              </Card>
-            ))}
+          <div className="seller-product-info-image-modal-layout">
+            <div className="seller-product-info-image-modal-main">
+              <div className="seller-product-info-image-modal-badge">Principal</div>
+              <img
+                src={selectedImages[0]?.url}
+                alt="Imagen principal"
+                className="seller-product-info-image-modal-main-img"
+              />
+            </div>
+
+            <div className="seller-product-info-image-modal-side">
+              {selectedImages.slice(1, 4).map((image, index) => (
+                <Card
+                  key={`${image.key || image.url}-${index}`}
+                  bodyStyle={{ padding: 8 }}
+                  className="seller-product-info-image-modal-side-card"
+                >
+                  <img
+                    src={image.url}
+                    alt={`Imagen secundaria ${index + 1}`}
+                    className="seller-product-info-image-modal-side-img"
+                  />
+                </Card>
+              ))}
+            </div>
           </div>
         ) : (
           <Empty description="No hay imagenes para mostrar." image={Empty.PRESENTED_IMAGE_SIMPLE} />

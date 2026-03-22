@@ -7,6 +7,7 @@ import stockManagementIcon from "../assets/stockManagement.svg";
 import statsIcon from "../assets/statsIcon.svg";
 import branchIcon from "../assets/branchIcon.svg";
 import salesHistoryIcon from "../assets/historyIcono.png";
+import infoProductIcon from "../assets/infoProductIcon.svg";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
@@ -91,7 +92,7 @@ export const menu = [
   {
     path: "/seller-product-info",
     label: "Informacion Productos",
-    icon: stockManagementIcon,
+    icon: infoProductIcon,
     roles: getAllowedRoles("/seller-product-info"),
   },
 ];

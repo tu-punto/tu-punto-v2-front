@@ -7,6 +7,7 @@ import plusIcon from "../../assets/plusIcon.svg";
 import minusIcon from "../../assets/minusIcon.svg";
 import "./bottom-menu.css";
 import { normalizeRole } from "../../utils/role";
+import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
 
 const BottomMenu = () => {
     const { user } = useContext(UserContext)!;
@@ -17,7 +18,9 @@ const BottomMenu = () => {
 
     useEffect(() => {
         const role = normalizeRole(user?.role);
-        const filtered = menu.filter(i => i.roles.includes(role));
+        const filtered = menu.filter(
+            i => i.roles.includes(role) && (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user))
+        );
         const bottom: any[] = [];
         const plus: any[] = [];
         filtered.forEach(i => (["Pedidos","Stock","Vender"].includes(i.label) ? bottom : plus).push(i));
