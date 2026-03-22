@@ -1,5 +1,5 @@
 import { AxiosError } from "axios"
-import { apiClient } from "./apiClient"
+import { apiClient, apiClientNoJSON } from "./apiClient"
 import { parseError } from "./util"
 
 const handleError = (error) => {
@@ -125,6 +125,89 @@ export const getSellerInventoryAllAPI = async (params?: {
     } catch (error) {
         console.error("Error al obtener inventario completo de vendedor:", error);
         return [];
+    }
+};
+
+export const getSellerProductInfoPageAPI = async (params?: {
+    sucursalId?: string;
+    categoryId?: string;
+    q?: string;
+    inStock?: boolean;
+    hasPromotion?: boolean;
+    hasImages?: boolean;
+    hasDescription?: boolean;
+    page?: number;
+    limit?: number;
+    sortOrder?: "asc" | "desc";
+}) => {
+    try {
+        const res = await apiClient.get("/product/seller/product-info", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener informacion de productos del vendedor:", error);
+        return {
+            success: false,
+            rows: [],
+            total: 0,
+            page: Number(params?.page || 1),
+            limit: Number(params?.limit || 10),
+            pages: 1
+        };
+    }
+};
+
+export const updateVariantExtrasBySellerAPI = async ({
+    productId,
+    sucursalId,
+    variantKey,
+    descripcion,
+    uso,
+    promocion,
+    clearImages,
+    retainedImages,
+    imageOrder,
+    newImageUids,
+    imageFiles,
+}: {
+    productId: string;
+    sucursalId: string;
+    variantKey: string;
+    descripcion?: string;
+    uso?: string;
+    promocion?: {
+        titulo?: string;
+        descripcion?: string;
+        fechaInicio?: string | null;
+        fechaFin?: string | null;
+    };
+    clearImages?: boolean;
+    retainedImages?: {
+        uid?: string;
+        url: string;
+        key?: string;
+    }[];
+    imageOrder?: string[];
+    newImageUids?: string[];
+    imageFiles?: File[];
+}) => {
+    try {
+        const formData = new FormData();
+        if (descripcion !== undefined) formData.append("descripcion", descripcion);
+        if (uso !== undefined) formData.append("uso", uso);
+        if (promocion !== undefined) formData.append("promocion", JSON.stringify(promocion));
+        if (clearImages) formData.append("clearImages", "true");
+        if (retainedImages !== undefined) formData.append("retainedImages", JSON.stringify(retainedImages));
+        if (imageOrder !== undefined) formData.append("imageOrder", JSON.stringify(imageOrder));
+        if (newImageUids !== undefined) formData.append("newImageUids", JSON.stringify(newImageUids));
+        (imageFiles || []).forEach((file) => formData.append("imagenes", file));
+
+        const res = await apiClientNoJSON.patch(
+            `/product/${productId}/sucursal/${sucursalId}/variant/${variantKey}/extras`,
+            formData
+        );
+        return res.data;
+    } catch (error) {
+        return handleError(error);
     }
 };
 export const getProductByIdAPI = async (idProduct) => {
