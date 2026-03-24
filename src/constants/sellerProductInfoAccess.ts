@@ -1,11 +1,8 @@
-const SELLER_PRODUCT_INFO_ALLOWED_EMAILS = ["prueba@gmail.com"];
-
-export const canAccessSellerProductInfo = (user?: { email?: string | null } | null) => {
-  const email = String(user?.email || "")
-    .trim()
-    .toLowerCase();
-
-  return SELLER_PRODUCT_INFO_ALLOWED_EMAILS.includes(email);
+export const canAccessSellerProductInfo = (
+  user?: { role?: string | null; can_access_seller_product_info?: boolean | null } | null
+) => {
+  return (
+    String(user?.role || "").trim().toLowerCase() === "seller" &&
+    user?.can_access_seller_product_info === true
+  );
 };
-
-export { SELLER_PRODUCT_INFO_ALLOWED_EMAILS };

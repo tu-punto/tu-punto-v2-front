@@ -285,10 +285,16 @@ const StockManagement = () => {
     }, [isSeller]);
 
     useEffect(() => {
+        if (isSeller) {
+            if (sellerSucursales.length === 0) return;
+            const current = String(sucursalId || "");
+            const hasValidBranch = sellerSucursales.some((s: any) => String(s._id) === current);
+            if (!hasValidBranch) return;
+        }
         if (!isSeller && (!sucursalId || sucursalId === "all")) return;
         if (!isSeller && !selectedSeller && sellersVigentes.length === 0) return;
         fetchInventoryPage(true);
-    }, [isSeller, sucursalId, selectedSeller, selectedCategory, debouncedSearch, prevKey, sellersVigentes]);
+    }, [isSeller, sucursalId, selectedSeller, selectedCategory, debouncedSearch, prevKey, sellersVigentes, sellerSucursales]);
 
     useEffect(() => {
         if (!isSeller || sellerSucursales.length === 0) return;
@@ -620,7 +626,7 @@ const StockManagement = () => {
             </Row>
             {isSeller ? (
                 <ProductTableSeller
-                    productsList={finalProductList}
+                    productsList={isLoadingInventory ? [] : finalProductList}
                     loading={isLoadingInventory}
                     onUpdateProducts={() => fetchInventoryPage(true)}
                     sucursalId={sucursalId}

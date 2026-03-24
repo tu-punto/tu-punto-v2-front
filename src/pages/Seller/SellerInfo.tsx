@@ -12,6 +12,10 @@ const SellerInfoPageWrapper = () => {
     useEffect(() => {
         const fetchSeller = async () => {
             try {
+                if (!user?.id_vendedor) {
+                    setSeller(null);
+                    return;
+                }
                 const sellerData = await getSellerAPI(user.id_vendedor);
 
                 const finish_date = new Date(sellerData.fecha_vigencia);
@@ -55,7 +59,7 @@ const SellerInfoPageWrapper = () => {
         };
 
         fetchSeller();
-    }, [user.id_vendedor]);
+    }, [user]);
 
     if (loading) {
         return <div className="text-mobile-sm xl:text-desktop-sm">Cargando...</div>;
