@@ -9,6 +9,7 @@ const VariantInputs = ({
                            startEmpty = false,
                            variantSuggestions = [],
                            subvariantSuggestions = {},
+                           prefillCombination = null,
                            resetKey,
                        }: any) => {
     const [variants, setVariants] = useState<any[]>([]);
@@ -17,14 +18,22 @@ const VariantInputs = ({
     const [bulkPrice, setBulkPrice] = useState<number | null>(null);
 
     useEffect(() => {
-        if (resetKey === undefined) return;
+        if (!startEmpty || resetKey === undefined) return;
 
-        setVariants([]);
-        setInputValues([]);
+        const nextVariants = prefillCombination
+            ? Object.entries(prefillCombination).map(([name, value]) => ({
+                name,
+                subvariants: [String(value)],
+                readOnly: false,
+            }))
+            : [];
+
+        setVariants(nextVariants);
+        setInputValues(nextVariants.map(() => ""));
         setShowBulkApply(false);
         setBulkPrice(null);
         setCombinations([]);
-    }, [resetKey, setCombinations]);
+    }, [prefillCombination, resetKey, setCombinations, startEmpty]);
 
     useEffect(() => {
         if (startEmpty || resetKey !== undefined) return;

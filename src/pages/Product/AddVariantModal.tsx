@@ -135,7 +135,7 @@ const AddVariantModal = ({ visible, onCancel, group }: any) => {
             width={1000}
         >
             <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
-                El formulario empieza vacio. Las variantes y subvariantes existentes se usan solo como sugerencias mientras completas esta nueva matriz.
+                Si abriste este modal desde una variante, esa combinacion ya viene cargada como base. Si no, el formulario empieza vacio y usa las variantes ya registradas solo como sugerencias.
             </Typography.Paragraph>
             <VariantInputs
                 combinations={combinations}
@@ -144,7 +144,8 @@ const AddVariantModal = ({ visible, onCancel, group }: any) => {
                 startEmpty
                 variantSuggestions={variantSuggestions}
                 subvariantSuggestions={subvariantSuggestions}
-                resetKey={resetKey}
+                prefillCombination={group?.referenceCombination || null}
+                resetKey={`${resetKey}-${buildCombinationFingerprint(group?.referenceCombination || {}) || 'blank'}`}
             />
         </Modal>
     );

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from 'react';
-import {Button, Input, Table, Spin, Select, message} from 'antd';
-import { InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import {Button, Input, Table, Spin, Select, Tooltip, message} from 'antd';
+import { CopyOutlined, InfoCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { UserContext } from '../../context/userContext';
 import ProductSearcher from './ProductSearcher';
 import AddVariantModal from '../Product/AddVariantModal';
@@ -38,6 +38,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
     const [variantModalOpen, setVariantModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [selectedReferenceCombination, setSelectedReferenceCombination] = useState<Record<string, string> | null>(null);
 
     const [infoModalOpen, setInfoModalOpen] = useState(false);
     const [selectedProductInfo, setSelectedProductInfo] = useState<IProduct>(null);
@@ -118,14 +119,35 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         setInfoModalOpen(false);
     };
 
-    const openVariantModal = (product: any) => {
-        setSelectedProduct(product);
+    const openVariantModal = async (product: any, referenceCombination: Record<string, string> | null = null) => {
+        const sucursalId = localStorage.getItem("sucursalId") || "";
+
+        let fullProduct = Array.isArray(product?.sucursales)
+            ? product
+            : await fetchFullProductById(product._id);
+
+        if (!fullProduct && sucursalId) {
+            fullProduct = reconstructProductFromFlat({
+                flatProducts: updatedProductsList,
+                productId: product._id,
+                sucursalId
+            });
+        }
+
+        if (!fullProduct) {
+            message.error("No se pudo obtener el producto completo para agregar variantes.");
+            return;
+        }
+
+        setSelectedReferenceCombination(referenceCombination);
+        setSelectedProduct(fullProduct);
         setVariantModalOpen(true);
     };
 
 
     const closeVariantModal = () => {
         setSelectedProduct(null);
+        setSelectedReferenceCombination(null);
         setVariantModalOpen(false);
     };
     const [selectedVariantName, setSelectedVariantName] = useState("");
@@ -316,14 +338,28 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             title: "Agregar Variante",
             key: "addVariant",
             render: (_: any, record: any) =>
-                !record.variant && (
+                !selectedSeller ? (
+                    <Button disabled title="Seleccione un vendedor para habilitar">
+                        {record.variant ? <CopyOutlined /> : <PlusOutlined />}
+                    </Button>
+                ) : record.variant ? (
+                    <Tooltip title="Abrir agregar variantes usando esta variante como referencia">
+                        <Button
+                            size="small"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                openVariantModal(record, record.variantes_obj || record.variantes || null);
+                            }}
+                        >
+                            <CopyOutlined />
+                        </Button>
+                    </Tooltip>
+                ) : (
                     <Button
                         onClick={(event) => {
                             event.stopPropagation();
-                            onShowVariantModal?.(record.productOriginal);
+                            openVariantModal(record.productOriginal, null);
                         }}
-                        disabled={!selectedSeller}
-                        title={!selectedSeller ? "Seleccione un vendedor para habilitar" : undefined}
                     >
                         <PlusOutlined />
                     </Button>
@@ -371,6 +407,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                         ...base,
                         key: `${base._id}-${variant.sucursalId}-${combo.variantes.Tipo}-${combo.variantes.Color}`,
                         variant: Object.values(combo.variantes).join(" / "),
+                        variantes_obj: combo.variantes,
                         precio: combo.precio,
                         stock: combo.stock,
                         isNew: true
@@ -503,7 +540,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 group={{
                     id: selectedProduct?._id,
                     name: selectedProduct?.nombre_producto,
-                    product: selectedProduct
+                    product: selectedProduct,
+                    referenceCombination: selectedReferenceCombination
                 }}
                 onAdd={handleVariantAdded}
             />
