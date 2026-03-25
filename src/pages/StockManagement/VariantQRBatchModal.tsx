@@ -251,6 +251,7 @@ export const openPrintWindow = (
 
 const MM_TO_INCH = 1 / 25.4;
 const TM_L90_DPI = 203;
+const RESULT_PAGE_SIZE = 20;
 const mmToPx = (mm: number) => Math.max(1, Math.round(mm * MM_TO_INCH * TM_L90_DPI));
 const waitMs = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const getQrScale = (qrSizeMm: number) => Math.max(0.85, Math.min(qrSizeMm / 12, 1.7));
@@ -446,7 +447,7 @@ const VariantQRBatchModal = ({
   );
   const [ticketWidthMm, setTicketWidthMm] = useState<number>(40);
   const [qrSizeMm, setQrSizeMm] = useState<number>(16);
-  const [printDelayMs, setPrintDelayMs] = useState<number>(500);
+  const [printDelayMs, setPrintDelayMs] = useState<number>(0);
   const [onlyMissing, setOnlyMissing] = useState(true);
   const [forceRegenerate, setForceRegenerate] = useState(false);
   const [loadingGenerate, setLoadingGenerate] = useState(false);
@@ -467,6 +468,7 @@ const VariantQRBatchModal = ({
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [resultGroups, setResultGroups] = useState<GroupSummaryResultItem[]>([]);
   const [result, setResult] = useState<any>(null);
+  const [visibleResultCount, setVisibleResultCount] = useState<number>(RESULT_PAGE_SIZE);
   const [groupManagerVisible, setGroupManagerVisible] = useState(false);
   const autoRunDoneRef = useRef(false);
   const [branches, setBranches] = useState<any[]>([]);
@@ -505,6 +507,11 @@ const VariantQRBatchModal = ({
   const generatedItems: QRItem[] = (result?.generatedItems || []) as QRItem[];
   const listedItems: QRItem[] = (result?.items || []) as QRItem[];
   const printableItems: QRItem[] = listedItems.length > 0 ? listedItems : generatedItems;
+  const visiblePrintableItems = useMemo(
+    () => printableItems.slice(0, visibleResultCount),
+    [printableItems, visibleResultCount]
+  );
+  const hasMorePrintableItems = visibleResultCount < printableItems.length;
   const hasMetrics = typeof result?.products === "number";
   const hasInitialProductIds = initialProductIds.length > 0;
   const effectiveProductIds = hasInitialProductIds ? initialProductIds : undefined;
@@ -1028,6 +1035,14 @@ const VariantQRBatchModal = ({
     void loadResultGroups();
   }, [visible, result, sellerId, groupManagerVisible]);
 
+  useEffect(() => {
+    if (!visible || !result) {
+      setVisibleResultCount(RESULT_PAGE_SIZE);
+      return;
+    }
+    setVisibleResultCount(RESULT_PAGE_SIZE);
+  }, [visible, result]);
+
   return (
     <Modal
       open={visible}
@@ -1367,6 +1382,18 @@ const VariantQRBatchModal = ({
                   Stock actual en todos
                 </Button>
                 <Button
+                  onClick={() =>
+                    openPrintWindow(printableItems, resolveSellerLabel, {
+                      ticketWidthMm,
+                      qrSizeMm
+                    })
+                  }
+                  disabled={!printableItems.length || qzBusy || previewBusy}
+                  style={{ borderRadius: 12 }}
+                >
+                  Imprimir todos / PDF
+                </Button>
+                <Button
                   type="primary"
                   onClick={() => void handlePrintResultDirect()}
                   loading={qzBusy}
@@ -1391,7 +1418,7 @@ const VariantQRBatchModal = ({
 
             {printableItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {printableItems.slice(0, 20).map((item: QRItem) => {
+                {visiblePrintableItems.map((item: QRItem) => {
                   const label = item.variantLabel || item.variantKey;
                   const productName = item.productName || item.productId;
                   const systemStock = getItemSystemStock(item);
@@ -1429,9 +1456,29 @@ const VariantQRBatchModal = ({
                     </div>
                   );
                 })}
-                {printableItems.length > 20 && (
-                  <div style={{ fontSize: 12, color: "#8c8c8c" }}>
-                    Se muestran las primeras 20 variantes del resultado.
+                {hasMorePrintableItems && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                      flexWrap: "wrap"
+                    }}
+                  >
+                    <div style={{ fontSize: 12, color: "#8c8c8c" }}>
+                      Se muestran {visiblePrintableItems.length} de {printableItems.length} variantes del resultado.
+                    </div>
+                    <Button
+                      onClick={() =>
+                        setVisibleResultCount((current) =>
+                          Math.min(current + RESULT_PAGE_SIZE, printableItems.length)
+                        )
+                      }
+                      style={{ borderRadius: 12 }}
+                    >
+                      Mostrar 20 mas
+                    </Button>
                   </div>
                 )}
               </div>

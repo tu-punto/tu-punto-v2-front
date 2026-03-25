@@ -63,6 +63,25 @@ interface GroupResolution {
 }
 
 type FlashState = "success" | "error" | "info" | null;
+type Point = { x: number; y: number };
+type TrackingBox = { leftPct: number; topPct: number; widthPct: number; heightPct: number };
+type BarcodeDetectorResult = {
+  rawValue?: string;
+  boundingBox?: { x: number; y: number; width: number; height: number };
+  cornerPoints?: Point[];
+};
+type BarcodeDetectorInstance = {
+  detect: (source: CanvasImageSource) => Promise<BarcodeDetectorResult[]>;
+};
+type DecodedFrame = { payload: string; trackingBox: TrackingBox | null };
+type ScanRegion = { x: number; y: number; width: number; height: number };
+
+const AUTO_CLOSE_SECONDS = 15;
+const DUPLICATE_READ_WINDOW_MS = 1200;
+const SCAN_INTERVAL_MS = 90;
+const MAX_FALLBACK_SCAN_WIDTH = 1024;
+const TRACKING_BOX_STALE_MS = 650;
+const TRACKING_REGION_SCALE = 1.9;
 
 const isGroupPayload = (payload: string) => {
   const value = String(payload || "").trim();
@@ -103,29 +122,127 @@ const getStatusMeta = (status: GroupResolvedItem["status"]) => {
   }
 };
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const normalizeTrackingBox = (box: TrackingBox): TrackingBox => {
+  const leftPct = clamp(box.leftPct, 0, 0.98);
+  const topPct = clamp(box.topPct, 0, 0.98);
+  const widthPct = clamp(box.widthPct, 0.04, 1 - leftPct);
+  const heightPct = clamp(box.heightPct, 0.04, 1 - topPct);
+  return { leftPct, topPct, widthPct, heightPct };
+};
+
+const buildTrackingBoxFromPoints = (
+  points: Point[],
+  frameWidth: number,
+  frameHeight: number
+): TrackingBox | null => {
+  if (!points.length || frameWidth <= 0 || frameHeight <= 0) return null;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  return normalizeTrackingBox({
+    leftPct: minX / frameWidth,
+    topPct: minY / frameHeight,
+    widthPct: (maxX - minX) / frameWidth,
+    heightPct: (maxY - minY) / frameHeight
+  });
+};
+
+const buildTrackingBoxFromRect = (
+  rect: { x: number; y: number; width: number; height: number },
+  frameWidth: number,
+  frameHeight: number
+): TrackingBox | null => {
+  if (frameWidth <= 0 || frameHeight <= 0 || rect.width <= 0 || rect.height <= 0) return null;
+  return normalizeTrackingBox({
+    leftPct: rect.x / frameWidth,
+    topPct: rect.y / frameHeight,
+    widthPct: rect.width / frameWidth,
+    heightPct: rect.height / frameHeight
+  });
+};
+
+const smoothTrackingBox = (
+  previous: TrackingBox | null,
+  next: TrackingBox | null,
+  weight = 0.65
+) => {
+  if (!next) return null;
+  if (!previous) return next;
+  return normalizeTrackingBox({
+    leftPct: previous.leftPct * weight + next.leftPct * (1 - weight),
+    topPct: previous.topPct * weight + next.topPct * (1 - weight),
+    widthPct: previous.widthPct * weight + next.widthPct * (1 - weight),
+    heightPct: previous.heightPct * weight + next.heightPct * (1 - weight)
+  });
+};
+
 function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const scanIntervalRef = useRef<number | null>(null);
+  const scanFrameRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
   const feedbackTimeoutRef = useRef<number | null>(null);
+  const focusIndicatorTimeoutRef = useRef<number | null>(null);
   const isProcessingRef = useRef(false);
+  const isDecodingRef = useRef(false);
+  const lastScanAttemptRef = useRef(0);
   const lastReadRef = useRef<{ payload: string; ts: number }>({ payload: "", ts: 0 });
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const barcodeDetectorRef = useRef<BarcodeDetectorInstance | null>(null);
+  const isScanningRef = useRef(false);
+  const groupSelectionRef = useRef<GroupResolution | null>(null);
+  const trackingBoxRef = useRef<TrackingBox | null>(null);
+  const lastTrackingAtRef = useRef(0);
 
   const [isScanning, setIsScanning] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(15);
+  const [secondsLeft, setSecondsLeft] = useState(AUTO_CLOSE_SECONDS);
   const [flashState, setFlashState] = useState<FlashState>(null);
   const [flashLabel, setFlashLabel] = useState("");
   const [groupSelection, setGroupSelection] = useState<GroupResolution | null>(null);
   const [groupSearch, setGroupSearch] = useState("");
+  const [trackingBox, setTrackingBox] = useState<TrackingBox | null>(null);
+  const [focusIndicator, setFocusIndicator] = useState<{ x: number; y: number; active: boolean } | null>(null);
+
+  const updateTrackingBox = (nextBox: TrackingBox | null) => {
+    if (!nextBox) {
+      trackingBoxRef.current = null;
+      lastTrackingAtRef.current = 0;
+      setTrackingBox(null);
+      return;
+    }
+    const smoothed = smoothTrackingBox(trackingBoxRef.current, nextBox);
+    trackingBoxRef.current = smoothed;
+    lastTrackingAtRef.current = Date.now();
+    setTrackingBox(smoothed);
+  };
+
+  const maybeClearTrackingBox = () => {
+    if (!trackingBoxRef.current) return;
+    if (Date.now() - lastTrackingAtRef.current <= TRACKING_BOX_STALE_MS) return;
+    trackingBoxRef.current = null;
+    setTrackingBox(null);
+  };
 
   const clearFeedbackTimeout = () => {
     if (feedbackTimeoutRef.current) {
       window.clearTimeout(feedbackTimeoutRef.current);
       feedbackTimeoutRef.current = null;
     }
+  };
+
+  const clearFocusIndicator = () => {
+    if (focusIndicatorTimeoutRef.current) {
+      window.clearTimeout(focusIndicatorTimeoutRef.current);
+      focusIndicatorTimeoutRef.current = null;
+    }
+    setFocusIndicator(null);
   };
 
   const showFlash = (type: Exclude<FlashState, null>, label: string) => {
@@ -139,9 +256,9 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   };
 
   const clearScannerIntervals = () => {
-    if (scanIntervalRef.current) {
-      window.clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
+    if (scanFrameRef.current) {
+      window.cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
     }
     if (countdownIntervalRef.current) {
       window.clearInterval(countdownIntervalRef.current);
@@ -161,18 +278,18 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   };
 
   const pauseScanning = () => {
+    isScanningRef.current = false;
+    updateTrackingBox(null);
+    clearFocusIndicator();
     setIsScanning(false);
-    if (scanIntervalRef.current) {
-      window.clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-    if (countdownIntervalRef.current) {
-      window.clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
+    clearScannerIntervals();
   };
 
   const closeScanner = (notifyTimeout = false) => {
+    isScanningRef.current = false;
+    groupSelectionRef.current = null;
+    updateTrackingBox(null);
+    clearFocusIndicator();
     setIsScanning(false);
     setGroupSelection(null);
     clearScannerIntervals();
@@ -184,13 +301,13 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   };
 
   const resetInactivityCountdown = () => {
-    if (!isScanning) return;
+    if (!isScanningRef.current) return;
     if (countdownIntervalRef.current) {
       window.clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
     }
 
-    let remaining = 15;
+    let remaining = AUTO_CLOSE_SECONDS;
     setSecondsLeft(remaining);
     countdownIntervalRef.current = window.setInterval(() => {
       remaining -= 1;
@@ -216,8 +333,31 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
       advanced.focusMode = "continuous";
     }
 
-    if (typeof capabilities.zoom?.max === "number" && capabilities.zoom.max >= 1.5) {
-      advanced.zoom = Math.min(2, capabilities.zoom.max);
+    if (
+      typeof capabilities.focusDistance?.min === "number" &&
+      typeof capabilities.focusDistance?.max === "number"
+    ) {
+      advanced.focusDistance =
+        capabilities.focusDistance.min +
+        (capabilities.focusDistance.max - capabilities.focusDistance.min) * 0.15;
+    }
+
+    if (typeof capabilities.zoom?.max === "number" && capabilities.zoom.max >= 1.2) {
+      advanced.zoom = Math.min(1.35, capabilities.zoom.max);
+    }
+
+    if (
+      Array.isArray(capabilities.exposureMode) &&
+      capabilities.exposureMode.includes("continuous")
+    ) {
+      advanced.exposureMode = "continuous";
+    }
+
+    if (
+      Array.isArray(capabilities.whiteBalanceMode) &&
+      capabilities.whiteBalanceMode.includes("continuous")
+    ) {
+      advanced.whiteBalanceMode = "continuous";
     }
 
     if (capabilities.torch) {
@@ -235,39 +375,250 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     }
   };
 
-  const tryDecode = (
+  const getBarcodeDetector = () => {
+    if (barcodeDetectorRef.current) return barcodeDetectorRef.current;
+
+    const detectorCtor = (globalThis as any).BarcodeDetector;
+    if (!detectorCtor) return null;
+
+    try {
+      barcodeDetectorRef.current = new detectorCtor({
+        formats: ["qr_code"]
+      }) as BarcodeDetectorInstance;
+    } catch (error) {
+      console.debug("BarcodeDetector no disponible para QR", error);
+      barcodeDetectorRef.current = null;
+    }
+
+    return barcodeDetectorRef.current;
+  };
+
+  const tryNativeDecode = async (video: HTMLVideoElement) => {
+    const detector = getBarcodeDetector();
+    if (!detector) return null;
+
+    try {
+      const results = await detector.detect(video);
+      const match = results.find((item) => item?.rawValue);
+      if (!match?.rawValue) return null;
+      const trackingFromPoints = Array.isArray(match.cornerPoints)
+        ? buildTrackingBoxFromPoints(match.cornerPoints, video.videoWidth, video.videoHeight)
+        : null;
+      const trackingFromRect = match.boundingBox
+        ? buildTrackingBoxFromRect(match.boundingBox, video.videoWidth, video.videoHeight)
+        : null;
+      return {
+        payload: String(match.rawValue),
+        trackingBox: trackingFromPoints || trackingFromRect
+      } satisfies DecodedFrame;
+    } catch (error) {
+      console.debug("Fallo lectura nativa QR, usando fallback jsQR", error);
+      return null;
+    }
+  };
+
+  const prepareFallbackFrame = (
+    video: HTMLVideoElement,
+    canvas: HTMLCanvasElement,
+    context: CanvasRenderingContext2D
+  ) => {
+    const sourceWidth = Math.max(video.videoWidth || 0, 1);
+    const sourceHeight = Math.max(video.videoHeight || 0, 1);
+    const targetWidth =
+      sourceWidth > MAX_FALLBACK_SCAN_WIDTH ? MAX_FALLBACK_SCAN_WIDTH : sourceWidth;
+    const targetHeight = Math.max(1, Math.round((sourceHeight / sourceWidth) * targetWidth));
+
+    if (canvas.width !== targetWidth) canvas.width = targetWidth;
+    if (canvas.height !== targetHeight) canvas.height = targetHeight;
+
+    context.imageSmoothingEnabled = false;
+    context.drawImage(video, 0, 0, targetWidth, targetHeight);
+  };
+
+  const buildTrackedRegion = (box: TrackingBox, width: number, height: number): ScanRegion => {
+    const centerX = (box.leftPct + box.widthPct / 2) * width;
+    const centerY = (box.topPct + box.heightPct / 2) * height;
+    const regionWidth = clamp(Math.round(box.widthPct * width * TRACKING_REGION_SCALE), 160, width);
+    const regionHeight = clamp(Math.round(box.heightPct * height * TRACKING_REGION_SCALE), 160, height);
+    const x = clamp(Math.round(centerX - regionWidth / 2), 0, Math.max(0, width - regionWidth));
+    const y = clamp(Math.round(centerY - regionHeight / 2), 0, Math.max(0, height - regionHeight));
+    return { x, y, width: regionWidth, height: regionHeight };
+  };
+
+  const getVideoMetrics = () => {
+    const video = videoRef.current;
+    if (!video) return null;
+
+    const renderWidth = video.clientWidth || 0;
+    const renderHeight = video.clientHeight || 0;
+    const sourceWidth = video.videoWidth || 0;
+    const sourceHeight = video.videoHeight || 0;
+    if (!renderWidth || !renderHeight || !sourceWidth || !sourceHeight) return null;
+
+    const scale = Math.max(renderWidth / sourceWidth, renderHeight / sourceHeight);
+    const contentWidth = sourceWidth * scale;
+    const contentHeight = sourceHeight * scale;
+    const offsetX = (renderWidth - contentWidth) / 2;
+    const offsetY = (renderHeight - contentHeight) / 2;
+
+    return { video, renderWidth, renderHeight, sourceWidth, sourceHeight, scale, contentWidth, contentHeight, offsetX, offsetY };
+  };
+
+  const showFocusIndicator = (x: number, y: number) => {
+    setFocusIndicator({ x, y, active: true });
+    if (focusIndicatorTimeoutRef.current) {
+      window.clearTimeout(focusIndicatorTimeoutRef.current);
+    }
+    focusIndicatorTimeoutRef.current = window.setTimeout(() => {
+      setFocusIndicator((current) => (current ? { ...current, active: false } : null));
+      focusIndicatorTimeoutRef.current = window.setTimeout(() => {
+        setFocusIndicator(null);
+        focusIndicatorTimeoutRef.current = null;
+      }, 260);
+    }, 420);
+  };
+
+  const handleTapToFocus = async (event: any) => {
+    const metrics = getVideoMetrics();
+    if (!metrics) return;
+
+    const { video, renderWidth, renderHeight, scale, offsetX, offsetY, sourceWidth, sourceHeight } = metrics;
+    const rect = video.getBoundingClientRect();
+    const localX = clamp(event.clientX - rect.left, 0, renderWidth);
+    const localY = clamp(event.clientY - rect.top, 0, renderHeight);
+    const sourceX = clamp((localX - offsetX) / scale, 0, sourceWidth);
+    const sourceY = clamp((localY - offsetY) / scale, 0, sourceHeight);
+    const xPct = clamp(sourceX / sourceWidth, 0, 1);
+    const yPct = clamp(sourceY / sourceHeight, 0, 1);
+
+    showFocusIndicator(localX, localY);
+    updateTrackingBox(
+      normalizeTrackingBox({
+        leftPct: clamp(xPct - 0.12, 0, 0.96),
+        topPct: clamp(yPct - 0.12, 0, 0.96),
+        widthPct: 0.24,
+        heightPct: 0.24
+      })
+    );
+
+    const track = trackRef.current as
+      | (MediaStreamTrack & {
+          getCapabilities?: () => Record<string, any>;
+          applyConstraints?: (constraints: MediaTrackConstraints) => Promise<void>;
+        })
+      | null;
+
+    const capabilities = track?.getCapabilities?.();
+    if (!track?.applyConstraints || !capabilities) return;
+
+    const advanced: Record<string, any> = {};
+    if (capabilities.pointsOfInterest) {
+      advanced.pointsOfInterest = [{ x: sourceX, y: sourceY }];
+    }
+    if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("single-shot")) {
+      advanced.focusMode = "single-shot";
+    } else if (
+      Array.isArray(capabilities.focusMode) &&
+      capabilities.focusMode.includes("continuous")
+    ) {
+      advanced.focusMode = "continuous";
+    }
+
+    if (!Object.keys(advanced).length) return;
+
+    try {
+      await track.applyConstraints({ advanced: [advanced] });
+
+      if (
+        advanced.focusMode === "single-shot" &&
+        Array.isArray(capabilities.focusMode) &&
+        capabilities.focusMode.includes("continuous")
+      ) {
+        window.setTimeout(() => {
+          void track.applyConstraints?.({
+            advanced: [{ focusMode: "continuous" }]
+          }).catch(() => undefined);
+        }, 220);
+      }
+    } catch (error) {
+      console.debug("Tap-to-focus no soportado por este dispositivo", error);
+    }
+  };
+
+  const readJsQrRegion = (
+    context: CanvasRenderingContext2D,
+    region: ScanRegion,
+    frameWidth: number,
+    frameHeight: number
+  ): DecodedFrame | null => {
+    const frame = context.getImageData(region.x, region.y, region.width, region.height);
+    const qrMatch = jsQR(frame.data, frame.width, frame.height, {
+      inversionAttempts: "attemptBoth"
+    });
+
+    if (!qrMatch?.data) return null;
+
+    const location = qrMatch.location;
+    const absolutePoints = location
+      ? [
+          { x: location.topLeftCorner.x + region.x, y: location.topLeftCorner.y + region.y },
+          { x: location.topRightCorner.x + region.x, y: location.topRightCorner.y + region.y },
+          { x: location.bottomRightCorner.x + region.x, y: location.bottomRightCorner.y + region.y },
+          { x: location.bottomLeftCorner.x + region.x, y: location.bottomLeftCorner.y + region.y }
+        ]
+      : [];
+
+    return {
+      payload: qrMatch.data,
+      trackingBox: buildTrackingBoxFromPoints(absolutePoints, frameWidth, frameHeight)
+    };
+  };
+
+  const tryDecodeWithJsQr = (
     context: CanvasRenderingContext2D,
     width: number,
     height: number
-  ) => {
-    const fullFrame = context.getImageData(0, 0, width, height);
-    const directCode = jsQR(fullFrame.data, fullFrame.width, fullFrame.height, {
-      inversionAttempts: "attemptBoth"
-    });
-    if (directCode?.data) {
-      return directCode.data;
+  ): DecodedFrame | null => {
+    const trackedRegion = trackingBoxRef.current
+      ? buildTrackedRegion(trackingBoxRef.current, width, height)
+      : null;
+
+    if (trackedRegion) {
+      const trackedCode = readJsQrRegion(context, trackedRegion, width, height);
+      if (trackedCode) {
+        return trackedCode;
+      }
     }
 
-    const cropWidth = Math.floor(width * 0.72);
-    const cropHeight = Math.floor(height * 0.72);
-    const offsetX = Math.floor((width - cropWidth) / 2);
-    const offsetY = Math.floor((height - cropHeight) / 2);
-    const croppedFrame = context.getImageData(offsetX, offsetY, cropWidth, cropHeight);
-    const croppedCode = jsQR(croppedFrame.data, croppedFrame.width, croppedFrame.height, {
-      inversionAttempts: "attemptBoth"
-    });
+    const cropWidth = Math.floor(width * 0.74);
+    const cropHeight = Math.floor(height * 0.74);
+    const centeredRegion = {
+      x: Math.floor((width - cropWidth) / 2),
+      y: Math.floor((height - cropHeight) / 2),
+      width: cropWidth,
+      height: cropHeight
+    };
+    const centeredCode = readJsQrRegion(context, centeredRegion, width, height);
+    if (centeredCode) {
+      return centeredCode;
+    }
 
-    return croppedCode?.data || null;
+    return readJsQrRegion(context, { x: 0, y: 0, width, height }, width, height);
   };
 
   const startScanning = () => {
+    isScanningRef.current = true;
     setIsScanning(true);
-    setSecondsLeft(15);
+    setSecondsLeft(AUTO_CLOSE_SECONDS);
+    lastScanAttemptRef.current = 0;
+  };
 
-    if (scanIntervalRef.current) {
-      window.clearInterval(scanIntervalRef.current);
-    }
-    scanIntervalRef.current = window.setInterval(scanQrCode, 350);
+  const scheduleNextScanFrame = () => {
+    if (!isScanningRef.current || groupSelectionRef.current || scanFrameRef.current !== null) return;
+    scanFrameRef.current = window.requestAnimationFrame(() => {
+      scanFrameRef.current = null;
+      void scanQrCode();
+    });
   };
 
   const startCamera = async () => {
@@ -277,7 +628,8 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
           facingMode: { ideal: "environment" },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-          aspectRatio: { ideal: 1.7777777778 }
+          aspectRatio: { ideal: 1.7777777778 },
+          frameRate: { ideal: 60, max: 60 }
         },
         audio: false
       });
@@ -292,6 +644,8 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.setAttribute("autoplay", "true");
         videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.muted = true;
+        await videoRef.current.play().catch(() => undefined);
       }
       startScanning();
     } catch (error) {
@@ -309,6 +663,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   const openGroupSelector = (group: GroupResolution, payload: string) => {
     pauseScanning();
     setGroupSearch("");
+    groupSelectionRef.current = group;
     setGroupSelection(group);
     lastReadRef.current = { payload, ts: Date.now() };
     showFlash("info", "QR de grupo detectado");
@@ -340,7 +695,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     const now = Date.now();
     if (
       lastReadRef.current.payload === payload &&
-      now - lastReadRef.current.ts < 1800
+      now - lastReadRef.current.ts < DUPLICATE_READ_WINDOW_MS
     ) {
       return;
     }
@@ -373,29 +728,59 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     }
   };
 
-  const scanQrCode = () => {
-    if (groupSelection) return;
+  const scanQrCode = async () => {
+    if (!isScanningRef.current || groupSelectionRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== 4) return;
+    if (!video || !canvas || video.readyState !== 4) {
+      scheduleNextScanFrame();
+      return;
+    }
+
+    const now = performance.now();
+    if (isDecodingRef.current || now - lastScanAttemptRef.current < SCAN_INTERVAL_MS) {
+      maybeClearTrackingBox();
+      scheduleNextScanFrame();
+      return;
+    }
+    lastScanAttemptRef.current = now;
 
     const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return;
+    if (!context) {
+      maybeClearTrackingBox();
+      scheduleNextScanFrame();
+      return;
+    }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.imageSmoothingEnabled = false;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const code = tryDecode(context, canvas.width, canvas.height);
+    isDecodingRef.current = true;
 
-    if (code) {
-      void handleProductRequest(code);
+    try {
+      const nativeResult = await tryNativeDecode(video);
+      if (nativeResult) {
+        updateTrackingBox(nativeResult.trackingBox);
+        await handleProductRequest(nativeResult.payload);
+        return;
+      }
+
+      prepareFallbackFrame(video, canvas, context);
+      const decoded = tryDecodeWithJsQr(context, canvas.width, canvas.height);
+
+      if (decoded) {
+        updateTrackingBox(decoded.trackingBox);
+        await handleProductRequest(decoded.payload);
+      } else {
+        maybeClearTrackingBox();
+      }
+    } finally {
+      isDecodingRef.current = false;
+      scheduleNextScanFrame();
     }
   };
 
   const handleCloseGroupSelection = () => {
     const currentPayload = groupSelection?.qrPayload || "";
+    groupSelectionRef.current = null;
     setGroupSelection(null);
     setGroupSearch("");
     if (currentPayload) {
@@ -416,6 +801,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
       groupName: groupSelection?.name
     });
 
+    groupSelectionRef.current = null;
     setGroupSelection(null);
     setGroupSearch("");
     handleResolvedVariant(normalized, "Variante del grupo agregada");
@@ -445,26 +831,61 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     );
   }, [groupSelection, groupSearch]);
 
+  const trackingOverlayStyle = useMemo(() => {
+    if (!trackingBox || !videoRef.current) return null;
+
+    const video = videoRef.current;
+    const renderWidth = video.clientWidth || 0;
+    const renderHeight = video.clientHeight || 0;
+    const sourceWidth = video.videoWidth || 0;
+    const sourceHeight = video.videoHeight || 0;
+    if (!renderWidth || !renderHeight || !sourceWidth || !sourceHeight) return null;
+
+    const scale = Math.max(renderWidth / sourceWidth, renderHeight / sourceHeight);
+    const contentWidth = sourceWidth * scale;
+    const contentHeight = sourceHeight * scale;
+    const offsetX = (renderWidth - contentWidth) / 2;
+    const offsetY = (renderHeight - contentHeight) / 2;
+
+    return {
+      left: offsetX + trackingBox.leftPct * contentWidth,
+      top: offsetY + trackingBox.topPct * contentHeight,
+      width: trackingBox.widthPct * contentWidth,
+      height: trackingBox.heightPct * contentHeight
+    };
+  }, [trackingBox]);
+
   useEffect(() => {
     void startCamera();
 
     return () => {
       clearScannerIntervals();
       clearFeedbackTimeout();
+      clearFocusIndicator();
       stopCamera();
     };
   }, []);
 
   useEffect(() => {
+    isScanningRef.current = isScanning;
     if (isScanning) {
       resetInactivityCountdown();
+      scheduleNextScanFrame();
       return;
     }
     if (countdownIntervalRef.current) {
       window.clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
     }
+    if (scanFrameRef.current) {
+      window.cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
+    }
   }, [isScanning]);
+
+  useEffect(() => {
+    groupSelectionRef.current = groupSelection;
+  }, [groupSelection]);
 
   return (
     <>
@@ -536,8 +957,11 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
             borderRadius: 18,
             overflow: "hidden",
             border: "1px solid #eddcc9",
-            background: "#f7efe7"
+            background: "#f7efe7",
+            touchAction: "manipulation",
+            cursor: "crosshair"
           }}
+          onPointerDown={(event) => void handleTapToFocus(event)}
         >
           <video
             ref={videoRef}
@@ -558,9 +982,102 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
             }}
           />
 
+          {trackingOverlayStyle && (
+            <>
+              <div
+                style={{
+                  position: "absolute",
+                  left: trackingOverlayStyle.left,
+                  top: trackingOverlayStyle.top,
+                  width: trackingOverlayStyle.width,
+                  height: trackingOverlayStyle.height,
+                  border: "2px solid #52c41a",
+                  borderRadius: 14,
+                  boxShadow:
+                    "0 0 0 1px rgba(255,255,255,0.7), 0 0 18px rgba(82, 196, 26, 0.45), inset 0 0 18px rgba(82, 196, 26, 0.12)",
+                  background: "rgba(82, 196, 26, 0.06)",
+                  pointerEvents: "none",
+                  transition: "all 0.09s linear"
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -28,
+                    left: 0,
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    background: "rgba(82, 196, 26, 0.92)",
+                    color: "#ffffff",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: 0.3,
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  QR detectado
+                </div>
+                {[
+                  { left: -2, top: -2, borderRight: "none", borderBottom: "none" },
+                  { right: -2, top: -2, borderLeft: "none", borderBottom: "none" },
+                  { left: -2, bottom: -2, borderRight: "none", borderTop: "none" },
+                  { right: -2, bottom: -2, borderLeft: "none", borderTop: "none" }
+                ].map((corner, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      position: "absolute",
+                      width: 18,
+                      height: 18,
+                      border: "3px solid #b7eb8f",
+                      borderRadius: 5,
+                      pointerEvents: "none",
+                      ...corner
+                    }}
+                  />
+                ))}
+              </div>
+              <div
+                style={{
+                  position: "absolute",
+                  left: trackingOverlayStyle.left,
+                  top: trackingOverlayStyle.top + trackingOverlayStyle.height / 2 - 1,
+                  width: trackingOverlayStyle.width,
+                  height: 2,
+                  background: "linear-gradient(90deg, rgba(82,196,26,0) 0%, rgba(82,196,26,0.95) 50%, rgba(82,196,26,0) 100%)",
+                  boxShadow: "0 0 14px rgba(82, 196, 26, 0.6)",
+                  pointerEvents: "none",
+                  transition: "all 0.09s linear"
+                }}
+              />
+            </>
+          )}
+
+          {focusIndicator && (
+            <div
+              style={{
+                position: "absolute",
+                left: focusIndicator.x - 26,
+                top: focusIndicator.y - 26,
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                border: `2px solid ${focusIndicator.active ? "#ffd666" : "rgba(255, 214, 102, 0)"}`,
+                boxShadow: focusIndicator.active
+                  ? "0 0 16px rgba(255, 214, 102, 0.55)"
+                  : "none",
+                background: focusIndicator.active ? "rgba(255, 214, 102, 0.08)" : "transparent",
+                pointerEvents: "none",
+                transition: "all 0.22s ease"
+              }}
+            />
+          )}
+
           {isScanning && (
             <div className="scanning-overlay">
-              Escaneando... cierre automatico en {secondsLeft}s
+              {trackingOverlayStyle
+                ? "QR en seguimiento..."
+                : `Escaneando... cierre automatico en ${secondsLeft}s`}
             </div>
           )}
         </div>
