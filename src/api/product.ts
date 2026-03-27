@@ -156,6 +156,35 @@ export const getSellerProductInfoPageAPI = async (params?: {
     }
 };
 
+export const getAdminSellerProductInfoPageAPI = async (params?: {
+    sellerId: string;
+    sucursalId?: string;
+    categoryId?: string;
+    q?: string;
+    inStock?: boolean;
+    hasPromotion?: boolean;
+    hasImages?: boolean;
+    hasDescription?: boolean;
+    page?: number;
+    limit?: number;
+    sortOrder?: "asc" | "desc";
+}) => {
+    try {
+        const res = await apiClient.get("/product/admin/seller/product-info", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener informacion de productos del vendedor para admin:", error);
+        return {
+            success: false,
+            rows: [],
+            total: 0,
+            page: Number(params?.page || 1),
+            limit: Number(params?.limit || 10),
+            pages: 1
+        };
+    }
+};
+
 export const updateVariantExtrasBySellerAPI = async ({
     productId,
     sucursalId,

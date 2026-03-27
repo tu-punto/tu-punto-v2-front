@@ -95,4 +95,10 @@ export const menu = [
     icon: infoProductIcon,
     roles: getAllowedRoles("/seller-product-info"),
   },
+  {
+    path: "/admin-seller-product-info",
+    label: "Productos Clientes",
+    icon: infoProductIcon,
+    roles: getAllowedRoles("/admin-seller-product-info"),
+  },
 ];

@@ -82,7 +82,11 @@ export const getPaymentProofsBySellerIdAPI = async (sellerId: any) => {
     }
 }
 
-export const getSellersBasicAPI = async (params?: { sucursalId?: string }) => {
+export const getSellersBasicAPI = async (params?: {
+    sucursalId?: string;
+    onlyProductInfoAccess?: boolean;
+    includeProductInfoStatus?: boolean;
+}) => {
     try {
         const res = await apiClient.get(`/seller/basic`, { params });
         return res.data;

@@ -1,5 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
+  Alert,
   Button,
   Card,
   Empty,
@@ -25,9 +27,9 @@ import {
   SearchOutlined,
 } from "@ant-design/icons";
 
-import { getSellerProductInfoPageAPI } from "../../api/product";
+import { getAdminSellerProductInfoPageAPI, getSellerProductInfoPageAPI } from "../../api/product";
 import { getCategoriesAPI } from "../../api/category";
-import { getSellerAPI } from "../../api/seller";
+import { getSellerAPI, getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
 import SellerProductInfoEditModal from "./SellerProductInfoEditModal";
 import infoProductIcon from "../../assets/infoProductIcon.svg";
@@ -37,6 +39,13 @@ import "./SellerProductInfoPage.css";
 type SellerBranchOption = {
   value: string;
   label: string;
+};
+
+type SellerOption = {
+  value: string;
+  label: ReactNode;
+  searchText: string;
+  status: CompletionStatus;
 };
 
 type CategoryOption = {
@@ -100,13 +109,33 @@ const getCompletionStatus = (row: SellerProductInfoRow): CompletionStatus => {
   return "partial";
 };
 
-const SellerProductInfoPage = () => {
+const getSellerProductInfoStatusMeta = (status?: string) => {
+  switch (status) {
+    case "complete":
+      return { color: "green" as const, label: "Completo" };
+    case "partial":
+      return { color: "gold" as const, label: "Incompleto" };
+    case "empty":
+    default:
+      return { color: "red" as const, label: "Sin informacion" };
+  }
+};
+
+type SellerProductInfoPageProps = {
+  mode?: "seller" | "admin";
+};
+
+const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) => {
   const { user } = useContext(UserContext);
+  const isAdminMode = mode === "admin";
+  const isReadOnly = isAdminMode;
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<SellerProductInfoRow[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [branches, setBranches] = useState<SellerBranchOption[]>([]);
+  const [sellerOptions, setSellerOptions] = useState<SellerOption[]>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -139,13 +168,64 @@ const SellerProductInfoPage = () => {
   useEffect(() => {
     const loadFiltersData = async () => {
       try {
-        const [categoriesResponse, sellerResponse] = await Promise.all([
+        const [categoriesResponse, sellersResponse] = await Promise.all([
           getCategoriesAPI(),
-          user?.id_vendedor ? getSellerAPI(user.id_vendedor) : Promise.resolve(null),
+          isAdminMode
+            ? getSellersBasicAPI({
+                onlyProductInfoAccess: true,
+                includeProductInfoStatus: true,
+              })
+            : Promise.resolve([]),
         ]);
 
         setCategories(Array.isArray(categoriesResponse) ? categoriesResponse : []);
+        if (isAdminMode) {
+          const nextSellerOptions = (Array.isArray(sellersResponse) ? sellersResponse : [])
+            .map((seller: any) => {
+              const sellerName =
+                `${String(seller?.nombre || "").trim()} ${String(seller?.apellido || "").trim()}`.trim() ||
+                String(seller?.mail || "Vendedor");
+              const sellerStatus = getSellerProductInfoStatusMeta(seller?.product_info_status);
 
+              return {
+                value: String(seller?._id || ""),
+                label: (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{sellerName}</span>
+                    <Tag color={sellerStatus.color} bordered={false} style={{ marginInlineEnd: 0, flexShrink: 0 }}>
+                      {sellerStatus.label}
+                    </Tag>
+                  </div>
+                ),
+                searchText: `${sellerName} ${String(seller?.mail || "")} ${sellerStatus.label}`.toLowerCase(),
+                status:
+                  seller?.product_info_status === "complete" || seller?.product_info_status === "partial"
+                    ? seller.product_info_status
+                    : "empty",
+              };
+            })
+            .filter((seller: SellerOption) => seller.value);
+          setSellerOptions(nextSellerOptions);
+        }
+      } catch (error) {
+        console.error("Error al cargar filtros de informacion de productos:", error);
+        message.error("No se pudieron cargar las opciones de filtros.");
+      }
+    };
+
+    void loadFiltersData();
+  }, [isAdminMode]);
+
+  useEffect(() => {
+    const targetSellerId = isAdminMode ? selectedSellerId : user?.id_vendedor;
+    if (!targetSellerId) {
+      setBranches([]);
+      return;
+    }
+
+    const loadSellerBranches = async () => {
+      try {
+        const sellerResponse = await getSellerAPI(String(targetSellerId));
         const sellerBranches = Array.isArray(sellerResponse?.pago_sucursales)
           ? sellerResponse.pago_sucursales.map((branch: any) => ({
               value: String(branch?.id_sucursal?._id || branch?.id_sucursal || ""),
@@ -155,19 +235,26 @@ const SellerProductInfoPage = () => {
 
         setBranches(sellerBranches.filter((branch) => branch.value));
       } catch (error) {
-        console.error("Error al cargar filtros de informacion de productos:", error);
-        message.error("No se pudieron cargar las opciones de filtros.");
+        console.error("Error al cargar sucursales del vendedor:", error);
+        setBranches([]);
       }
     };
 
-    void loadFiltersData();
-  }, [user?.id_vendedor]);
+    void loadSellerBranches();
+  }, [isAdminMode, selectedSellerId, user?.id_vendedor]);
 
   useEffect(() => {
     const loadProductInfo = async () => {
+      if (isAdminMode && !selectedSellerId) {
+        setRows([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        const response = await getSellerProductInfoPageAPI({
+        const requestParams = {
           sucursalId: selectedBranch !== "all" ? selectedBranch : undefined,
           categoryId: selectedCategory !== "all" ? selectedCategory : undefined,
           q: debouncedSearch || undefined,
@@ -178,7 +265,13 @@ const SellerProductInfoPage = () => {
           page,
           limit,
           sortOrder,
-        });
+        };
+        const response = isAdminMode
+          ? await getAdminSellerProductInfoPageAPI({
+              sellerId: String(selectedSellerId),
+              ...requestParams,
+            })
+          : await getSellerProductInfoPageAPI(requestParams);
 
         const safeRows = Array.isArray(response?.rows) ? response.rows : [];
         setRows(
@@ -202,6 +295,8 @@ const SellerProductInfoPage = () => {
 
     void loadProductInfo();
   }, [
+    isAdminMode,
+    selectedSellerId,
     selectedBranch,
     selectedCategory,
     debouncedSearch,
@@ -392,7 +487,10 @@ const SellerProductInfoPage = () => {
         );
       },
     },
-    {
+  ];
+
+  if (!isReadOnly) {
+    columns.push({
       title: "Actualizar",
       key: "actions",
       width: 110,
@@ -409,8 +507,8 @@ const SellerProductInfoPage = () => {
           />
         </Tooltip>
       ),
-    },
-  ];
+    });
+  }
 
   return (
     <div className="seller-product-info-page p-4">
@@ -441,6 +539,25 @@ const SellerProductInfoPage = () => {
               size="large"
             />
 
+            {isAdminMode && (
+              <Select
+                size="large"
+                value={selectedSellerId}
+                onChange={(value) => {
+                  setSelectedSellerId(value);
+                  setSelectedBranch("all");
+                  setPage(1);
+                }}
+                options={sellerOptions}
+                placeholder="Selecciona un vendedor"
+                showSearch
+                allowClear
+                filterOption={(input, option) =>
+                  String((option as SellerOption | undefined)?.searchText || "").includes(input.toLowerCase())
+                }
+              />
+            )}
+
             <Select
               size="large"
               value={selectedBranch}
@@ -449,6 +566,7 @@ const SellerProductInfoPage = () => {
                 setPage(1);
               }}
               options={[{ value: "all", label: "Todas las sucursales" }, ...branches]}
+              disabled={isAdminMode && !selectedSellerId}
             />
 
             <Select
@@ -459,14 +577,25 @@ const SellerProductInfoPage = () => {
                 setPage(1);
               }}
               options={[{ value: "all", label: "Todas las categorias" }, ...categoryOptions]}
+              disabled={isAdminMode && !selectedSellerId}
             />
           </div>
+
+          {isAdminMode && !selectedSellerId && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginTop: 16 }}
+              message="Selecciona un vendedor para cargar sus productos."
+            />
+          )}
 
           <div className="seller-product-info-toggle-row">
             <Space>
               <span>Solo con stock</span>
               <Switch
                 checked={filterInStock}
+                disabled={isAdminMode && !selectedSellerId}
                 onChange={(checked) => {
                   setFilterInStock(checked);
                   setPage(1);
@@ -477,6 +606,7 @@ const SellerProductInfoPage = () => {
               <span>Con promocion</span>
               <Switch
                 checked={filterHasPromotion}
+                disabled={isAdminMode && !selectedSellerId}
                 onChange={(checked) => {
                   setFilterHasPromotion(checked);
                   setPage(1);
@@ -487,6 +617,7 @@ const SellerProductInfoPage = () => {
               <span>Con imágenes</span>
               <Switch
                 checked={filterHasImages}
+                disabled={isAdminMode && !selectedSellerId}
                 onChange={(checked) => {
                   setFilterHasImages(checked);
                   setPage(1);
@@ -497,6 +628,7 @@ const SellerProductInfoPage = () => {
               <span>Con descripcion</span>
               <Switch
                 checked={filterHasDescription}
+                disabled={isAdminMode && !selectedSellerId}
                 onChange={(checked) => {
                   setFilterHasDescription(checked);
                   setPage(1);
@@ -590,7 +722,11 @@ const SellerProductInfoPage = () => {
           locale={{
             emptyText: (
               <Empty
-                description="No hay variantes que coincidan con los filtros actuales."
+                description={
+                  isAdminMode && !selectedSellerId
+                    ? "Selecciona un vendedor para ver sus variantes."
+                    : "No hay variantes que coincidan con los filtros actuales."
+                }
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             ),
@@ -649,17 +785,19 @@ const SellerProductInfoPage = () => {
         )}
       </Modal>
 
-      <SellerProductInfoEditModal
-        visible={editModalOpen}
-        record={editingRecord}
-        onClose={() => {
-          setEditModalOpen(false);
-          setEditingRecord(null);
-        }}
-        onSuccess={async () => {
-          setRefreshTick((current) => current + 1);
-        }}
-      />
+      {!isReadOnly && (
+        <SellerProductInfoEditModal
+          visible={editModalOpen}
+          record={editingRecord}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditingRecord(null);
+          }}
+          onSuccess={async () => {
+            setRefreshTick((current) => current + 1);
+          }}
+        />
+      )}
     </div>
   );
 };

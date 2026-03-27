@@ -35,7 +35,11 @@ const SellerProductInfoRoute = () => {
     return <Navigate to="/sales" replace />;
   }
 
-  return <SellerProductInfoPage />;
+  return <SellerProductInfoPage mode="seller" />;
+};
+
+const AdminSellerProductInfoRoute = () => {
+  return <SellerProductInfoPage mode="admin" />;
 };
 
 const protectedRoutes = [
@@ -122,6 +126,10 @@ const protectedRoutes = [
       {
         path: "/seller-product-info",
         element: guard("/seller-product-info", <SellerProductInfoRoute />),
+      },
+      {
+        path: "/admin-seller-product-info",
+        element: guard("/admin-seller-product-info", <AdminSellerProductInfoRoute />),
       },
       {
         path: "*",
