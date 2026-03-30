@@ -174,6 +174,7 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
             ? getSellersBasicAPI({
                 onlyProductInfoAccess: true,
                 includeProductInfoStatus: true,
+                onlyActiveOrRenewal: true,
               })
             : Promise.resolve([]),
         ]);

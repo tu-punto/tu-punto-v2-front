@@ -1,221 +1,447 @@
-import { Modal, Button, Table, InputNumber, Popconfirm, message } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
-import { createVariantAPI, generateIngressPDFAPI, registerProductAPI, updateSubvariantStockAPI } from "../../api/product";
-import { getTempStock, getTempProducts, getTempVariants, clearTempStock, clearTempProducts, clearTempVariants } from "../../utils/storageHelpers";
+import { useEffect, useMemo, useState } from "react";
+import { Button, InputNumber, Modal, Popconfirm, Table, Typography, message } from "antd";
+import { ArrowDownOutlined, ArrowUpOutlined, StopOutlined } from "@ant-design/icons";
+
 import { createEntryAPI } from "../../api/entry.ts";
-// const downloadQRFromBackend = (qrImagePath, productName, productId) => {
-//   if (!qrImagePath) {
-//     console.error('No hay imagen QR disponible para este producto');
-//     return;
-//   }
-//   const url = `/qr/download-qr?url=${encodeURIComponent(qrImagePath)}&name=QR_${productName || productId || 'producto'}.png`;
-//   const link = document.createElement('a');
-//   link.href = url;
-//   link.setAttribute('download', `QR_${productName || productId || 'producto'}.png`);
-//   document.body.appendChild(link);
-//   link.click();
-//   document.body.removeChild(link);
-// };
-// const downloadQRFromAWS = (qrImagePath, productName, productId) => {
-//   if (!qrImagePath) {
-//     console.error('No hay imagen QR disponible para este producto');
-//     return;
-//   }
-//   const link = document.createElement('a');
-//   link.href = qrImagePath;
-//   link.setAttribute('download', `QR_${productName || productId || 'producto'}.png`);
-//   document.body.appendChild(link);
-//   link.click();
-//   document.body.removeChild(link);
-// };
-const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursales, selectedSeller }) => {
-  const [stockData, setStockData] = useState([]);
-  const [variantData, setVariantData] = useState([]);
-  const [productData, setProductData] = useState([]);
+import { createVariantAPI, registerProductAPI, updateSubvariantStockAPI } from "../../api/product";
+import {
+  clearTempProducts,
+  clearTempStock,
+  clearTempVariants,
+  getTempStock,
+  getTempVariants,
+  saveTempStock
+} from "../../utils/storageHelpers";
+import QRScanner from "../Sales/QRScanner";
+
+const { Text, Title } = Typography;
+
+const SCAN_MODE_META = {
+  ingress: {
+    label: "Ingresos",
+    actionLabel: "Escaner QR de ingresos",
+    description: "Cada lectura suma una unidad a la variante y la deja lista en el ajuste pendiente.",
+    successLabel: "Variante agregada a ingresos",
+    groupSuccessLabel: "Variante del grupo sumada a ingresos",
+    tagColor: "green",
+    delta: 1,
+    buttonStyle: {
+      background: "linear-gradient(135deg, #52c41a 0%, #389e0d 100%)",
+      borderColor: "#389e0d",
+      color: "#ffffff"
+    }
+  },
+  egress: {
+    label: "Salidas",
+    actionLabel: "Escaner QR de salidas",
+    description: "Cada lectura descuenta una unidad. El sistema bloquea salidas que dejarian stock negativo.",
+    successLabel: "Variante agregada a salidas",
+    groupSuccessLabel: "Variante del grupo descontada",
+    tagColor: "red",
+    delta: -1,
+    buttonStyle: {
+      background: "linear-gradient(135deg, #ff7875 0%, #cf1322 100%)",
+      borderColor: "#cf1322",
+      color: "#ffffff"
+    }
+  }
+} as const;
+
+const toVariantMap = (input: any): Record<string, string> => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  return input as Record<string, string>;
+};
+
+const getVariantValuesLabel = (variantes: Record<string, string>) =>
+  Object.values(toVariantMap(variantes))
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" / ");
+
+const getVariantFullLabel = (variantes: Record<string, string>) => {
+  const valuesLabel = getVariantValuesLabel(variantes);
+  return valuesLabel ? ` - ${valuesLabel}` : "";
+};
+
+const areVariantsEqual = (a: Record<string, string>, b: Record<string, string>) => {
+  const keysA = Object.keys(a || {});
+  const keysB = Object.keys(b || {});
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((key) => a[key] === b[key]);
+};
+
+const buildDraftKey = (record: any) => {
+  const productId = String(record?.product?._id || record?.product?.id_producto || "");
+  const variantKey = String(record?.product?.variantKey || "");
+  const variantHash = JSON.stringify(toVariantMap(record?.product?.variantes));
+  return `${productId}::${variantKey || variantHash}`;
+};
+
+const normalizeNumber = (value: any) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const normalizeStockDraftEntries = (items: any[] = []) =>
+  items.map((item: any) => ({
+    ...item,
+    product: {
+      ...item?.product,
+      variantes: item?.product?.variantes || item?.product?.variantes_obj || {}
+    }
+  }));
+
+const ConfirmProductsModal = ({
+  visible,
+  onClose,
+  onSuccess,
+  productosConSucursales,
+  selectedSeller,
+  onStockDraftChange,
+  newStock = []
+}: any) => {
+  const [stockData, setStockData] = useState<any[]>([]);
+  const [variantData, setVariantData] = useState<any[]>([]);
+  const [productData, setProductData] = useState<any[]>([]);
+  const [loadingSave, setLoadingSave] = useState(false);
+  const [activeScannerMode, setActiveScannerMode] = useState<"ingress" | "egress" | null>(null);
+  const [scannerSession, setScannerSession] = useState(0);
   const sucursalId = localStorage.getItem("sucursalId");
-  const [loadingPDF, setLoadingPDF] = useState(false);
 
   useEffect(() => {
-    //const newStock = JSON.parse(localStorage.getItem("newStock") || "[]");
-    //const newVariants = JSON.parse(localStorage.getItem("newVariants") || "[]");
-    const newProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
-    //console.log("Productos cargados desde localStorage:", newProducts);
-    const filteredProducts = newProducts.map((p) => {
-      const prod = p.productData || p;
-      const filteredSucursales = prod.sucursales.map((s) => ({
-        ...s,
-        combinaciones: s.id_sucursal === sucursalId
-          ? s.combinaciones.filter((c) => c.stock > 0)
-          : []
-      })).filter(s => s.combinaciones.length > 0);
-      return { ...p, productData: { ...prod, sucursales: filteredSucursales } };
+    if (!visible) return;
+
+    const tempProducts = JSON.parse(localStorage.getItem("newProducts") || "[]");
+    const filteredProducts = tempProducts.map((item: any) => {
+      const product = item.productData || item;
+      const filteredSucursales = (product.sucursales || [])
+        .map((sucursal: any) => ({
+          ...sucursal,
+          combinaciones:
+            String(sucursal.id_sucursal) === String(sucursalId)
+              ? (sucursal.combinaciones || []).filter((comb: any) => normalizeNumber(comb.stock) > 0)
+              : []
+        }))
+        .filter((sucursal: any) => (sucursal.combinaciones || []).length > 0);
+
+      return { ...item, productData: { ...product, sucursales: filteredSucursales } };
     });
 
-    setStockData(getTempStock());
+    setStockData(normalizeStockDraftEntries(Array.isArray(newStock) ? newStock : getTempStock()));
     setVariantData(getTempVariants());
     setProductData(filteredProducts);
-  }, [visible]);
+    setActiveScannerMode(null);
+  }, [visible, sucursalId]);
 
-  const handleEditStock = (record, value) => {
-    const updated = stockData.map(item =>
-      item === record ? { ...item, newStock: { ...item.newStock, stock: value } } : item
+  useEffect(() => {
+    if (!visible) return;
+    saveTempStock(stockData);
+    onStockDraftChange?.(stockData);
+  }, [stockData, visible, onStockDraftChange]);
+
+  const closeScannerPanel = () => {
+    setActiveScannerMode(null);
+    setScannerSession((current) => current + 1);
+  };
+
+  const openScanner = (mode: "ingress" | "egress") => {
+    setActiveScannerMode(mode);
+    setScannerSession((current) => current + 1);
+  };
+
+  const handleDeleteStockRecord = (record: any) => {
+    setStockData((current) => current.filter((item) => buildDraftKey(item) !== buildDraftKey(record)));
+  };
+
+  const applyStockDelta = (record: any, nextDelta: number) => {
+    const currentStock = normalizeNumber(record?.product?.stock);
+    if (currentStock + nextDelta < 0) {
+      message.warning("No puedes registrar una salida mayor al stock disponible en esta sucursal.");
+      return;
+    }
+
+    setStockData((current) =>
+      current.flatMap((item) => {
+        if (buildDraftKey(item) !== buildDraftKey(record)) return [item];
+        if (!nextDelta) return [];
+        return [{ ...item, newStock: { ...item.newStock, stock: nextDelta } }];
+      })
     );
-    setStockData(updated);
   };
 
-  const handleDelete = (data, setData, record) => {
-    setData(data.filter(item => item !== record));
+  const handleEditStock = (record: any, value: number | null) => {
+    applyStockDelta(record, normalizeNumber(value));
   };
 
-  const handleEditVariant = (record, key, value) => {
-    const updated = variantData.map(item =>
-      item === record ? { ...item, [key]: value } : item
-    );
-    setVariantData(updated);
-  };
+  const handleEditProduct = (
+    productId: string,
+    branchId: string,
+    combinationIndex: number,
+    field: "stock" | "precio",
+    value: number | null
+  ) => {
+    const parsedValue = normalizeNumber(value);
+    setProductData((current) =>
+      current.map((rawItem: any) => {
+        const product = rawItem.productData || rawItem;
+        if (String(product._id) !== String(productId)) return rawItem;
 
-  const handleEditProduct = (productId, sucursalId, combIndex, field, value) => {
-    const updated = productData.map(raw => {
-      const prod = raw.productData || raw;
-      if (prod._id === productId) {
-        const updatedSucursales = prod.sucursales.map(suc => {
-          if (suc.id_sucursal === sucursalId) {
-            const combinaciones = [...suc.combinaciones];
-            combinaciones[combIndex][field] = value;
-            return { ...suc, combinaciones };
-          }
-          return suc;
+        const nextSucursales = (product.sucursales || []).map((sucursal: any) => {
+          if (String(sucursal.id_sucursal) !== String(branchId)) return sucursal;
+          const nextCombinaciones = [...(sucursal.combinaciones || [])];
+          nextCombinaciones[combinationIndex] = {
+            ...nextCombinaciones[combinationIndex],
+            [field]: parsedValue
+          };
+          return { ...sucursal, combinaciones: nextCombinaciones };
         });
-        return { ...raw, productData: { ...prod, sucursales: updatedSucursales } };
-      }
-      return raw;
-    });
-    setProductData(updated);
+
+        return { ...rawItem, productData: { ...product, sucursales: nextSucursales } };
+      })
+    );
   };
 
   const flattenedCombinations = useMemo(() => {
-    return productData.flatMap(raw => {
-      const prod = raw.productData || raw;
-      const sucursal = prod.sucursales?.find(s => s.id_sucursal === sucursalId);
-      if (!sucursal) return [];
+    return productData.flatMap((rawItem: any) => {
+      const product = rawItem.productData || rawItem;
+      const branch = (product.sucursales || []).find(
+        (sucursal: any) => String(sucursal.id_sucursal) === String(sucursalId)
+      );
+      if (!branch) return [];
 
-      return sucursal.combinaciones.map((comb, idx) => ({
-        key: `${prod._id}-${sucursal.id_sucursal}-${idx}`,
-        nombre_producto: prod.nombre_producto,
-        sucursalId: sucursal.id_sucursal,
-        index: idx,
-        variantes: Object.entries(comb.variantes).map(([k, v]) => `${k[0]}: ${v}`).join(" / "),
-        precio: comb.precio,
-        stock: comb.stock,
-        productId: prod._id
+      return (branch.combinaciones || []).map((combination: any, index: number) => ({
+        key: `${product._id}-${branch.id_sucursal}-${index}`,
+        nombre_producto: product.nombre_producto,
+        sucursalId: branch.id_sucursal,
+        index,
+        variantes: Object.entries(toVariantMap(combination.variantes))
+          .map(([key, value]) => `${key[0]}: ${value}`)
+          .join(" / "),
+        precio: normalizeNumber(combination.precio),
+        stock: normalizeNumber(combination.stock),
+        productId: product._id
       }));
     });
   }, [productData, sucursalId]);
+
+  const movementRows = useMemo(() => stockData.filter((item) => normalizeNumber(item?.newStock?.stock) !== 0), [stockData]);
 
   const clearAll = () => {
     clearTempStock();
     clearTempProducts();
     clearTempVariants();
+    onStockDraftChange?.([]);
     setStockData([]);
     setVariantData([]);
     setProductData([]);
+    setActiveScannerMode(null);
     onClose?.();
   };
-  const sonObjetosIguales = (a: Record<string, string>, b: Record<string, string>) => {
-    const clavesA = Object.keys(a);
-    const clavesB = Object.keys(b);
-    if (clavesA.length !== clavesB.length) return false;
-    return clavesA.every(k => a[k] === b[k]);
+
+  const isCompactScannerLayout = typeof window !== "undefined" && window.innerWidth < 1180;
+
+  const getScannerButtonStyle = (mode: "ingress" | "egress") => {
+    const isActive = activeScannerMode === mode;
+    const isIngress = mode === "ingress";
+    const activeColor = isIngress ? "#389e0d" : "#cf1322";
+    const inactiveColor = isIngress ? "#52c41a" : "#ff4d4f";
+
+    return {
+      background: isActive ? activeColor : "#ffffff",
+      borderColor: isActive ? activeColor : inactiveColor,
+      color: isActive ? "#ffffff" : inactiveColor,
+      boxShadow: "none"
+    };
   };
+
+  const getMovementTone = (value: number) => {
+    if (value > 0) {
+      return {
+        color: "#389e0d",
+        borderColor: "#b7eb8f",
+        background: "#f6ffed"
+      };
+    }
+
+    if (value < 0) {
+      return {
+        color: "#cf1322",
+        borderColor: "#ffa39e",
+        background: "#fff1f0"
+      };
+    }
+
+    return {
+      color: "#262626",
+      borderColor: "#d9d9d9",
+      background: "#ffffff"
+    };
+  };
+
+  const handleScannedVariant = (item: any) => {
+    if (!activeScannerMode) return;
+
+    if (selectedSeller?._id && String(item?.id_vendedor || "") !== String(selectedSeller._id)) {
+      message.error("El QR escaneado no pertenece al vendedor seleccionado.");
+      return;
+    }
+
+    const delta = SCAN_MODE_META[activeScannerMode].delta;
+    const scannedVariants = toVariantMap(item?.variantes);
+    const scannedStock = normalizeNumber(item?.stock);
+
+    setStockData((current) => {
+      const foundIndex = current.findIndex((entry) => {
+        const entryVariants = toVariantMap(entry?.product?.variantes);
+        return (
+          String(entry?.product?._id || entry?.product?.id_producto || "") === String(item?.id_producto || "") &&
+          (String(entry?.product?.variantKey || "") === String(item?.variantKey || "") ||
+            areVariantsEqual(entryVariants, scannedVariants))
+        );
+      });
+
+      if (foundIndex >= 0) {
+        const existing = current[foundIndex];
+        const nextDelta = normalizeNumber(existing?.newStock?.stock) + delta;
+        const currentStock = normalizeNumber(existing?.product?.stock);
+
+        if (currentStock + nextDelta < 0) {
+          message.warning("No puedes registrar una salida mayor al stock disponible en esta sucursal.");
+          return current;
+        }
+
+        if (!nextDelta) {
+          return current.filter((_, index) => index !== foundIndex);
+        }
+
+        const next = [...current];
+        next[foundIndex] = {
+          ...existing,
+          newStock: {
+            ...existing.newStock,
+            stock: nextDelta
+          }
+        };
+        return next;
+      }
+
+      if (scannedStock + delta < 0) {
+        message.warning("No puedes registrar una salida mayor al stock disponible en esta sucursal.");
+        return current;
+      }
+
+      return [
+        ...current,
+        {
+          product: {
+            _id: String(item?.id_producto || ""),
+            nombre_producto: String(item?.nombre_producto || "Producto"),
+            nombre_categoria: String(item?.nombre_categoria || item?.categoria || "Sin categoria"),
+            categoria: item?.categoria,
+            variantes: scannedVariants,
+            variantKey: String(item?.variantKey || ""),
+            variantLabel: String(item?.variantLabel || ""),
+            precio: normalizeNumber(item?.precio),
+            stock: scannedStock,
+            sucursalId: item?.sucursalId ? String(item.sucursalId) : sucursalId
+          },
+          newStock: {
+            productId: String(item?.id_producto || ""),
+            sucursalId: item?.sucursalId ? String(item.sucursalId) : sucursalId,
+            stock: delta
+          }
+        }
+      ];
+    });
+  };
+
   const saveProducts = async () => {
     try {
-      const createdProducts = [];
-      // 1. Registrar variantes nuevas
+      const createdProducts: any[] = [];
+
       for (const variant of variantData) {
-        const payload = {
+        await createVariantAPI({
           productId: variant.product._id,
           sucursalId,
           combinaciones: variant.combinaciones
-        };
-        await createVariantAPI(payload);
+        });
       }
 
-      // 2. Registrar productos nuevos
-      for (const prodRaw of productData) {
-        const product = prodRaw.productData || prodRaw;
+      for (const rawItem of productData) {
+        const product = rawItem.productData || rawItem;
         const response = await registerProductAPI(product);
-        // Si la respuesta es { success: true, newProduct: {...} }
-        if (response && response.newProduct) {
+        if (response?.newProduct) {
           createdProducts.push(response.newProduct);
         }
       }
 
-      // 3. Actualizar stock e ingresar registro de entrada
-      for (const entry of stockData) {
-        const { product } = entry;
-        const variantes = product?.variantes
-          ?? product?.variantes_obj
-          ?? product?.variantesObj
-          ?? product?.variant
-          ?? {};
-        const ingreso = entry.newStock.stock;
-        const productId = product._id || product.id_producto;
+      const entriesToPersist = stockData.filter((entry) => normalizeNumber(entry?.newStock?.stock) !== 0);
 
+      for (const entry of entriesToPersist) {
+        const product = entry.product || {};
+        const variantes = toVariantMap(product.variantes);
+        const delta = normalizeNumber(entry?.newStock?.stock);
+        const productId = String(product._id || product.id_producto || "");
 
-        const productoOriginal = productosConSucursales.find(p =>
-          p._id === product._id || p._id === product.id_producto
+        if (!productId) {
+          console.error("No se pudo identificar el producto para actualizar stock.");
+          continue;
+        }
+
+        if (!Object.keys(variantes).length) {
+          console.error("No se encontraron variantes validas para actualizar stock:", productId);
+          continue;
+        }
+
+        const originalProduct = (productosConSucursales || []).find(
+          (candidate: any) => String(candidate?._id) === productId || String(candidate?.id_producto) === productId
         );
 
-        const sucursal = productoOriginal?.sucursales?.find((s: any) => {
-          const idSucursalStr = typeof s.id_sucursal === "string"
-            ? s.id_sucursal
-            : s.id_sucursal?._id || s.id_sucursal?.$oid || s.id_sucursal?.toString?.();
-          return idSucursalStr === sucursalId;
+        const branch = (originalProduct?.sucursales || []).find((candidate: any) => {
+          const branchId =
+            typeof candidate?.id_sucursal === "string"
+              ? candidate.id_sucursal
+              : candidate?.id_sucursal?._id || candidate?.id_sucursal?.$oid || candidate?.id_sucursal?.toString?.();
+          return String(branchId) === String(sucursalId);
         });
 
-        const combinacion = sucursal?.combinaciones?.find((c: any) =>
-          sonObjetosIguales(c.variantes, variantes)
+        const combination = (branch?.combinaciones || []).find((candidate: any) =>
+          areVariantsEqual(toVariantMap(candidate?.variantes), variantes)
         );
 
-        const stockActual = combinacion?.stock || 0;
-        const nuevoStock = stockActual + ingreso;
+        const currentStock = normalizeNumber(combination?.stock ?? product?.stock);
+        const nextStock = currentStock + delta;
 
-        console.warn("📦 Payload para updateSubvariantStockAPI:");
-
-        if (!variantes || Object.keys(variantes).length === 0) {
-          console.error("❌ ERROR: variantes vacío o malformado para producto:", productId);
-          continue; // o return
+        if (nextStock < 0) {
+          throw new Error(
+            `La variante ${product.nombre_producto}${getVariantFullLabel(variantes)} quedaria con stock negativo.`
+          );
         }
+
         await updateSubvariantStockAPI({
           productId,
           sucursalId,
           variantes,
-          stock: nuevoStock
+          stock: nextStock
         });
-
-        if (!variantes || Object.keys(variantes).length === 0) {
-          console.warn("🚨 Variantes vacías para producto", productId);
-          continue; // o throw
-        }
 
         await createEntryAPI({
           producto: productId,
           sucursal: sucursalId,
-          nombre_variante: `${product.nombre_producto} - ${Object.entries(variantes).map(([k, v]) => `${v}`).join(" / ")}`,
-          cantidad_ingreso: ingreso,
-          estado: "confirmado",
-          categoria: product.categoria || "Ropa",
+          nombre_variante: `${product.nombre_producto || "Producto"}${getVariantFullLabel(variantes)}`,
+          cantidad_ingreso: delta,
+          estado: delta >= 0 ? "confirmado" : "salida_qr",
+          categoria: product.categoria || product.nombre_categoria || "Ropa",
           fecha: new Date().toISOString()
         });
       }
 
-      // 4. Limpiar
       clearAll();
+
       const createdProductIds = createdProducts
-        .map((p: any) => String(p?._id || ""))
+        .map((product: any) => String(product?._id || ""))
         .filter(Boolean);
 
-      // Mostrar resultado
       if (createdProductIds.length > 0) {
         message.success(`Cambios aplicados. Productos nuevos: ${createdProductIds.length}`);
       } else {
@@ -225,295 +451,379 @@ const ConfirmProductsModal = ({ visible, onClose, onSuccess, productosConSucursa
       onSuccess?.({
         createdProductIds
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al guardar productos:", error);
-      message.error("Ocurrió un error al guardar los cambios.");
+      message.error(error?.message || "Ocurrio un error al guardar los cambios.");
       throw error;
     }
   };
+
   return (
-    <>
-      {loadingPDF && (
-        <div className="fixed inset-0 z-[1250] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center animate-fade-in">
-            <svg className="animate-spin h-10 w-10 text-orange-500 mb-4" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v8H4z"
-              />
-            </svg>
-            <p className="text-orange-500 font-semibold text-lg">Generando comprobante...</p>
+    <Modal
+      title={null}
+      visible={visible}
+      onCancel={onClose}
+      width={activeScannerMode ? (isCompactScannerLayout ? "96%" : 1340) : isCompactScannerLayout ? "96%" : 980}
+      destroyOnClose
+      footer={[
+        <Button key="clear" danger onClick={clearAll}>
+          Limpiar cambios
+        </Button>,
+        <Button key="cancel" onClick={onClose}>
+          Cancelar
+        </Button>,
+        <Button
+          key="save"
+          type="primary"
+          loading={loadingSave}
+          disabled={loadingSave}
+          onClick={async () => {
+            setLoadingSave(true);
+            try {
+              await saveProducts();
+            } catch (error) {
+              console.error("Error al guardar productos:", error);
+            } finally {
+              setLoadingSave(false);
+            }
+          }}
+        >
+          Confirmar cambios
+        </Button>
+      ]}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <div>
+            <Title level={4} style={{ margin: 0 }}>
+              Actualizar stock
+            </Title>
           </div>
         </div>
-      )}
-      <Modal
-        title="Confirmar Productos"
-        visible={visible}
-        onCancel={onClose}
-        footer={[
-          <Button key="clear" danger onClick={clearAll}>Limpiar Cambios</Button>,
-          <Button key="cancel" onClick={onClose}>Cancelar</Button>,
-          <Button
-            key="save"
-            type="primary"
-            loading={loadingPDF}
-            disabled={loadingPDF}
-            onClick={async () => {
-              setLoadingPDF(true);
 
-              try {
-                // await generateIngressPDFAPI({
-                //     sellerName: selectedSeller?.nombre + " " + selectedSeller?.apellido || "Sin definir",
-                //     sucursalNombre: "Prado",
-                //     ingresos: stockData,
-                //     variantes: variantData,
-                //     productos: flattenedCombinations,
-                //     sucursalId
-                // });
-                await saveProducts();
-
-                // window.location.reload();
-
-              } catch (err) {
-                message.error("Error al guardar productos.");
-                console.error("❌ Error:", err);
-              } finally {
-                setLoadingPDF(false);
-              }
+        <div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 10
             }}
           >
-            Confirmar cambios
-          </Button>
+            <div>
+              <Title level={5} style={{ margin: 0 }}>
+                Ingresos
+              </Title>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button
+                icon={<ArrowUpOutlined />}
+                style={getScannerButtonStyle("ingress")}
+                onClick={() => openScanner("ingress")}
+              >
+                Ingresos
+              </Button>
+              <Button
+                icon={<ArrowDownOutlined />}
+                style={getScannerButtonStyle("egress")}
+                onClick={() => openScanner("egress")}
+              >
+                Salidas
+              </Button>
+              {activeScannerMode && (
+                <Button icon={<StopOutlined />} onClick={closeScannerPanel}>
+                  Cerrar escaner
+                </Button>
+              )}
+            </div>
+          </div>
 
-        ]}
-        width={900}
-      >
-        <h3>Ingresos a Productos Existentes</h3>
-        {stockData.length > 0 ? (
-          <Table
-            dataSource={stockData}
-            rowKey={(_, i) => i}
-            pagination={false}
-            columns={[
-              {
-                title: "Producto",
-                render: (_, record) => {
-                  const variantes =
-                    Object.entries(
-                      record.product.variantes ||
-                      record.product.variantes_obj ||
-                      record.product.variant ||
-                      {}
-                    )
-                      .map(([_, v]) => `${v}`)
-                      .join(" / ");
+          {activeScannerMode && (
+            <div style={{ marginBottom: 12, maxWidth: 760, marginInline: "auto" }}>
+              <QRScanner
+                key={`stock-qr-${activeScannerMode}-${scannerSession}`}
+                onProductScanned={handleScannedVariant}
+                onClose={closeScannerPanel}
+                title={SCAN_MODE_META[activeScannerMode].actionLabel}
+                description={SCAN_MODE_META[activeScannerMode].description}
+                successLabel={SCAN_MODE_META[activeScannerMode].successLabel}
+                groupSuccessLabel={SCAN_MODE_META[activeScannerMode].groupSuccessLabel}
+                appearance="simple"
+                simpleVideoMinHeight={260}
+              />
+            </div>
+          )}
 
-                  return `→ ${record.product.nombre_producto || ''}${variantes ? ' - ' + variantes : ''}`;
+          {movementRows.length > 0 ? (
+            <Table
+              dataSource={movementRows}
+              rowKey={buildDraftKey}
+              pagination={false}
+              scroll={{ x: "max-content" }}
+              columns={[
+                {
+                  title: "Producto",
+                  render: (_: any, record: any) => {
+                    const variantes = toVariantMap(record?.product?.variantes);
+                    return `${record?.product?.nombre_producto || "Producto"}${getVariantFullLabel(variantes)}`;
+                  }
+                },
+                {
+                  title: "Stock actual",
+                  render: (_: any, record: any) => <span>{normalizeNumber(record?.product?.stock)}</span>
+                },
+                {
+                  title: "Precio unitario",
+                  render: (_: any, record: any) => <span>Bs. {normalizeNumber(record?.product?.precio).toFixed(2)}</span>
+                },
+                {
+                  title: "Ingresos",
+                  render: (_: any, record: any) => {
+                    const delta = normalizeNumber(record?.newStock?.stock);
+                    const tone = getMovementTone(delta);
+                    return (
+                      <InputNumber
+                        min={-9999}
+                        max={9999}
+                        value={delta}
+                        formatter={(value) => {
+                          if (value === null || value === undefined || value === "") return "";
+                          const numericValue = normalizeNumber(value);
+                          return numericValue > 0 ? `+${numericValue}` : `${numericValue}`;
+                        }}
+                        parser={(value) => String(value || "").replace(/[^\d-]/g, "")}
+                        onChange={(value) => handleEditStock(record, value)}
+                        style={{
+                          width: 120,
+                          color: tone.color,
+                          borderColor: tone.borderColor,
+                          background: tone.background
+                        }}
+                      />
+                    );
+                  }
+                },
+                {
+                  title: "Stock final",
+                  render: (_: any, record: any) => {
+                    const currentStock = normalizeNumber(record?.product?.stock);
+                    const delta = normalizeNumber(record?.newStock?.stock);
+                    const tone = getMovementTone(delta);
+                    return <Text strong style={{ color: tone.color }}>{currentStock + delta}</Text>;
+                  }
+                },
+                {
+                  title: "Categoria",
+                  render: (_: any, record: any) => (
+                    <span>{record?.product?.categoria || record?.product?.nombre_categoria || "Sin categoria"}</span>
+                  )
+                },
+                {
+                  title: "Acciones",
+                  render: (_: any, record: any) => (
+                    <Popconfirm
+                      title="Eliminar movimiento"
+                      onConfirm={() => handleDeleteStockRecord(record)}
+                    >
+                      <Button danger>Eliminar</Button>
+                    </Popconfirm>
+                  )
                 }
-              },
-              {
-                title: "Stock actual",
-                render: (_, record) => (
-                  <span>{record.product.stock || "-"}</span>
-                )
-              },
-              {
-                title: "Precio Unitario",
-                render: (_, record) => (
-                  <span>{record.product.precio || "-"}</span>
-                )
-              },
-              {
-                title: "Ingresos",
-                render: (_, record) => (
-                  <InputNumber
-                    min={-9999}
-                    value={record.newStock.stock}
-                    onChange={(val) => handleEditStock(record, val)}
-                  />
-                )
-              },
-              {
-                title: "Categoría",
-                render: (_, record) => (
-                  <span>{record.product.categoria || "Ropa"}</span> // si no tienes, hardcodea momentáneamente
-                )
-              },
-              {
-                title: "Acciones",
-                render: (_, record) => (
-                  <Popconfirm
-                    title="¿Eliminar?"
-                    onConfirm={() => handleDelete(stockData, setStockData, record)}
-                  >
-                    <Button danger>Eliminar</Button>
-                  </Popconfirm>
-                )
-              }
-            ]}
-          />
-        ) : <p style={{ color: 'gray' }}>No hay ingresos nuevos.</p>}
+              ]}
+            />
+          ) : (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              No hay movimientos pendientes.
+            </Text>
+          )}
+        </div>
 
-        <h3>Variantes Nuevas</h3>
-        {variantData.length > 0 ? (
-          <Table
-            dataSource={variantData.flatMap((record, i) => (
-              record.combinaciones.map((comb, index) => ({
-                key: `${i}-${index}`,
-                nombre_producto: record.product.nombre_producto,
-                variantes: Object.entries(comb.variantes).map(([k, v]) => `${k}: ${v}`).join(" / "),
-                precio: comb.precio,
-                stock: comb.stock,
-                variantRecord: record,
-                combIndex: index,
-              }))
-            ))}
-            rowKey="key"
-            pagination={false}
-            columns={[
-              { title: "Producto", dataIndex: "nombre_producto" },
-              { title: "Variantes", dataIndex: "variantes" },
-              {
-                title: "Stock",
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    value={record.stock}
-                    onChange={(val) => {
-                      const updated = variantData.map(v => {
-                        if (v === record.variantRecord) {
-                          const combinaciones = [...v.combinaciones];
-                          combinaciones[record.combIndex].stock = val;
-                          return { ...v, combinaciones };
-                        }
-                        return v;
-                      });
-                      setVariantData(updated);
-                    }}
-                  />
-                )
-              },
-              {
-                title: "Precio",
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    value={record.precio}
-                    onChange={(val) => {
-                      const updated = variantData.map(v => {
-                        if (v === record.variantRecord) {
-                          const combinaciones = [...v.combinaciones];
-                          combinaciones[record.combIndex].precio = val;
-                          return { ...v, combinaciones };
-                        }
-                        return v;
-                      });
-                      setVariantData(updated);
-                    }}
-                  />
-                )
-              },
-              {
-                title: "Acciones",
-                render: (_, record) => (
-                  <Popconfirm
-                    title="¿Eliminar?"
-                    onConfirm={() => {
-                      const updated = variantData.map(v => {
-                        if (v === record.variantRecord) {
-                          const combinaciones = v.combinaciones.filter((_, i) => i !== record.combIndex);
-                          return { ...v, combinaciones };
-                        }
-                        return v;
-                      });
-                      setVariantData(updated);
-                    }}
-                  >
-                    <Button danger>Eliminar</Button>
-                  </Popconfirm>
-                )
-              }
-            ]}
-          />
-        ) : <p style={{ color: 'gray' }}>No hay variantes nuevas.</p>}
+        <div>
+          <Title level={5} style={{ marginBottom: 10 }}>
+            Variantes nuevas
+          </Title>
+          {variantData.length > 0 ? (
+            <Table
+              dataSource={variantData.flatMap((record: any, recordIndex: number) =>
+                (record.combinaciones || []).map((combination: any, combinationIndex: number) => ({
+                  key: `${recordIndex}-${combinationIndex}`,
+                  nombre_producto: record.product.nombre_producto,
+                  variantes: Object.entries(toVariantMap(combination.variantes))
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join(" / "),
+                  precio: normalizeNumber(combination.precio),
+                  stock: normalizeNumber(combination.stock),
+                  variantRecord: record,
+                  combinationIndex
+                }))
+              )}
+              rowKey="key"
+              pagination={false}
+              columns={[
+                { title: "Producto", dataIndex: "nombre_producto" },
+                { title: "Variantes", dataIndex: "variantes" },
+                {
+                  title: "Stock",
+                  render: (_: any, record: any) => (
+                    <InputNumber
+                      min={0}
+                      value={record.stock}
+                      onChange={(value) => {
+                        const parsedValue = normalizeNumber(value);
+                        setVariantData((current) =>
+                          current.map((variantItem: any) => {
+                            if (variantItem !== record.variantRecord) return variantItem;
+                            const nextCombinations = [...variantItem.combinaciones];
+                            nextCombinations[record.combinationIndex] = {
+                              ...nextCombinations[record.combinationIndex],
+                              stock: parsedValue
+                            };
+                            return { ...variantItem, combinaciones: nextCombinations };
+                          })
+                        );
+                      }}
+                    />
+                  )
+                },
+                {
+                  title: "Precio",
+                  render: (_: any, record: any) => (
+                    <InputNumber
+                      min={0}
+                      value={record.precio}
+                      onChange={(value) => {
+                        const parsedValue = normalizeNumber(value);
+                        setVariantData((current) =>
+                          current.map((variantItem: any) => {
+                            if (variantItem !== record.variantRecord) return variantItem;
+                            const nextCombinations = [...variantItem.combinaciones];
+                            nextCombinations[record.combinationIndex] = {
+                              ...nextCombinations[record.combinationIndex],
+                              precio: parsedValue
+                            };
+                            return { ...variantItem, combinaciones: nextCombinations };
+                          })
+                        );
+                      }}
+                    />
+                  )
+                },
+                {
+                  title: "Acciones",
+                  render: (_: any, record: any) => (
+                    <Popconfirm
+                      title="Eliminar variante"
+                      onConfirm={() => {
+                        setVariantData((current) =>
+                          current.map((variantItem: any) => {
+                            if (variantItem !== record.variantRecord) return variantItem;
+                            return {
+                              ...variantItem,
+                              combinaciones: variantItem.combinaciones.filter(
+                                (_: any, index: number) => index !== record.combinationIndex
+                              )
+                            };
+                          })
+                        );
+                      }}
+                    >
+                      <Button danger>Eliminar</Button>
+                    </Popconfirm>
+                  )
+                }
+              ]}
+            />
+          ) : (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              No hay variantes nuevas.
+            </Text>
+          )}
+        </div>
 
-        <h3>Productos Nuevos</h3>
-        {flattenedCombinations.length > 0 ? (
-          <Table
-            dataSource={flattenedCombinations}
-            rowKey="key"
-            pagination={false}
-            columns={[
-              { title: "Producto", dataIndex: "nombre_producto" },
-              { title: "Variantes", dataIndex: "variantes" },
-              {
-                title: "Stock",
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    value={record.stock}
-                    onChange={(val) =>
-                      handleEditProduct(record.productId, record.sucursalId, record.index, "stock", val)
-                    }
-                  />
-                )
-              },
-              {
-                title: "Precio",
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    value={record.precio}
-                    onChange={(val) =>
-                      handleEditProduct(record.productId, record.sucursalId, record.index, "precio", val)
-                    }
-                  />
-                )
-              },
-              {
-                title: "Acciones",
-                render: (_, record) => (
-                  <Popconfirm
-                    title="¿Eliminar combinación?"
-                    onConfirm={() => {
-                      const updated = productData.map(raw => {
-                        const prod = raw.productData || raw;
-                        if (prod._id === record.productId) {
-                          const updatedSucursales = prod.sucursales.map(suc => {
-                            if (suc.id_sucursal === record.sucursalId) {
+        <div>
+          <Title level={5} style={{ marginBottom: 10 }}>
+            Productos nuevos
+          </Title>
+          {flattenedCombinations.length > 0 ? (
+            <Table
+              dataSource={flattenedCombinations}
+              rowKey="key"
+              pagination={false}
+              columns={[
+                { title: "Producto", dataIndex: "nombre_producto" },
+                { title: "Variantes", dataIndex: "variantes" },
+                {
+                  title: "Stock",
+                  render: (_: any, record: any) => (
+                    <InputNumber
+                      min={0}
+                      value={record.stock}
+                      onChange={(value) =>
+                        handleEditProduct(record.productId, record.sucursalId, record.index, "stock", value)
+                      }
+                    />
+                  )
+                },
+                {
+                  title: "Precio",
+                  render: (_: any, record: any) => (
+                    <InputNumber
+                      min={0}
+                      value={record.precio}
+                      onChange={(value) =>
+                        handleEditProduct(record.productId, record.sucursalId, record.index, "precio", value)
+                      }
+                    />
+                  )
+                },
+                {
+                  title: "Acciones",
+                  render: (_: any, record: any) => (
+                    <Popconfirm
+                      title="Eliminar combinacion"
+                      onConfirm={() => {
+                        setProductData((current) =>
+                          current.map((rawItem: any) => {
+                            const product = rawItem.productData || rawItem;
+                            if (String(product._id) !== String(record.productId)) return rawItem;
+
+                            const nextSucursales = (product.sucursales || []).map((sucursal: any) => {
+                              if (String(sucursal.id_sucursal) !== String(record.sucursalId)) return sucursal;
                               return {
-                                ...suc,
-                                combinaciones: suc.combinaciones.filter((_, i) => i !== record.index)
+                                ...sucursal,
+                                combinaciones: (sucursal.combinaciones || []).filter(
+                                  (_: any, index: number) => index !== record.index
+                                )
                               };
-                            }
-                            return suc;
-                          });
-                          return { ...raw, productData: { ...prod, sucursales: updatedSucursales } };
-                        }
-                        return raw;
-                      });
-                      setProductData(updated);
-                    }}
-                  >
-                    <Button danger>Eliminar</Button>
-                  </Popconfirm>
-                )
-              }
-            ]}
-          />
-        ) : <p style={{ color: 'gray' }}>No hay productos nuevos.</p>}
-      </Modal>
-    </>
+                            });
+
+                            return {
+                              ...rawItem,
+                              productData: {
+                                ...product,
+                                sucursales: nextSucursales
+                              }
+                            };
+                          })
+                        );
+                      }}
+                    >
+                      <Button danger>Eliminar</Button>
+                    </Popconfirm>
+                  )
+                }
+              ]}
+            />
+          ) : (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              No hay productos nuevos.
+            </Text>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 };
 

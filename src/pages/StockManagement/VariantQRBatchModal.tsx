@@ -252,6 +252,7 @@ export const openPrintWindow = (
 const MM_TO_INCH = 1 / 25.4;
 const TM_L90_DPI = 203;
 const RESULT_PAGE_SIZE = 20;
+const SHOW_ALL_THRESHOLD = 50;
 const mmToPx = (mm: number) => Math.max(1, Math.round(mm * MM_TO_INCH * TM_L90_DPI));
 const waitMs = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const getQrScale = (qrSizeMm: number) => Math.max(0.85, Math.min(qrSizeMm / 12, 1.7));
@@ -512,6 +513,7 @@ const VariantQRBatchModal = ({
     [printableItems, visibleResultCount]
   );
   const hasMorePrintableItems = visibleResultCount < printableItems.length;
+  const canShowAllPrintableItems = printableItems.length > SHOW_ALL_THRESHOLD && hasMorePrintableItems;
   const hasMetrics = typeof result?.products === "number";
   const hasInitialProductIds = initialProductIds.length > 0;
   const effectiveProductIds = hasInitialProductIds ? initialProductIds : undefined;
@@ -1479,6 +1481,14 @@ const VariantQRBatchModal = ({
                     >
                       Mostrar 20 mas
                     </Button>
+                    {canShowAllPrintableItems && (
+                      <Button
+                        onClick={() => setVisibleResultCount(printableItems.length)}
+                        style={{ borderRadius: 12 }}
+                      >
+                        Mostrar todos
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
