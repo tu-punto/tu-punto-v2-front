@@ -86,6 +86,7 @@ export const getSellersBasicAPI = async (params?: {
     sucursalId?: string;
     onlyProductInfoAccess?: boolean;
     includeProductInfoStatus?: boolean;
+    onlyActiveOrRenewal?: boolean;
 }) => {
     try {
         const res = await apiClient.get(`/seller/basic`, { params });

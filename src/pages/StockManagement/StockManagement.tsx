@@ -702,6 +702,7 @@ const StockManagement = () => {
                 <ConfirmProductsModal
                     visible={isConfirmModalVisible}
                     onClose={cancelConfirmProduct}
+                    onStockDraftChange={setStockListForConfirmModal}
                     onSuccess={(context?: { createdProductIds?: string[] }) => {
                         closeConfirmProduct();
                         setProductsToUpdate({});

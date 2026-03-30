@@ -15,6 +15,12 @@ const { Text, Title } = Typography;
 interface QRScannerProps {
   onProductScanned: (product: any) => void;
   onClose?: () => void;
+  title?: string;
+  description?: string;
+  successLabel?: string;
+  groupSuccessLabel?: string;
+  appearance?: "default" | "simple";
+  simpleVideoMinHeight?: number;
 }
 
 interface ScannedVariantItem {
@@ -182,7 +188,16 @@ const smoothTrackingBox = (
   });
 };
 
-function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
+function QRScanner({
+  onProductScanned,
+  onClose,
+  title = "Escaner de ventas por QR",
+  description = "Lee variantes directas o grupos QR y agrega al carrito sin salir de ventas.",
+  successLabel = "Producto agregado al carrito",
+  groupSuccessLabel = "Variante del grupo agregada",
+  appearance = "default",
+  simpleVideoMinHeight = 280
+}: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -209,6 +224,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
   const [groupSearch, setGroupSearch] = useState("");
   const [trackingBox, setTrackingBox] = useState<TrackingBox | null>(null);
   const [focusIndicator, setFocusIndicator] = useState<{ x: number; y: number; active: boolean } | null>(null);
+  const isSimple = appearance === "simple";
 
   const updateTrackingBox = (nextBox: TrackingBox | null) => {
     if (!nextBox) {
@@ -654,10 +670,10 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     }
   };
 
-  const handleResolvedVariant = (item: ScannedVariantItem, successLabel = "Producto agregado al carrito") => {
+  const handleResolvedVariant = (item: ScannedVariantItem, label = successLabel) => {
     onProductScanned?.(item);
     resetInactivityCountdown();
-    showFlash("success", successLabel);
+    showFlash("success", label);
   };
 
   const openGroupSelector = (group: GroupResolution, payload: string) => {
@@ -804,7 +820,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
     groupSelectionRef.current = null;
     setGroupSelection(null);
     setGroupSearch("");
-    handleResolvedVariant(normalized, "Variante del grupo agregada");
+    handleResolvedVariant(normalized, groupSuccessLabel);
     startScanning();
   };
 
@@ -892,16 +908,22 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
       <div
         style={{
           width: "100%",
-          maxWidth: 760,
+          maxWidth: isSimple ? "100%" : 760,
           padding: 18,
           background:
-            flashState === "success"
-              ? "linear-gradient(180deg, #f9fff3 0%, #ffffff 100%)"
-              : "linear-gradient(180deg, #fffaf4 0%, #ffffff 100%)",
-          borderRadius: 20,
+            isSimple
+              ? "#ffffff"
+              : flashState === "success"
+                ? "linear-gradient(180deg, #f9fff3 0%, #ffffff 100%)"
+                : "linear-gradient(180deg, #fffaf4 0%, #ffffff 100%)",
+          borderRadius: isSimple ? 12 : 20,
           border:
-            flashState === "success" ? "1px solid #d6f0b4" : "1px solid #f1e2cf",
-          boxShadow: "0 16px 36px rgba(49, 49, 49, 0.08)",
+            isSimple
+              ? "1px solid #e8e8e8"
+              : flashState === "success"
+                ? "1px solid #d6f0b4"
+                : "1px solid #f1e2cf",
+          boxShadow: isSimple ? "none" : "0 16px 36px rgba(49, 49, 49, 0.08)",
           margin: "0 auto",
           transition: "all 0.2s ease"
         }}
@@ -921,12 +943,12 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
               style={{
                 width: 44,
                 height: 44,
-                borderRadius: 14,
+                borderRadius: isSimple ? 12 : 14,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "linear-gradient(135deg, #ffe8c7 0%, #fff5e6 100%)",
-                color: "#b86d17",
+                background: isSimple ? "#f5f5f5" : "linear-gradient(135deg, #ffe8c7 0%, #fff5e6 100%)",
+                color: isSimple ? "#595959" : "#b86d17",
                 fontSize: 20,
                 flexShrink: 0
               }}
@@ -935,31 +957,38 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
             </div>
             <div>
               <Title level={5} style={{ margin: 0 }}>
-                Escaner de ventas por QR
+                {title}
               </Title>
-              <Text style={{ color: "#8c6b45" }}>
-                Lee variantes directas o grupos QR y agrega al carrito sin salir de ventas.
+              <Text style={{ color: isSimple ? "#8c8c8c" : "#8c6b45" }}>
+                {description}
               </Text>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Tag color={groupSelection ? "processing" : isScanning ? "green" : "default"}>
-              {groupSelection ? "Seleccionando grupo" : isScanning ? "Escaneando" : "En pausa"}
-            </Tag>
-            <Tag color="gold">Auto cierre {secondsLeft}s</Tag>
-          </div>
+          {isSimple ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {groupSelection ? "Seleccionando grupo" : isScanning ? "Escaneando" : "En pausa"} | cierre{" "}
+              {secondsLeft}s
+            </Text>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Tag color={groupSelection ? "processing" : isScanning ? "green" : "default"}>
+                {groupSelection ? "Seleccionando grupo" : isScanning ? "Escaneando" : "En pausa"}
+              </Tag>
+              <Tag color="gold">Auto cierre {secondsLeft}s</Tag>
+            </div>
+          )}
         </div>
 
         <div
           style={{
             position: "relative",
-            borderRadius: 18,
+            borderRadius: isSimple ? 12 : 18,
             overflow: "hidden",
-            border: "1px solid #eddcc9",
-            background: "#f7efe7",
+            border: isSimple ? "1px solid #d9d9d9" : "1px solid #eddcc9",
+            background: isSimple ? "#fafafa" : "#f7efe7",
             touchAction: "manipulation",
-            cursor: "crosshair"
+            cursor: isSimple ? "default" : "crosshair"
           }}
           onPointerDown={(event) => void handleTapToFocus(event)}
         >
@@ -967,7 +996,12 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
             ref={videoRef}
             autoPlay
             playsInline
-            style={{ width: "100%", borderRadius: 18, objectFit: "cover", minHeight: 320 }}
+            style={{
+              width: "100%",
+              borderRadius: 18,
+              objectFit: "cover",
+              minHeight: isSimple ? simpleVideoMinHeight : 320
+            }}
             className="camera-view"
           />
 
@@ -976,9 +1010,9 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
               position: "absolute",
               inset: 18,
               border: "2px solid rgba(255,255,255,0.65)",
-              borderRadius: 18,
+              borderRadius: isSimple ? 12 : 18,
               pointerEvents: "none",
-              boxShadow: "inset 0 0 0 1px rgba(184,109,23,0.15)"
+              boxShadow: isSimple ? "none" : "inset 0 0 0 1px rgba(184,109,23,0.15)"
             }}
           />
 
@@ -1099,7 +1133,18 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
           </Button>
         </div>
 
-        <Alert
+        {isSimple && (
+          <Text
+            type="secondary"
+            style={{ display: "block", marginTop: 12, textAlign: "center", fontSize: 12 }}
+          >
+            {groupSelection
+              ? "El escaner queda en pausa mientras eliges una variante."
+              : "Manten el QR centrado. Si escaneas un grupo, podras elegir la variante."}
+          </Text>
+        )}
+
+        {!isSimple && <Alert
           style={{ marginTop: 16, borderRadius: 14 }}
           type={groupSelection ? "info" : "warning"}
           showIcon
@@ -1109,7 +1154,7 @@ function QRScanner({ onProductScanned, onClose }: QRScannerProps) {
               ? "El escaner queda en pausa mientras eliges una variante dentro del grupo."
               : "Mantén el QR centrado unos instantes. Si escaneas un grupo, se abrirá un selector para elegir la variante."
           }
-        />
+        />}
 
         {flashState && (
           <div style={{ marginTop: 12, textAlign: "center" }}>
