@@ -2,9 +2,13 @@ import { AxiosError } from "axios"
 import { apiClient } from "./apiClient"
 import { parseError } from "./util"
 
-export const getSellersAPI = async () => {
+export const getSellersAPI = async (params?: {
+    q?: string;
+    status?: "activo" | "debe_renovar" | "ya_no_es_cliente";
+    pendingPayment?: "con_deuda" | "sin_deuda";
+}) => {
     try {
-        const res = await apiClient.get(`/seller`)
+        const res = await apiClient.get(`/seller`, { params })
         return res.data
     } catch (error) {
         parseError(error as AxiosError)

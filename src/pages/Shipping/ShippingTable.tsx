@@ -15,6 +15,58 @@ import moment from "moment-timezone";
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
+const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
+
+const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
+    const estadoReal = String(pedido?.estado_pedido || "").trim();
+
+    if (estadoReal === "Entregado") {
+        return {
+            label: "Entregado",
+            tone: {
+                text: "#237804",
+                border: "#b7eb8f",
+                background: "#f6ffed",
+                dot: "#52c41a",
+            },
+            tooltip: "Estado real del pedido.",
+            isVisualOnly: false,
+        };
+    }
+
+    const fechaObjetivo = pedido?.hora_entrega_rango_final || pedido?.hora_entrega_acordada;
+    const horaObjetivo = fechaObjetivo ? moment.parseZone(fechaObjetivo) : null;
+    const shouldLookInTransit =
+        estadoReal === "En Espera" &&
+        horaObjetivo?.isValid() &&
+        horaObjetivo.diff(now, "minutes", true) <= VISUAL_IN_TRANSIT_THRESHOLD_MINUTES;
+
+    if (shouldLookInTransit) {
+        return {
+            label: "En camino",
+            tone: {
+                text: "#ad6800",
+                border: "#ffd591",
+                background: "#fff7e6",
+                dot: "#fa8c16",
+            },
+            tooltip: "Estado visual. El pedido sigue en espera en el sistema hasta marcarlo como entregado.",
+            isVisualOnly: true,
+        };
+    }
+
+    return {
+        label: estadoReal || "En Espera",
+        tone: {
+            text: "#1d39c4",
+            border: "#adc6ff",
+            background: "#f0f5ff",
+            dot: "#2f54eb",
+        },
+        tooltip: "Estado real del pedido.",
+        isVisualOnly: false,
+    };
+};
 
 const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?: () => void }) => {
     const { user }: any = useContext(UserContext);
@@ -45,6 +97,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
     const [loadingTable, setLoadingTable] = useState(false);
+    const [statusNow, setStatusNow] = useState(() => moment().tz("America/La_Paz"));
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator;
@@ -259,6 +312,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setStatusNow(moment().tz("America/La_Paz"));
+        }, 60000);
+
+        return () => window.clearInterval(intervalId);
+    }, []);
+
     const columns = [
         {/*{
             title: '',
@@ -306,6 +367,46 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             title: 'Lugar de entrega',
             dataIndex: 'lugar_entrega',
             key: 'lugar_entrega'
+        },
+        {
+            title: 'Estado',
+            key: 'estado_visual',
+            width: 150,
+            render: (_: any, record: any) => {
+                const statusMeta = getVisualStatusMeta(record, statusNow);
+
+                return (
+                    <Tooltip title={statusMeta.tooltip}>
+                        <span
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "4px 10px",
+                                borderRadius: 999,
+                                border: `1px solid ${statusMeta.tone.border}`,
+                                background: statusMeta.tone.background,
+                                color: statusMeta.tone.text,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            <span
+                                className={statusMeta.isVisualOnly ? "animate-pulse" : ""}
+                                style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    background: statusMeta.tone.dot,
+                                    flexShrink: 0,
+                                }}
+                            />
+                            {statusMeta.label}
+                        </span>
+                    </Tooltip>
+                );
+            }
         },
         {
             title: 'Vendedor',

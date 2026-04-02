@@ -29,6 +29,7 @@ export default function SellerTable({
   const [sellers, setSellers] = useState<SellerRow[]>([]);
 
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -177,10 +178,36 @@ export default function SellerTable({
   ];
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(searchText.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchText]);
+
+  useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const res = await getSellersAPI();
+        const statusParam =
+          estadoFilter === "Activo"
+            ? "activo"
+            : estadoFilter === "Debe renovar"
+            ? "debe_renovar"
+            : estadoFilter === "Ya no es cliente"
+            ? "ya_no_es_cliente"
+            : undefined;
+        const pendingPaymentParam =
+          pagoFilter === "con deuda"
+            ? "con_deuda"
+            : pagoFilter === "sin deuda"
+            ? "sin_deuda"
+            : undefined;
+        const res = await getSellersAPI({
+          q: debouncedSearch || undefined,
+          status: statusParam,
+          pendingPayment: pendingPaymentParam,
+        });
         const sellers: ISeller[] = (Array.isArray(res) ? res : []) as ISeller[];
 
         const rows: SellerRow[] = await Promise.all(
@@ -226,7 +253,7 @@ export default function SellerTable({
         setLoading(false);
       }
     })();
-  }, [refreshKey]);
+  }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, isFactura]);
 
   const openDrawer = (row: SellerRow) => {
     setSelected(row);
@@ -240,38 +267,7 @@ export default function SellerTable({
     setSelected(null);
   };
 
-  const filterSellers = (arr: SellerRow[]) => {
-    let filtered = arr;
-
-    if (searchText) {
-      filtered = filtered.filter((s) =>
-        s.nombre.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-
-    // Filtro por estado
-    if (estadoFilter !== "todos") {
-      filtered = filtered.filter(
-        (s) => getEstadoVendedor(s.fecha_vigencia) === estadoFilter
-      );
-    }
-
-    // Filtro por pago
-    if (pagoFilter !== "todos") {
-      filtered = filtered.filter((s) => {
-        if (pagoFilter === "con deuda") {
-          return s.pagoTotalInt !== 0;
-        } else if (pagoFilter === "sin deuda") {
-          return s.pagoTotalInt === 0;
-        }
-        return true;
-      });
-    }
-
-    return filtered;
-  };
-
-  const filteredSellers = filterSellers(sellers);
+  const filteredSellers = sellers;
 
   return (
     <>
