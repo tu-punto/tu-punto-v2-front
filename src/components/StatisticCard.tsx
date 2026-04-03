@@ -9,7 +9,14 @@ interface StatisticCardProps {
 }
 
 const StatisticCard = ({ title, value, prefix, color }: StatisticCardProps) => (
-  <Card className="h-full shadow-sm">
+  <Card
+    className="h-full shadow-sm"
+    style={{
+      borderTop: `3px solid ${color}`,
+      borderRadius: 12,
+    }}
+    bodyStyle={{ paddingTop: 20 }}
+  >
     <Statistic
       title={<span className="font-semibold text-lg">{title}</span>}
       value={value}

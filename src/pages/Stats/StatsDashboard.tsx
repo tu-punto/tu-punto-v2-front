@@ -8,6 +8,7 @@ import {
   Typography,
   Space,
   Alert,
+  Select,
 } from "antd";
 import {
   DollarOutlined,
@@ -20,15 +21,30 @@ import { DATE_TAGS } from "../../constants/fluxes";
 import { getFilteredStats } from "../../helpers/financeFluxesHelpers";
 import dayjs from "dayjs";
 import StatisticCard from "../../components/StatisticCard";
-import { getCommissionAPI, getMerchandiseSoldAPI } from "../../api/financeFlux";
 import ReportsLauncher from "../../components/ReportsLauncher";
+import { getSucursalsAPI } from "../../api/sucursal";
+
+const EMPTY_STATS = {
+  income: 0,
+  expenses: 0,
+  investments: 0,
+  utility: 0,
+  commission: 0,
+  merchandiseSold: 0,
+  deliveryIncome: 0,
+  deliveryExpenses: 0,
+  deliveryBalance: 0,
+  externalDeliveryIncome: 0,
+  caja: 0,
+};
 
 const StatisticsDashboard = () => {
-  const [stats, setStats] = useState<any>();
-  const [selectedTag, setSelectedTag] = useState<string | null>(
-    DATE_TAGS.LAST_30_DAYS
-  );
+  const [stats, setStats] = useState<any>(EMPTY_STATS);
+  const [selectedTag, setSelectedTag] = useState<string | null>(DATE_TAGS.LAST_30_DAYS);
   const [customDateRange, setCustomDateRange] = useState<any>([]);
+  const [branches, setBranches] = useState<Array<{ value: string; label: string }>>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [loading, setLoading] = useState({
     income: true,
     expenses: true,
@@ -36,12 +52,8 @@ const StatisticsDashboard = () => {
     deliveryIncome: true,
     deliveryExpenses: true,
   });
-  const [commission, setCommission] = useState<number>(0);
-  const [loadingCommission, setLoadingCommission] = useState<boolean>(true);
-  const [merchandiseSold, setMerchandiseSold] = useState<number>(0);
-  const [loadingMerchandise, setLoadingMerchandise] = useState<boolean>(true);
 
-  const fetchStats = useCallback(async (filter: string = DATE_TAGS.ALL_TIME) => {
+  const fetchStats = useCallback(async (filter: string = DATE_TAGS.ALL_TIME, branchIds: string[] = []) => {
     setLoading({
       income: true,
       expenses: true,
@@ -49,62 +61,10 @@ const StatisticsDashboard = () => {
       deliveryIncome: true,
       deliveryExpenses: true,
     });
-    setLoadingCommission(true);
-    setLoadingMerchandise(true);
+
     try {
-      const statsInfo = await getFilteredStats(filter, customDateRange);
+      const statsInfo = await getFilteredStats(filter, customDateRange, branchIds);
       setStats(statsInfo);
-
-      let from: string | undefined;
-      let to: string | undefined;
-      let rangeParam: string | undefined;
-
-      if (filter === DATE_TAGS.CUSTOM && customDateRange && customDateRange.length === 2) {
-        from = customDateRange[0] ? dayjs(customDateRange[0]).format("YYYY-MM-DD") : undefined;
-        to = customDateRange[1] ? dayjs(customDateRange[1]).format("YYYY-MM-DD") : undefined;
-        rangeParam = "custom";
-      } else {
-        // Derive range via dates to avoid backend range mismatch; omit params for ALL_TIME
-        const now = dayjs();
-        let start: dayjs.Dayjs | null = null;
-        switch (filter) {
-          case DATE_TAGS.LAST_7_DAYS:
-            start = now.subtract(7, "day").startOf("day");
-            rangeParam = "7d";
-            break;
-          case DATE_TAGS.LAST_30_DAYS:
-            start = now.subtract(30, "day").startOf("day");
-            rangeParam = "30d";
-            break;
-          case DATE_TAGS.LAST_90_DAYS:
-            start = now.subtract(90, "day").startOf("day");
-            rangeParam = "90d";
-            break;
-          case DATE_TAGS.LAST_YEAR:
-            start = now.startOf("year");
-            rangeParam = "365d"; 
-            break;
-          case DATE_TAGS.ALL_TIME:
-          default:
-            start = null;
-            rangeParam = "all";
-            break;
-        }
-        if (start) {
-          from = start.format("YYYY-MM-DD");
-          to = now.endOf("day").format("YYYY-MM-DD");
-        }
-      }
-
-      const commissionRes = await getCommissionAPI({ from, to });
-      const commissionValue = typeof commissionRes === "number"
-        ? commissionRes
-        : (commissionRes?.comision ?? commissionRes?.total ?? 0);
-      setCommission(Number(commissionValue) || 0);
-
-      const merchRes = await getMerchandiseSoldAPI({ range: rangeParam, from, to });
-      const merchValue = typeof merchRes === "number" ? merchRes : (merchRes?.mercaderiaVendida ?? merchRes?.total ?? 0);
-      setMerchandiseSold(Number(merchValue) || 0);
     } catch (error) {
       console.error(error);
     } finally {
@@ -115,10 +75,26 @@ const StatisticsDashboard = () => {
         deliveryIncome: false,
         deliveryExpenses: false,
       });
-      setLoadingCommission(false);
-      setLoadingMerchandise(false);
     }
   }, [customDateRange]);
+
+  const fetchBranches = useCallback(async () => {
+    setBranchesLoading(true);
+    try {
+      const response = await getSucursalsAPI();
+      const nextBranches = (Array.isArray(response) ? response : [])
+        .map((branch: any) => ({
+          value: String(branch?._id || ""),
+          label: String(branch?.nombre || branch?.sucursal || "Sucursal").trim(),
+        }))
+        .filter((branch) => branch.value);
+      setBranches(nextBranches);
+    } catch (error) {
+      console.error("Error al cargar sucursales para estadísticas:", error);
+    } finally {
+      setBranchesLoading(false);
+    }
+  }, []);
 
   const onTagClick = (tag: string) => {
     setSelectedTag(tag);
@@ -127,22 +103,23 @@ const StatisticsDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    fetchStats(selectedTag || DATE_TAGS.ALL_TIME);
-  }, [selectedTag, fetchStats]);
+  const onBranchChange = (values: string[]) => {
+    setSelectedBranchIds(Array.from(new Set((values || []).filter(Boolean))));
+  };
 
-  if (!stats) {
-    return (
-      <div className="h-[calc(100vh-64px)] flex items-center justify-center">
-        <Spin size="large" tip="Cargando estadísticas..." />
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetchBranches();
+  }, [fetchBranches]);
+
+  useEffect(() => {
+    if (selectedTag === DATE_TAGS.CUSTOM && customDateRange?.length !== 2) return;
+    fetchStats(selectedTag || DATE_TAGS.ALL_TIME, selectedBranchIds);
+  }, [selectedTag, customDateRange, selectedBranchIds, fetchStats]);
 
   const espTags = [
-    "ÚLTIMOS 7 DÍAS",
-    "ÚLTIMOS 30 DÍAS",
-    "ÚLTIMOS 90 DÍAS",
+    "ULTIMOS 7 DIAS",
+    "ULTIMOS 30 DIAS",
+    "ULTIMOS 90 DIAS",
     "ESTE AÑO",
     "FECHA PERSONALIZADA",
     "TODO EL TIEMPO",
@@ -153,6 +130,7 @@ const StatisticsDashboard = () => {
       <div className="absolute right-4 top-4">
         <ReportsLauncher />
       </div>
+
       <Space direction="vertical" className="w-full" size="large">
         <div>
           <Space wrap className="mb-4">
@@ -161,29 +139,75 @@ const StatisticsDashboard = () => {
                 key={key}
                 checked={selectedTag === value}
                 onChange={() => onTagClick(value)}
-                className={`px-4 py-2 border rounded transition-all ${selectedTag === value
-                  ? "border-blue-500 bg-blue-50 !text-blue-600"
-                  : "border-gray-200 hover:border-blue-400"
-                  }`}
+                className={`px-4 py-2 border rounded transition-all ${
+                  selectedTag === value
+                    ? "border-blue-500 bg-blue-50 !text-blue-600"
+                    : "border-gray-200 hover:border-blue-400"
+                }`}
               >
                 {espTags[index]}
               </Tag.CheckableTag>
             ))}
           </Space>
+
+          <Card
+            className="border-gray-200 bg-slate-50/80"
+            bodyStyle={{ padding: 16 }}
+          >
+            <Space direction="vertical" size="small" className="w-full">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Typography.Text strong>Filtros por sucursal</Typography.Text>
+                <Tag color={selectedBranchIds.length ? "blue" : "default"} className="rounded-full px-3 py-1">
+                  {selectedBranchIds.length
+                    ? `${selectedBranchIds.length} sucursal${selectedBranchIds.length > 1 ? "es" : ""}`
+                    : "Global"}
+                </Tag>
+              </div>
+              <Space wrap size={[8, 8]}>
+                <Tag.CheckableTag
+                  checked={!selectedBranchIds.length}
+                  onChange={() => setSelectedBranchIds([])}
+                  className={`px-4 py-2 border rounded transition-all ${
+                    !selectedBranchIds.length
+                      ? "border-blue-500 bg-blue-50 !text-blue-600"
+                      : "border-gray-200 hover:border-blue-400"
+                  }`}
+                >
+                  Global
+                </Tag.CheckableTag>
+                {selectedBranchIds.length > 0 && (
+                  <Typography.Text type="secondary">
+                    Filtrando solo las sucursales seleccionadas
+                  </Typography.Text>
+                )}
+              </Space>
+              <Select
+                mode="multiple"
+                size="large"
+                allowClear
+                className="w-full"
+                placeholder="Selecciona una o varias sucursales"
+                loading={branchesLoading}
+                value={selectedBranchIds}
+                onChange={onBranchChange}
+                maxTagCount="responsive"
+                optionFilterProp="label"
+                options={branches}
+              />
+              <Typography.Text type="secondary">
+                Global suma todo. Si eliges sucursales, todas las tarjetas se recalculan solo con esas sucursales.
+              </Typography.Text>
+            </Space>
+          </Card>
         </div>
 
         {selectedTag === DATE_TAGS.CUSTOM && (
           <Card className="bg-gray-50 border-gray-200">
             <Space direction="vertical" size="small" className="w-full">
-              <Typography.Text strong>
-                Seleccione el rango de fechas:
-              </Typography.Text>
+              <Typography.Text strong>Seleccione el rango de fechas:</Typography.Text>
               <DatePicker.RangePicker
                 onChange={(dates) => {
                   setCustomDateRange(dates);
-                  if (dates) {
-                    fetchStats(DATE_TAGS.CUSTOM);
-                  }
                 }}
                 value={customDateRange}
                 format="DD-MM-YYYY"
@@ -194,11 +218,9 @@ const StatisticsDashboard = () => {
               {customDateRange?.length === 2 && (
                 <div className="flex justify-center w-full">
                   <Alert
-                    message={`Rango seleccionado: ${dayjs(
-                      customDateRange[0]
-                    ).format("DD-MM-YYYY")} - ${dayjs(customDateRange[1]).format(
-                      "DD-MM-YYYY"
-                    )}`}
+                    message={`Rango seleccionado: ${dayjs(customDateRange[0]).format("DD-MM-YYYY")} - ${dayjs(
+                      customDateRange[1]
+                    ).format("DD-MM-YYYY")}`}
                     type="info"
                     showIcon
                   />
@@ -208,77 +230,46 @@ const StatisticsDashboard = () => {
           </Card>
         )}
 
-        {/* Estadísticas Generales */}
         <div>
           <Typography.Title level={3} className="!mb-6">
-            Estadísticas Generales
+            Estadisticas Generales
           </Typography.Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
               <Spin spinning={loading.income} tip="Cargando...">
-                <StatisticCard
-                  title="INGRESOS"
-                  value={stats?.income || 0}
-                  prefix={<DollarOutlined />}
-                  color="#20c997"
-                />
+                <StatisticCard title="INGRESOS" value={stats?.income || 0} prefix={<DollarOutlined />} color="#20c997" />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
               <Spin spinning={loading.expenses} tip="Cargando...">
-                <StatisticCard
-                  title="GASTOS"
-                  value={stats?.expenses || 0}
-                  prefix={<ShoppingCartOutlined />}
-                  color="#dc3545"
-                />
+                <StatisticCard title="GASTOS" value={stats?.expenses || 0} prefix={<ShoppingCartOutlined />} color="#dc3545" />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility}>
-                <StatisticCard
-                  title="UTILIDAD"
-                  value={stats?.utility ?? 0}
-                  prefix={<RiseOutlined />}
-                  color="#28a745"
-                />
+              <Spin spinning={loading.utility} tip="Cargando...">
+                <StatisticCard title="UTILIDAD" value={stats?.utility ?? 0} prefix={<RiseOutlined />} color="#28a745" />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
               <Spin spinning={loading.expenses} tip="Cargando...">
-                <StatisticCard
-                  title="INVERSIÓN"
-                  value={stats?.investments || 0}
-                  prefix={<RiseOutlined />}
-                  color="#007bff"
-                />
+                <StatisticCard title="INVERSION" value={stats?.investments || 0} prefix={<RiseOutlined />} color="#007bff" />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
-                <StatisticCard
-                  title="CAJA"
-                  value={stats?.caja ?? 0}
-                  prefix={<DollarOutlined />}
-                  color="#faad14"
-                />
+              <Spin spinning={loading.utility} tip="Cargando...">
+                <StatisticCard title="CAJA" value={stats?.caja ?? 0} prefix={<DollarOutlined />} color="#faad14" />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingCommission} tip="Cargando...">
-                <StatisticCard
-                  title="Comisión"
-                  value={commission}
-                  prefix={<RiseOutlined />}
-                  color="#6f42c1"
-                />
+              <Spin spinning={loading.utility} tip="Cargando...">
+                <StatisticCard title="COMISION" value={stats?.commission ?? 0} prefix={<RiseOutlined />} color="#6f42c1" />
               </Spin>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loadingMerchandise} tip="Cargando...">
+              <Spin spinning={loading.utility} tip="Cargando...">
                 <StatisticCard
-                  title="Mercadería Vendida"
-                  value={merchandiseSold}
+                  title="MERCADERIA VENDIDA"
+                  value={stats?.merchandiseSold ?? 0}
                   prefix={<ShoppingCartOutlined />}
                   color="#dc3545"
                 />
@@ -287,17 +278,16 @@ const StatisticsDashboard = () => {
           </Row>
         </div>
 
-        {/* Estadísticas Delivery */}
         <div>
           <Typography.Title level={3} className="!mb-6">
-            Estadísticas de Delivery
+            Estadisticas de Delivery
           </Typography.Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8}>
               <Spin spinning={loading.deliveryIncome} tip="Cargando...">
                 <StatisticCard
-                  title="INGRESOS DELIVERY SUELTOS"
-                  value={stats?.deliveryIncome}
+                  title="MONTO COBRADO DELIVERY"
+                  value={stats?.deliveryIncome ?? 0}
                   prefix={<DollarOutlined />}
                   color="#007bff"
                 />
@@ -307,7 +297,7 @@ const StatisticsDashboard = () => {
               <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
                 <StatisticCard
                   title="COSTOS DELIVERY"
-                  value={stats?.deliveryExpenses}
+                  value={stats?.deliveryExpenses ?? 0}
                   prefix={<CarOutlined />}
                   color="#6f42c1"
                 />

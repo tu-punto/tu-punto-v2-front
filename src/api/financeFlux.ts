@@ -102,12 +102,14 @@ export const getFinancialSummaryAPI = async (options?: {
         from?: string;
         to?: string;
         mode?: string;
+        sucursalIds?: string[];
 }) => {
         const params = new URLSearchParams();
         if (options?.range) params.append("range", options.range);
         if (options?.from) params.append("from", options.from);
         if (options?.to) params.append("to", options.to);
         if (options?.mode) params.append("mode", options.mode);
+        if (options?.sucursalIds?.length) params.append("sucursalIds", options.sucursalIds.join(","));
         const qs = params.toString();
         const url = qs ? `/financeFlux/financial-summary?${qs}` : "/financeFlux/financial-summary";
         const res = await apiClient.get(url);
@@ -118,12 +120,14 @@ export const getCommissionAPI = async (options?: {
     range?: string;
     from?: string;
     to?: string;
+    sucursalIds?: string[];
 }) => {
     try {
         const params = new URLSearchParams();
         if (options?.range) params.append("range", options.range);
         if (options?.from) params.append("from", options.from);
         if (options?.to) params.append("to", options.to);
+        if (options?.sucursalIds?.length) params.append("sucursalIds", options.sucursalIds.join(","));
         const qs = params.toString();
         const url = qs ? `/financeFlux/commission?${qs}` : "/financeFlux/commission";
         const res = await apiClient.get(url);
@@ -137,12 +141,14 @@ export const getMerchandiseSoldAPI = async (options?: {
     range?: string;
     from?: string;
     to?: string;
+    sucursalIds?: string[];
 }) => {
     try {
         const params = new URLSearchParams();
         if (options?.range) params.append("range", options.range);
         if (options?.from) params.append("from", options.from);
         if (options?.to) params.append("to", options.to);
+        if (options?.sucursalIds?.length) params.append("sucursalIds", options.sucursalIds.join(","));
         const qs = params.toString();
         const url = qs ? `/financeFlux/merchandise-sold?${qs}` : "/financeFlux/merchandise-sold";
         const res = await apiClient.get(url);
