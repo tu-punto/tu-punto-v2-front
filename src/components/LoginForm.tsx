@@ -32,7 +32,7 @@ export default function LoginForm({
     try {
       const loginRes = await checkLoginAPI(values);
       if (!loginRes?.success) {
-        return message.error("Login fallido");
+        return message.error(loginRes?.msg || loginRes?.error || "Login fallido");
       }
       const userRes = await getUserByCookieAPI();
       if (!userRes.success) {

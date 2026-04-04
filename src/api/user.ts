@@ -8,7 +8,7 @@ export const checkLoginAPI = async (userData: any) => {
     return { success: true, data: res.data };
   } catch (error) {
     console.log(error)
-    parseError(error as AxiosError);
+    return parseError(error as AxiosError);
   }
 };
 export const getAdminsAPI = async () => {

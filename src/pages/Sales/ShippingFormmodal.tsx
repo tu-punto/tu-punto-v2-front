@@ -108,11 +108,22 @@ function ShippingFormModal({
     }, [estadoPedido]);
 
     useEffect(() => {
-        if (estadoPedido === "Entregado" && estaPagado === "si" && tipoPago !== "3") {
+        if (estadoPedido === "Entregado") {
+            setEstaPagado("si");
+            setAdelantoVisible(false);
+            setAdelantoClienteInput(0);
             setTipoPago("3");
-            form.setFieldValue("tipo_de_pago", "3");
+            setQrInput(0);
+            setEfectivoInput(0);
+            form.setFieldsValue({
+                esta_pagado: "si",
+                adelanto_cliente: 0,
+                tipo_de_pago: "3",
+                subtotal_qr: 0,
+                subtotal_efectivo: 0,
+            });
         }
-    }, [estadoPedido, estaPagado, tipoPago, form]);
+    }, [estadoPedido, form]);
 
     const hideDeliveryCosts = !isAdmin;
     const hayMultiplesVendedores = useMemo(() => {
@@ -147,6 +158,9 @@ function ShippingFormModal({
         try {
             const fechaSeleccionada = values.fecha_pedido?.format("YYYY-MM-DD") || moment().tz("America/La_Paz").format("YYYY-MM-DD");
             const horaSeleccionada = values.hora_entrega_acordada?.format("HH:mm:ss") || "00:00:00";
+            const effectivePaidStatus = values.estado_pedido === "Entregado" ? "si" : values.esta_pagado;
+            const effectivePaymentType = values.estado_pedido === "Entregado" ? "3" : values.tipo_de_pago;
+            const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
 
             const fechaPedido = moment.tz("America/La_Paz").toDate();
             const horaEntregaAcordada = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "America/La_Paz").toDate();
@@ -154,12 +168,14 @@ function ShippingFormModal({
 
             const response = await registerShippingAPI({
                 ...values,
+                esta_pagado: effectivePaidStatus,
+                adelanto_cliente: effectiveAdvance,
                 telefono_cliente: (codigoCelular) ? codigoCelular + values.telefono_cliente : "",
                 fecha_pedido: fechaPedido,
                 hora_entrega_acordada: horaEntregaAcordada,
                 hora_entrega_real: horaEntregaReal,
-                tipo_de_pago: tipoPagoMap[parseInt(values.tipo_de_pago)],
-                pagado_al_vendedor: values.esta_pagado === "si" || values.tipo_de_pago === "3",
+                tipo_de_pago: tipoPagoMap[parseInt(effectivePaymentType)],
+                pagado_al_vendedor: effectivePaidStatus === "si" || effectivePaymentType === "3",
                 id_sucursal: branchIdFromProps,
                 lugar_origen: branchIdFromProps,
             });

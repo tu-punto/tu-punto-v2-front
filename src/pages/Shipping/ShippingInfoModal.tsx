@@ -165,11 +165,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }, [estadoPedidoForm, estadoInicialPedido]);
 
     useEffect(() => {
-        if (estadoPedidoForm === "Entregado" && estaPagado === "si" && tipoPago !== "3") {
+        if (estadoPedidoForm === "Entregado") {
+            setEstaPagado("si");
+            setAdelantoVisible(false);
             setTipoPago("3");
-            internalForm.setFieldValue("tipo_de_pago", "3");
+            setQrInput(0);
+            setEfectivoInput(0);
+            internalForm.setFieldsValue({
+                esta_pagado: "si",
+                adelanto_cliente: 0,
+                tipo_de_pago: "3",
+                subtotal_qr: 0,
+                subtotal_efectivo: 0,
+            });
         }
-    }, [estadoPedidoForm, estaPagado, tipoPago, internalForm]);
+    }, [estadoPedidoForm, internalForm]);
 
     const tipoPagoTextoAValor: Record<string, string> = {
         'Transferencia o QR': '1',
@@ -389,6 +399,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 : moment().format("HH:mm:ss");
 
             const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
+            const effectivePaidStatus = values.estado_pedido === "Entregado" ? "si" : values.esta_pagado;
+            const effectivePaymentType = values.estado_pedido === "Entregado" ? "3" : values.tipo_de_pago;
+            const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
 
             let horaEntregaReal = values.estado_pedido === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
@@ -400,15 +413,16 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,
-                pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
+                pagado_al_vendedor: effectivePaidStatus === 'si' || effectivePaymentType === '3',
                 hora_entrega_rango_final: horaEntregaRangoFinal,
-                esta_pagado: values.esta_pagado,
-                adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
+                esta_pagado: effectivePaidStatus,
+                adelanto_cliente: effectiveAdvance,
+                tipo_de_pago: effectivePaymentType,
                 quien_paga_delivery: normalizeDeliveryPayer(values.quien_paga_delivery),
             };
 
             // Forzar subtotales según el tipo de pago
-            switch (values.tipo_de_pago) {
+            switch (effectivePaymentType) {
                 case '1':
                     updateShippingInfo.subtotal_qr = saldoACobrar;
                     updateShippingInfo.subtotal_efectivo = 0;

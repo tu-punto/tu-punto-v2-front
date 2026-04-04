@@ -30,7 +30,7 @@ const handleAuthRedirect = (status?: number, url?: string) => {
     }
   }
 
-  if (status === 403) {
+  if (status === 403 && !url?.includes("/user/login")) {
     const isUnauthorizedPage = currentHash.startsWith("#/unauthorized");
     if (!isUnauthorizedPage) {
       window.location.hash = "/unauthorized";
