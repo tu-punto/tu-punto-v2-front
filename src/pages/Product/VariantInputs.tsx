@@ -1,21 +1,23 @@
-import { useState, useEffect } from 'react';
-import { AutoComplete, Input, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
+import { useEffect, useState } from 'react';
+import { AutoComplete, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 
 const VariantInputs = ({
-                           combinations,
-                           setCombinations,
-                           readOnlyCombinations = [],
-                           startEmpty = false,
-                           variantSuggestions = [],
-                           subvariantSuggestions = {},
-                           prefillCombination = null,
-                           resetKey,
-                       }: any) => {
+    combinations,
+    setCombinations,
+    readOnlyCombinations = [],
+    startEmpty = false,
+    variantSuggestions = [],
+    subvariantSuggestions = {},
+    prefillCombination = null,
+    resetKey,
+}: any) => {
     const [variants, setVariants] = useState<any[]>([]);
     const [inputValues, setInputValues] = useState<string[]>([]);
-    const [showBulkApply, setShowBulkApply] = useState(false);
+    const [subvariantPriceInputs, setSubvariantPriceInputs] = useState<(number | null)[]>([]);
+    const [selectedSubvariants, setSelectedSubvariants] = useState<(string | null)[]>([]);
     const [bulkPrice, setBulkPrice] = useState<number | null>(null);
+    const [showBulkPriceTools, setShowBulkPriceTools] = useState(false);
 
     useEffect(() => {
         if (!startEmpty || resetKey === undefined) return;
@@ -30,8 +32,10 @@ const VariantInputs = ({
 
         setVariants(nextVariants);
         setInputValues(nextVariants.map(() => ""));
-        setShowBulkApply(false);
+        setSubvariantPriceInputs(nextVariants.map(() => null));
+        setSelectedSubvariants(nextVariants.map(() => null));
         setBulkPrice(null);
+        setShowBulkPriceTools(false);
         setCombinations([]);
     }, [prefillCombination, resetKey, setCombinations, startEmpty]);
 
@@ -59,6 +63,8 @@ const VariantInputs = ({
 
         setVariants(formatted);
         setInputValues(formatted.map(() => ""));
+        setSubvariantPriceInputs(formatted.map(() => null));
+        setSelectedSubvariants(formatted.map(() => null));
     }, [readOnlyCombinations, resetKey, startEmpty]);
 
     const normalizeText = (value: string) => value.trim().toLowerCase();
@@ -94,14 +100,26 @@ const VariantInputs = ({
     const addVariant = () => {
         setVariants([...variants, { name: '', subvariants: [], readOnly: false }]);
         setInputValues([...inputValues, ""]);
+        setSubvariantPriceInputs([...subvariantPriceInputs, null]);
+        setSelectedSubvariants([...selectedSubvariants, null]);
     };
+
     const removeVariant = (index: number) => {
         const updated = [...variants];
         updated.splice(index, 1);
         setVariants(updated);
+
         const updatedInputs = [...inputValues];
         updatedInputs.splice(index, 1);
         setInputValues(updatedInputs);
+
+        const updatedSubvariantPrices = [...subvariantPriceInputs];
+        updatedSubvariantPrices.splice(index, 1);
+        setSubvariantPriceInputs(updatedSubvariantPrices);
+
+        const updatedSelectedSubvariants = [...selectedSubvariants];
+        updatedSelectedSubvariants.splice(index, 1);
+        setSelectedSubvariants(updatedSelectedSubvariants);
     };
 
     const updateVariantName = (index: number, name: string) => {
@@ -118,30 +136,41 @@ const VariantInputs = ({
         const existingValues = updated[variantIndex].subvariants.map((subvariant: string) =>
             normalizeText(subvariant)
         );
+
         if (!existingValues.includes(normalizeText(trimmedValue))) {
             updated[variantIndex].subvariants.push(trimmedValue);
         }
+
         setVariants(updated);
     };
 
     const removeSubvariant = (variantIndex: number, value: string) => {
         const updated = [...variants];
-        updated[variantIndex].subvariants = updated[variantIndex].subvariants.filter((sv: string) => sv !== value);
+        updated[variantIndex].subvariants = updated[variantIndex].subvariants.filter(
+            (subvariant: string) => subvariant !== value
+        );
         setVariants(updated);
+
+        if (selectedSubvariants[variantIndex] === value) {
+            updateSubvariantPriceInput(variantIndex, null);
+            selectSubvariant(variantIndex, null);
+        }
     };
 
     useEffect(() => {
-        const generateCombinations = (index = 0, path = [], result = []) => {
+        const generateCombinations = (index = 0, path: any[] = [], result: any[] = []) => {
             if (index === variants.length) {
                 const combination: any = {
-                    key: path.map(p => `${p.name}-${p.value}`).join('-'),
+                    key: path.map((part) => `${part.name}-${part.value}`).join('-'),
                     stock: undefined,
                     price: undefined,
                 };
-                path.forEach((p, i) => {
-                    combination[`var${i}`] = p.value;
-                    combination[`varName${i}`] = p.name;
+
+                path.forEach((part, pathIndex) => {
+                    combination[`var${pathIndex}`] = part.value;
+                    combination[`varName${pathIndex}`] = part.name;
                 });
+
                 result.push(combination);
                 return;
             }
@@ -152,21 +181,24 @@ const VariantInputs = ({
         };
 
         const result: any[] = [];
-        if (variants.length > 0 && variants.every(v => v.subvariants.length && v.name)) {
+        if (variants.length > 0 && variants.every((variant) => variant.subvariants.length && variant.name)) {
             generateCombinations(0, [], result);
         }
 
-        const normalizedReadOnly = startEmpty ? [] : readOnlyCombinations.map((combo: any) => {
-            const key = Object.entries(combo)
-                .filter(([k]) => k.startsWith('varName'))
-                .map((_, i) => `${combo[`varName${i}`]}-${combo[`var${i}`]}`)
-                .join('-');
-            return {
-                ...combo,
-                key,
-                disabled: true
-            };
-        });
+        const normalizedReadOnly = startEmpty
+            ? []
+            : readOnlyCombinations.map((combo: any) => {
+                const key = Object.entries(combo)
+                    .filter(([comboKey]) => comboKey.startsWith('varName'))
+                    .map((_, index) => `${combo[`varName${index}`]}-${combo[`var${index}`]}`)
+                    .join('-');
+
+                return {
+                    ...combo,
+                    key,
+                    disabled: true
+                };
+            });
 
         setCombinations((previousCombinations: any[]) => {
             const previousByKey = new Map(
@@ -176,8 +208,8 @@ const VariantInputs = ({
             );
             const lockedKeys = new Set(normalizedReadOnly.map((combo: any) => combo.key));
             const generatedCombinations = result
-                .filter(combo => !lockedKeys.has(combo.key))
-                .map(combo => {
+                .filter((combo) => !lockedKeys.has(combo.key))
+                .map((combo) => {
                     const previous = previousByKey.get(combo.key);
                     return previous ? { ...combo, stock: previous.stock, price: previous.price } : combo;
                 });
@@ -188,23 +220,80 @@ const VariantInputs = ({
         });
     }, [variants, readOnlyCombinations, setCombinations, startEmpty]);
 
-    const handleChange = (key: string, field: 'stock' | 'price', value: number) => {
+    const handleChange = (key: string, field: 'stock' | 'price', value: number | null) => {
         const updated = combinations.map((combo: any) =>
             combo.key === key ? { ...combo, [field]: value } : combo
         );
         setCombinations(updated);
 
-        if (field === "price" && value > 0 && bulkPrice === null) {
+        if (field === "price" && value !== null && value > 0 && bulkPrice === null) {
             setBulkPrice(value);
-            setShowBulkApply(true);
         }
     };
 
+    const editableCombinations = combinations.filter((combo: any) => !combo.disabled);
 
-    const dynamicColumns = variants.map((variant, i) => ({
-        title: variant.name || `Var${i + 1}`,
-        dataIndex: `var${i}`,
-        key: `var${i}`,
+    const applyBulkPrice = () => {
+        if (bulkPrice === null || bulkPrice < 0) return;
+
+        const updated = combinations.map((combo: any) =>
+            combo.disabled ? combo : { ...combo, price: bulkPrice }
+        );
+        setCombinations(updated);
+        setBulkPrice(null);
+    };
+
+    const updateSubvariantPriceInput = (index: number, value: number | null) => {
+        const updated = [...subvariantPriceInputs];
+        updated[index] = value;
+        setSubvariantPriceInputs(updated);
+    };
+
+    const selectSubvariant = (variantIndex: number, value: string | null) => {
+        const updated = [...selectedSubvariants];
+        updated[variantIndex] = value;
+        setSelectedSubvariants(updated);
+    };
+
+    const applySubvariantPrice = (variantIndex: number) => {
+        const nextPrice = subvariantPriceInputs[variantIndex];
+        const variantName = variants[variantIndex]?.name;
+        const selectedSubvariant = selectedSubvariants[variantIndex];
+        if (nextPrice === null || nextPrice < 0 || !variantName || !selectedSubvariant) return;
+
+        const updated = combinations.map((combo: any) => {
+            const affectsCombination =
+                !combo.disabled &&
+                Object.keys(combo)
+                    .filter((key) => key.startsWith('varName'))
+                    .some((key) => {
+                        const suffix = key.replace('varName', '');
+                        return combo[key] === variantName && combo[`var${suffix}`] === selectedSubvariant;
+                    });
+
+            return affectsCombination ? { ...combo, price: nextPrice } : combo;
+        });
+
+        setCombinations(updated);
+        updateSubvariantPriceInput(variantIndex, null);
+        selectSubvariant(variantIndex, null);
+    };
+
+    const submitSubvariantInput = (variantIndex: number) => {
+        const pendingValue = String(inputValues[variantIndex] || '').trim();
+        if (!pendingValue) return;
+
+        addSubvariant(variantIndex, pendingValue);
+
+        const updated = [...inputValues];
+        updated[variantIndex] = "";
+        setInputValues(updated);
+    };
+
+    const dynamicColumns = variants.map((variant, index) => ({
+        title: variant.name || `Var${index + 1}`,
+        dataIndex: `var${index}`,
+        key: `var${index}`,
     }));
 
     const columns = [
@@ -222,13 +311,21 @@ const VariantInputs = ({
             )
         },
         {
-            title: 'Precio',
             dataIndex: 'price',
+            key: 'price',
+            title: (
+                <span
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setShowBulkPriceTools((current) => !current)}
+                >
+                    Precio
+                </span>
+            ),
             render: (_: any, record: any) => (
                 <InputNumber
                     min={0}
                     value={record.price}
-                    onChange={(value) => handleChange(record.key, 'price', value || 0)}
+                    onChange={(value) => handleChange(record.key, 'price', value)}
                     disabled={record.disabled}
                 />
             )
@@ -254,9 +351,12 @@ const VariantInputs = ({
                                 }
                             />
                             {!variant.readOnly && (
-                                <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
+                                <>
+                                    <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
+                                </>
                             )}
                         </Space>
+
                         {!variant.readOnly && getVariantNameOptions(index).length > 0 && (
                             <Space wrap size={[4, 4]}>
                                 <Typography.Text type="secondary">Sugeridas:</Typography.Text>
@@ -271,17 +371,54 @@ const VariantInputs = ({
                                 ))}
                             </Space>
                         )}
+
                         <Space wrap>
-                            {variant.subvariants.map((sv: string) => (
+                            {variant.subvariants.map((subvariant: string) => (
                                 <Tag
                                     closable={!variant.readOnly}
-                                    onClose={() => removeSubvariant(index, sv)}
-                                    key={sv}
+                                    onClose={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        removeSubvariant(index, subvariant);
+                                    }}
+                                    key={subvariant}
+                                    color={selectedSubvariants[index] === subvariant ? 'blue' : undefined}
+                                    style={{ cursor: variant.readOnly ? 'default' : 'pointer' }}
+                                    onClick={() => {
+                                        if (variant.readOnly) return;
+                                        selectSubvariant(
+                                            index,
+                                            selectedSubvariants[index] === subvariant ? null : subvariant
+                                        );
+                                    }}
                                 >
-                                    {sv}
+                                    {subvariant}
                                 </Tag>
                             ))}
                         </Space>
+
+                        {!variant.readOnly && selectedSubvariants[index] && (
+                            <Space wrap>
+                                <Typography.Text type="secondary">
+                                    Precio para {selectedSubvariants[index]}
+                                </Typography.Text>
+                                <InputNumber
+                                    min={0}
+                                    value={subvariantPriceInputs[index]}
+                                    onChange={(value) => updateSubvariantPriceInput(index, value ?? null)}
+                                    placeholder="Precio"
+                                    style={{ width: 110 }}
+                                />
+                                <Button
+                                    type="primary"
+                                    onClick={() => applySubvariantPrice(index)}
+                                    disabled={subvariantPriceInputs[index] === null}
+                                >
+                                    Aplicar
+                                </Button>
+                            </Space>
+                        )}
+
                         {!variant.readOnly && getSuggestedSubvariants(variant.name, index).length > 0 && (
                             <Space wrap size={[4, 4]}>
                                 <Typography.Text type="secondary">Subvariantes sugeridas:</Typography.Text>
@@ -296,6 +433,7 @@ const VariantInputs = ({
                                 ))}
                             </Space>
                         )}
+
                         <Space.Compact style={{ width: '100%', maxWidth: 420 }}>
                             <AutoComplete
                                 style={{ width: '100%' }}
@@ -319,54 +457,67 @@ const VariantInputs = ({
                                 filterOption={(inputValue, option) =>
                                     String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
                                 }
+                                onKeyDown={(event) => {
+                                    if (event.key !== 'Enter') return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    submitSubvariantInput(index);
+                                }}
                             />
                             <Button
                                 type="primary"
                                 icon={<PlusOutlined />}
                                 disabled={!variant.name || !String(inputValues[index] || '').trim()}
                                 onClick={() => {
-                                    addSubvariant(index, inputValues[index] || '');
-                                    const updated = [...inputValues];
-                                    updated[index] = "";
-                                    setInputValues(updated);
+                                    submitSubvariantInput(index);
                                 }}
                             />
                         </Space.Compact>
                     </Space>
                 </div>
             ))}
+
             <Button icon={<PlusOutlined />} onClick={addVariant}>
                 Agregar Variante
             </Button>
 
             <div style={{ marginTop: 24 }}>
                 <Typography.Title level={5}>Combinaciones</Typography.Title>
-                {showBulkApply && (
-                    <div style={{ marginBottom: 16, background: '#f6ffed', border: '1px solid #b7eb8f', padding: 12, borderRadius: 6 }}>
-                        <Typography.Text strong>¿Usar este precio para todas las combinaciones?</Typography.Text>
-                        <Button
-                            type="link"
-                            onClick={() => {
-                                const updated = combinations.map((combo: any) =>
-                                    combo.disabled ? combo : { ...combo, price: bulkPrice }
-                                );
-                                setCombinations(updated);
-                                setShowBulkApply(false);
-                                setBulkPrice(null);
-                            }}
-                        >
-                            Aplicar a todas
-                        </Button>
-                        <Button
-                            type="link"
-                            danger
-                            onClick={() => {
-                                setShowBulkApply(false);
-                                setBulkPrice(null);
-                            }}
-                        >
-                            Cancelar
-                        </Button>
+
+                {editableCombinations.length > 0 && showBulkPriceTools && (
+                    <div
+                        style={{
+                            marginBottom: 16,
+                            padding: 16,
+                            borderRadius: 12,
+                            border: '1px solid #e8e8e8',
+                            background: 'linear-gradient(180deg, #fcfcfc 0%, #f7f7f7 100%)'
+                        }}
+                    >
+                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                            <div>
+                                <Typography.Text strong>Precio masivo</Typography.Text>
+                                <br />
+                                <Typography.Text type="secondary">
+                                    Aplica el mismo precio a las {editableCombinations.length} combinaciones nuevas sin interrumpir la edicion.
+                                </Typography.Text>
+                            </div>
+
+                            <Space wrap size={[8, 8]}>
+                                <InputNumber
+                                    min={0}
+                                    value={bulkPrice}
+                                    onChange={(value) => setBulkPrice(value ?? null)}
+                                    placeholder="Precio para todas"
+                                />
+                                <Button type="primary" onClick={applyBulkPrice} disabled={bulkPrice === null}>
+                                    Aplicar a todas
+                                </Button>
+                                <Button onClick={() => setBulkPrice(null)} disabled={bulkPrice === null}>
+                                    Limpiar
+                                </Button>
+                            </Space>
+                        </Space>
                     </div>
                 )}
 

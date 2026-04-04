@@ -49,7 +49,7 @@ const SalesHistoryTable = () => {
     const fetchSales = async () => {
         setLoading(true);
         try {
-            const res = await getSalesHistoryAPI(selectedDate?.toISOString(), sucursalId);
+            const res = await getSalesHistoryAPI(selectedDate?.format("YYYY-MM-DD"), sucursalId);
             console.log("📦 Datos recibidos del backend:", res.resumen);
             if (res.success) {
                 setSales(res.resumen);

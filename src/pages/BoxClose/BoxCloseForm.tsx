@@ -31,6 +31,8 @@ interface OperacionAdicional {
   monto: number;
 }
 
+const roundAmount = (value: number) => Number(value.toFixed(2));
+
 const getOperationSign = (tipo: TipoOperacion) =>
   tipo === "gasto" || tipo === "gasto_profit" ? -1 : 1;
 
@@ -74,7 +76,29 @@ const BoxCloseForm = ({
   const [operations, setOperations] = useState<OperacionAdicional[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [operationForm] = Form.useForm();
+
+  const getOperationTotals = (ops: OperacionAdicional[]) => {
+    let deltaEf = 0;
+    let deltaQr = 0;
+    let cambiosExternos = 0;
+
+    for (const operation of ops) {
+      const delta = getOperationSign(operation.tipo) * operation.monto;
+
+      if (operation.metodo === "efectivo") deltaEf += delta;
+      else deltaQr += delta;
+
+      cambiosExternos += delta;
+    }
+
+    return {
+      deltaEf: roundAmount(deltaEf),
+      deltaQr: roundAmount(deltaQr),
+      cambiosExternos: roundAmount(cambiosExternos),
+    };
+  };
   function recalcExpectedAndDiffs(ops: OperacionAdicional[]) {
+    return applyExpectedAndDiffs(ops);
     const iniEf   = Number(form.getFieldValue("efectivo_inicial") || 0);
     const ventasE = Number(form.getFieldValue("ventas_efectivo")   || 0);
 
@@ -108,6 +132,26 @@ const BoxCloseForm = ({
     form.setFieldValue("diferencia_efectivo", Number((efectivoReal - efectivoEsperado).toFixed(2)));
     form.setFieldValue("diferencia_bancario", Number((bancarioReal - bancarioEsperado).toFixed(2)));
   }
+
+  function applyExpectedAndDiffs(ops: OperacionAdicional[]) {
+    const iniEf = Number(form.getFieldValue("efectivo_inicial") || 0);
+    const ventasE = Number(form.getFieldValue("ventas_efectivo") || 0);
+    const iniQr = Number(form.getFieldValue("bancario_inicial") || 0);
+    const ventasQ = Number(form.getFieldValue("ventas_qr") || 0);
+    const { deltaEf, deltaQr, cambiosExternos } = getOperationTotals(ops);
+
+    const efectivoEsperado = iniEf + ventasE + deltaEf;
+    const bancarioEsperado = iniQr + ventasQ + deltaQr;
+    const efectivoReal = Number(form.getFieldValue("efectivo_real") || 0);
+    const bancarioReal = Number(form.getFieldValue("bancario_real") || 0);
+
+    form.setFieldValue("cambios_externos", cambiosExternos);
+    form.setFieldValue("efectivo_esperado", roundAmount(efectivoEsperado));
+    form.setFieldValue("bancario_esperado", roundAmount(bancarioEsperado));
+    form.setFieldValue("diferencia_efectivo", roundAmount(efectivoReal - efectivoEsperado));
+    form.setFieldValue("diferencia_bancario", roundAmount(bancarioReal - bancarioEsperado));
+  }
+
   useEffect(() => {
     const fetchAdmins = async () => {
       const data = await getAdminsAPI();
@@ -117,19 +161,17 @@ const BoxCloseForm = ({
   }, []);
   const fetchSalesSummary = async () => {
     try {
-      const summary = await getDailySummary(selectedDate?.toISOString());
+      const summary = await getDailySummary(selectedDate?.format("YYYY-MM-DD"));
       setSalesSummary(summary || { cash: 0, bank: 0, total: 0 });
       const efectivoInicial = parseFloat(lastClosingBalance.efectivo_real) || 0;
-      const cambiosExternos = form.getFieldValue("cambios_externos") || 0;
-      const efectivoEsperado = efectivoInicial + (summary?.cash || 0) + cambiosExternos;
 
       form.setFieldsValue({
         efectivo_inicial: efectivoInicial,
         bancario_inicial: 0,
         ventas_efectivo: summary?.cash || 0,
         ventas_qr: summary?.bank || 0,
-        efectivo_esperado: efectivoEsperado,
-        bancario_esperado: summary?.bank,
+        efectivo_esperado: roundAmount(efectivoInicial + (summary?.cash || 0)),
+        bancario_esperado: roundAmount(summary?.bank || 0),
       });
       recalcExpectedAndDiffs(operations);
     } catch (error) {
@@ -140,12 +182,11 @@ const BoxCloseForm = ({
 
   const efectivoInicial = Form.useWatch("efectivo_inicial", form) || 0;
   const ventas = Form.useWatch("ventas_efectivo", form) || 0;
-  const cambios = Form.useWatch("cambios_externos", form) || 0;
 
   useEffect(() => {
-    const esperado = efectivoInicial + ventas + cambios;
-    form.setFieldValue("efectivo_esperado", esperado.toFixed(2));
-  }, [efectivoInicial, ventas, cambios]);
+    const { deltaEf } = getOperationTotals(operations);
+    form.setFieldValue("efectivo_esperado", roundAmount(efectivoInicial + ventas + deltaEf));
+  }, [efectivoInicial, ventas, operations]);
 
   useEffect(() => {
     const total = Object.entries(coins).reduce(

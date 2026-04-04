@@ -14,6 +14,9 @@ import dayjs from 'dayjs';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
+    value === "vendedor" ? "vendedor" : "comprador";
+
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
@@ -104,6 +107,13 @@ function ShippingFormModal({
         }
     }, [estadoPedido]);
 
+    useEffect(() => {
+        if (estadoPedido === "Entregado" && estaPagado === "si" && tipoPago !== "3") {
+            setTipoPago("3");
+            form.setFieldValue("tipo_de_pago", "3");
+        }
+    }, [estadoPedido, estaPagado, tipoPago, form]);
+
     const hideDeliveryCosts = !isAdmin;
     const hayMultiplesVendedores = useMemo(() => {
         const vendedores = selectedProducts.map((p: any) => p.id_vendedor);
@@ -181,7 +191,7 @@ function ShippingFormModal({
                     variantKey: p.variantKey,
                     nombre_variante: `${p.producto}`,
                     stockActual: p.stockActual,
-                    quien_paga_delivery: form.getFieldValue("quien_paga_delivery") || "comprador" // ✅ agregar esto
+                    quien_paga_delivery: normalizeDeliveryPayer(form.getFieldValue("quien_paga_delivery"))
 
                 };
             });
@@ -462,7 +472,7 @@ function ShippingFormModal({
                                     >
                                         <Radio.Group
                                             onChange={(e) => {
-                                                const value = e.target.value;
+                                                const value = normalizeDeliveryPayer(e.target.value);
                                                 setQuienPaga(value);
                                                 form.setFieldValue("quien_paga_delivery", value);
 
@@ -474,7 +484,6 @@ function ShippingFormModal({
                                         >
                                             <Radio.Button value="comprador" disabled={hayMultiplesVendedores}>COMPRADOR</Radio.Button>
                                             <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
-                                            <Radio.Button value="tupunto">Tu Punto</Radio.Button>
                                         </Radio.Group>
                                     </Form.Item>
                                 </Col>

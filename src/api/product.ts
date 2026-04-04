@@ -337,7 +337,7 @@ export const updateProductBranchStockAPI = async (productBranchId, nuevaCantidad
 }
 export const updateProductPriceAPI = async (priceUpdates) => {
     try {
-        const res = await apiClient.put('/product/update-price', { priceUpdates });
+        const res = await apiClient.put('/product/update-price', priceUpdates);
         return res.data;
     } catch (error) {
         return handleError(error);

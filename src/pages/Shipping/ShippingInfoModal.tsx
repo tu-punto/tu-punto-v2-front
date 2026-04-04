@@ -22,6 +22,9 @@ import { generateShippingLabelQRAPI } from '../../api/qr.ts';
 import moment from "moment-timezone";
 import { updateProductsByShippingAPI } from "../../api/sales.ts";
 
+const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
+    value === "vendedor" ? "vendedor" : "comprador";
+
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
     const [products, setProducts, handleValueChange] = useEditableTable([]);
@@ -161,6 +164,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }
     }, [estadoPedidoForm, estadoInicialPedido]);
 
+    useEffect(() => {
+        if (estadoPedidoForm === "Entregado" && estaPagado === "si" && tipoPago !== "3") {
+            setTipoPago("3");
+            internalForm.setFieldValue("tipo_de_pago", "3");
+        }
+    }, [estadoPedidoForm, estaPagado, tipoPago, internalForm]);
+
     const tipoPagoTextoAValor: Record<string, string> = {
         'Transferencia o QR': '1',
         'Efectivo': '2',
@@ -187,10 +197,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const esOtroLugar = !sucursals.find(s => s.nombre === shipping.lugar_entrega);
         const lugar_entrega = esOtroLugar ? 'otro' : shipping.lugar_entrega;
         const lugar_entrega_input = esOtroLugar ? shipping.lugar_entrega : '';
-        const quienPagaDeVenta =
+        const quienPagaDeVenta = normalizeDeliveryPayer(
             shipping?.venta?.[0]?.quien_paga_delivery ||
-            shipping?.quien_paga_delivery ||
-            "comprador";
+            shipping?.quien_paga_delivery
+        );
         const rawFecha = shipping.hora_entrega_acordada;
         const originalHoraEntregaUTC = rawFecha ? dayjs.utc(rawFecha) : null;
 
@@ -352,7 +362,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 setLoading(false);
                 return;
             }
-            const quienPagaActual = internalForm.getFieldValue("quien_paga_delivery");
+            const quienPagaActual = normalizeDeliveryPayer(internalForm.getFieldValue("quien_paga_delivery"));
             const updatedExisting = existingProducts.map((p: any) => ({
                 _id: p.id_venta,
                 quien_paga_delivery: quienPagaActual,
@@ -389,16 +399,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ...values,
                 lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
-                hora_entrega_acordada: fechaHoraEntregaAcordada,                
+                hora_entrega_acordada: fechaHoraEntregaAcordada,
                 pagado_al_vendedor: values.esta_pagado === 'si' || values.tipo_de_pago === '3',
                 hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: values.esta_pagado,
                 adelanto_cliente: ['si', 'no'].includes(values.esta_pagado) ? 0 : (values.adelanto_cliente || 0),
-                quien_paga_delivery: values.quien_paga_delivery,
+                quien_paga_delivery: normalizeDeliveryPayer(values.quien_paga_delivery),
             };
-            if (values.quien_paga_delivery === "tupunto") {
-                updateShippingInfo.cargo_delivery = 0;
-            }
 
             // Forzar subtotales según el tipo de pago
             switch (values.tipo_de_pago) {
@@ -737,12 +744,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     >
                                         <Radio.Group
                                             value={quienPagaDelivery} //  esto lo hace controlado
-                                            onChange={e => internalForm.setFieldValue("quien_paga_delivery", e.target.value)}
+                                            onChange={e => internalForm.setFieldValue("quien_paga_delivery", normalizeDeliveryPayer(e.target.value))}
                                             disabled={!isAdmin}
                                         >
                                             <Radio.Button value="comprador">COMPRADOR</Radio.Button>
                                             <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
-                                            <Radio.Button value="tupunto">Tu Punto</Radio.Button>
                                         </Radio.Group>
                                     </Form.Item>
 
@@ -750,7 +756,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             </Row>
 
                             <Row gutter={16}>
-                                {quienPagaDelivery !== "tupunto" && (
+                                {["comprador", "vendedor"].includes(quienPagaDelivery || "") && (
                                     <Col span={12}>
                                         <Form.Item
                                             name="cargo_delivery"

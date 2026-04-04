@@ -6,6 +6,7 @@ export interface Shipping {
   id_pedido: string;
   cliente: string;
   telefono_cliente: number;
+  carnet_cliente?: string;
   tipo_de_pago: string;
   fecha_pedido: Date;
   hora_entrega_acordada: Date;

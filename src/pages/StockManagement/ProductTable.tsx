@@ -8,6 +8,7 @@ import StockPerBranchModal from './StockPerBranchModal';
 import { IProduct } from "../../models/productModel.ts";
 import { getCategoryByIdAPI } from '../../api/category';
 import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
+import ProductPriceMatrixModal from "./ProductPriceMatrixModal.tsx";
 import { saveTempStock } from "../../utils/storageHelpers";
 import { reconstructProductFromFlat, fetchFullProductById } from "../../utils/storageHelpers";
 
@@ -177,23 +178,50 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     };
     const [priceModalOpen, setPriceModalOpen] = useState(false);
     const [selectedProductForPrice, setSelectedProductForPrice] = useState<any>(null);
+    const [selectedVariantForPrice, setSelectedVariantForPrice] = useState<any>(null);
+    const [priceMatrixModalOpen, setPriceMatrixModalOpen] = useState(false);
+    const [selectedProductForPriceMatrix, setSelectedProductForPriceMatrix] = useState<any>(null);
 
-    const openPriceModal = async (variantName: string, flatProduct: any) => {
+    const openPriceModal = async (flatProduct: any) => {
         const product = await fetchFullProductById(flatProduct._id);
 
         if (!product) {
             return message.error("No se pudo obtener el producto completo");
         }
 
-        setSelectedVariantName(variantName);
         setSelectedProductForPrice(product);
+        setSelectedVariantForPrice({
+            label: flatProduct.variant,
+            variantKey: flatProduct.variantKey,
+            variantes: flatProduct.variantes_obj || flatProduct.variantes || {},
+            precio: flatProduct.precio
+        });
         setPriceModalOpen(true);
     };
 
     const closePriceModal = () => {
-        setSelectedVariantName("");
         setSelectedProductForPrice(null);
+        setSelectedVariantForPrice(null);
         setPriceModalOpen(false);
+    };
+
+    const openPriceMatrixModal = async (record: any) => {
+        const sourceProduct = record?.productOriginal || record;
+        const product = Array.isArray(sourceProduct?.sucursales)
+            ? sourceProduct
+            : await fetchFullProductById(sourceProduct?._id);
+
+        if (!product) {
+            return message.error("No se pudo obtener el producto completo");
+        }
+
+        setSelectedProductForPriceMatrix(product);
+        setPriceMatrixModalOpen(true);
+    };
+
+    const closePriceMatrixModal = () => {
+        setSelectedProductForPriceMatrix(null);
+        setPriceMatrixModalOpen(false);
     };
 
     const groupCriteria = (group: any, products: any[]) => {
@@ -293,11 +321,25 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             title: 'Precio Unitario',
             key: 'precio',
             render: (_: any, record: any) => record.variant ? (
-                <Button type="link" onClick={() => openPriceModal(record.variant, record)}>
+                <Button
+                    type="link"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        openPriceModal(record);
+                    }}
+                >
                     {record.precio}
                 </Button>
             ) : (
-                <span>-</span>
+                <Button
+                    type="link"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        openPriceMatrixModal(record);
+                    }}
+                >
+                    -
+                </Button>
             )
         },
         {
@@ -554,8 +596,14 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             <PricePerBranchModal
                 visible={priceModalOpen}
                 onClose={closePriceModal}
-                variantName={selectedVariantName}
+                variantData={selectedVariantForPrice}
                 producto={selectedProductForPrice}
+                onRefresh={onUpdateProducts}
+            />
+            <ProductPriceMatrixModal
+                visible={priceMatrixModalOpen}
+                onClose={closePriceMatrixModal}
+                producto={selectedProductForPriceMatrix}
                 onRefresh={onUpdateProducts}
             />
         </Spin>

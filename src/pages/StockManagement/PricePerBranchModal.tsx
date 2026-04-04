@@ -1,165 +1,164 @@
-import { Modal, Table, InputNumber, Button, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { Alert, Button, Card, Divider, InputNumber, List, Modal, Space, Tag, Typography, message } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 import { getSucursalsAPI } from '../../api/sucursal';
 import { updateProductPriceAPI } from '../../api/product';
-import { Modal as AntModal } from 'antd';
+
+const { Text, Title } = Typography;
+
+const normalizeVariantMap = (variantes: Record<string, string> = {}) =>
+    Object.fromEntries(
+        Object.entries(variantes || {}).map(([key, value]) => [
+            String(key).trim(),
+            String(value ?? '').trim()
+        ])
+    );
+
+const areVariantsEqual = (
+    left: Record<string, string> = {},
+    right: Record<string, string> = {}
+) => {
+    const normalizedLeft = normalizeVariantMap(left);
+    const normalizedRight = normalizeVariantMap(right);
+    const leftKeys = Object.keys(normalizedLeft);
+    const rightKeys = Object.keys(normalizedRight);
+
+    if (leftKeys.length !== rightKeys.length) return false;
+
+    return leftKeys.every(
+        (key) =>
+            String(normalizedLeft[key] || '').toLowerCase() ===
+            String(normalizedRight[key] || '').toLowerCase()
+    );
+};
+
+const findMatchingCombination = (combinaciones: any[] = [], variantData: any) =>
+    combinaciones.find((item) => {
+        if (variantData?.variantKey && item?.variantKey) {
+            return item.variantKey === variantData.variantKey;
+        }
+
+        return areVariantsEqual(item?.variantes || {}, variantData?.variantes || {});
+    });
+
+const formatPrice = (value: number | null | undefined) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+    return `Bs ${Number(value).toFixed(2)}`;
+};
 
 const PricePerBranchModal = ({
-                                 visible,
-                                 onClose,
-                                 variantName,
-                                 producto,
-                                 onRefresh
+    visible,
+    onClose,
+    variantData,
+    producto,
+    onRefresh
 }: {
     visible: boolean;
     onClose: () => void;
-    variantName: string;
+    variantData: any;
     producto: any;
+    onRefresh?: () => Promise<void> | void;
 }) => {
-    const [dataSource, setDataSource] = useState<any[]>([]);
+    const [branchRows, setBranchRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [globalPrice, setGlobalPrice] = useState<number | null>(null);
+    const [price, setPrice] = useState<number | null>(null);
+
     useEffect(() => {
         if (!visible) {
-            setGlobalPrice(null);
+            setBranchRows([]);
+            setPrice(null);
         }
     }, [visible]);
 
     useEffect(() => {
-        if (visible && variantName && producto) {
-            fetchData();
-        }
-    }, [visible, variantName, producto]);
+        if (!visible || !variantData || !producto) return;
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const sucursales = await getSucursalsAPI();
-            const allVariantKeys = Object.keys(
-                producto?.sucursales?.[0]?.combinaciones?.[0]?.variantes || {}
-            );
+        const fetchData = async () => {
+            setLoading(true);
 
-            const combinedData = sucursales
-                .map((branch: any) => {
+            try {
+                const sucursales = await getSucursalsAPI();
+                const combinedData = sucursales.map((branch: any) => {
                     const sucursalId = branch._id?.$oid || branch._id;
                     const sucursal = producto.sucursales?.find(
-                        (s: any) => (s.id_sucursal?.$oid || s.id_sucursal) === sucursalId
+                        (item: any) => String(item.id_sucursal?.$oid || item.id_sucursal) === String(sucursalId)
                     );
-
-                    const combinacion = sucursal?.combinaciones?.find((c: any) => {
-                        const entry = Object.entries(c.variantes || {})
-                            .map(([_, v]) => v)
-                            .join(" / ");
-                        return entry === variantName;
-                    });
-
-                    if (!combinacion) return null;
+                    const combinacion = findMatchingCombination(sucursal?.combinaciones || [], variantData);
 
                     return {
-                        key: sucursalId,
+                        key: String(sucursalId),
                         nombre: branch.nombre,
-                        precio: combinacion.precio ?? 0,
-                        disponible: true,
-                        variantes: combinacion.variantes || {},
+                        disponible: Boolean(combinacion),
+                        precio: combinacion ? Number(combinacion.precio || 0) : null
                     };
-                })
-                .filter(Boolean);
+                });
 
-            setDataSource(combinedData);
-        } catch (error) {
-            console.error("Error al obtener datos de precios por sucursal:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+                const firstAvailablePrice = combinedData.find((item) => item.disponible)?.precio;
+                const basePrice = Number(
+                    variantData?.precio ?? firstAvailablePrice ?? 0
+                );
 
-    const handlePriceChange = (value: number, key: string) => {
-        setDataSource((prev) =>
-            prev.map((item) => (item.key === key ? { ...item, precio: value } : item))
-        );
-    };
+                setBranchRows(combinedData);
+                setPrice(Number.isFinite(basePrice) ? basePrice : null);
+            } catch (error) {
+                console.error("Error al obtener datos de precio unificado:", error);
+                message.error("No se pudo cargar la informacion de precios");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [visible, variantData, producto]);
+
+    const availableRows = useMemo(
+        () => branchRows.filter((item) => item.disponible),
+        [branchRows]
+    );
+
+    const distinctPrices = useMemo(() => {
+        const values = availableRows.map((item) => Number(item.precio || 0).toFixed(2));
+        return Array.from(new Set(values));
+    }, [availableRows]);
+
+    const hasInconsistentPrices = distinctPrices.length > 1;
+    const missingBranches = branchRows.length - availableRows.length;
+
     const handleSave = async () => {
-        const hasInvalidPrice = dataSource.some(
-            item => item.disponible && (item.precio === null || item.precio === undefined || item.precio < 0)
-        );
-
-        if (hasInvalidPrice) {
-            message.warning('Hay precios inválidos en sucursales donde el producto está presente.');
+        if (price === null || price <= 0) {
+            message.warning('Ingrese un precio valido mayor a 0');
             return;
         }
 
-        AntModal.confirm({
-            title: '¿Estás seguro de guardar estos precios?',
-            content: 'Solo se actualizarán los precios en sucursales donde el producto ya está registrado.',
-            okText: 'Sí, guardar',
-            cancelText: 'Cancelar',
-            onOk: async () => {
-                setSaving(true);
-                try {
-                    const priceUpdates = dataSource
-                        .filter(item => item.precio > 0) // o simplemente: true
-                        .map((item) => {
-                            // Si no hay combinación, usamos variantes del variantName (manual)
-                            let variantes = item.variantes;
+        try {
+            setSaving(true);
 
-                            if (!item.disponible || Object.keys(variantes || {}).length === 0) {
-                                const variantParts = variantName.split(" / ");
-                                const allCombinaciones = producto.sucursales?.flatMap(s => s.combinaciones) || [];
-                                const keysSet = new Set<string>();
-                                allCombinaciones.forEach(c => {
-                                    Object.keys(c.variantes || {}).forEach(k => keysSet.add(k));
-                                });
-                                const keys = Array.from(keysSet);
-                                variantes = Object.fromEntries(keys.map((k, i) => [k, variantParts[i] || ""]));
-                            }
+            const res = await updateProductPriceAPI({
+                productId: producto._id?.$oid || producto._id,
+                variantKey: variantData?.variantKey,
+                variantes: normalizeVariantMap(variantData?.variantes || {}),
+                precio: Number(price)
+            });
 
-                            return {
-                                productId: producto._id?.$oid || producto._id,
-                                sucursalId: item.key,
-                                variantes,
-                                precio: item.precio,
-                            };
-                        });
-                    console.log("📤 Enviando priceUpdates:", priceUpdates);
-
-                    const res = await updateProductPriceAPI(priceUpdates);
-
-                    if (res.success) {
-                        message.success('Precios actualizados correctamente');
-                        onClose();
-                        onRefresh?.();
-                    } else {
-                        message.error(res.message || 'Error al actualizar precios');
-                    }
-                } catch (error) {
-                    console.error('Error al guardar precios:', error);
-                    message.error('Ocurrió un error al guardar');
-                } finally {
-                    setSaving(false);
-                }
+            if (!res?.success) {
+                message.error(res?.message || 'Error al actualizar el precio');
+                return;
             }
-        });
+
+            message.success('Precio actualizado en todas las sucursales');
+            await onRefresh?.();
+            onClose();
+        } catch (error) {
+            console.error('Error al guardar precio unificado:', error);
+            message.error('Ocurrio un error al guardar el precio');
+        } finally {
+            setSaving(false);
+        }
     };
-    const columns = [
-        { title: 'Sucursal', dataIndex: 'nombre', key: 'nombre' },
-        {
-            title: 'Precio',
-            dataIndex: 'precio',
-            key: 'precio',
-            render: (value: number, record: any) => (
-                <InputNumber
-                    min={0}
-                    value={value}
-                    onChange={(val) => handlePriceChange(val as number, record.key)}
-                />
-            ),
-        },
-    ];
 
     return (
         <Modal
-            title={`Precios por Sucursal - Variante: ${variantName}`}
+            title="Precio unificado de variante"
             open={visible}
             onCancel={onClose}
             footer={[
@@ -167,43 +166,119 @@ const PricePerBranchModal = ({
                     Cancelar
                 </Button>,
                 <Button key="save" type="primary" loading={saving} onClick={handleSave}>
-                    Guardar
-                </Button>,
-            ]}
-            width={600}
-        >
-            <div style={{ marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span>Precio para todas las sucursales:</span>
-                <InputNumber
-                    min={0}
-                    value={globalPrice}
-                    onChange={(value) => setGlobalPrice(value ?? null)}
-                    placeholder="Ej. 10.00"
-                />
-                <Button
-                    onClick={() => {
-                        if (globalPrice == null || globalPrice < 0) {
-                            message.warning("Ingrese un precio válido");
-                            return;
-                        }
-                        const actualizadas = dataSource.map((item) =>
-                            item.disponible ? { ...item, precio: globalPrice } : item
-                        );
-                        setDataSource(actualizadas);
-                    }}
-                    type="default"
-                >
-                    Aplicar a todos
+                    Guardar precio
                 </Button>
-            </div>
+            ]}
+            width={720}
+        >
+            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div>
+                    <Title level={5} style={{ marginBottom: 4 }}>
+                        {producto?.nombre_producto || 'Producto'}
+                    </Title>
+                    <Text type="secondary">
+                        {variantData?.label || 'Variante sin nombre'}
+                    </Text>
+                </div>
 
-            <Table
-                columns={columns}
-                dataSource={dataSource}
-                loading={loading}
-                pagination={false}
-                size="small"
-            />
+                {hasInconsistentPrices && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        message="Se detectaron precios distintos entre sucursales"
+                        description="Al guardar, la variante quedara con un solo precio unificado."
+                    />
+                )}
+
+                <Card
+                    bordered={false}
+                    style={{
+                        border: '1px solid #f0f0f0',
+                        borderRadius: 14,
+                        background: 'linear-gradient(180deg, #fcfcfc 0%, #f7f7f7 100%)'
+                    }}
+                >
+                    <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                        <Space wrap size={[8, 8]}>
+                            <Tag color="blue">{availableRows.length} sucursales con la variante</Tag>
+                            <Tag color={missingBranches > 0 ? 'gold' : 'green'}>
+                                {missingBranches > 0
+                                    ? `${missingBranches} sucursales sin esa combinacion`
+                                    : 'Sin diferencias de presencia'}
+                            </Tag>
+                        </Space>
+
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                            <div style={{ minWidth: 220, flex: '1 1 220px' }}>
+                                <Text type="secondary">Nuevo precio</Text>
+                                <InputNumber
+                                    min={0}
+                                    value={price}
+                                    onChange={(value) => setPrice(value ?? null)}
+                                    style={{ width: '100%', marginTop: 6 }}
+                                    placeholder="Ej. 79.90"
+                                />
+                            </div>
+
+                            <Button
+                                onClick={() =>
+                                    setPrice(
+                                        Number(
+                                            availableRows[0]?.precio ??
+                                            variantData?.precio ??
+                                            0
+                                        )
+                                    )
+                                }
+                                disabled={!availableRows.length}
+                            >
+                                Usar precio actual
+                            </Button>
+                        </div>
+
+                    </Space>
+                </Card>
+
+                <Divider style={{ margin: 0 }} />
+
+                <div>
+                    <Text strong>Referencia por sucursal</Text>
+                    <List
+                        loading={loading}
+                        dataSource={branchRows}
+                        locale={{ emptyText: 'No se encontraron sucursales para esta variante.' }}
+                        style={{ marginTop: 12 }}
+                        renderItem={(item) => (
+                            <List.Item>
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        flexWrap: 'wrap'
+                                    }}
+                                >
+                                    <Space wrap size={[8, 8]}>
+                                        <Text strong>{item.nombre}</Text>
+                                        <Tag color={item.disponible ? 'green' : 'default'}>
+                                            {item.disponible ? 'Disponible' : 'Sin variante'}
+                                        </Tag>
+                                    </Space>
+
+                                    <Space wrap size={[8, 8]}>
+                                        <Text type="secondary">Actual: {formatPrice(item.precio)}</Text>
+                                        {item.disponible && price !== null && (
+                                            <Tag color="blue">Quedara: {formatPrice(price)}</Tag>
+                                        )}
+                                    </Space>
+                                </div>
+                            </List.Item>
+                        )}
+                    />
+                </div>
+            </Space>
         </Modal>
     );
 };
