@@ -3,9 +3,11 @@ import FinanceFluxTable from "./FinanceFluxTable"
 import FinanceFluxFormModal from "./FinanceFluxFormModal";
 import { Button } from "antd";
 import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
+import RecurringExpensesModal from "./RecurringExpensesModal";
 
 const FinanceFlux = () => {
     const [isModalVisible, setIsModalVisible] = useState(false)
+    const [isRecurringModalVisible, setIsRecurringModalVisible] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const [editingFlux, setEditingFlux] = useState(null);
     const fetchFluxCategory = useFinanceFluxCategoryStore(
@@ -38,6 +40,10 @@ const FinanceFlux = () => {
         setRefreshKey(prevKey => prevKey + 1)
     }
 
+    const handleRecurringPaid = () => {
+        setRefreshKey(prevKey => prevKey + 1)
+    }
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-4">
@@ -47,13 +53,21 @@ const FinanceFlux = () => {
                         Gastos e Ingresos
                     </h1>
                 </div>
-                <Button
-                    onClick={showModal}
-                    type="primary"
-                    className="text-mobile-sm xl:text-desktop-sm"
-                >
-                    Agregar Gasto o Ingreso
-                </Button>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <Button
+                        onClick={() => setIsRecurringModalVisible(true)}
+                        className="text-mobile-sm xl:text-desktop-sm"
+                    >
+                        Gastos recurrentes
+                    </Button>
+                    <Button
+                        onClick={showModal}
+                        type="primary"
+                        className="text-mobile-sm xl:text-desktop-sm"
+                    >
+                        Agregar Gasto o Ingreso
+                    </Button>
+                </div>
             </div>
 
             <FinanceFluxTable refreshKey={refreshKey} onEdit={handleEdit} />
@@ -63,6 +77,11 @@ const FinanceFlux = () => {
                 onFinish={onFinish}
                 onSuccess={handleSuccess}
                 editingFlux={editingFlux}
+            />
+            <RecurringExpensesModal
+                open={isRecurringModalVisible}
+                onClose={() => setIsRecurringModalVisible(false)}
+                onPaid={handleRecurringPaid}
             />
         </div>
     )
