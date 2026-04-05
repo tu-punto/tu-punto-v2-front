@@ -20,9 +20,11 @@ import ServicesPage from "../pages/Service/ServicePanelPage";
 import FindShipping from "../pages/Shipping/FindShipping";
 import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
 import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoPage";
+import SuperadminVariantsPage from "../pages/SuperadminVariants/SuperadminVariantsPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
+import { isSuperadminUser } from "../utils/role";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
@@ -40,6 +42,16 @@ const SellerProductInfoRoute = () => {
 
 const AdminSellerProductInfoRoute = () => {
   return <SellerProductInfoPage mode="admin" />;
+};
+
+const SuperadminVariantsRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!isSuperadminUser(user)) {
+    return <Navigate to="/stock" replace />;
+  }
+
+  return <SuperadminVariantsPage />;
 };
 
 const protectedRoutes = [
@@ -130,6 +142,10 @@ const protectedRoutes = [
       {
         path: "/admin-seller-product-info",
         element: guard("/admin-seller-product-info", <AdminSellerProductInfoRoute />),
+      },
+      {
+        path: "/superadmin-variants",
+        element: guard("/superadmin-variants", <SuperadminVariantsRoute />),
       },
       {
         path: "*",

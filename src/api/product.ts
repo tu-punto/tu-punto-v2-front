@@ -185,6 +185,77 @@ export const getAdminSellerProductInfoPageAPI = async (params?: {
     }
 };
 
+export const getSuperadminVariantInventoryPageAPI = async (params?: {
+    sellerId: string;
+    q?: string;
+    inStock?: boolean;
+    page?: number;
+    limit?: number;
+    sortOrder?: "asc" | "desc";
+}) => {
+    try {
+        const res = await apiClient.get("/product/superadmin/variant-inventory", { params });
+        return res.data;
+    } catch (error) {
+        console.error("Error al obtener inventario avanzado de variantes:", error);
+        return {
+            success: false,
+            rows: [],
+            branches: [],
+            total: 0,
+            page: Number(params?.page || 1),
+            limit: Number(params?.limit || 20),
+            pages: 1
+        };
+    }
+};
+
+export const updateSuperadminVariantStockAPI = async (payload: {
+    productId: string;
+    sellerId: string;
+    variantKey: string;
+    sucursalId: string;
+    stock: number;
+}) => {
+    try {
+        const res = await apiClient.patch("/product/superadmin/variant-stock", payload);
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
+export const renameSuperadminVariantAPI = async (payload: {
+    productId: string;
+    sellerId: string;
+    variantKey: string;
+    sucursalId?: string;
+    scope: "branch" | "all";
+    variantAttributes: Record<string, string>;
+}) => {
+    try {
+        const res = await apiClient.patch("/product/superadmin/variant-rename", payload);
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
+export const deleteSuperadminVariantAPI = async (payload: {
+    productId: string;
+    sellerId: string;
+    variantKey: string;
+    sucursalId?: string;
+    scope: "branch" | "all";
+}) => {
+    try {
+        const res = await apiClient.delete("/product/superadmin/variant", { data: payload });
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
 export const updateVariantExtrasBySellerAPI = async ({
     productId,
     sucursalId,

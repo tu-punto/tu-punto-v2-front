@@ -8,6 +8,7 @@ import statsIcon from "../assets/statsIcon.svg";
 import branchIcon from "../assets/branchIcon.svg";
 import salesHistoryIcon from "../assets/historyIcono.png";
 import infoProductIcon from "../assets/infoProductIcon.svg";
+import superadminVariantsIcon from "../assets/superadminVariantsIcon.svg";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
@@ -100,5 +101,12 @@ export const menu = [
     label: "Productos Clientes",
     icon: infoProductIcon,
     roles: getAllowedRoles("/admin-seller-product-info"),
+  },
+  {
+    path: "/superadmin-variants",
+    label: "Control Variantes",
+    icon: superadminVariantsIcon,
+    roles: getAllowedRoles("/superadmin-variants"),
+    requiresSuperadmin: true,
   },
 ];

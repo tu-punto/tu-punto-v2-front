@@ -5,7 +5,7 @@ import { UserContext } from "../../context/userContext";
 import { menu } from "../../constants/menu";
 import { Button, message } from "antd";
 import { logoutUserAPI } from "../../api/user";
-import { normalizeRole } from "../../utils/role";
+import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
 
 interface SidebarProps {
@@ -37,7 +37,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const filteredMenuItems = menu.filter((item) =>
     item.roles.includes(normalizeRole(user?.role)) &&
-    (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user))
+    (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
+    (!item.requiresSuperadmin || isSuperadminUser(user))
   );
 
   return (
