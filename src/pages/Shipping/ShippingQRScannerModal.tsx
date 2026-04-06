@@ -6,10 +6,44 @@ import {
   resolveShippingQRPayloadAPI,
   transitionShippingStatusByQRAPI
 } from "../../api/qr";
+import { getSucursalsAPI } from "../../api/sucursal";
 import ShippingInfoModal from "./ShippingInfoModal";
 
 const { Text } = Typography;
 const STATUS_OPTIONS = ["En Espera", "En camino", "No entregado", "Cancelado", "Entregado"];
+
+const resolveBranchId = (value: any): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value?._id || value?.id_sucursal || value?.$oid || "");
+};
+
+const normalizeBranchName = (value: unknown): string =>
+  String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const findBranchByName = (branches: any[], value: unknown) => {
+  const normalizedName = normalizeBranchName(value);
+  if (!normalizedName) return null;
+
+  return branches.find((branch: any) => normalizeBranchName(branch?.nombre) === normalizedName) || null;
+};
+
+const resolvePaymentBranchIdForShipping = (shipping: any, branches: any[]): string => {
+  const originBranchId = resolveBranchId(shipping?.lugar_origen);
+  const storedPaymentBranchId = resolveBranchId(shipping?.sucursal);
+  const legacyDestinationBranchId = resolveBranchId(findBranchByName(branches, shipping?.lugar_entrega)?._id);
+
+  if (shipping?.tipo_destino === "otro_lugar") {
+    return storedPaymentBranchId || originBranchId;
+  }
+
+  return (
+    (storedPaymentBranchId && storedPaymentBranchId !== originBranchId ? storedPaymentBranchId : "") ||
+    legacyDestinationBranchId ||
+    storedPaymentBranchId ||
+    originBranchId
+  );
+};
 
 interface Props {
   open: boolean;
@@ -36,6 +70,10 @@ const ShippingQRScannerModal = ({ open, onClose }: Props) => {
   const [shippingInfoVisible, setShippingInfoVisible] = useState(false);
   const [flashState, setFlashState] = useState<"success" | "error" | null>(null);
   const [flashLabel, setFlashLabel] = useState("");
+  const [sucursals, setSucursals] = useState<any[]>([]);
+  const currentSucursalId = localStorage.getItem("sucursalId") || "";
+  const paymentBranchId = resolvePaymentBranchIdForShipping(selectedShipping, sucursals);
+  const canMarkAsDelivered = !selectedShipping || !paymentBranchId || paymentBranchId === currentSucursalId;
 
   const clearFeedback = () => {
     if (feedbackTimeoutRef.current) {
@@ -221,6 +259,17 @@ const ShippingQRScannerModal = ({ open, onClose }: Props) => {
   };
 
   useEffect(() => {
+    const fetchSucursals = async () => {
+      const response = await getSucursalsAPI();
+      if (response?.success) {
+        setSucursals(response.sucursals || []);
+      }
+    };
+
+    void fetchSucursals();
+  }, []);
+
+  useEffect(() => {
     if (!open) {
       setIsScanning(false);
       clearIntervals();
@@ -316,11 +365,25 @@ const ShippingQRScannerModal = ({ open, onClose }: Props) => {
                   className="w-full"
                   value={targetStatus}
                   onChange={setTargetStatus}
-                  options={STATUS_OPTIONS.map((status) => ({ label: status, value: status }))}
+                  options={STATUS_OPTIONS.map((status) => ({
+                    label: status,
+                    value: status,
+                    disabled: status === "Entregado" && !canMarkAsDelivered
+                  }))}
                 />
               </div>
+              {!canMarkAsDelivered && (
+                <div style={{ marginBottom: 12, color: "#b45309", fontSize: 12 }}>
+                  Solo la sucursal destino puede marcar este pedido como entregado.
+                </div>
+              )}
               <div className="flex gap-2">
-                <Button type="primary" onClick={handleTransition} loading={transitionLoading}>
+                <Button
+                  type="primary"
+                  onClick={handleTransition}
+                  loading={transitionLoading}
+                  disabled={targetStatus === "Entregado" && !canMarkAsDelivered}
+                >
                   Cambiar estado por QR
                 </Button>
                 <Button onClick={() => setShippingInfoVisible(true)}>Ver pedido</Button>
@@ -349,7 +412,7 @@ const ShippingQRScannerModal = ({ open, onClose }: Props) => {
         onClose={() => setShippingInfoVisible(false)}
         onSave={() => setShippingInfoVisible(false)}
         shipping={selectedShipping}
-        sucursals={[]}
+        sucursals={sucursals}
         isAdmin={true}
       />
     </>

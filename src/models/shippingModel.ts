@@ -12,7 +12,9 @@ export interface Shipping {
   hora_entrega_acordada: Date;
   hora_entrega_real: Date;
   observaciones: string;
+  tipo_destino?: "sucursal" | "otro_lugar";
   lugar_entrega: string;
+  ubicacion_link?: string;
   costo_delivery: number;
   cargo_delivery: number;
   estado_pedido: string;

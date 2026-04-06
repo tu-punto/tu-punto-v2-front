@@ -7,11 +7,45 @@ import {
   resolveShippingQRPayloadAPI,
   transitionShippingStatusByQRAPI
 } from "../../api/qr";
+import { getSucursalsAPI } from "../../api/sucursal";
 import ShippingInfoModal from "./ShippingInfoModal";
 
 const { Text } = Typography;
 
 const STATUS_OPTIONS = ["En Espera", "En camino", "No entregado", "Cancelado", "Entregado"];
+
+const resolveBranchId = (value: any): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value?._id || value?.id_sucursal || value?.$oid || "");
+};
+
+const normalizeBranchName = (value: unknown): string =>
+  String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const findBranchByName = (branches: any[], value: unknown) => {
+  const normalizedName = normalizeBranchName(value);
+  if (!normalizedName) return null;
+
+  return branches.find((branch: any) => normalizeBranchName(branch?.nombre) === normalizedName) || null;
+};
+
+const resolvePaymentBranchIdForShipping = (shipping: any, branches: any[]): string => {
+  const originBranchId = resolveBranchId(shipping?.lugar_origen);
+  const storedPaymentBranchId = resolveBranchId(shipping?.sucursal);
+  const legacyDestinationBranchId = resolveBranchId(findBranchByName(branches, shipping?.lugar_entrega)?._id);
+
+  if (shipping?.tipo_destino === "otro_lugar") {
+    return storedPaymentBranchId || originBranchId;
+  }
+
+  return (
+    (storedPaymentBranchId && storedPaymentBranchId !== originBranchId ? storedPaymentBranchId : "") ||
+    legacyDestinationBranchId ||
+    storedPaymentBranchId ||
+    originBranchId
+  );
+};
 
 function FindShipping() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -26,6 +60,21 @@ function FindShipping() {
   const [targetStatus, setTargetStatus] = useState<string>("En Espera");
   const [statusHistory, setStatusHistory] = useState<any[]>([]);
   const [transitionLoading, setTransitionLoading] = useState(false);
+  const [sucursals, setSucursals] = useState<any[]>([]);
+  const currentSucursalId = localStorage.getItem("sucursalId") || "";
+  const paymentBranchId = resolvePaymentBranchIdForShipping(selectedShipping, sucursals);
+  const canMarkAsDelivered = !selectedShipping || !paymentBranchId || paymentBranchId === currentSucursalId;
+
+  useEffect(() => {
+    const fetchSucursals = async () => {
+      const response = await getSucursalsAPI();
+      if (response?.success) {
+        setSucursals(response.sucursals || []);
+      }
+    };
+
+    void fetchSucursals();
+  }, []);
 
   const stopScanning = () => {
     setIsScanning(false);
@@ -174,11 +223,25 @@ function FindShipping() {
                 className="w-full"
                 value={targetStatus}
                 onChange={setTargetStatus}
-                options={STATUS_OPTIONS.map((status) => ({ label: status, value: status }))}
+                options={STATUS_OPTIONS.map((status) => ({
+                  label: status,
+                  value: status,
+                  disabled: status === "Entregado" && !canMarkAsDelivered
+                }))}
               />
             </div>
+            {!canMarkAsDelivered && (
+              <div style={{ marginBottom: 12, color: "#b45309", fontSize: 12 }}>
+                Solo la sucursal destino puede marcar este pedido como entregado.
+              </div>
+            )}
             <div className="flex gap-2">
-              <Button type="primary" onClick={handleTransition} loading={transitionLoading}>
+              <Button
+                type="primary"
+                onClick={handleTransition}
+                loading={transitionLoading}
+                disabled={targetStatus === "Entregado" && !canMarkAsDelivered}
+              >
                 Cambiar Estado por QR
               </Button>
               <Button onClick={() => setModalVisible(true)}>Ver Detalle</Button>
@@ -206,7 +269,7 @@ function FindShipping() {
             setModalVisible(false);
           }}
           shipping={selectedShipping}
-          sucursals={[]}
+          sucursals={sucursals}
           isAdmin={true}
         />
 

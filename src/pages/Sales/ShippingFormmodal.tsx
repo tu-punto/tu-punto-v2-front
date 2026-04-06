@@ -17,6 +17,9 @@ dayjs.extend(timezone);
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
 
+const buildGoogleMapsSearchUrl = (query: string) =>
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
@@ -30,7 +33,6 @@ function ShippingFormModal({
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [adelantoClienteInput, setAdelantoClienteInput] = useState<number>(0);
     const [adelantoVisible, setAdelantoVisible] = useState(false);
-    const [isDeliveryPlaceInput, setIsDeliveryPlaceInput] = useState(false);
     const [montoCobradoDelivery, setMontoCobradoDelivery] = useState<number>(0);
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
     const [codigoCelular, setCodigoCelular] = useState<number | null>()
@@ -109,19 +111,17 @@ function ShippingFormModal({
 
     useEffect(() => {
         if (estadoPedido === "Entregado") {
-            setEstaPagado("si");
-            setAdelantoVisible(false);
-            setAdelantoClienteInput(0);
-            setTipoPago("3");
-            setQrInput(0);
-            setEfectivoInput(0);
-            form.setFieldsValue({
-                esta_pagado: "si",
-                adelanto_cliente: 0,
-                tipo_de_pago: "3",
-                subtotal_qr: 0,
-                subtotal_efectivo: 0,
-            });
+            const paidStatus = form.getFieldValue("esta_pagado");
+            if (paidStatus === "si") {
+                setTipoPago("3");
+                setQrInput(0);
+                setEfectivoInput(0);
+                form.setFieldsValue({
+                    tipo_de_pago: "3",
+                    subtotal_qr: 0,
+                    subtotal_efectivo: 0,
+                });
+            }
         }
     }, [estadoPedido, form]);
 
@@ -131,13 +131,27 @@ function ShippingFormModal({
         const unicos = [...new Set(vendedores)];
         return unicos.length > 1;
     }, [selectedProducts]);
-    const lugarEntrega = useWatch('lugar_entrega', form);
-
+    const tipoDestino = useWatch('tipo_destino', form);
+    const destinoSucursalId = useWatch('destino_sucursal_id', form);
+    const lugarEntregaInput = useWatch('lugar_entrega_input', form);
+    const destinoSucursalSeleccionada = useMemo(
+        () => sucursals.find((s: any) => String(s._id) === String(destinoSucursalId)),
+        [sucursals, destinoSucursalId]
+    );
     const origenEsIgualADestino = useMemo(() => {
-        if (!lugarEntrega || !nombreSucursal) return false;
-
-        return lugarEntrega.trim().toLowerCase() === nombreSucursal.trim().toLowerCase();
-    }, [lugarEntrega, nombreSucursal]);
+        if (tipoDestino !== 'sucursal') return false;
+        return String(destinoSucursalId || '') === String(branchIdFromProps || '');
+    }, [tipoDestino, destinoSucursalId, branchIdFromProps]);
+    const requiereConfigDelivery = useMemo(() => {
+        if (tipoDestino === 'sucursal') {
+            return !origenEsIgualADestino;
+        }
+        return Boolean(tipoDestino === 'otro_lugar' && (lugarEntregaInput || '').trim());
+    }, [tipoDestino, origenEsIgualADestino, lugarEntregaInput]);
+    const mapsPreviewUrl = useMemo(() => {
+        const query = (lugarEntregaInput || '').trim();
+        return query ? buildGoogleMapsSearchUrl(query) : '';
+    }, [lugarEntregaInput]);
 
     const handleFinish = async (values: any) => {
         //console.log(" selectedProducts:", selectedProducts);
@@ -146,9 +160,7 @@ function ShippingFormModal({
             setLoading(false);
             return;
         }
-        const sucursalId = localStorage.getItem('sucursalId');
         setLoading(true);
-        const lugarOrigen = sucursals?.[0]?._id || null;
         const tipoPagoMap: Record<number, string> = {
             1: 'Transferencia o QR',
             2: 'Efectivo',
@@ -158,9 +170,30 @@ function ShippingFormModal({
         try {
             const fechaSeleccionada = values.fecha_pedido?.format("YYYY-MM-DD") || moment().tz("America/La_Paz").format("YYYY-MM-DD");
             const horaSeleccionada = values.hora_entrega_acordada?.format("HH:mm:ss") || "00:00:00";
-            const effectivePaidStatus = values.estado_pedido === "Entregado" ? "si" : values.esta_pagado;
-            const effectivePaymentType = values.estado_pedido === "Entregado" ? "3" : values.tipo_de_pago;
+            const effectivePaidStatus = values.esta_pagado;
+            const effectivePaymentType =
+                values.estado_pedido === "Entregado" && values.esta_pagado === "si"
+                    ? "3"
+                    : values.tipo_de_pago;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
+            const effectiveDestinationType = values.tipo_destino === "sucursal" ? "sucursal" : "otro_lugar";
+            const destinationBranch = sucursals.find((s: any) => String(s._id) === String(values.destino_sucursal_id));
+            const lugarEntregaFinal = effectiveDestinationType === "sucursal"
+                ? destinationBranch?.nombre || nombreSucursal
+                : String(values.lugar_entrega_input || "").trim();
+            const ubicacionLinkFinal = String(values.ubicacion_link || "").trim() ||
+                (effectiveDestinationType === "otro_lugar" && lugarEntregaFinal
+                    ? buildGoogleMapsSearchUrl(lugarEntregaFinal)
+                    : "");
+            const paymentBranchId = effectiveDestinationType === "sucursal" && destinationBranch?._id
+                ? destinationBranch._id
+                : branchIdFromProps;
+
+            if (!lugarEntregaFinal) {
+                message.error("Debes definir el lugar de entrega.");
+                setLoading(false);
+                return;
+            }
 
             const fechaPedido = moment.tz("America/La_Paz").toDate();
             const horaEntregaAcordada = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "America/La_Paz").toDate();
@@ -168,6 +201,9 @@ function ShippingFormModal({
 
             const response = await registerShippingAPI({
                 ...values,
+                tipo_destino: effectiveDestinationType,
+                lugar_entrega: lugarEntregaFinal,
+                ubicacion_link: ubicacionLinkFinal,
                 esta_pagado: effectivePaidStatus,
                 adelanto_cliente: effectiveAdvance,
                 telefono_cliente: (codigoCelular) ? codigoCelular + values.telefono_cliente : "",
@@ -175,8 +211,8 @@ function ShippingFormModal({
                 hora_entrega_acordada: horaEntregaAcordada,
                 hora_entrega_real: horaEntregaReal,
                 tipo_de_pago: tipoPagoMap[parseInt(effectivePaymentType)],
-                pagado_al_vendedor: effectivePaidStatus === "si" || effectivePaymentType === "3",
-                id_sucursal: branchIdFromProps,
+                pagado_al_vendedor: effectivePaymentType === "3",
+                sucursal: paymentBranchId,
                 lugar_origen: branchIdFromProps,
             });
 
@@ -280,7 +316,13 @@ function ShippingFormModal({
 
     return (
         <Modal title="Realizar Entrega" open={visible} onCancel={onCancel} footer={null} width={800}>
-            <Form form={form} name="shippingForm" onFinish={handleFinish} layout="vertical">
+            <Form
+                form={form}
+                name="shippingForm"
+                onFinish={handleFinish}
+                layout="vertical"
+                initialValues={{ tipo_destino: "otro_lugar", estado_pedido: "En Espera" }}
+            >
                 {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false}>
                     <Row gutter={16}>
@@ -371,34 +413,109 @@ function ShippingFormModal({
                     </Row>
                     <Row gutter={16}>
                         <Col span={24}>
-                            <Form.Item name="lugar_entrega" label="Lugar De Entrega" rules={[{ required: true }]}>
-                                {isDeliveryPlaceInput ? (
-                                    <div className='flex align-middle gap-2'>
-                                        <Input placeholder='Escriba el lugar de entrega' />
-                                        <Button onClick={() => { setIsDeliveryPlaceInput(false); form.resetFields(['lugar_entrega']) }}>
-                                            Volver a seleccionar
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Select
-                                        placeholder="Seleccione el lugar de entrega"
-                                        allowClear
-                                        style={{ width: '100%' }}
-                                        onChange={(value) => {
-                                            if (value === 'otro') setIsDeliveryPlaceInput(true);
-                                        }}
-                                        options={[
-                                            ...sucursals.map((s: any) => ({
-                                                value: s.nombre,
-                                                label: s.nombre,
-                                            })),
-                                            { value: "otro", label: "Otro" }
-                                        ]}
-                                    />
-                                )}
+                            <Form.Item
+                                name="tipo_destino"
+                                label="Destino de la entrega"
+                                initialValue="otro_lugar"
+                                rules={[{ required: true }]}
+                            >
+                                <Radio.Group
+                                    onChange={(e) => {
+                                        const nextType = e.target.value;
+                                        if (nextType === "sucursal") {
+                                            form.setFieldsValue({
+                                                lugar_entrega_input: undefined,
+                                                ubicacion_link: undefined
+                                            });
+                                        } else {
+                                            form.setFieldsValue({
+                                                destino_sucursal_id: undefined
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <Radio.Button value="otro_lugar">Otro lugar</Radio.Button>
+                                    <Radio.Button value="sucursal">Otra sucursal</Radio.Button>
+                                </Radio.Group>
                             </Form.Item>
                         </Col>
                     </Row>
+                    {tipoDestino === "sucursal" ? (
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item
+                                    name="destino_sucursal_id"
+                                    label="Sucursal destino"
+                                    rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
+                                >
+                                    <Select
+                                        placeholder="Seleccione la sucursal destino"
+                                        allowClear
+                                        style={{ width: '100%' }}
+                                        options={sucursals
+                                            .filter((s: any) => String(s._id) !== String(branchIdFromProps))
+                                            .map((s: any) => ({
+                                                value: s._id,
+                                                label: s.nombre,
+                                            }))}
+                                    />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    ) : (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item
+                                        name="lugar_entrega_input"
+                                        label="Dirección o referencia de entrega"
+                                        rules={[{ required: true, message: "Escribe la dirección o referencia" }]}
+                                    >
+                                        <Input placeholder="Ej. Av. Busch #123, frente a la plaza" />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Row gutter={16}>
+                                <Col span={18}>
+                                    <Form.Item name="ubicacion_link" label="Link de ubicación">
+                                        <Input placeholder="Pega aquí el link de Google Maps o Waze" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Button
+                                        style={{ marginTop: 30, width: "100%" }}
+                                        onClick={() => {
+                                            if (!mapsPreviewUrl) {
+                                                message.warning("Escribe primero la dirección para abrir Maps.");
+                                                return;
+                                            }
+                                            window.open(mapsPreviewUrl, "_blank", "noopener,noreferrer");
+                                        }}
+                                    >
+                                        Abrir Maps
+                                    </Button>
+                                </Col>
+                            </Row>
+                            {mapsPreviewUrl && (
+                                <Row gutter={16}>
+                                    <Col span={24}>
+                                        <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                                            Puedes abrir Google Maps con la dirección escrita y luego pegar el link exacto si lo prefieres.
+                                        </div>
+                                    </Col>
+                                </Row>
+                            )}
+                        </>
+                    )}
+                    {tipoDestino === "sucursal" && destinoSucursalSeleccionada && (
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                                    El stock se descontará de <strong>{nombreSucursal || "la sucursal origen"}</strong> y el cobro quedará en <strong>{destinoSucursalSeleccionada.nombre}</strong>.
+                                </div>
+                            </Col>
+                        </Row>
+                    )}
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="observaciones" label="Observaciones">
@@ -477,7 +594,7 @@ function ShippingFormModal({
                     </Row>
 
                     {/* ¿Quién paga el delivery? */}
-                    {lugarEntrega && !origenEsIgualADestino && (
+                    {requiereConfigDelivery && (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>

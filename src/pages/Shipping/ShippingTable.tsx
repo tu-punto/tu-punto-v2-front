@@ -19,15 +19,16 @@ const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
+const resolveBranchId = (value: any) => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    return String(value?._id || value?.id_sucursal || value?.$oid || "");
+};
+
 const getOriginBranchName = (pedido: any) => {
     const lugar = pedido?.lugar_origen;
     if (typeof lugar === "object" && lugar !== null) {
         return String(lugar.nombre || "");
-    }
-
-    const sucursal = pedido?.sucursal;
-    if (typeof sucursal === "object" && sucursal !== null) {
-        return String(sucursal.nombre || "");
     }
 
     return "";
@@ -292,9 +293,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             const isOtherLocation = selectedLocation === 'other';
             const isExternal = !!pedido.is_external;
             const lugarEntregaLower = String(pedido.lugar_entrega || "").toLowerCase();
-            const origenId = pedido.lugar_origen?._id?.toString() ||
-                pedido.sucursal?._id?.toString() ||
-                String(pedido.id_sucursal || "");
+            const origenId = resolveBranchId(pedido.lugar_origen);
             const selectedOriginId = nombreSucursalToIdMap.get(selectedOrigin);
             const matchesOrigin = !selectedOrigin || origenId === selectedOriginId;
 
@@ -522,19 +521,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             const response = await getSucursalsBasicAPI();
             setSucursal(Array.isArray(response) ? response : []);
 
-            if (isAdmin || isOperator) {
-                const sucursalId = localStorage.getItem("sucursalId");
-                if (sucursalId) {
-                    const sucursalActual = response.find((s: any) =>
-                        s._id === sucursalId || s.id_sucursal === sucursalId
-                    );
-                    if (sucursalActual) {
-                        setSelectedOrigin(sucursalActual.nombre);
-                    }
-                }
-            } else {
-                setSelectedOrigin('');
-            }
+            setSelectedOrigin('');
         } catch (error) {
             message.error('Error al obtener las sucursales');
         }
@@ -650,7 +637,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     style={{ width: 200, margin: 0 }}
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
-                    allowClear={!isAdmin && !isOperator}
+                    allowClear
                     disabled={isAdmin || isOperator} // ← Bloquea si es admin
                 >
                     {sucursal.map((suc: any) => (

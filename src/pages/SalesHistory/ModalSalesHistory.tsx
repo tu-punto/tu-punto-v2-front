@@ -8,6 +8,12 @@ import { deleteProductsByShippingAPI, updateProductsByShippingAPI } from '../../
 import { getSellersAPI } from '../../api/seller.ts';
 import dayjs from "dayjs";
 
+const resolveBranchId = (value: any): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value?._id || value?.id_sucursal || value?.$oid || "");
+};
+
 const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [originalProducts, setOriginalProducts] = useState<any[]>([]);
@@ -24,6 +30,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [adelantoVisible, setAdelantoVisible] = useState(false);
   const [adelantoCliente, setAdelantoCliente] = useState<number>(0);
   const [sellers, setSellers] = useState([]);
+  const originBranchId = resolveBranchId(shipping?.lugar_origen) || resolveBranchId(shipping?.sucursal);
 
   const normalizarTipoPago = (valor: string): string | null => {
     const mapping: Record<string, string> = {
@@ -135,7 +142,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     }
   }, [tipoPago, saldoACobrar]);
   const enrichedProducts = useMemo(() => {
-    const sucursalId = localStorage.getItem("sucursalId");
+    const sucursalId = originBranchId || localStorage.getItem("sucursalId");
     if (!data) return [];
 
     return data.flatMap((p: any) => {
@@ -157,7 +164,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         };
       });
     });
-  }, [data]);
+  }, [data, originBranchId]);
 
   const id_shipping = shipping?._id || '';
 
@@ -601,7 +608,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           sellers={sellers}
           isAdmin={isAdmin}
           shippingId={id_shipping}
-          sucursalId={localStorage.getItem("sucursalId")}
+          sucursalId={originBranchId || localStorage.getItem("sucursalId")}
           allowAddProducts={false}
           onSave={() => {
             setEditProductsModalVisible(false);

@@ -25,6 +25,25 @@ import { updateProductsByShippingAPI } from "../../api/sales.ts";
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
 
+const buildGoogleMapsSearchUrl = (query: string) =>
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
+const resolveBranchId = (value: any): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    return String(value?._id || value?.id_sucursal || value?.$oid || "");
+};
+
+const normalizeBranchName = (value: unknown): string =>
+    String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const findBranchByName = (branches: any[], value: unknown) => {
+    const normalizedName = normalizeBranchName(value);
+    if (!normalizedName) return null;
+
+    return branches.find((branch: any) => normalizeBranchName(branch?.nombre) === normalizedName) || null;
+};
+
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
     const [internalForm] = Form.useForm();
     const [products, setProducts, handleValueChange] = useEditableTable([]);
@@ -38,7 +57,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [costoDelivery, setCostoDelivery] = useState(0);
     //const [adelantoClienteInput, setAdelantoClienteInput] = useState<number>(0);
     const quienPagaDelivery = useWatch("quien_paga_delivery", internalForm);
-    const [isDeliveryPlaceInput, setIsDeliveryPlaceInput] = useState(false);
     const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [estadoInicialPedido, setEstadoInicialPedido] = useState<string | null>(null);
@@ -80,26 +98,64 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }
     }, [visible, shipping]);
 
-    const lugarEntrega = useWatch('lugar_entrega', internalForm);
-    // Extraer nombre del lugar de origen desde el shipping usando el ID
-    const origenNombre = useMemo(() => {
-        const origenId = typeof shipping?.lugar_origen === 'object'
-            ? shipping.lugar_origen.$oid || shipping.lugar_origen._id
-            : shipping?.lugar_origen;
+    const tipoDestino = useWatch("tipo_destino", internalForm);
+    const destinoSucursalId = useWatch("destino_sucursal_id", internalForm);
+    const lugarEntregaInput = useWatch("lugar_entrega_input", internalForm);
+    const origenBranchId = useMemo(() => resolveBranchId(shipping?.lugar_origen), [shipping]);
+    const legacyDestinationSucursal = useMemo(
+        () => findBranchByName(sucursals, shipping?.lugar_entrega),
+        [sucursals, shipping?.lugar_entrega]
+    );
+    const paymentBranchId = useMemo(
+        () => {
+            const storedPaymentBranchId = resolveBranchId(shipping?.sucursal);
+            const legacyDestinationBranchId = resolveBranchId(legacyDestinationSucursal?._id);
 
-        const sucursal = sucursals.find((s: any) => String(s._id) === String(origenId));
-        const nombre = sucursal?.nombre?.trim().toLowerCase() ?? null;
+            if (shipping?.tipo_destino === "otro_lugar") {
+                return storedPaymentBranchId || origenBranchId;
+            }
 
-        return nombre;
-    }, [shipping, sucursals]);
-
+            return (
+                (storedPaymentBranchId && storedPaymentBranchId !== origenBranchId ? storedPaymentBranchId : "") ||
+                legacyDestinationBranchId ||
+                storedPaymentBranchId ||
+                origenBranchId
+            );
+        },
+        [shipping, origenBranchId, legacyDestinationSucursal]
+    );
+    const currentSucursalId = localStorage.getItem("sucursalId") || "";
+    const origenSucursal = useMemo(
+        () => sucursals.find((s: any) => String(s._id) === String(origenBranchId)),
+        [sucursals, origenBranchId]
+    );
+    const destinoSucursalSeleccionada = useMemo(
+        () => sucursals.find((s: any) => String(s._id) === String(destinoSucursalId || paymentBranchId)),
+        [sucursals, destinoSucursalId, paymentBranchId]
+    );
     const origenEsIgualADestino = useMemo(() => {
-        const entrega = lugarEntrega?.trim().toLowerCase();
-        const origen = origenNombre?.trim().toLowerCase();
-
-        if (!entrega || !origen) return false;
-        return entrega === origen;
-    }, [lugarEntrega, origenNombre]);
+        if (tipoDestino !== "sucursal") return false;
+        return String(destinoSucursalId || paymentBranchId) === String(origenBranchId);
+    }, [tipoDestino, destinoSucursalId, paymentBranchId, origenBranchId]);
+    const requiereConfigDelivery = useMemo(() => {
+        if (tipoDestino === "sucursal") {
+            return !origenEsIgualADestino;
+        }
+        return Boolean(tipoDestino === "otro_lugar" && (lugarEntregaInput || "").trim());
+    }, [tipoDestino, origenEsIgualADestino, lugarEntregaInput]);
+    const mapsPreviewUrl = useMemo(() => {
+        const query = String(lugarEntregaInput || "").trim();
+        return query ? buildGoogleMapsSearchUrl(query) : "";
+    }, [lugarEntregaInput]);
+    const deliveryOwnerBranchId = useMemo(() => {
+        if (tipoDestino === "sucursal") {
+            return String(destinoSucursalId || paymentBranchId || "");
+        }
+        return origenBranchId || paymentBranchId;
+    }, [tipoDestino, destinoSucursalId, paymentBranchId, origenBranchId]);
+    const canMarkAsDelivered = useMemo(() => {
+        return !deliveryOwnerBranchId || String(deliveryOwnerBranchId) === String(currentSucursalId);
+    }, [deliveryOwnerBranchId, currentSucursalId]);
 
 
     const saldoACobrar = useMemo(() => {
@@ -166,18 +222,17 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
     useEffect(() => {
         if (estadoPedidoForm === "Entregado") {
-            setEstaPagado("si");
-            setAdelantoVisible(false);
-            setTipoPago("3");
-            setQrInput(0);
-            setEfectivoInput(0);
-            internalForm.setFieldsValue({
-                esta_pagado: "si",
-                adelanto_cliente: 0,
-                tipo_de_pago: "3",
-                subtotal_qr: 0,
-                subtotal_efectivo: 0,
-            });
+            const paidStatus = internalForm.getFieldValue("esta_pagado");
+            if (paidStatus === "si") {
+                setTipoPago("3");
+                setQrInput(0);
+                setEfectivoInput(0);
+                internalForm.setFieldsValue({
+                    tipo_de_pago: "3",
+                    subtotal_qr: 0,
+                    subtotal_efectivo: 0,
+                });
+            }
         }
     }, [estadoPedidoForm, internalForm]);
 
@@ -204,9 +259,24 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         internalForm.resetFields();
         //console.log("📦 Valor original hora_entrega_acordada (sin parsear):", shipping.hora_entrega_acordada);
 
-        const esOtroLugar = !sucursals.find(s => s.nombre === shipping.lugar_entrega);
-        const lugar_entrega = esOtroLugar ? 'otro' : shipping.lugar_entrega;
-        const lugar_entrega_input = esOtroLugar ? shipping.lugar_entrega : '';
+        const originId = resolveBranchId(shipping.lugar_origen);
+        const shippingPaymentBranchId = resolveBranchId(shipping.sucursal) || originId;
+        const legacyDestinationBranch = findBranchByName(sucursals, shipping.lugar_entrega);
+        const legacyDestinationBranchId = resolveBranchId(legacyDestinationBranch?._id);
+        const inferredDestinationType =
+            shipping.tipo_destino ||
+            (((shippingPaymentBranchId && shippingPaymentBranchId !== originId) || legacyDestinationBranchId)
+                ? "sucursal"
+                : "otro_lugar");
+        const inferredDestinationBranchId = inferredDestinationType === "sucursal"
+            ? (
+                (shippingPaymentBranchId && shippingPaymentBranchId !== originId ? shippingPaymentBranchId : "") ||
+                legacyDestinationBranchId ||
+                shippingPaymentBranchId ||
+                originId
+            )
+            : undefined;
+        const lugar_entrega_input = inferredDestinationType === "otro_lugar" ? shipping.lugar_entrega : '';
         const quienPagaDeVenta = normalizeDeliveryPayer(
             shipping?.venta?.[0]?.quien_paga_delivery ||
             shipping?.quien_paga_delivery
@@ -225,8 +295,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
             telefono_cliente: shipping.telefono_cliente,
-            lugar_entrega,
+            tipo_destino: inferredDestinationType,
+            destino_sucursal_id: inferredDestinationType === "sucursal" ? inferredDestinationBranchId : undefined,
             lugar_entrega_input,
+            ubicacion_link: shipping.ubicacion_link || "",
             fecha_entrega: originalHoraEntregaUTC ? dayjs(originalHoraEntregaUTC.format("YYYY-MM-DD"), "YYYY-MM-DD") : null,
             hora_entrega_acordada: originalHoraEntregaUTC
                 ? dayjs(originalHoraEntregaUTC.format("HH:mm:ss"), "HH:mm:ss")
@@ -248,8 +320,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
         setEstadoPedido(shipping.estado_pedido || "En Espera");
         setEstadoInicialPedido(shipping.estado_pedido || "En Espera");
-        setIsDeliveryPlaceInput(esOtroLugar);
-        if (!origenEsIgualADestino && !quienPagaDeVenta) {
+        if (inferredDestinationType !== "sucursal" || inferredDestinationBranchId !== originId) {
             internalForm.setFieldValue('quien_paga_delivery', 'comprador');
         }
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
@@ -300,7 +371,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         setTotalAmount(parseFloat(recalculated.toFixed(2)));
     }, [products]);
     const enrichedProducts = useMemo(() => {
-        const sucursalId = localStorage.getItem("sucursalId");
+        const sucursalId = origenBranchId || localStorage.getItem("sucursalId");
         if (!data) return [];
 
         return data.flatMap((p: any) => {
@@ -321,7 +392,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 };
             });
         });
-    }, [data]);
+    }, [data, origenBranchId]);
     const handleGenerateShippingQR = async () => {
         if (!shipping?._id) return;
         setQrLoading(true);
@@ -350,7 +421,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         setLoading(true);
         const newProducts = products.filter((p: any) => !p.id_venta);
         const existingProducts = products.filter((p: any) => p.id_venta);
-        const sucursalId = localStorage.getItem('sucursalId');
+        const stockBranchId = origenBranchId || localStorage.getItem('sucursalId');
 
         const formattedNewProducts = newProducts
             .filter((p: any) => p.id_producto?.length === 24) // ✅ incluye temporales ya registrados
@@ -361,7 +432,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 id_producto: p.id_producto,
                 id_pedido: shipping._id,
                 id_vendedor: p.id_vendedor,
-                sucursal: sucursalId,
+                sucursal: stockBranchId,
                 deposito_realizado: false,
                 nombre_variante: p.nombre_variante || p.producto,
             }));
@@ -399,9 +470,24 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 : moment().format("HH:mm:ss");
 
             const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
-            const effectivePaidStatus = values.estado_pedido === "Entregado" ? "si" : values.esta_pagado;
-            const effectivePaymentType = values.estado_pedido === "Entregado" ? "3" : values.tipo_de_pago;
+            const effectivePaidStatus = values.esta_pagado;
+            const effectivePaymentType =
+                values.estado_pedido === "Entregado" && values.esta_pagado === "si"
+                    ? "3"
+                    : values.tipo_de_pago;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
+            const effectiveDestinationType = values.tipo_destino === "sucursal" ? "sucursal" : "otro_lugar";
+            const destinationBranch = sucursals.find((s: any) => String(s._id) === String(values.destino_sucursal_id));
+            const lugarEntregaFinal = effectiveDestinationType === "sucursal"
+                ? destinationBranch?.nombre || origenSucursal?.nombre || shipping?.lugar_entrega
+                : String(values.lugar_entrega_input || "").trim();
+            const ubicacionLinkFinal = String(values.ubicacion_link || "").trim() ||
+                (effectiveDestinationType === "otro_lugar" && lugarEntregaFinal
+                    ? buildGoogleMapsSearchUrl(lugarEntregaFinal)
+                    : "");
+            const paymentBranchIdForUpdate = effectiveDestinationType === "sucursal" && destinationBranch?._id
+                ? destinationBranch._id
+                : origenBranchId;
 
             let horaEntregaReal = values.estado_pedido === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
@@ -410,10 +496,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             //console.log("🕒 Hora de entrega acordada:", fechaHoraEntregaAcordada);
             const updateShippingInfo: any = {
                 ...values,
-                lugar_entrega: values.lugar_entrega === 'otro' ? values.lugar_entrega_input : values.lugar_entrega,
+                tipo_destino: effectiveDestinationType,
+                sucursal: paymentBranchIdForUpdate,
+                lugar_entrega: lugarEntregaFinal,
+                ubicacion_link: ubicacionLinkFinal,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,
-                pagado_al_vendedor: effectivePaidStatus === 'si' || effectivePaymentType === '3',
+                pagado_al_vendedor: effectivePaymentType === '3',
                 hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: effectivePaidStatus,
                 adelanto_cliente: effectiveAdvance,
@@ -605,41 +694,99 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     </Row>
                     <Row gutter={16}>
                         <Col span={24}>
-                            <Form.Item name="lugar_entrega" label="Lugar de Entrega" rules={[{ required: true }]}>
-                                {isDeliveryPlaceInput ? (
-                                    <div className='flex align-middle gap-2'>
-                                        <Form.Item name="lugar_entrega_input" noStyle>
-                                            <Input placeholder='Escriba el lugar de entrega' />
-                                        </Form.Item>
-                                        <Button
-                                            onClick={() => {
-                                                setIsDeliveryPlaceInput(false);
-                                                internalForm.resetFields(['lugar_entrega']);
-                                            }}
-                                        >
-                                            Volver a seleccionar
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Select
-                                        placeholder="Seleccione el lugar de entrega"
-                                        allowClear
-                                        style={{ width: '100%' }}
-                                        onChange={(value) => {
-                                            if (value === 'otro') setIsDeliveryPlaceInput(true);
-                                        }}
-                                        options={[
-                                            ...sucursals.map((s: any) => ({
-                                                value: s.nombre,
-                                                label: s.nombre,
-                                            })),
-                                            { value: "otro", label: "Otro" }
-                                        ]}
-                                    />
-                                )}
+                            <Form.Item
+                                name="tipo_destino"
+                                label="Destino de la entrega"
+                                rules={[{ required: true }]}
+                            >
+                                <Radio.Group
+                                    disabled={!isAdmin}
+                                    onChange={(e) => {
+                                        const nextType = e.target.value;
+                                        if (nextType === "sucursal") {
+                                            internalForm.setFieldsValue({
+                                                lugar_entrega_input: undefined,
+                                                ubicacion_link: undefined
+                                            });
+                                        } else {
+                                            internalForm.setFieldsValue({
+                                                destino_sucursal_id: undefined
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <Radio.Button value="otro_lugar">Otro lugar</Radio.Button>
+                                    <Radio.Button value="sucursal">Otra sucursal</Radio.Button>
+                                </Radio.Group>
                             </Form.Item>
                         </Col>
                     </Row>
+                    {tipoDestino === "sucursal" ? (
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item
+                                    name="destino_sucursal_id"
+                                    label="Sucursal destino"
+                                    rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
+                                >
+                                    <Select
+                                        disabled={!isAdmin}
+                                        placeholder="Seleccione la sucursal destino"
+                                        allowClear
+                                        style={{ width: '100%' }}
+                                        options={sucursals
+                                            .filter((s: any) => String(s._id) !== String(origenBranchId))
+                                            .map((s: any) => ({
+                                                value: s._id,
+                                                label: s.nombre,
+                                            }))}
+                                    />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    ) : (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item
+                                        name="lugar_entrega_input"
+                                        label="Dirección o referencia de entrega"
+                                        rules={[{ required: true, message: "Escribe la dirección o referencia" }]}
+                                    >
+                                        <Input placeholder="Ej. Avenida, barrio, referencia exacta" />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Row gutter={16}>
+                                <Col span={18}>
+                                    <Form.Item name="ubicacion_link" label="Link de ubicación">
+                                        <Input placeholder="Pega aquí el link de Google Maps o Waze" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Button
+                                        disabled={!mapsPreviewUrl}
+                                        style={{ marginTop: 30, width: "100%" }}
+                                        onClick={() => {
+                                            if (!mapsPreviewUrl) return;
+                                            window.open(mapsPreviewUrl, "_blank", "noopener,noreferrer");
+                                        }}
+                                    >
+                                        Abrir Maps
+                                    </Button>
+                                </Col>
+                            </Row>
+                        </>
+                    )}
+                    {tipoDestino === "sucursal" && destinoSucursalSeleccionada && (
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                                    El stock se descontará de <strong>{origenSucursal?.nombre || "la sucursal origen"}</strong> y el cobro quedará en <strong>{destinoSucursalSeleccionada.nombre}</strong>.
+                                </div>
+                            </Col>
+                        </Row>
+                    )}
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="observaciones" label="Observaciones">
@@ -740,14 +887,19 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
                                 <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "En Espera"}>
                                     <Radio.Button value="En Espera">En espera</Radio.Button>
-                                    <Radio.Button value="Entregado">Entregado</Radio.Button>
+                                    <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
+                            {!canMarkAsDelivered && (
+                                <div style={{ marginTop: -8, marginBottom: 8, color: "#b45309", fontSize: 12 }}>
+                                    Solo la sucursal destino puede marcar este pedido como entregado.
+                                </div>
+                            )}
                         </Col>
                     </Row>
 
                     {/* ¿Quién paga el delivery? */}
-                    {!origenEsIgualADestino && (
+                    {requiereConfigDelivery && (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>
@@ -958,7 +1110,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 sellers={sellers}
                 isAdmin={isAdmin}
                 shippingId={id_shipping}
-                sucursalId={localStorage.getItem("sucursalId")}
+                sucursalId={origenBranchId || localStorage.getItem("sucursalId")}
                 allowAddProducts={true} // Explícitamente permitir agregar productos
                 onSave={() => {
                     setEditProductsModalVisible(false);
