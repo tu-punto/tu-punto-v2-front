@@ -134,14 +134,16 @@ function ShippingFormModal({
     const tipoDestino = useWatch('tipo_destino', form);
     const destinoSucursalId = useWatch('destino_sucursal_id', form);
     const lugarEntregaInput = useWatch('lugar_entrega_input', form);
+    const effectiveDestinationBranchId = tipoDestino === 'esta_sucursal' ? branchIdFromProps : destinoSucursalId;
     const destinoSucursalSeleccionada = useMemo(
-        () => sucursals.find((s: any) => String(s._id) === String(destinoSucursalId)),
-        [sucursals, destinoSucursalId]
+        () => sucursals.find((s: any) => String(s._id) === String(effectiveDestinationBranchId)),
+        [sucursals, effectiveDestinationBranchId]
     );
     const origenEsIgualADestino = useMemo(() => {
+        if (tipoDestino === 'esta_sucursal') return true;
         if (tipoDestino !== 'sucursal') return false;
-        return String(destinoSucursalId || '') === String(branchIdFromProps || '');
-    }, [tipoDestino, destinoSucursalId, branchIdFromProps]);
+        return String(effectiveDestinationBranchId || '') === String(branchIdFromProps || '');
+    }, [tipoDestino, effectiveDestinationBranchId, branchIdFromProps]);
     const requiereConfigDelivery = useMemo(() => {
         if (tipoDestino === 'sucursal') {
             return !origenEsIgualADestino;
@@ -176,8 +178,10 @@ function ShippingFormModal({
                     ? "3"
                     : values.tipo_de_pago;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
-            const effectiveDestinationType = values.tipo_destino === "sucursal" ? "sucursal" : "otro_lugar";
-            const destinationBranch = sucursals.find((s: any) => String(s._id) === String(values.destino_sucursal_id));
+            const effectiveDestinationType = values.tipo_destino === "otro_lugar" ? "otro_lugar" : "sucursal";
+            const destinationBranchId =
+                values.tipo_destino === "esta_sucursal" ? branchIdFromProps : values.destino_sucursal_id;
+            const destinationBranch = sucursals.find((s: any) => String(s._id) === String(destinationBranchId));
             const lugarEntregaFinal = effectiveDestinationType === "sucursal"
                 ? destinationBranch?.nombre || nombreSucursal
                 : String(values.lugar_entrega_input || "").trim();
@@ -185,8 +189,8 @@ function ShippingFormModal({
                 (effectiveDestinationType === "otro_lugar" && lugarEntregaFinal
                     ? buildGoogleMapsSearchUrl(lugarEntregaFinal)
                     : "");
-            const paymentBranchId = effectiveDestinationType === "sucursal" && destinationBranch?._id
-                ? destinationBranch._id
+            const paymentBranchId = effectiveDestinationType === "sucursal" && destinationBranchId
+                ? destinationBranchId
                 : branchIdFromProps;
 
             if (!lugarEntregaFinal) {
@@ -321,7 +325,11 @@ function ShippingFormModal({
                 name="shippingForm"
                 onFinish={handleFinish}
                 layout="vertical"
-                initialValues={{ tipo_destino: "otro_lugar", estado_pedido: "En Espera" }}
+                initialValues={{
+                    tipo_destino: "esta_sucursal",
+                    destino_sucursal_id: branchIdFromProps,
+                    estado_pedido: "En Espera"
+                }}
             >
                 {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false}>
@@ -416,24 +424,31 @@ function ShippingFormModal({
                             <Form.Item
                                 name="tipo_destino"
                                 label="Destino de la entrega"
-                                initialValue="otro_lugar"
+                                initialValue="esta_sucursal"
                                 rules={[{ required: true }]}
                             >
                                 <Radio.Group
                                     onChange={(e) => {
                                         const nextType = e.target.value;
-                                        if (nextType === "sucursal") {
+                                        if (nextType === "otro_lugar") {
                                             form.setFieldsValue({
+                                                destino_sucursal_id: undefined
+                                            });
+                                        } else if (nextType === "esta_sucursal") {
+                                            form.setFieldsValue({
+                                                destino_sucursal_id: branchIdFromProps,
                                                 lugar_entrega_input: undefined,
                                                 ubicacion_link: undefined
                                             });
                                         } else {
                                             form.setFieldsValue({
-                                                destino_sucursal_id: undefined
+                                                lugar_entrega_input: undefined,
+                                                ubicacion_link: undefined
                                             });
                                         }
                                     }}
                                 >
+                                    <Radio.Button value="esta_sucursal">Esta sucursal</Radio.Button>
                                     <Radio.Button value="otro_lugar">Otro lugar</Radio.Button>
                                     <Radio.Button value="sucursal">Otra sucursal</Radio.Button>
                                 </Radio.Group>
@@ -462,7 +477,7 @@ function ShippingFormModal({
                                 </Form.Item>
                             </Col>
                         </Row>
-                    ) : (
+                    ) : tipoDestino === "otro_lugar" ? (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>
@@ -506,8 +521,16 @@ function ShippingFormModal({
                                 </Row>
                             )}
                         </>
+                    ) : (
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                                    El pedido quedará asignado a <strong>{nombreSucursal || "esta sucursal"}</strong>.
+                                </div>
+                            </Col>
+                        </Row>
                     )}
-                    {tipoDestino === "sucursal" && destinoSucursalSeleccionada && (
+                    {(tipoDestino === "sucursal" || tipoDestino === "esta_sucursal") && destinoSucursalSeleccionada && (
                         <Row gutter={16}>
                             <Col span={24}>
                                 <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
