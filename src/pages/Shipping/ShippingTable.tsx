@@ -7,6 +7,7 @@ import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
 import ExternalPackagesFormModal from './ExternalPackagesFormModal';
 import ExternalShippingInfoModal from './ExternalShippingInfoModal';
+import SimplePackageManagerModal from './SimplePackageManagerModal';
 import { getSucursalsBasicAPI } from '../../api/sucursal';
 import { getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
@@ -120,6 +121,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [selectedExternalShipping, setSelectedExternalShipping] = useState<any>(null);
     const [isExternalInfoVisible, setIsExternalInfoVisible] = useState(false);
     const [isExternalCreateVisible, setIsExternalCreateVisible] = useState(false);
+    const [isSimplePackageManagerVisible, setIsSimplePackageManagerVisible] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState('');
     const [selectedOrigin, setSelectedOrigin] = useState('');
     const [otherLocation, setOtherLocation] = useState('');
@@ -724,6 +726,18 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         />
                     </Tooltip>
                 )}
+                {canManageExternal && (
+                    <Tooltip title="Gestionar paquetes del servicio">
+                        <Button
+                            type="default"
+                            icon={<InboxOutlined />}
+                            onClick={() => setIsSimplePackageManagerVisible(true)}
+                            style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
+                        >
+                            Paquetes
+                        </Button>
+                    </Tooltip>
+                )}
                 {onOpenQR && (
                     <Tooltip title="Escanear QR de pedidos">
                         <Button
@@ -1006,6 +1020,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     setSelectedExternalShipping(null);
                     fetchShippings();
                 }}
+            />
+            <SimplePackageManagerModal
+                visible={isSimplePackageManagerVisible}
+                onClose={() => setIsSimplePackageManagerVisible(false)}
             />
         </div>
     );

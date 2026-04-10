@@ -50,6 +50,11 @@ import EntryHistorySection from "./EntryHistorySection";
 import PaymentProofSection from "./PaymentProofSection";
 import ActionButtons from "./ActionButtons";
 import SellerDebtTable from "./SellerDebtTable";
+import {
+  branchesEnableCommissionService,
+  branchesEnableSimplePackageService,
+  hasSimplePackageService,
+} from "../../../utils/sellerServiceAccess";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
@@ -76,6 +81,39 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
+  const sellerUsesSimplePackages = hasSimplePackageService(user);
+  const [serviceFlags, setServiceFlags] = useState({
+    hasCommissionService: false,
+    hasSimplePackageServiceEnabled: false,
+  });
+
+  const syncServiceFlags = (branches: any[] = []) => {
+    setServiceFlags({
+      hasCommissionService: branchesEnableCommissionService(branches),
+      hasSimplePackageServiceEnabled: branchesEnableSimplePackageService(branches),
+    });
+  };
+
+  const buildSellerFormValues = (sellerData: any) => {
+    const branches = sellerData?.pago_sucursales?.length
+      ? sellerData.pago_sucursales.map((sucursal: any) => ({
+          ...sucursal,
+          almacenamiento: sucursal.alquiler,
+          fecha_ingreso: sucursal.fecha_ingreso ? dayjs(sucursal.fecha_ingreso) : null,
+          fecha_salida: sucursal.fecha_salida ? dayjs(sucursal.fecha_salida) : null,
+        }))
+      : [{}];
+
+    return {
+      telefono: sellerData?.telefono,
+      fecha_vigencia: sellerData?.fecha_vigencia ? dayjs(sellerData.fecha_vigencia, "D-M-YYYY") : null,
+      mail: sellerData?.mail || "",
+      comision_porcentual: sellerData?.comision_porcentual || 0,
+      amortizacion: sellerData?.amortizacion || 0,
+      precio_paquete: sellerData?.precio_paquete || 0,
+      sucursales: branches,
+    };
+  };
 
   /* ───── cargar sucursales y luego todo ───── */
   useEffect(() => {
@@ -118,6 +156,28 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
     fetchSellerMetrics();
   }, [seller?.key, refreshKey]);
+
+  useEffect(() => {
+    const values = buildSellerFormValues(seller);
+    form.resetFields();
+    form.setFieldsValue(values);
+    syncServiceFlags(values.sucursales || []);
+  }, [form, seller]);
+
+  useEffect(() => {
+    if (!serviceFlags.hasCommissionService) {
+      form.setFieldValue("comision_porcentual", 0);
+    }
+  }, [form, serviceFlags.hasCommissionService]);
+
+  useEffect(() => {
+    if (!serviceFlags.hasSimplePackageServiceEnabled) {
+      form.setFieldsValue({
+        amortizacion: 0,
+        precio_paquete: 0,
+      });
+    }
+  }, [form, serviceFlags.hasSimplePackageServiceEnabled]);
 
   /* ─────────── solicitudes ─────────── */
   const fetchSucursales = async () => {
@@ -326,11 +386,16 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         form={form}
         onFinish={handleFinish}
         layout="vertical"
+        onValuesChange={(_, allValues) => {
+          syncServiceFlags(allValues?.sucursales || []);
+        }}
         initialValues={{
           telefono: seller.telefono,
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
           mail: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
+          amortizacion: seller.amortizacion || 0,
+          precio_paquete: seller.precio_paquete || 0,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -385,10 +450,32 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                   prefix={<PercentageOutlined />}
                   min={0}
                   max={100}
-                  disabled={isSeller}
+                  disabled={isSeller || !serviceFlags.hasCommissionService}
                   style={{ width: "100%" }}
                   placeholder="0"
                   addonAfter="%"
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="amortizacion" label="Amortización">
+                <InputNumber
+                  min={0}
+                  disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                  style={{ width: "100%" }}
+                  placeholder="0"
+                  addonBefore="Bs."
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="precio_paquete" label="Precio por paquete">
+                <InputNumber
+                  min={0}
+                  disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                  style={{ width: "100%" }}
+                  placeholder="0"
+                  addonBefore="Bs."
                 />
               </Form.Item>
             </Col>
@@ -440,18 +527,20 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         </Card>
 
         {/* Secciones independientes */}
-        <SalesSection
-          initialSales={salesData}
-          onSalesChange={setSalesData}
-          onDeletedSalesChange={() => {}}
-          onUpdateNoPagadasTotal={() => {}}
-          onUpdateHistorialTotal={() => {}}
-          isSeller={isSeller}
-          onUpdateOneSale={handleUpdateSale}
-          onDeleteOneSale={handleDeleteSale}
-        />
+        {!sellerUsesSimplePackages && (
+          <SalesSection
+            initialSales={salesData}
+            onSalesChange={setSalesData}
+            onDeletedSalesChange={() => {}}
+            onUpdateNoPagadasTotal={() => {}}
+            onUpdateHistorialTotal={() => {}}
+            isSeller={isSeller}
+            onUpdateOneSale={handleUpdateSale}
+            onDeleteOneSale={handleDeleteSale}
+          />
+        )}
 
-        <EntryHistorySection initialEntries={entryData} />
+        {!sellerUsesSimplePackages && <EntryHistorySection initialEntries={entryData} />}
 
         <SellerDebtTable
           data={sellerDebts}

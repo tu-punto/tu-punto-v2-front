@@ -8,6 +8,7 @@ import minusIcon from "../../assets/minusIcon.svg";
 import "./bottom-menu.css";
 import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
+import { canSellerAccessInventory, hasSimplePackageService } from "../../utils/sellerServiceAccess";
 
 const BottomMenu = () => {
     const { user } = useContext(UserContext)!;
@@ -21,7 +22,9 @@ const BottomMenu = () => {
         const filtered = menu.filter(
             i =>
               i.roles.includes(role) &&
-              (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
+              (i.path !== "/simple-packages" || hasSimplePackageService(user)) &&
+              (!["/stock", "/shop"].includes(i.path) || canSellerAccessInventory(user)) &&
+              (i.path !== "/seller-product-info" || (canAccessSellerProductInfo(user) && !hasSimplePackageService(user))) &&
               (!i.requiresSuperadmin || isSuperadminUser(user))
         );
         const bottom: any[] = [];

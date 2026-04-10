@@ -1,6 +1,7 @@
 import "./Header.css";
 import logoImg from "../../../public/logo-no-letter-dark-bg.png";
 import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
+import NotificationBell from "../../components/NotificationBell";
 
 const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { sucursalNombre, sucursalImagenHeader, pillLabel } = useBranchHeaderInfo();
@@ -27,6 +28,10 @@ const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
             <span className="tp-branch-pill__name">{sucursalNombre}</span>
           </div>
         </div>
+      </div>
+
+      <div style={{ marginLeft: "auto" }}>
+        <NotificationBell compact />
       </div>
     </div>
   );

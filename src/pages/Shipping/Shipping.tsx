@@ -10,7 +10,10 @@ const Shipping = () => {
 	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
 	const { user }: any = useContext(UserContext);
-	const canScanOrders = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'operator';
+	const canScanOrders =
+		user?.role?.toLowerCase() === 'admin' ||
+		user?.role?.toLowerCase() === 'operator' ||
+		user?.role?.toLowerCase() === 'seller';
 
 
 	return (

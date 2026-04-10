@@ -1,10 +1,13 @@
 import { apiClient, apiClientNoJSON } from "./apiClient";
 
+export type TicketPromedioMode = "pago_fijo" | "comision" | "pago_fijo_mas_comision";
+
 export type ReportParams = {
   mes?: string;
   meses?: string[];
   sucursales?: string[];
   modoTop?: "clientes" | "vendedores";
+  ticketPromedioModo?: TicketPromedioMode;
   reportes?: string[];
   columnas?: Record<string, string[]>;
 };
@@ -26,6 +29,11 @@ type MesFinParams = {
 type VentasQrParams = {
   meses: string[];
   sucursales?: string[];
+};
+
+type EntregasNuevoServicioParams = {
+  meses: string[];
+  sellerId?: string;
 };
 
 function extractFilename(contentDisposition?: string) {
@@ -83,6 +91,7 @@ export async function downloadOperacionMensualXlsx(params: ReportParams) {
       mes: params.mes,
       meses: params.meses?.join(","),
       modoTop: params.modoTop,
+      ticketPromedioModo: params.ticketPromedioModo,
       sucursales: params.sucursales?.join(","),
       reportes: params.reportes?.join(","),
       columnas: params.columnas ? JSON.stringify(params.columnas) : undefined,
@@ -216,6 +225,33 @@ export async function downloadVentasQrXlsx(params: VentasQrParams) {
       sucursales: params.sucursales?.join(","),
     },
     `ventas_qr_${nombreMeses}.xlsx`,
+  );
+}
+
+export async function getEntregasNuevoServicioAPI(params: EntregasNuevoServicioParams) {
+  const { data } = await apiClient.get("/reports/entregas-simples", {
+    params: {
+      meses: params.meses.join(","),
+      sellerId: params.sellerId,
+    },
+    withCredentials: true,
+  });
+  return data;
+}
+
+export async function downloadEntregasNuevoServicioXlsx(params: EntregasNuevoServicioParams) {
+  const nombreMeses =
+    params.meses.length <= 1
+      ? params.meses[0] || "sin_mes"
+      : `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`;
+
+  await downloadXlsxFromGet(
+    "/reports/entregas-simples/xlsx",
+    {
+      meses: params.meses.join(","),
+      sellerId: params.sellerId,
+    },
+    `entregas_nuevo_servicio_${nombreMeses}.xlsx`,
   );
 }
 

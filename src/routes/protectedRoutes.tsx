@@ -21,10 +21,12 @@ import FindShipping from "../pages/Shipping/FindShipping";
 import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
 import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoPage";
 import SuperadminVariantsPage from "../pages/SuperadminVariants/SuperadminVariantsPage";
+import SimplePackagesPage from "../pages/SimplePackages/SimplePackagesPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
 import { isSuperadminUser } from "../utils/role";
+import { canSellerAccessInventory, hasSimplePackageService } from "../utils/sellerServiceAccess";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
@@ -33,11 +35,45 @@ const guard = (path: string, element: JSX.Element) => (
 const SellerProductInfoRoute = () => {
   const { user } = useContext(UserContext);
 
+  if (hasSimplePackageService(user)) {
+    return <Navigate to="/simple-packages" replace />;
+  }
+
   if (!canAccessSellerProductInfo(user)) {
-    return <Navigate to="/sales" replace />;
+    return <Navigate to="/shop" replace />;
   }
 
   return <SellerProductInfoPage mode="seller" />;
+};
+
+const StockRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!canSellerAccessInventory(user)) {
+    return <Navigate to="/simple-packages" replace />;
+  }
+
+  return <StockManagement />;
+};
+
+const ShopRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!canSellerAccessInventory(user)) {
+    return <Navigate to="/simple-packages" replace />;
+  }
+
+  return <Sales />;
+};
+
+const SimplePackagesRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!hasSimplePackageService(user)) {
+    return <Navigate to="/shipping" replace />;
+  }
+
+  return <SimplePackagesPage />;
 };
 
 const AdminSellerProductInfoRoute = () => {
@@ -89,7 +125,7 @@ const protectedRoutes = [
       },
       {
         path: "/stock",
-        element: guard("/stock", <StockManagement />),
+        element: guard("/stock", <StockRoute />),
       },
       {
         path: "/stats",
@@ -109,7 +145,11 @@ const protectedRoutes = [
       },
       {
         path: "/shop",
-        element: guard("/shop", <Sales />),
+        element: guard("/shop", <ShopRoute />),
+      },
+      {
+        path: "/simple-packages",
+        element: guard("/simple-packages", <SimplePackagesRoute />),
       },
       {
         path: "/cash",

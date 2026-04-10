@@ -27,6 +27,10 @@ import { registerUserAPI } from "../../api/user";
 import { getSucursalsAPI } from "../../api/sucursal";
 import { roles } from "../../constants/roles";
 import BranchFields from "./components/BranchFields";
+import {
+  branchesEnableCommissionService,
+  branchesEnableSimplePackageService,
+} from "../../utils/sellerServiceAccess";
 
 const { SELLER } = roles;
 
@@ -42,6 +46,17 @@ export default function SellerFormModal({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
+  const [serviceFlags, setServiceFlags] = useState({
+    hasCommissionService: false,
+    hasSimplePackageService: false,
+  });
+
+  const syncServiceFlags = (branches: any[] = []) => {
+    setServiceFlags({
+      hasCommissionService: branchesEnableCommissionService(branches),
+      hasSimplePackageService: branchesEnableSimplePackageService(branches),
+    });
+  };
 
   /* cargar sucursales al abrir */
   useEffect(() => {
@@ -50,10 +65,27 @@ export default function SellerFormModal({
         const res = await getSucursalsAPI();
         setSucursalOptions(res || []);
         form.resetFields();
-        form.setFieldsValue({ sucursales: [{}] });
+        const initialBranches = [{}];
+        form.setFieldsValue({ sucursales: initialBranches });
+        syncServiceFlags(initialBranches);
       })();
     }
-  }, [visible]);
+  }, [form, visible]);
+
+  useEffect(() => {
+    if (!serviceFlags.hasCommissionService) {
+      form.setFieldValue("comision_porcentual", 0);
+    }
+  }, [form, serviceFlags.hasCommissionService]);
+
+  useEffect(() => {
+    if (!serviceFlags.hasSimplePackageService) {
+      form.setFieldsValue({
+        amortizacion: 0,
+        precio_paquete: 0,
+      });
+    }
+  }, [form, serviceFlags.hasSimplePackageService]);
 
   /* añadir card */
   const addBranch = () => {
@@ -119,7 +151,14 @@ export default function SellerFormModal({
       destroyOnClose
       title="Agregar vendedor"
     >
-      <Form layout="vertical" form={form} onFinish={onFinish}>
+      <Form
+        layout="vertical"
+        form={form}
+        onFinish={onFinish}
+        onValuesChange={(_, allValues) => {
+          syncServiceFlags(allValues?.sucursales || []);
+        }}
+      >
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -211,6 +250,27 @@ export default function SellerFormModal({
                 max={100}
                 formatter={(v) => `${v}%`}
                 className="w-full"
+                disabled={!serviceFlags.hasCommissionService}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={6}>
+            <Form.Item label="Amortización" name="amortizacion">
+              <InputNumber
+                min={0}
+                addonBefore="Bs."
+                className="w-full"
+                disabled={!serviceFlags.hasSimplePackageService}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={6}>
+            <Form.Item label="Precio por paquete" name="precio_paquete">
+              <InputNumber
+                min={0}
+                addonBefore="Bs."
+                className="w-full"
+                disabled={!serviceFlags.hasSimplePackageService}
               />
             </Form.Item>
           </Col>

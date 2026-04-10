@@ -11,7 +11,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 import EmptySalesTable from '../Sales/EmptySalesTable';
 import useEditableTable from '../../hooks/useEditableTable';
-import { UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { UserOutlined, PhoneOutlined, CommentOutlined, EditOutlined, DeleteOutlined, PrinterOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { useWatch } from 'antd/es/form/Form';
 import EditProductsModal from './EditProductsModal';
 import useRawProducts from "../../hooks/useRawProducts.tsx";
@@ -21,6 +21,7 @@ import { deleteShippingAPI } from '../../api/shipping';
 import { generateShippingLabelQRAPI } from '../../api/qr.ts';
 import moment from "moment-timezone";
 import { updateProductsByShippingAPI } from "../../api/sales.ts";
+import { printShippingTemporaryLabel } from "./shippingQrLabel";
 
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
@@ -66,6 +67,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [showWarning, setShowWarning] = useState(false);
     const [loading, setLoading] = useState(false);
     const [qrLoading, setQrLoading] = useState(false);
+    const [shippingQrData, setShippingQrData] = useState<{
+        shippingQrCode?: string;
+        shippingQrPayload?: string;
+        shippingQrImagePath?: string;
+    } | null>(null);
     const { rawProducts: data } = useRawProducts(); const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
     const adelantoCliente = useWatch('adelanto_cliente', internalForm);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
@@ -348,6 +354,19 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }, [visible, shipping, sucursals]);
 
     useEffect(() => {
+        if (!visible || !shipping?._id) {
+            setShippingQrData(null);
+            return;
+        }
+
+        setShippingQrData({
+            shippingQrCode: shipping?.shipping_qr_code,
+            shippingQrPayload: shipping?.shipping_qr_payload,
+            shippingQrImagePath: shipping?.shipping_qr_image_path
+        });
+    }, [visible, shipping]);
+
+    useEffect(() => {
         const monto = saldoACobrar || 0;
         const suma = (qrInput || 0) + (efectivoInput || 0);
         if (tipoPago === '4') {
@@ -405,13 +424,61 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             });
         });
     }, [data, origenBranchId]);
+    const temporaryLabelItems = useMemo(() => {
+        const fromShipping = (shipping?.productos_temporales || []).map((item: any, index: number) => ({
+            key: `temp-${index}-${item?.nombre_producto || item?.producto || "item"}`,
+            name: String(item?.nombre_producto || item?.producto || item?.nombre_variante || "Producto temporal"),
+            quantity: Number(item?.cantidad || 1)
+        }));
+
+        const fromSales = (products || [])
+            .filter((item: any) => Boolean(item?.esTemporal || item?.producto?.esTemporal))
+            .map((item: any, index: number) => ({
+                key: `sale-temp-${index}-${item?.producto || item?.nombre_variante || "item"}`,
+                name: String(item?.nombre_variante || item?.producto || "Producto temporal"),
+                quantity: Number(item?.cantidad || 1)
+            }));
+
+        const merged = new Map<string, { key: string; name: string; quantity: number }>();
+        [...fromShipping, ...fromSales].forEach((item) => {
+            const current = merged.get(item.name);
+            if (current) {
+                current.quantity += item.quantity;
+                return;
+            }
+            merged.set(item.name, { ...item });
+        });
+
+        return Array.from(merged.values());
+    }, [products, shipping]);
+
+    const ensureShippingQrData = async () => {
+        const cachedQrPath = shippingQrData?.shippingQrImagePath || shipping?.shipping_qr_image_path;
+        if (cachedQrPath) {
+            return {
+                shippingQrCode: shippingQrData?.shippingQrCode || shipping?.shipping_qr_code,
+                shippingQrPayload: shippingQrData?.shippingQrPayload || shipping?.shipping_qr_payload,
+                shippingQrImagePath: cachedQrPath
+            };
+        }
+
+        const response = await generateShippingLabelQRAPI(shipping._id);
+        const qrData = response?.qrData;
+        if (!response?.success || !qrData?.shippingQrImagePath) {
+            return null;
+        }
+
+        setShippingQrData(qrData);
+        return qrData;
+    };
+
     const handleGenerateShippingQR = async () => {
         if (!shipping?._id) return;
         setQrLoading(true);
         try {
-            const response = await generateShippingLabelQRAPI(shipping._id);
-            const qrPath = response?.qrData?.shippingQrImagePath;
-            if (!response?.success || !qrPath) {
+            const qrData = await ensureShippingQrData();
+            const qrPath = qrData?.shippingQrImagePath;
+            if (!qrPath) {
                 message.error("No se pudo generar QR de entrega");
                 return;
             }
@@ -575,6 +642,69 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }
 
     //console.log("📦 enrichedProducts:", enrichedProducts);
+    const handleSendShippingQRToWhatsApp = async () => {
+        const phoneNumber = String(shipping?.telefono_cliente || "").replace(/\D/g, "");
+        if (!phoneNumber) {
+            message.warning("Este pedido no tiene un numero de WhatsApp valido.");
+            return;
+        }
+
+        setQrLoading(true);
+        try {
+            const qrData = await ensureShippingQrData();
+            if (!qrData?.shippingQrImagePath) {
+                message.error("No se pudo obtener el QR del pedido.");
+                return;
+            }
+
+            const deliveryDate = shipping?.hora_entrega_acordada
+                ? moment(shipping.hora_entrega_acordada).format("DD/MM/YYYY HH:mm")
+                : "";
+            const messageText = [
+                `Hola ${shipping?.cliente || ""}, te compartimos el QR de tu pedido ${shipping?._id || ""}.`,
+                deliveryDate ? `Entrega prevista: ${deliveryDate}.` : "",
+                `QR: ${qrData.shippingQrImagePath}`
+            ]
+                .filter(Boolean)
+                .join("\n");
+
+            window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(messageText)}`, "_blank");
+        } catch (error) {
+            console.error("Error enviando QR por WhatsApp:", error);
+            message.error("No se pudo preparar el envio por WhatsApp.");
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
+    const handlePrintTemporaryLabel = async () => {
+        if (!temporaryLabelItems.length) {
+            message.info("Este pedido no tiene productos temporales para etiquetar.");
+            return;
+        }
+
+        setQrLoading(true);
+        try {
+            const qrData = await ensureShippingQrData();
+            printShippingTemporaryLabel({
+                shippingId: String(shipping?._id || ""),
+                clientName: shipping?.cliente,
+                clientPhone: shipping?.telefono_cliente,
+                destination: shipping?.lugar_entrega,
+                qrImagePath: qrData?.shippingQrImagePath,
+                items: temporaryLabelItems.map((item) => ({
+                    name: item.name,
+                    quantity: item.quantity
+                }))
+            });
+        } catch (error) {
+            console.error("Error imprimiendo etiqueta temporal:", error);
+            message.error("No se pudo generar la etiqueta temporal.");
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
     const id_shipping = shipping?._id || '';
     return (
         <Modal
@@ -621,10 +751,35 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     />
                 </div>
             )}
-            {isAdmin && shipping?._id && (
-                <div style={{ marginBottom: 12, textAlign: "right", marginTop: 6 }}>
-                    <Button onClick={handleGenerateShippingQR} loading={qrLoading}>
-                        Generar / Ver QR de Entrega
+            {shipping?._id && (
+                <div
+                    style={{
+                        marginBottom: 12,
+                        marginTop: 6,
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 8,
+                        flexWrap: "wrap"
+                    }}
+                >
+                    <Button icon={<QrcodeOutlined />} onClick={handleGenerateShippingQR} loading={qrLoading}>
+                        Ver QR de entrega
+                    </Button>
+                    <Button
+                        icon={<CommentOutlined />}
+                        onClick={() => void handleSendShippingQRToWhatsApp()}
+                        loading={qrLoading}
+                        disabled={!shipping?.telefono_cliente}
+                    >
+                        Enviar QR por WhatsApp
+                    </Button>
+                    <Button
+                        icon={<PrinterOutlined />}
+                        onClick={() => void handlePrintTemporaryLabel()}
+                        loading={qrLoading}
+                        disabled={!temporaryLabelItems.length}
+                    >
+                        Etiqueta temporales
                     </Button>
                 </div>
             )}

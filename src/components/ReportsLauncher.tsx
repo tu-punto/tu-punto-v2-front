@@ -34,9 +34,12 @@ import {
   getIngresosMesesAPI,
   downloadOperacionMensualXlsx,
   downloadStockProductosXlsx,
+  downloadEntregasNuevoServicioXlsx,
   downloadVentasQrXlsx,
   downloadVentasVendedores4mXlsx,
+  getEntregasNuevoServicioAPI,
   getOperacionMensualAPI,
+  type TicketPromedioMode,
   getVentasVendedoresMesesAPI,
   getVentasQrAPI,
 } from "../api/reports";
@@ -51,6 +54,7 @@ type OperacionReportKey =
   | "clientesPorHoraMensual"
   | "ticketPromedioPorSucursal"
   | "ticketPromedioClientesPorSucursal"
+  | "entregasExternasRealizadasPorSucursal"
   | "clientesActivosPorSucursal"
   | "clientesNuevosPorSucursal"
   | "ventasMensualPorSucursal";
@@ -63,6 +67,7 @@ type ReportId =
   | "ingresos3m"
   | "clientesActivos3m"
   | "ventasVendedores4m"
+  | "entregasNuevoServicio"
   | "ventasQr"
   | "clientesStatus";
 
@@ -73,7 +78,16 @@ type ReportDefinition = {
   title: string;
   description: string;
   category: ReportCategory;
-  previewMode: "operacion" | "ventasQr" | "comisiones" | "ingresos" | "clientesActivosServicio" | "ventasVendedores" | "inventario" | "none";
+  previewMode:
+    | "operacion"
+    | "ventasQr"
+    | "comisiones"
+    | "ingresos"
+    | "clientesActivosServicio"
+    | "ventasVendedores"
+    | "inventario"
+    | "entregasNuevoServicio"
+    | "none";
   requires: {
     meses?: boolean;
     mesFin?: boolean;
@@ -81,9 +95,11 @@ type ReportDefinition = {
     sucursalId?: boolean;
     sellerId?: boolean;
     modoTop?: boolean;
+    ticketPromedioModo?: boolean;
     incluirDeuda?: boolean;
   };
   operacionKey?: OperacionReportKey;
+  isNew?: boolean;
 };
 
 type LauncherFormValues = {
@@ -94,8 +110,24 @@ type LauncherFormValues = {
   sucursalId?: string;
   sellerId?: string;
   modoTop?: "clientes" | "vendedores";
+  ticketPromedioModo?: TicketPromedioMode;
   incluirDeuda?: boolean;
 };
+
+function getTicketPromedioModeLabel(mode?: TicketPromedioMode | string) {
+  if (mode === "comision") return "Comision";
+  if (mode === "pago_fijo_mas_comision") return "Pago fijo + comision";
+  return "Pago fijo";
+}
+
+function renderReportTitle(title: string, isNew?: boolean) {
+  return (
+    <Space size={6} wrap>
+      <span>{title}</span>
+      {isNew ? <Tag color="orange">NUEVO</Tag> : null}
+    </Space>
+  );
+}
 
 const REPORTS: ReportDefinition[] = [
   {
@@ -133,6 +165,7 @@ const REPORTS: ReportDefinition[] = [
     previewMode: "operacion",
     requires: { meses: true, sucursales: true },
     operacionKey: "costoEntregaPromedioPorSucursal",
+    isNew: true,
   },
   {
     id: "clientesPorHoraMensual",
@@ -155,11 +188,12 @@ const REPORTS: ReportDefinition[] = [
   {
     id: "ticketPromedioPorSucursal",
     title: "Ticket promedio por vendedor",
-    description: "Promedio de servicios pagados por los vendedores activos.",
+    description: "Permite comparar pago fijo, comision o la suma de ambos por vendedor activo.",
     category: "Operacion mensual",
     previewMode: "operacion",
-    requires: { meses: true, sucursales: true },
+    requires: { meses: true, sucursales: true, ticketPromedioModo: true },
     operacionKey: "ticketPromedioPorSucursal",
+    isNew: true,
   },
   {
     id: "clientesActivosPorSucursal",
@@ -178,6 +212,16 @@ const REPORTS: ReportDefinition[] = [
     previewMode: "operacion",
     requires: { meses: true, sucursales: true },
     operacionKey: "clientesNuevosPorSucursal",
+  },
+  {
+    id: "entregasExternasRealizadasPorSucursal",
+    title: "Entregas externas realizadas por sucursal",
+    description: "Cantidad de paquetes y monto cobrado por sucursal.",
+    category: "Operacion mensual",
+    previewMode: "operacion",
+    requires: { meses: true, sucursales: true },
+    operacionKey: "entregasExternasRealizadasPorSucursal",
+    isNew: true,
   },
   {
     id: "ventasMensualPorSucursal",
@@ -237,6 +281,15 @@ const REPORTS: ReportDefinition[] = [
     requires: { meses: true },
   },
   {
+    id: "entregasNuevoServicio",
+    title: "Entregas realizadas con el nuevo servicio",
+    description: "Paquetes cargados en el modulo nuevo, con resumen por mes, vendedor y metodo de pago.",
+    category: "Reportes adicionales",
+    previewMode: "entregasNuevoServicio",
+    requires: { meses: true, sellerId: true },
+    isNew: true,
+  },
+  {
     id: "ventasQr",
     title: "Ventas QR",
     description: "Vista previa y descarga XLSX.",
@@ -288,8 +341,10 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
   ticketPromedioPorSucursal: [
     { title: "Mes", dataIndex: "mes", width: 110 },
     { title: "Sucursal", dataIndex: "sucursal" },
-    { title: "Clientes activos", dataIndex: "vendedores_activos", width: 140 },
-    { title: "Total servicios (Bs.)", dataIndex: "total_servicios_bs", width: 170 },
+    { title: "Vendedores activos", dataIndex: "vendedores_activos", width: 150 },
+    { title: "Pago fijo (Bs.)", dataIndex: "total_servicios_bs", width: 140 },
+    { title: "Comision (Bs.)", dataIndex: "total_comision_bs", width: 140 },
+    { title: "Total considerado (Bs.)", dataIndex: "total_ticket_bs", width: 170 },
     { title: "Ticket Prom. (Bs.)", dataIndex: "ticket_promedio_bs", width: 150 },
   ],
   ticketPromedioClientesPorSucursal: [
@@ -297,6 +352,11 @@ const columnsByOperacionKey: Record<OperacionReportKey, any[]> = {
     { title: "Pedidos", dataIndex: "pedidos", width: 100 },
     { title: "Monto total (Bs.)", dataIndex: "monto_total_bs", width: 150 },
     { title: "Ticket Prom. (Bs.)", dataIndex: "ticket_promedio_bs", width: 150 },
+  ],
+  entregasExternasRealizadasPorSucursal: [
+    { title: "Sucursal", dataIndex: "sucursal" },
+    { title: "Paquetes", dataIndex: "cantidad_paquetes", width: 110 },
+    { title: "Monto cobrado (Bs.)", dataIndex: "monto_cobrado_bs", width: 170 },
   ],
   clientesActivosPorSucursal: [
     { title: "Sucursal", dataIndex: "sucursal" },
@@ -368,6 +428,7 @@ export default function ReportsLauncher() {
   const [loadingSellers, setLoadingSellers] = useState(false);
 
   const reportId = Form.useWatch("reportId", form) as ReportId | undefined;
+  const watchedTicketPromedioModo = Form.useWatch("ticketPromedioModo", form) as TicketPromedioMode | undefined;
   const selectedReport = useMemo(() => REPORTS.find((r) => r.id === reportId), [reportId]);
 
   useEffect(() => {
@@ -393,13 +454,14 @@ export default function ReportsLauncher() {
       modoTop: "clientes",
       sucursales: [],
       sellerId: undefined,
+      ticketPromedioModo: "pago_fijo",
       incluirDeuda: false,
     });
   }, [form]);
 
   useEffect(() => {
     setPreview(null);
-  }, [reportId]);
+  }, [reportId, watchedTicketPromedioModo]);
 
   const sucOptions = useMemo(
     () => sucursales.map((s) => ({ value: s._id, label: s.nombre })),
@@ -421,7 +483,7 @@ export default function ReportsLauncher() {
       label: category,
       options: REPORTS.filter((r) => r.category === category).map((r) => ({
         value: r.id,
-        label: r.title,
+        label: renderReportTitle(r.title, r.isNew),
         searchText: `${r.title} ${r.description} ${r.category}`.toLowerCase(),
       })),
     }));
@@ -487,6 +549,7 @@ export default function ReportsLauncher() {
           meses,
           sucursales: vals.sucursales,
           modoTop: vals.modoTop,
+          ticketPromedioModo: vals.ticketPromedioModo,
           reportes: [selectedReport.operacionKey],
         });
 
@@ -542,6 +605,16 @@ export default function ReportsLauncher() {
         return;
       }
 
+      if (selectedReport.previewMode === "entregasNuevoServicio") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getEntregasNuevoServicioAPI({
+          meses,
+          sellerId: vals.sellerId,
+        });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
       if (selectedReport.previewMode === "inventario") {
         const data = await getInventarioActualAPI({
           idSucursal: vals.sucursalId as string,
@@ -574,6 +647,7 @@ export default function ReportsLauncher() {
         case "clientesPorHoraMensual":
         case "ticketPromedioPorSucursal":
         case "ticketPromedioClientesPorSucursal":
+        case "entregasExternasRealizadasPorSucursal":
         case "clientesActivosPorSucursal":
         case "clientesNuevosPorSucursal":
         case "ventasMensualPorSucursal": {
@@ -581,6 +655,7 @@ export default function ReportsLauncher() {
             meses,
             sucursales: vals.sucursales,
             modoTop: vals.modoTop,
+            ticketPromedioModo: vals.ticketPromedioModo,
             reportes: [selectedReport.operacionKey as string],
           });
           break;
@@ -605,6 +680,9 @@ export default function ReportsLauncher() {
           break;
         case "ventasVendedores4m":
           await downloadVentasVendedores4mXlsx({ meses, mesFin });
+          break;
+        case "entregasNuevoServicio":
+          await downloadEntregasNuevoServicioXlsx({ meses, sellerId: vals.sellerId });
           break;
         case "ventasQr": {
           await downloadVentasQrXlsx({ meses, sucursales: vals.sucursales });
@@ -660,9 +738,14 @@ export default function ReportsLauncher() {
     if (key === "ticketPromedioPorSucursal" && data.ticketPromedioGlobal) {
       return [
         {
-          title: "Ticket promedio global por vendedor",
+          title: `Ticket promedio global por vendedor (${getTicketPromedioModeLabel(data.ticketPromedioGlobal.ticket_promedio_modo || data.ticketPromedioModo)})`,
           value: formatBs(data.ticketPromedioGlobal.ticket_promedio_bs),
           subtitle: `Sucursales: ${data.ticketPromedioGlobal.sucursales ?? 0}`,
+        },
+        {
+          title: "Total considerado",
+          value: formatBs(data.ticketPromedioGlobal.total_ticket_bs),
+          subtitle: `Pago fijo: ${formatBs(data.ticketPromedioGlobal.total_servicios_bs)} | Comision: ${formatBs(data.ticketPromedioGlobal.total_comision_bs)}`,
         },
       ];
     }
@@ -683,6 +766,21 @@ export default function ReportsLauncher() {
           title: "Clientes activos global",
           value: `${data.clientesActivosGlobal.clientes_activos ?? 0}`,
           subtitle: "Total unico del periodo",
+        },
+      ];
+    }
+
+    if (key === "entregasExternasRealizadasPorSucursal" && data.entregasExternasRealizadasGlobal) {
+      return [
+        {
+          title: "Paquetes externos realizados",
+          value: `${data.entregasExternasRealizadasGlobal.cantidad_paquetes ?? 0}`,
+          subtitle: "Total del periodo",
+        },
+        {
+          title: "Monto cobrado total",
+          value: formatBs(data.entregasExternasRealizadasGlobal.monto_cobrado_bs),
+          subtitle: "Cobrado efectivo del periodo",
         },
       ];
     }
@@ -797,6 +895,34 @@ export default function ReportsLauncher() {
       };
     }
 
+    if (preview.reportId === "entregasNuevoServicio") {
+      return {
+        cards: [
+          {
+            title: "Paquetes registrados",
+            value: `${data?.totalGeneral?.paquetes ?? 0}`,
+            subtitle: `Pagados: ${data?.totalGeneral?.pagados ?? 0}`,
+          },
+          {
+            title: "Monto total paquete",
+            value: formatBs(data?.totalGeneral?.precio_paquete_bs),
+            subtitle: `Deuda vendedor: ${formatBs(data?.totalGeneral?.deuda_vendedor_bs)}`,
+          },
+          {
+            title: "Deuda comprador",
+            value: formatBs(data?.totalGeneral?.deuda_comprador_bs),
+            subtitle: "Calculado segun precio por paquete y amortizacion",
+          },
+        ],
+        tables: [
+          { title: "Totales por mes", rows: data.totalesPorMes || [] },
+          { title: "Totales por vendedor", rows: data.totalesPorVendedor || [] },
+          { title: "Totales por metodo de pago", rows: data.totalesPorMetodoPago || [] },
+          { title: "Detalle", rows: data.rows || [] },
+        ],
+      };
+    }
+
     return null;
   }, [preview]);
 
@@ -836,7 +962,7 @@ export default function ReportsLauncher() {
       >
         <Space direction="vertical" className="w-full" size="middle">
           <Card size="small">
-            <Form form={form} layout="vertical" initialValues={{ modoTop: "clientes", incluirDeuda: false }}>
+            <Form form={form} layout="vertical" initialValues={{ modoTop: "clientes", ticketPromedioModo: "pago_fijo", incluirDeuda: false }}>
               <Row gutter={[12, 12]}>
                 <Col xs={24} md={14}>
                   <Form.Item name="reportId" label="Reporte" rules={[{ required: true, message: "Selecciona un reporte" }]}>
@@ -856,7 +982,14 @@ export default function ReportsLauncher() {
                 <Col xs={24} md={10}>
                   <Card size="small" style={{ height: "100%" }}>
                     <Space direction="vertical" size={3}>
-                      <Text strong>{selectedReport?.title || "Sin reporte seleccionado"}</Text>
+                      {selectedReport ? (
+                        <Space size={6} wrap>
+                          <Text strong>{selectedReport.title}</Text>
+                          {selectedReport.isNew ? <Tag color="orange">NUEVO</Tag> : null}
+                        </Space>
+                      ) : (
+                        <Text strong>Sin reporte seleccionado</Text>
+                      )}
                       <Text type="secondary">{selectedReport?.description || ""}</Text>
                       {selectedReport && (
                         <Space size={6} wrap>
@@ -935,6 +1068,25 @@ export default function ReportsLauncher() {
                         <Radio.Button value="clientes">Clientes</Radio.Button>
                         <Radio.Button value="vendedores">Vendedores</Radio.Button>
                       </Radio.Group>
+                    </Form.Item>
+                  </Col>
+                )}
+
+                {selectedReport?.requires.ticketPromedioModo && (
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name="ticketPromedioModo"
+                      label="Modo de ticket promedio"
+                      rules={[{ required: true, message: "Selecciona un modo" }]}
+                    >
+                      <Select
+                        options={[
+                          { value: "pago_fijo", label: "Pago fijo" },
+                          { value: "comision", label: "Comision" },
+                          { value: "pago_fijo_mas_comision", label: "Pago fijo + comision" },
+                        ]}
+                        placeholder="Selecciona el tipo de ticket"
+                      />
                     </Form.Item>
                   </Col>
                 )}

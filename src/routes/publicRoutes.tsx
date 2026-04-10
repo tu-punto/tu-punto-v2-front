@@ -1,8 +1,9 @@
 import { Navigate } from "react-router-dom";
 import ErrorPage from "../pages/ErrorPage";
-import AdminLoginPage from "../pages/Login/AdminLoginPage";
+  import AdminLoginPage from "../pages/Login/AdminLoginPage";
 import SellerLoginPage from "../pages/Login/SellerLoginPage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
+import TrackingPage from "../pages/Tracking/TrackingPage";
 
 const publicRoutes = [
   {
@@ -16,6 +17,10 @@ const publicRoutes = [
   {
     path: "/unauthorized",
     element: <UnauthorizedPage />,
+  },
+  {
+    path: "/tracking/:code",
+    element: <TrackingPage />,
   },
   {
     path: "/",

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { UserContext } from "../../context/userContext";
 import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
+import NotificationBell from "../../components/NotificationBell";
 
 const Header = () => {
   const { user, setUser } = useContext(UserContext)!;
@@ -55,9 +56,12 @@ const Header = () => {
         </div>
       </div>
 
-      <Button onClick={handleLogout} type="text" className="bg-light-blue text-dark-blue text-mobile-sm xl:text-desktop-sm">
-        Cerrar sesion
-      </Button>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <NotificationBell />
+        <Button onClick={handleLogout} type="text" className="bg-light-blue text-dark-blue text-mobile-sm xl:text-desktop-sm">
+          Cerrar sesion
+        </Button>
+      </div>
     </div>
   );
 };

@@ -7,6 +7,7 @@ import HeaderXS from "./Header/HeaderXS";
 import Sider from "antd/es/layout/Sider";
 import BottomMenu from "./MobileMenu/BottomMenu";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import ServiceAnnouncementGate from "../components/ServiceAnnouncementGate";
 
 const { Content } = Layout;
 
@@ -76,6 +77,8 @@ const AppLayout = () => {
           <Content className={`flex flex-col bg-white p-6 ${isMobile ? "pb-28" : ""}`}>
             <Outlet />
           </Content>
+
+          <ServiceAnnouncementGate />
 
           {isMobile && <BottomMenu />}
         </Layout>

@@ -19,6 +19,8 @@ import { createProductsFromGroup } from '../../services/createProducts';
 import {saveTempStock, getTempProducts, getTempVariants, clearTempProducts,clearTempStock, clearTempVariants, reconstructProductFromFlat} from "../../utils/storageHelpers.ts";
 import ProductTableSeller from "./ProductTableSeller.tsx";
 import VariantQRBatchModal from "./VariantQRBatchModal.tsx";
+import InventoryQRModal from "./InventoryQRModal.tsx";
+import StockQRInfoModal from "./StockQRInfoModal.tsx";
 //test
 const SELLERS_PAGE_SIZE = 10;
 
@@ -44,6 +46,8 @@ const StockManagement = () => {
     const [isQRBatchModalVisible, setIsQRBatchModalVisible] = useState(false);
     const [qrModalProductIds, setQrModalProductIds] = useState<string[]>([]);
     const [qrModalAutoGenerate, setQrModalAutoGenerate] = useState(false);
+    const [isInventoryQRModalVisible, setIsInventoryQRModalVisible] = useState(false);
+    const [isStockQRInfoModalVisible, setIsStockQRInfoModalVisible] = useState(false);
 
     const [products, setProducts] = useState<any[]>([]);
     const [sellers, setSellers] = useState<any[]>([]);
@@ -414,6 +418,49 @@ const StockManagement = () => {
         color: "#ffffff"
     };
 
+    const buildDraftKey = (item: any) => {
+        const productId = String(item?.product?._id || item?.product?.id_producto || "");
+        const variantKey = String(item?.product?.variantKey || "");
+        const variantHash = JSON.stringify(item?.product?.variantes || item?.product?.variantes_obj || {});
+        return `${productId}::${variantKey || variantHash}`;
+    };
+
+    const mergeStockDrafts = (baseDraft: any[], incomingDraft: any[]) => {
+        const nextMap = new Map<string, any>();
+
+        [...(baseDraft || []), ...(incomingDraft || [])].forEach((item) => {
+            nextMap.set(buildDraftKey(item), item);
+        });
+
+        return Array.from(nextMap.values());
+    };
+
+    const selectedSellerRecord = !isSeller
+        ? sellers.find((seller: any) => String(seller?._id) === String(selectedSeller || ""))
+        : null;
+    const effectiveSellerId = isSeller ? String(user?.id_vendedor || "") : String(selectedSeller || "");
+    const effectiveSellerLabel = isSeller
+        ? String(user?.nombre_vendedor || "Vendedor")
+        : String(selectedSellerRecord?.name || "Vendedor");
+    const effectiveBranchId = isSeller
+        ? (sucursalId !== "all" ? String(sucursalId || "") : "")
+        : String((sucursalId && sucursalId !== "all" ? sucursalId : localStorage.getItem("sucursalId")) || "");
+    const effectiveBranchLabel = isSeller
+        ? String(
+            sellerSucursales.find((branch: any) => String(branch?._id) === String(effectiveBranchId))?.nombre ||
+            "Sucursal actual"
+        )
+        : "Sucursal actual";
+    const qrToolsDisabled = !effectiveSellerId || !effectiveBranchId;
+
+    const openConfirmWithDraft = (draft: any[]) => {
+        const mergedDraft = mergeStockDrafts(stockListForConfirmModal, draft);
+        saveTempStock(mergedDraft);
+        setStockListForConfirmModal(mergedDraft);
+        setStock(mergedDraft);
+        setIsConfirmModalVisible(true);
+    };
+
 
 
 
@@ -476,11 +523,11 @@ const StockManagement = () => {
                                     Filtros
                                 </div>
                             </div>
-                            <div
-                                style={{
-                                    padding: "4px 10px",
-                                    borderRadius: 999,
-                                    background: selectedSeller ? "#f6ffed" : "#fafafa",
+                        <div
+                            style={{
+                                padding: "4px 10px",
+                                borderRadius: 999,
+                                background: selectedSeller ? "#f6ffed" : "#fafafa",
                                     color: selectedSeller ? "#237804" : "#8c8c8c",
                                     fontSize: 12,
                                     fontWeight: 600,
@@ -489,8 +536,21 @@ const StockManagement = () => {
                             >
                                 {selectedSeller ? "Vendedor seleccionado" : "Selecciona vendedor para editar stock"}
                             </div>
+                            <div
+                                style={{
+                                    padding: "4px 10px",
+                                    borderRadius: 999,
+                                    background: qrToolsDisabled ? "#fafafa" : "#f6ffed",
+                                    color: qrToolsDisabled ? "#8c8c8c" : "#237804",
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    border: qrToolsDisabled ? "1px solid #e8e8e8" : "1px solid #b7eb8f"
+                                }}
+                            >
+                                {qrToolsDisabled ? "Selecciona contexto para usar QR" : "QR listo para esta sucursal"}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                         <div>
                             <SellerList
                                 sellers={sellers}
@@ -551,6 +611,30 @@ const StockManagement = () => {
                                 style={actionButtonStyle}
                             >
                                 Actualizar stock
+                            </Button>
+                        </div>
+                        <div>
+                            <Button
+                                icon={<QrcodeOutlined />}
+                                block
+                                style={actionButtonStyle}
+                                disabled={qrToolsDisabled}
+                                onClick={() => setIsInventoryQRModalVisible(true)}
+                                title={qrToolsDisabled ? "Debe seleccionar un vendedor primero" : undefined}
+                            >
+                                Inventario QR
+                            </Button>
+                        </div>
+                        <div>
+                            <Button
+                                icon={<InfoCircleOutlined />}
+                                block
+                                style={actionButtonStyle}
+                                disabled={qrToolsDisabled}
+                                onClick={() => setIsStockQRInfoModalVisible(true)}
+                                title={qrToolsDisabled ? "Debe seleccionar un vendedor primero" : undefined}
+                            >
+                                Informacion QR
                             </Button>
                         </div>
                         <div>
@@ -724,6 +808,26 @@ const StockManagement = () => {
                     selectedSeller={sellers.find(s => s._id === selectedSeller)}
                 />
             )}
+            <InventoryQRModal
+                open={isInventoryQRModalVisible}
+                onClose={() => setIsInventoryQRModalVisible(false)}
+                sellerId={effectiveSellerId || undefined}
+                sellerLabel={effectiveSellerLabel}
+                sucursalId={effectiveBranchId || undefined}
+                sucursalLabel={effectiveBranchLabel}
+                onUseDifferences={(draft) => {
+                    setIsInventoryQRModalVisible(false);
+                    openConfirmWithDraft(draft);
+                }}
+            />
+            <StockQRInfoModal
+                open={isStockQRInfoModalVisible}
+                onClose={() => setIsStockQRInfoModalVisible(false)}
+                sellerId={effectiveSellerId || undefined}
+                sellerLabel={effectiveSellerLabel}
+                sucursalId={effectiveBranchId || undefined}
+                sucursalLabel={effectiveBranchLabel}
+            />
             {isMoveModalVisible && (
                 <MoveProductsModal
                     visible={isMoveModalVisible}

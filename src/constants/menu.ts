@@ -9,6 +9,7 @@ import branchIcon from "../assets/branchIcon.svg";
 import salesHistoryIcon from "../assets/historyIcono.png";
 import infoProductIcon from "../assets/infoProductIcon.svg";
 import superadminVariantsIcon from "../assets/superadminVariantsIcon.svg";
+import servicesIcon from "../assets/services.png";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
@@ -83,6 +84,18 @@ export const menu = [
     label: "Usuarios",
     icon: sellerIcon,
     roles: getAllowedRoles("/user"),
+  },
+  {
+    path: "/servicesPage",
+    label: "Servicios",
+    icon: servicesIcon,
+    roles: getAllowedRoles("/servicesPage"),
+  },
+  {
+    path: "/simple-packages",
+    label: "Paquetes",
+    icon: boxIcon,
+    roles: getAllowedRoles("/simple-packages"),
   },
   {
     path: "/shipping-guide",
