@@ -561,6 +561,7 @@ export const Sales = () => {
                         {productOptions}
                       </Select>
                     )}
+                    {(isAdmin || isOperator) && (
                     <Button
                       type="primary"
                       onClick={() => setProductAddModal(true)}
@@ -568,6 +569,7 @@ export const Sales = () => {
                     >
                       Añadir nuevo producto
                     </Button>
+                    )}
                     {(isAdmin || isOperator) && (
                       <Select
                         placeholder="Selecciona un vendedor"

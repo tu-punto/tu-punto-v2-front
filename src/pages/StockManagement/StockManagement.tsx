@@ -558,20 +558,22 @@ const StockManagement = () => {
                                 onSelectSeller={handleSelectSeller}
                             />
                         </div>
-                        <div>
-                            <Button
-                                onClick={() => setProductFormVisible(true)}
-                                type="default"
-                                icon={<PlusOutlined />}
-                                block
-                                disabled={!selectedSeller}
-                                title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
-                                className="text-mobile-base xl:text-mobile-base"
-                                style={actionButtonStyle}
-                            >
-                                Agregar producto
-                            </Button>
-                        </div>
+                        {!isSeller && (
+                            <div>
+                                <Button
+                                    onClick={() => setProductFormVisible(true)}
+                                    type="default"
+                                    icon={<PlusOutlined />}
+                                    block
+                                    disabled={!selectedSeller}
+                                    title={!selectedSeller ? "Debe seleccionar un vendedor primero" : undefined}
+                                    className="text-mobile-base xl:text-mobile-base"
+                                    style={actionButtonStyle}
+                                >
+                                    Agregar producto
+                                </Button>
+                            </div>
+                        )}
                         <div>
                             <Button
                                 onClick={() => {

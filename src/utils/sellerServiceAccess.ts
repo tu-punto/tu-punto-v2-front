@@ -21,4 +21,4 @@ export const hasSimplePackageService = (user?: any) =>
   normalizeRole(user?.role) === "seller" && user?.seller_has_simple_package_service === true;
 
 export const canSellerAccessInventory = (user?: any) =>
-  normalizeRole(user?.role) !== "seller" || user?.seller_can_access_inventory !== false;
+  normalizeRole(user?.role) !== "seller" || !hasSimplePackageService(user);

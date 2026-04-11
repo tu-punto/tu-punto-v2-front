@@ -53,7 +53,6 @@ import SellerDebtTable from "./SellerDebtTable";
 import {
   branchesEnableCommissionService,
   branchesEnableSimplePackageService,
-  hasSimplePackageService,
 } from "../../../utils/sellerServiceAccess";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -81,7 +80,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
-  const sellerUsesSimplePackages = hasSimplePackageService(user);
   const [serviceFlags, setServiceFlags] = useState({
     hasCommissionService: false,
     hasSimplePackageServiceEnabled: false,
@@ -527,20 +525,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         </Card>
 
         {/* Secciones independientes */}
-        {!sellerUsesSimplePackages && (
-          <SalesSection
-            initialSales={salesData}
-            onSalesChange={setSalesData}
-            onDeletedSalesChange={() => {}}
-            onUpdateNoPagadasTotal={() => {}}
-            onUpdateHistorialTotal={() => {}}
-            isSeller={isSeller}
-            onUpdateOneSale={handleUpdateSale}
-            onDeleteOneSale={handleDeleteSale}
-          />
-        )}
+        <SalesSection
+          initialSales={salesData}
+          onSalesChange={setSalesData}
+          onDeletedSalesChange={() => {}}
+          onUpdateNoPagadasTotal={() => {}}
+          onUpdateHistorialTotal={() => {}}
+          isSeller={isSeller}
+          onUpdateOneSale={handleUpdateSale}
+          onDeleteOneSale={handleDeleteSale}
+        />
 
-        {!sellerUsesSimplePackages && <EntryHistorySection initialEntries={entryData} />}
+        <EntryHistorySection initialEntries={entryData} />
 
         <SellerDebtTable
           data={sellerDebts}
