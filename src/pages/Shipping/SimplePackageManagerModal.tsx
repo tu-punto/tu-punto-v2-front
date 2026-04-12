@@ -98,11 +98,13 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
   }, [branchPrices]);
 
   const getRoutePrice = (originId: string, destinationId?: string) =>
-    Number(
-      (routeOptionsByOrigin.get(String(originId)) || []).find(
-        (item) => String(item.value) === String(destinationId || "")
-      )?.precio || 0
-    );
+    String(originId) === String(destinationId || "")
+      ? 0
+      : Number(
+          (routeOptionsByOrigin.get(String(originId)) || []).find(
+            (item) => String(item.value) === String(destinationId || "")
+          )?.precio || 0
+        );
 
   const fetchSellers = async () => {
     setLoadingSellers(true);
@@ -141,7 +143,7 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
       setSellerConfig({
         precio_paquete: Number(sellerResponse?.precio_paquete || 0),
         amortizacion: Number(sellerResponse?.amortizacion || 0),
-        saldo_por_paquete: Number(sellerResponse?.saldo_por_paquete || 0),
+        saldo_por_paquete: 0,
       });
       setBranchPrices(Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : []);
     } catch (error) {
@@ -451,7 +453,15 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
                         const originId = String(
                           row?.origen_sucursal?._id || row?.origen_sucursal || row?.sucursal?._id || row?.sucursal || ""
                         );
-                        const destinationOptions = routeOptionsByOrigin.get(originId) || [];
+                        const currentOriginName = String(
+                          row?.origen_sucursal?.nombre || row?.sucursal?.nombre || "Sucursal origen"
+                        );
+                        const destinationOptions = [
+                          { value: originId, label: currentOriginName },
+                          ...(routeOptionsByOrigin.get(originId) || []).filter(
+                            (item) => String(item.value) !== String(originId)
+                          ),
+                        ];
 
                         return (
                           <tr key={String(row._id)}>

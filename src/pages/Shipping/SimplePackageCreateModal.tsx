@@ -1,4 +1,4 @@
-import { Button, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
+import { Button, Card, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { getSellersBasicAPI, getSellerAPI } from "../../api/seller";
 import { getSimplePackageBranchPricesAPI, registerSimplePackagesAPI } from "../../api/simplePackage";
@@ -40,7 +40,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
     precio_paquete: 0,
     amortizacion: 0,
-    saldo_por_paquete: 0,
+      saldo_por_paquete: 0,
   });
   const [rows, setRows] = useState<SimplePackageDraftRow[]>([
     createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 }),
@@ -68,16 +68,23 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
 
   const destinationOptions = useMemo(() => {
     if (!selectedOriginId) return [];
-    return branchPrices
+    const sameOriginOption = originOptions.find((option) => String(option.value) === String(selectedOriginId));
+    const pricedOptions = branchPrices
       .filter((row: any) => String(row?.origen_sucursal?._id || row?.origen_sucursal || "") === String(selectedOriginId))
       .map((row: any) => ({
         value: String(row?.destino_sucursal?._id || row?.destino_sucursal || ""),
         label: String(row?.destino_sucursal?.nombre || "Sucursal destino"),
       }));
-  }, [branchPrices, selectedOriginId]);
+    return [
+      ...(sameOriginOption ? [{ value: sameOriginOption.value, label: sameOriginOption.label }] : []),
+      ...pricedOptions.filter((option) => String(option.value) !== String(selectedOriginId)),
+    ];
+  }, [branchPrices, originOptions, selectedOriginId]);
 
   const getBranchRoutePrice = (originId: string, destinationId?: string) =>
-    Number(routePriceMap.get(`${originId}::${destinationId || ""}`) || 0);
+    String(originId) === String(destinationId || "")
+      ? 0
+      : Number(routePriceMap.get(`${originId}::${destinationId || ""}`) || 0);
 
   const resetState = () => {
     setSelectedSellerId(initialSellerId || "");
@@ -135,7 +142,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
         const nextConfig = {
           precio_paquete: Number(seller?.precio_paquete || 0),
           amortizacion: Number(seller?.amortizacion || 0),
-          saldo_por_paquete: Number(seller?.saldo_por_paquete || 0),
+          saldo_por_paquete: 0,
         };
         const nextBranches = Array.isArray(seller?.pago_sucursales)
           ? seller.pago_sucursales.filter((branch: any) => Number(branch?.entrega_simple || 0) > 0)
@@ -214,6 +221,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
       descripcion_paquete: String(row.descripcion_paquete || "").trim(),
       destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
       package_size: "estandar",
+      saldo_por_paquete: Number(row.saldo_por_paquete || 0),
     }));
 
     for (let index = 0; index < paquetes.length; index += 1) {
@@ -375,6 +383,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                     <th style={tableCellStyle}>Descripcion del paquete</th>
                     <th style={tableCellStyle}>Celular</th>
                     <th style={tableCellStyle}>Sucursal destino</th>
+                    <th style={tableCellStyle}>Saldo por paquete</th>
                     <th style={tableCellStyle}>Precio entre sucursal</th>
                   </tr>
                 </thead>
@@ -412,6 +421,17 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                           placeholder="Destino"
                           disabled={!selectedOriginId}
                           onChange={(value) => updateRow(index, { destino_sucursal_id: String(value || "") })}
+                        />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <InputNumber
+                          min={0}
+                          style={{ width: "100%" }}
+                          addonBefore="Bs."
+                          value={Number(row.saldo_por_paquete || 0)}
+                          onChange={(value) =>
+                            updateRow(index, { saldo_por_paquete: Math.max(0, Number(value || 0)) })
+                          }
                         />
                       </td>
                       <td style={tableCellStyle}>

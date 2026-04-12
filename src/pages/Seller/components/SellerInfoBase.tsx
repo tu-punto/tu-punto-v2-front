@@ -109,7 +109,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       comision_porcentual: sellerData?.comision_porcentual || 0,
       amortizacion: sellerData?.amortizacion || 0,
       precio_paquete: sellerData?.precio_paquete || 0,
-      saldo_por_paquete: sellerData?.saldo_por_paquete || 0,
       sucursales: branches,
     };
   };
@@ -174,7 +173,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       form.setFieldsValue({
         amortizacion: 0,
         precio_paquete: 0,
-        saldo_por_paquete: 0,
       });
     }
   }, [form, serviceFlags.hasSimplePackageServiceEnabled]);
@@ -396,7 +394,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           comision_porcentual: seller.comision_porcentual || 0,
           amortizacion: seller.amortizacion || 0,
           precio_paquete: seller.precio_paquete || 0,
-          saldo_por_paquete: seller.saldo_por_paquete || 0,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -471,17 +468,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
             </Col>
             <Col xs={24} sm={12} md={6}>
               <Form.Item name="precio_paquete" label="Precio por paquete">
-                <InputNumber
-                  min={0}
-                  disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
-                  style={{ width: "100%" }}
-                  placeholder="0"
-                  addonBefore="Bs."
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Form.Item name="saldo_por_paquete" label="Saldo por paquete">
                 <InputNumber
                   min={0}
                   disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
