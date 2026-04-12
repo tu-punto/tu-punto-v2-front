@@ -109,6 +109,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       comision_porcentual: sellerData?.comision_porcentual || 0,
       amortizacion: sellerData?.amortizacion || 0,
       precio_paquete: sellerData?.precio_paquete || 0,
+      saldo_por_paquete: sellerData?.saldo_por_paquete || 0,
       sucursales: branches,
     };
   };
@@ -173,6 +174,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       form.setFieldsValue({
         amortizacion: 0,
         precio_paquete: 0,
+        saldo_por_paquete: 0,
       });
     }
   }, [form, serviceFlags.hasSimplePackageServiceEnabled]);
@@ -394,6 +396,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           comision_porcentual: seller.comision_porcentual || 0,
           amortizacion: seller.amortizacion || 0,
           precio_paquete: seller.precio_paquete || 0,
+          saldo_por_paquete: seller.saldo_por_paquete || 0,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -477,6 +480,17 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                 />
               </Form.Item>
             </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="saldo_por_paquete" label="Saldo por paquete">
+                <InputNumber
+                  min={0}
+                  disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                  style={{ width: "100%" }}
+                  placeholder="0"
+                  addonBefore="Bs."
+                />
+              </Form.Item>
+            </Col>
           </Row>
         </Card>
 
@@ -525,18 +539,22 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         </Card>
 
         {/* Secciones independientes */}
-        <SalesSection
-          initialSales={salesData}
-          onSalesChange={setSalesData}
-          onDeletedSalesChange={() => {}}
-          onUpdateNoPagadasTotal={() => {}}
-          onUpdateHistorialTotal={() => {}}
-          isSeller={isSeller}
-          onUpdateOneSale={handleUpdateSale}
-          onDeleteOneSale={handleDeleteSale}
-        />
+        {!(isSeller && serviceFlags.hasSimplePackageServiceEnabled) && (
+          <SalesSection
+            initialSales={salesData}
+            onSalesChange={setSalesData}
+            onDeletedSalesChange={() => {}}
+            onUpdateNoPagadasTotal={() => {}}
+            onUpdateHistorialTotal={() => {}}
+            isSeller={isSeller}
+            onUpdateOneSale={handleUpdateSale}
+            onDeleteOneSale={handleDeleteSale}
+          />
+        )}
 
-        <EntryHistorySection initialEntries={entryData} />
+        {!(isSeller && serviceFlags.hasSimplePackageServiceEnabled) && (
+          <EntryHistorySection initialEntries={entryData} />
+        )}
 
         <SellerDebtTable
           data={sellerDebts}

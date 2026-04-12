@@ -59,7 +59,7 @@ const LoginPage = () => {
       window.dispatchEvent(new Event("branch-header-updated"));
 
       if (normalizeRole(userRes.data?.role) === "seller") {
-        navigate("/seller-info");
+        navigate(userRes.data?.seller_has_simple_package_service ? "/simple-packages" : "/seller-info");
       } else {
         await sendHelloAPI("+59170186881");
         navigate("/stock");

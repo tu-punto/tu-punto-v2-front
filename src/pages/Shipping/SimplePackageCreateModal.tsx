@@ -1,13 +1,16 @@
-import { Button, Card, Input, InputNumber, Select, Space, Spin, Typography, message } from "antd";
-import { useContext, useEffect, useMemo, useState } from "react";
-import { getSellerAPI } from "../../api/seller";
+import { Button, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { getSellersBasicAPI, getSellerAPI } from "../../api/seller";
 import { getSimplePackageBranchPricesAPI, registerSimplePackagesAPI } from "../../api/simplePackage";
-import { UserContext } from "../../context/userContext";
-import {
-  createDraftRow,
-  resizeDraftRows,
-  SimplePackageDraftRow,
-} from "./simplePackageHelpers";
+import { branchesEnableSimplePackageService } from "../../utils/sellerServiceAccess";
+import { createDraftRow, resizeDraftRows, SimplePackageDraftRow } from "../SimplePackages/simplePackageHelpers";
+
+interface SimplePackageCreateModalProps {
+  visible: boolean;
+  initialSellerId?: string;
+  onClose: () => void;
+  onCreated: () => void;
+}
 
 const MIN_PACKAGES = 1;
 
@@ -23,39 +26,33 @@ type SellerConfig = {
   saldo_por_paquete: number;
 };
 
-const SimplePackagesPage = () => {
-  const { user }: any = useContext(UserContext);
-  const [loadingConfig, setLoadingConfig] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [packageCount, setPackageCount] = useState(MIN_PACKAGES);
-  const [generalDescription, setGeneralDescription] = useState("");
-  const [selectedOriginId, setSelectedOriginId] = useState("");
-  const [selectedDestinationId, setSelectedDestinationId] = useState("");
+const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated }: SimplePackageCreateModalProps) => {
+  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+  const [sellerOptions, setSellerOptions] = useState<any[]>([]);
   const [sellerBranches, setSellerBranches] = useState<any[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState("");
+  const [selectedOriginId, setSelectedOriginId] = useState("");
+  const [selectedDestinationId, setSelectedDestinationId] = useState("");
+  const [packageCount, setPackageCount] = useState(MIN_PACKAGES);
+  const [generalDescription, setGeneralDescription] = useState("");
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
-    precio_paquete: Number(user?.seller_precio_paquete || 0),
-    amortizacion: Number(user?.seller_amortizacion || 0),
-    saldo_por_paquete: Number(user?.seller_saldo_por_paquete || 0),
+    precio_paquete: 0,
+    amortizacion: 0,
+    saldo_por_paquete: 0,
   });
   const [rows, setRows] = useState<SimplePackageDraftRow[]>([
-    createDraftRow(0, {
-      precio_paquete: Number(user?.seller_precio_paquete || 0),
-      amortizacion: Number(user?.seller_amortizacion || 0),
-      saldo_por_paquete: Number(user?.seller_saldo_por_paquete || 0),
-    }),
+    createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 }),
   ]);
 
   const routePriceMap = useMemo(() => {
-    const map = new Map<string, { precio: number; destino: any }>();
+    const map = new Map<string, number>();
     branchPrices.forEach((row: any) => {
       const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
       const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
       if (!originId || !destinationId) return;
-      map.set(`${originId}::${destinationId}`, {
-        precio: Number(row?.precio || 0),
-        destino: row?.destino_sucursal,
-      });
+      map.set(`${originId}::${destinationId}`, Number(row?.precio || 0));
     });
     return map;
   }, [branchPrices]);
@@ -79,64 +76,89 @@ const SimplePackagesPage = () => {
       }));
   }, [branchPrices, selectedOriginId]);
 
-  const getBranchRoutePrice = (originId: string, destinationId?: string) => {
-    if (!originId || !destinationId) return 0;
-    return Number(routePriceMap.get(`${originId}::${destinationId}`)?.precio || 0);
+  const getBranchRoutePrice = (originId: string, destinationId?: string) =>
+    Number(routePriceMap.get(`${originId}::${destinationId || ""}`) || 0);
+
+  const resetState = () => {
+    setSelectedSellerId(initialSellerId || "");
+    setSelectedOriginId("");
+    setSelectedDestinationId("");
+    setPackageCount(MIN_PACKAGES);
+    setGeneralDescription("");
+    setSellerBranches([]);
+    setSellerConfig({ precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 });
+    setRows([createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 })]);
   };
 
   useEffect(() => {
-    const fetchSellerConfig = async () => {
-      if (!user?.id_vendedor) {
-        setLoadingConfig(false);
-        return;
-      }
+    if (!visible) return;
 
+    const loadBaseData = async () => {
+      setLoadingData(true);
       try {
-        const [seller, branchPricesResponse] = await Promise.all([
-          getSellerAPI(user.id_vendedor),
+        const [sellersResponse, pricesResponse] = await Promise.all([
+          getSellersBasicAPI({ onlyActiveOrRenewal: true }),
           getSimplePackageBranchPricesAPI(),
         ]);
+        const sellers = (Array.isArray(sellersResponse) ? sellersResponse : []).filter((seller: any) =>
+          branchesEnableSimplePackageService(seller?.pago_sucursales || [])
+        );
 
+        setSellerOptions(
+          sellers.map((seller: any) => ({
+            value: String(seller?._id || ""),
+            label:
+              `${String(seller?.nombre || "").trim()} ${String(seller?.apellido || "").trim()}`.trim() ||
+              String(seller?.mail || "Vendedor"),
+          }))
+        );
+        setBranchPrices(Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : []);
+        setSelectedSellerId(String(initialSellerId || sellers[0]?._id || ""));
+      } catch (error) {
+        console.error(error);
+        message.error("No se pudieron cargar los vendedores del servicio");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    void loadBaseData();
+  }, [visible, initialSellerId]);
+
+  useEffect(() => {
+    if (!visible || !selectedSellerId) return;
+
+    const loadSeller = async () => {
+      setLoadingData(true);
+      try {
+        const seller = await getSellerAPI(selectedSellerId);
         const nextConfig = {
-          precio_paquete: Number(seller?.precio_paquete ?? user?.seller_precio_paquete ?? 0),
-          amortizacion: Number(seller?.amortizacion ?? user?.seller_amortizacion ?? 0),
-          saldo_por_paquete: Number(seller?.saldo_por_paquete ?? user?.seller_saldo_por_paquete ?? 0),
+          precio_paquete: Number(seller?.precio_paquete || 0),
+          amortizacion: Number(seller?.amortizacion || 0),
+          saldo_por_paquete: Number(seller?.saldo_por_paquete || 0),
         };
         const nextBranches = Array.isArray(seller?.pago_sucursales)
           ? seller.pago_sucursales.filter((branch: any) => Number(branch?.entrega_simple || 0) > 0)
           : [];
-        const currentBranchId = localStorage.getItem("sucursalId") || "";
-        const defaultOriginId =
-          nextBranches.find(
-            (branch: any) => String(branch?.id_sucursal?._id || branch?.id_sucursal || "") === String(currentBranchId)
-          )?.id_sucursal?._id ||
-          nextBranches.find(
-            (branch: any) => String(branch?.id_sucursal || "") === String(currentBranchId)
-          )?.id_sucursal ||
-          nextBranches[0]?.id_sucursal?._id ||
-          nextBranches[0]?.id_sucursal ||
-          "";
+        const defaultOrigin = String(nextBranches[0]?.id_sucursal?._id || nextBranches[0]?.id_sucursal || "");
 
         setSellerConfig(nextConfig);
         setSellerBranches(nextBranches);
-        setBranchPrices(Array.isArray(branchPricesResponse?.rows) ? branchPricesResponse.rows : []);
-        setSelectedOriginId(String(defaultOriginId || ""));
+        setSelectedOriginId(defaultOrigin);
+        setSelectedDestinationId("");
+        setPackageCount(MIN_PACKAGES);
+        setGeneralDescription("");
         setRows(resizeDraftRows(MIN_PACKAGES, [], nextConfig));
       } catch (error) {
         console.error(error);
-        message.error("No se pudo cargar la configuracion del servicio");
+        message.error("No se pudo cargar la configuracion del vendedor");
       } finally {
-        setLoadingConfig(false);
+        setLoadingData(false);
       }
     };
 
-    void fetchSellerConfig();
-  }, [
-    user?.id_vendedor,
-    user?.seller_amortizacion,
-    user?.seller_precio_paquete,
-    user?.seller_saldo_por_paquete,
-  ]);
+    void loadSeller();
+  }, [selectedSellerId, visible]);
 
   useEffect(() => {
     if (!selectedOriginId) return;
@@ -176,64 +198,26 @@ const SimplePackagesPage = () => {
     );
   };
 
-  const handlePackageCountChange = (value: number | null) => {
-    const nextCount = Math.max(MIN_PACKAGES, Number(value || MIN_PACKAGES));
-    setPackageCount(nextCount);
-    setRows((prev) => resizeDraftRows(nextCount, prev, sellerConfig));
-  };
-
-  const handleApplyDescription = () => {
-    const description = String(generalDescription || "").trim();
-    if (!description) {
-      message.warning("Escribe una descripcion general antes de aplicarla");
+  const handleSave = async () => {
+    if (!selectedSellerId) {
+      message.error("Selecciona un vendedor");
       return;
     }
-
-    setRows((prev) =>
-      prev.map((row, index) =>
-        createDraftRow(index, sellerConfig, {
-          ...row,
-          descripcion_paquete: description,
-        })
-      )
-    );
-    message.success("Descripcion aplicada a todos los paquetes");
-  };
-
-  const handleApplyDestination = () => {
-    if (!selectedDestinationId) {
-      message.warning("Selecciona una sucursal destino para aplicarla");
-      return;
-    }
-
-    setRows((prev) =>
-      prev.map((row, index) =>
-        createDraftRow(index, sellerConfig, {
-          ...row,
-          destino_sucursal_id: selectedDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, selectedDestinationId),
-        })
-      )
-    );
-    message.success("Sucursal destino aplicada a todos los paquetes");
-  };
-
-  const handleSubmit = async () => {
     if (!selectedOriginId) {
       message.error("Selecciona una sucursal de origen");
       return;
     }
 
-    const payloadRows = rows.map((row) => ({
+    const paquetes = rows.map((row) => ({
       comprador: String(row.comprador || "").trim(),
       telefono_comprador: String(row.telefono_comprador || "").trim(),
       descripcion_paquete: String(row.descripcion_paquete || "").trim(),
       destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
-      package_size: row.package_size,
+      package_size: "estandar",
     }));
 
-    for (let index = 0; index < payloadRows.length; index += 1) {
-      const row = payloadRows[index];
+    for (let index = 0; index < paquetes.length; index += 1) {
+      const row = paquetes[index];
       if (!row.comprador && !row.telefono_comprador) {
         message.error(`Paquete ${index + 1}: ingresa nombre o celular del comprador`);
         return;
@@ -243,17 +227,17 @@ const SimplePackagesPage = () => {
         return;
       }
       if (!row.destino_sucursal_id) {
-        message.error(`Paquete ${index + 1}: selecciona la sucursal destino`);
+        message.error(`Paquete ${index + 1}: selecciona una sucursal destino`);
         return;
       }
     }
 
-    setSaving(true);
+    setLoading(true);
     try {
       const response = await registerSimplePackagesAPI({
-        sellerId: user?.id_vendedor,
+        sellerId: selectedSellerId,
         originBranchId: selectedOriginId,
-        paquetes: payloadRows,
+        paquetes,
       });
 
       if (!response.success) {
@@ -261,39 +245,56 @@ const SimplePackagesPage = () => {
         return;
       }
 
-      message.success(`Se registraron ${response.createdCount || payloadRows.length} paquetes`);
-      setPackageCount(MIN_PACKAGES);
-      setGeneralDescription("");
-      setSelectedDestinationId("");
-      setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
+      message.success(`Se registraron ${response.createdCount || paquetes.length} paquetes`);
+      resetState();
+      onCreated();
     } catch (error) {
       console.error(error);
-      message.error("Error registrando paquetes");
+      message.error("Error registrando paquetes del servicio");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
-          <img src="/box-icon.png" alt="Paquetes" className="w-8 h-8" />
-          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">Paquetes del servicio</h1>
-        </div>
-      </div>
-
-      <Spin spinning={loadingConfig}>
-        <Space direction="vertical" size={16} style={{ display: "flex" }}>
+    <Modal
+      title="Crear paquetes del servicio"
+      open={visible}
+      onCancel={() => {
+        resetState();
+        onClose();
+      }}
+      footer={null}
+      width={1180}
+      destroyOnClose
+    >
+      <Spin spinning={loadingData}>
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
           <Card>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[220px_240px_1fr_auto] gap-3 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_220px_220px_1fr_auto] gap-3 items-end">
+              <div>
+                <Typography.Text strong>Vendedor</Typography.Text>
+                <Select
+                  style={{ width: "100%", marginTop: 8 }}
+                  value={selectedSellerId || undefined}
+                  onChange={(value) => setSelectedSellerId(String(value || ""))}
+                  options={sellerOptions}
+                  placeholder="Selecciona un vendedor"
+                  showSearch
+                  optionFilterProp="label"
+                />
+              </div>
               <div>
                 <Typography.Text strong>Numero de paquetes</Typography.Text>
                 <InputNumber
                   min={MIN_PACKAGES}
                   style={{ width: "100%", marginTop: 8 }}
                   value={packageCount}
-                  onChange={handlePackageCountChange}
+                  onChange={(value) => {
+                    const nextCount = Math.max(MIN_PACKAGES, Number(value || MIN_PACKAGES));
+                    setPackageCount(nextCount);
+                    setRows((prev) => resizeDraftRows(nextCount, prev, sellerConfig));
+                  }}
                 />
               </div>
               <div>
@@ -303,7 +304,7 @@ const SimplePackagesPage = () => {
                   value={selectedOriginId || undefined}
                   onChange={(value) => setSelectedOriginId(String(value || ""))}
                   options={originOptions}
-                  placeholder="Selecciona origen"
+                  placeholder="Origen"
                 />
               </div>
               <div>
@@ -313,12 +314,25 @@ const SimplePackagesPage = () => {
                   value={selectedDestinationId || undefined}
                   onChange={(value) => setSelectedDestinationId(String(value || ""))}
                   options={destinationOptions}
-                  placeholder="Selecciona destino"
-                  disabled={!selectedOriginId}
+                  placeholder="Destino"
                   allowClear
+                  disabled={!selectedOriginId}
                 />
               </div>
-              <Button onClick={handleApplyDestination} disabled={!selectedOriginId || !selectedDestinationId}>
+              <Button
+                disabled={!selectedOriginId || !selectedDestinationId}
+                onClick={() =>
+                  setRows((prev) =>
+                    prev.map((row, index) =>
+                      createDraftRow(index, sellerConfig, {
+                        ...row,
+                        destino_sucursal_id: selectedDestinationId,
+                        precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, selectedDestinationId),
+                      })
+                    )
+                  )
+                }
+              >
                 Usar destino en todos
               </Button>
             </div>
@@ -332,10 +346,23 @@ const SimplePackagesPage = () => {
                   style={{ marginTop: 8 }}
                   value={generalDescription}
                   onChange={(event) => setGeneralDescription(event.target.value)}
-                  placeholder="Ej: Ropa otoño, lote abril, accesorios pequeños"
+                  placeholder="Ej: Lote abril, cajas pequeñas, ropa nueva"
                 />
               </div>
-              <Button onClick={handleApplyDescription}>Usar en todos</Button>
+              <Button
+                onClick={() =>
+                  setRows((prev) =>
+                    prev.map((row, index) =>
+                      createDraftRow(index, sellerConfig, {
+                        ...row,
+                        descripcion_paquete: String(generalDescription || "").trim(),
+                      })
+                    )
+                  )
+                }
+              >
+                Usar en todos
+              </Button>
             </div>
           </Card>
 
@@ -357,24 +384,19 @@ const SimplePackagesPage = () => {
                       <td style={tableCellStyle}>
                         <Input
                           value={row.comprador}
-                          placeholder="Nombre del comprador"
                           onChange={(event) => updateRow(index, { comprador: event.target.value })}
                         />
                       </td>
                       <td style={tableCellStyle}>
                         <Input.TextArea
                           value={row.descripcion_paquete}
-                          placeholder="Descripcion"
                           autoSize={{ minRows: 1, maxRows: 5 }}
-                          onChange={(event) =>
-                            updateRow(index, { descripcion_paquete: event.target.value })
-                          }
+                          onChange={(event) => updateRow(index, { descripcion_paquete: event.target.value })}
                         />
                       </td>
                       <td style={tableCellStyle}>
                         <Input
                           value={row.telefono_comprador}
-                          placeholder="Celular"
                           onChange={(event) =>
                             updateRow(index, {
                               telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
@@ -389,16 +411,11 @@ const SimplePackagesPage = () => {
                           options={destinationOptions}
                           placeholder="Destino"
                           disabled={!selectedOriginId}
-                          onChange={(value) =>
-                            updateRow(index, { destino_sucursal_id: String(value || "") })
-                          }
+                          onChange={(value) => updateRow(index, { destino_sucursal_id: String(value || "") })}
                         />
                       </td>
                       <td style={tableCellStyle}>
-                        <Input
-                          value={`Bs. ${Number(row.precio_entre_sucursal || 0).toFixed(2)}`}
-                          readOnly
-                        />
+                        <Input value={`Bs. ${Number(row.precio_entre_sucursal || 0).toFixed(2)}`} readOnly />
                       </td>
                     </tr>
                   ))}
@@ -406,6 +423,7 @@ const SimplePackagesPage = () => {
               </table>
             </div>
           </Card>
+
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button
               onClick={() => {
@@ -417,14 +435,14 @@ const SimplePackagesPage = () => {
             >
               Limpiar
             </Button>
-            <Button type="primary" loading={saving} onClick={handleSubmit}>
+            <Button type="primary" loading={loading} onClick={handleSave}>
               Guardar paquetes
             </Button>
           </div>
         </Space>
       </Spin>
-    </div>
+    </Modal>
   );
 };
 
-export default SimplePackagesPage;
+export default SimplePackageCreateModal;

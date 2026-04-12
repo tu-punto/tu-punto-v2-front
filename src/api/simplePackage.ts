@@ -40,6 +40,28 @@ export const getUploadedSimplePackageSellersAPI = async () => {
   }
 };
 
+export const getSimplePackageBranchPricesAPI = async (params?: { originBranchId?: string }) => {
+  try {
+    const res = await apiClient.get("/simple-packages/branch-prices", { params });
+    return res.data;
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
+export const upsertSimplePackageBranchPriceAPI = async (payload: {
+  originBranchId: string;
+  destinationBranchId: string;
+  precio: number;
+}) => {
+  try {
+    const res = await apiClient.post("/simple-packages/branch-prices", payload);
+    return { success: true, ...res.data };
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
 export const updateSimplePackageAPI = async (id: string, payload: any) => {
   try {
     const res = await apiClient.put(`/simple-packages/${id}`, payload);

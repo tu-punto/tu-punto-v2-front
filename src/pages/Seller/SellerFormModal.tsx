@@ -83,6 +83,7 @@ export default function SellerFormModal({
       form.setFieldsValue({
         amortizacion: 0,
         precio_paquete: 0,
+        saldo_por_paquete: 0,
       });
     }
   }, [form, serviceFlags.hasSimplePackageService]);
@@ -266,6 +267,16 @@ export default function SellerFormModal({
           </Col>
           <Col xs={24} md={6}>
             <Form.Item label="Precio por paquete" name="precio_paquete">
+              <InputNumber
+                min={0}
+                addonBefore="Bs."
+                className="w-full"
+                disabled={!serviceFlags.hasSimplePackageService}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={6}>
+            <Form.Item label="Saldo por paquete" name="saldo_por_paquete">
               <InputNumber
                 min={0}
                 addonBefore="Bs."
