@@ -51,6 +51,7 @@ export const createDraftRow = (
 ): SimplePackageDraftRow => {
   const packageSize = existing?.package_size === "grande" ? "grande" : "estandar";
   const routePrice = Number(existing?.precio_entre_sucursal || 0);
+  const saldoPorPaquete = Number(existing?.saldo_por_paquete ?? config.saldo_por_paquete ?? 0);
   return {
     key: existing?.key || existing?._id || `draft-${index}-${Date.now()}`,
     comprador: existing?.comprador || "",
@@ -64,7 +65,7 @@ export const createDraftRow = (
     ...buildPackagePricing(
       config.precio_paquete,
       config.amortizacion,
-      config.saldo_por_paquete,
+      saldoPorPaquete,
       packageSize,
       routePrice
     ),
@@ -91,6 +92,7 @@ export const calculateSimplePackageTotals = (rows: SimplePackageDraftRow[]) =>
       precio_entre_sucursal: roundCurrency(
         acc.precio_entre_sucursal + Number(row?.precio_entre_sucursal || 0)
       ),
+      precio_total: roundCurrency(acc.precio_total + Number(row?.precio_total || 0)),
     }),
     {
       precio_paquete: 0,
@@ -98,6 +100,7 @@ export const calculateSimplePackageTotals = (rows: SimplePackageDraftRow[]) =>
       saldo_por_paquete: 0,
       deuda_comprador: 0,
       precio_entre_sucursal: 0,
+      precio_total: 0,
     }
   );
 
@@ -114,7 +117,9 @@ export const applyPackagePatch = (
         : row.package_size;
   const unitPrice = Number(config?.precio_paquete ?? (row?.precio_paquete_unitario || 0));
   const amortizacion = Number(config?.amortizacion ?? (row?.amortizacion_vendedor || 0));
-  const saldoPorPaquete = Number(config?.saldo_por_paquete ?? (row?.saldo_por_paquete || 0));
+  const saldoPorPaquete = Number(
+    patch.saldo_por_paquete ?? config?.saldo_por_paquete ?? (row?.saldo_por_paquete || 0)
+  );
   const branchRoutePrice = Number(patch.precio_entre_sucursal ?? (row?.precio_entre_sucursal || 0));
   const pricing = buildPackagePricing(
     unitPrice,

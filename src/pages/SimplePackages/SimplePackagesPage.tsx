@@ -71,18 +71,24 @@ const SimplePackagesPage = () => {
 
   const destinationOptions = useMemo(() => {
     if (!selectedOriginId) return [];
+    const allowedBranchIds = new Set(
+      sellerBranches
+        .map((branch: any) => String(branch?.id_sucursal?._id || branch?.id_sucursal || ""))
+        .filter(Boolean)
+    );
     const sameOriginOption = originOptions.find((option) => String(option.value) === String(selectedOriginId));
     const pricedOptions = branchPrices
       .filter((row: any) => String(row?.origen_sucursal?._id || row?.origen_sucursal || "") === String(selectedOriginId))
       .map((row: any) => ({
         value: String(row?.destino_sucursal?._id || row?.destino_sucursal || ""),
         label: String(row?.destino_sucursal?.nombre || "Sucursal destino"),
-      }));
+      }))
+      .filter((option) => allowedBranchIds.has(String(option.value)));
     return [
       ...(sameOriginOption ? [{ value: sameOriginOption.value, label: sameOriginOption.label }] : []),
       ...pricedOptions.filter((option) => String(option.value) !== String(selectedOriginId)),
     ];
-  }, [branchPrices, originOptions, selectedOriginId]);
+  }, [branchPrices, originOptions, selectedOriginId, sellerBranches]);
 
   const getBranchRoutePrice = (originId: string, destinationId?: string) => {
     if (!originId || !destinationId) return 0;
@@ -273,7 +279,7 @@ const SimplePackagesPage = () => {
       message.success(`Se registraron ${response.createdCount || payloadRows.length} paquetes`);
       setPackageCount(MIN_PACKAGES);
       setGeneralDescription("");
-      setSelectedDestinationId("");
+      setSelectedDestinationId(String(selectedOriginId || ""));
       setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
     } catch (error) {
       console.error(error);
@@ -324,7 +330,6 @@ const SimplePackagesPage = () => {
                   options={destinationOptions}
                   placeholder="Selecciona destino"
                   disabled={!selectedOriginId}
-                  allowClear
                 />
               </div>
               <Button onClick={handleApplyDestination} disabled={!selectedOriginId || !selectedDestinationId}>
@@ -357,8 +362,9 @@ const SimplePackagesPage = () => {
                     <th style={tableCellStyle}>Descripcion del paquete</th>
                     <th style={tableCellStyle}>Celular</th>
                     <th style={tableCellStyle}>Sucursal destino</th>
-                    <th style={tableCellStyle}>Saldo por paquete</th>
-                    <th style={tableCellStyle}>Precio entre sucursal</th>
+                    <th style={tableCellStyle}>Saldo del paquete</th>
+                    <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
+                    <th style={tableCellStyle}>Precio total del servicio por paquete (sujeto a variacion segun el tamaño del paquete)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -421,6 +427,9 @@ const SimplePackagesPage = () => {
                           readOnly
                         />
                       </td>
+                      <td style={tableCellStyle}>
+                        <Input value={`Bs. ${Number(row.precio_total || 0).toFixed(2)}`} readOnly />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -432,7 +441,7 @@ const SimplePackagesPage = () => {
               onClick={() => {
                 setPackageCount(MIN_PACKAGES);
                 setGeneralDescription("");
-                setSelectedDestinationId("");
+                setSelectedDestinationId(String(selectedOriginId || ""));
                 setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
               }}
             >

@@ -89,6 +89,7 @@ export const getPaymentProofsBySellerIdAPI = async (sellerId: any) => {
 export const getSellersBasicAPI = async (params?: {
     sucursalId?: string;
     onlyProductInfoAccess?: boolean;
+    onlySimplePackageAccess?: boolean;
     includeProductInfoStatus?: boolean;
     onlyActiveOrRenewal?: boolean;
 }) => {

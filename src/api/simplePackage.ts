@@ -20,6 +20,7 @@ export const registerSimplePackagesAPI = async (payload: any) => {
 
 export const getSimplePackagesListAPI = async (params?: {
   sellerId?: string;
+  originBranchId?: string;
   from?: string;
   to?: string;
 }) => {
@@ -31,9 +32,9 @@ export const getSimplePackagesListAPI = async (params?: {
   }
 };
 
-export const getUploadedSimplePackageSellersAPI = async () => {
+export const getUploadedSimplePackageSellersAPI = async (params?: { originBranchId?: string }) => {
   try {
-    const res = await apiClient.get("/simple-packages/uploaded-sellers");
+    const res = await apiClient.get("/simple-packages/uploaded-sellers", { params });
     return res.data;
   } catch (error) {
     return parseAxiosError(error);
