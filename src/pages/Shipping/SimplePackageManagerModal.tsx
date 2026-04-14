@@ -23,6 +23,7 @@ import { isSuperadminUser } from "../../utils/role";
 interface SimplePackageManagerModalProps {
   visible: boolean;
   onClose: () => void;
+  onChanged?: () => void;
 }
 
 const MIN_PACKAGES = 1;
@@ -47,9 +48,10 @@ const summaryCardStyle: React.CSSProperties = {
 
 const getBranchId = (value: any) => String(value?._id || value || "").trim();
 
-const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerModalProps) => {
+const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackageManagerModalProps) => {
   const { user }: any = useContext(UserContext);
   const currentSucursalId = String(localStorage.getItem("sucursalId") || "").trim();
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 768 : false));
 
   const [loadingSellers, setLoadingSellers] = useState(false);
   const [loadingRows, setLoadingRows] = useState(false);
@@ -313,6 +315,13 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
   }, [visible]);
 
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
     if (!visible || !selectedSellerId || creating) return;
     void fetchPackages(selectedSellerId);
   }, [visible, selectedSellerId, creating]);
@@ -346,14 +355,6 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
       })
     );
   }, [createDestinationOptions, createOriginId, createSellerConfig, creating, routeOptionsByOrigin]);
-
-  const openCreateMode = () => {
-    setCreating(true);
-    setCreatePackageCount(MIN_PACKAGES);
-    setCreateGeneralDescription("");
-    setCreateRows([createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 })]);
-    setCreateSellerId(selectedSellerId || String(createSellerOptions[0]?._id || ""));
-  };
 
   const commitRowPatch = async (rowId: string, patch: Record<string, unknown>) => {
     const previousRows = rows;
@@ -588,6 +589,49 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
     }
   };
 
+  const handleCreateCurrentRows = () => {
+    if (!selectedSellerId) {
+      message.warning("Selecciona un vendedor");
+      return;
+    }
+    if (!rows.length) {
+      message.warning("Este vendedor no tiene paquetes para crear");
+      return;
+    }
+
+    const pendingRows = rows.filter((row) => !row?.is_external);
+    if (!pendingRows.length) {
+      message.info("Todos los paquetes de esta tabla ya fueron creados en pedidos");
+      return;
+    }
+
+    Modal.confirm({
+      title: "Crear pedidos simples",
+      content: `Se crearán ${pendingRows.length} pedidos simples en la tabla de pedidos. ¿Continuar?`,
+      okText: "Crear",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const responses = await Promise.all(
+            pendingRows.map((row) => updateSimplePackageAPI(String(row._id), { is_external: true }))
+          );
+          const failed = responses.find((response: any) => !response?.success);
+          if (failed) {
+            message.error(failed.message || "No se pudieron crear los pedidos simples");
+            return;
+          }
+
+          message.success(`Se crearon ${pendingRows.length} pedidos simples`);
+          await fetchPackages(selectedSellerId);
+          onChanged?.();
+        } catch (error) {
+          console.error(error);
+          message.error("Error creando los pedidos simples");
+        }
+      },
+    });
+  };
+
   return (
     <>
       <Modal
@@ -598,17 +642,26 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
           onClose();
         }}
         footer={null}
-        width={1480}
+        width={isMobile ? "96vw" : 1480}
         style={{ maxWidth: "98vw" }}
         destroyOnClose
       >
-        <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 16, minHeight: 520 }}>
-          <div style={{ borderRight: "1px solid #f0f0f0", paddingRight: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "240px 1fr", gap: 16, minHeight: 520 }}>
+          <div style={{ borderRight: isMobile ? "none" : "1px solid #f0f0f0", paddingRight: isMobile ? 0 : 12 }}>
             <Typography.Title level={5} style={{ marginTop: 0 }}>
               Vendedores
             </Typography.Title>
             <Spin spinning={loadingSellers}>
-              <Space direction="vertical" style={{ width: "100%" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: isMobile ? "row" : "column",
+                  gap: 12,
+                  width: "100%",
+                  overflowX: isMobile ? "auto" : "visible",
+                  paddingBottom: isMobile ? 4 : 0,
+                }}
+              >
                 {sellerRows.map((seller) => {
                   const isActive = String(seller._id) === String(selectedSellerId);
                   return (
@@ -620,7 +673,8 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
                         setSelectedSellerId(String(seller._id));
                       }}
                       style={{
-                        width: "100%",
+                        width: isMobile ? 220 : "100%",
+                        minWidth: isMobile ? 220 : undefined,
                         textAlign: "left",
                         padding: "12px 14px",
                         borderRadius: 12,
@@ -633,8 +687,8 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
                     </button>
                   );
                 })}
-                {!loadingSellers && sellerRows.length === 0 && <Empty description="No hay vendedores con paquetes cargados" />}
-              </Space>
+              </div>
+              {!loadingSellers && sellerRows.length === 0 && <Empty description="No hay vendedores con paquetes cargados" />}
             </Spin>
           </div>
           <div>
@@ -671,7 +725,7 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
               </div>
               <Space wrap>
                 {!creating ? (
-                  <Button type="primary" onClick={openCreateMode}>
+                  <Button type="primary" onClick={handleCreateCurrentRows}>
                     Crear paquetes
                   </Button>
                 ) : (
@@ -954,7 +1008,8 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
                   ) : rows.length === 0 ? (
                     <Empty description="Este vendedor no tiene paquetes cargados en tu sucursal" />
                   ) : (
-                    <div style={{ overflowX: "auto" }}>
+                    <>
+                    <div className="hidden md:block" style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                         <thead>
                           <tr style={{ background: "#f8fafc" }}>
@@ -1077,6 +1132,119 @@ const SimplePackageManagerModal = ({ visible, onClose }: SimplePackageManagerMod
                         </tbody>
                       </table>
                     </div>
+                    <div className="md:hidden space-y-3">
+                      {rows.map((row) => {
+                        const rowId = String(row._id);
+                        const isSaving = savingRowIds.includes(rowId);
+                        const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
+                        const currentOriginName = String(
+                          row?.origen_sucursal?.nombre || row?.sucursal?.nombre || "Sucursal origen"
+                        );
+                        const destinationOptions = getDestinationOptions(
+                          originId,
+                          allowedSelectedSellerBranchIds,
+                          currentOriginName
+                        );
+
+                        return (
+                          <div key={rowId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <Typography.Text strong>{row.comprador || "Sin comprador"}</Typography.Text>
+                              <Typography.Text type="secondary">
+                                Total: Bs. {Number(row.precio_total || 0).toFixed(2)}
+                              </Typography.Text>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <Typography.Text strong>Descripcion del paquete</Typography.Text>
+                                <Input.TextArea className="mt-1" value={row.descripcion_paquete || ""} readOnly autoSize={{ minRows: 2, maxRows: 4 }} style={readonlyBuyerStyle} />
+                              </div>
+                              <div>
+                                <Typography.Text strong>Celular</Typography.Text>
+                                <Input className="mt-1" value={row.telefono_comprador || ""} readOnly style={readonlyBuyerStyle} />
+                              </div>
+                              <div>
+                                <Typography.Text strong>Sucursal destino</Typography.Text>
+                                <Select
+                                  className="mt-1"
+                                  value={getBranchId(row?.destino_sucursal) || undefined}
+                                  style={{ width: "100%" }}
+                                  disabled={isSaving}
+                                  options={destinationOptions}
+                                  onChange={(value) => commitRowPatch(rowId, { destino_sucursal: value })}
+                                />
+                              </div>
+                              <div>
+                                <Typography.Text strong>Tamaño</Typography.Text>
+                                <Select
+                                  className="mt-1"
+                                  value={row.package_size || "estandar"}
+                                  style={{ width: "100%" }}
+                                  disabled={isSaving}
+                                  options={[
+                                    { label: "Estandar", value: "estandar" },
+                                    { label: "Grande", value: "grande" },
+                                  ]}
+                                  onChange={(value) => commitRowPatch(rowId, { package_size: value })}
+                                />
+                              </div>
+                              <div className="grid grid-cols-1 gap-3">
+                                <div>
+                                  <Typography.Text strong>Precio del envio</Typography.Text>
+                                  <InputNumber
+                                    className="mt-1"
+                                    min={0}
+                                    style={{ width: "100%" }}
+                                    addonBefore="Bs."
+                                    disabled={isSaving}
+                                    value={Number(row.precio_entre_sucursal || 0)}
+                                    onChange={(value) =>
+                                      setRows((current) =>
+                                        current.map((currentRow) =>
+                                          String(currentRow._id) === rowId
+                                            ? applyPackagePatch(
+                                                currentRow,
+                                                { precio_entre_sucursal: Math.max(0, Number(value || 0)) },
+                                                sellerConfig
+                                              )
+                                            : currentRow
+                                        )
+                                      )
+                                    }
+                                    onBlur={() => {
+                                      const currentRow = rows.find((item) => String(item._id) === rowId);
+                                      void commitRowPatch(rowId, {
+                                        precio_entre_sucursal: Math.max(0, Number(currentRow?.precio_entre_sucursal || 0)),
+                                      });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <Typography.Text strong>Precio paquete</Typography.Text>
+                                  <Input className="mt-1" value={`Bs. ${Number(row.precio_paquete || 0).toFixed(2)}`} readOnly />
+                                </div>
+                                <div>
+                                  <Typography.Text strong>Saldo del paquete</Typography.Text>
+                                  <Input className="mt-1" value={`Bs. ${Number(row.saldo_por_paquete || 0).toFixed(2)}`} readOnly />
+                                </div>
+                                <div>
+                                  <Typography.Text strong>Deuda vendedor</Typography.Text>
+                                  <Input className="mt-1" value={`Bs. ${Number(row.amortizacion_vendedor || 0).toFixed(2)}`} readOnly />
+                                </div>
+                                <div>
+                                  <Typography.Text strong>Deuda comprador</Typography.Text>
+                                  <Input className="mt-1" value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
+                                </div>
+                              </div>
+                              <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
+                                Borrar
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    </>
                   )}
                 </Spin>
               </>

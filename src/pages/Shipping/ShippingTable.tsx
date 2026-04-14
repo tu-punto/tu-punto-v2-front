@@ -157,7 +157,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         const estadoPedido = externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : "En Espera");
         const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
         const sucursalOrigen = typeof externalSale?.sucursal === "object" ? externalSale.sucursal : null;
-        const sucursalNombre = sucursalOrigen?.nombre || externalSale?.lugar_entrega || "Externo";
+        const destinationLabel =
+            externalSale?.lugar_entrega ||
+            externalSale?.destino_sucursal?.nombre ||
+            sucursalOrigen?.nombre ||
+            (externalSale?.service_origin === "simple_package" ? "Simple" : "Externo");
 
         return {
             ...externalSale,
@@ -169,7 +173,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             hora_entrega_acordada: fechaBase,
             hora_entrega_real: externalSale?.hora_entrega_real || fechaBase,
             lugar_origen: sucursalOrigen,
-            lugar_entrega: sucursalNombre,
+            lugar_entrega: destinationLabel,
             id_sucursal: sucursalOrigen?._id || externalSale?.sucursal || externalSale?.id_sucursal,
             sucursal: sucursalOrigen,
             estado_pedido: estadoPedido,
@@ -458,6 +462,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             key: 'vendedor',
             render: (_: any, record: any) => {
                 if (record.is_external) {
+                    if (String(record?.service_origin || "") === "simple_package") {
+                        return <span style={{ color: '#fa8c16', fontWeight: 700 }}>Simple</span>;
+                    }
                     return <span style={{ color: '#cf1322', fontWeight: 700 }}>Externo</span>;
                 }
 
@@ -1024,6 +1031,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             <SimplePackageManagerModal
                 visible={isSimplePackageManagerVisible}
                 onClose={() => setIsSimplePackageManagerVisible(false)}
+                onChanged={() => {
+                    fetchShippings();
+                }}
             />
         </div>
     );

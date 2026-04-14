@@ -354,7 +354,7 @@ const SimplePackagesPage = () => {
           </Card>
 
           <Card bodyStyle={{ padding: 0 }}>
-            <div style={{ overflowX: "auto" }}>
+            <div className="hidden md:block" style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
@@ -435,8 +435,94 @@ const SimplePackagesPage = () => {
                 </tbody>
               </table>
             </div>
+            <div className="md:hidden p-3 space-y-3">
+              {rows.map((row, index) => (
+                <div key={row.key} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between">
+                    <Typography.Text strong>Paquete {index + 1}</Typography.Text>
+                    <Typography.Text type="secondary">
+                      Total: Bs. {Number(row.precio_total || 0).toFixed(2)}
+                    </Typography.Text>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <Typography.Text strong>Nombre del comprador</Typography.Text>
+                      <Input
+                        className="mt-1"
+                        value={row.comprador}
+                        placeholder="Nombre del comprador"
+                        onChange={(event) => updateRow(index, { comprador: event.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text strong>Descripcion del paquete</Typography.Text>
+                      <Input.TextArea
+                        className="mt-1"
+                        value={row.descripcion_paquete}
+                        placeholder="Descripcion"
+                        autoSize={{ minRows: 2, maxRows: 5 }}
+                        onChange={(event) => updateRow(index, { descripcion_paquete: event.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text strong>Celular</Typography.Text>
+                      <Input
+                        className="mt-1"
+                        value={row.telefono_comprador}
+                        placeholder="Celular"
+                        onChange={(event) =>
+                          updateRow(index, {
+                            telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text strong>Sucursal destino</Typography.Text>
+                      <Select
+                        className="mt-1"
+                        style={{ width: "100%" }}
+                        value={row.destino_sucursal_id || undefined}
+                        options={destinationOptions}
+                        placeholder="Destino"
+                        disabled={!selectedOriginId}
+                        onChange={(value) => updateRow(index, { destino_sucursal_id: String(value || "") })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Typography.Text strong>Saldo del paquete</Typography.Text>
+                        <InputNumber
+                          className="mt-1"
+                          min={0}
+                          style={{ width: "100%" }}
+                          addonBefore="Bs."
+                          value={Number(row.saldo_por_paquete || 0)}
+                          onChange={(value) =>
+                            updateRow(index, { saldo_por_paquete: Math.max(0, Number(value || 0)) })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Typography.Text strong>Precio del envio</Typography.Text>
+                        <Input
+                          className="mt-1"
+                          value={`Bs. ${Number(row.precio_entre_sucursal || 0).toFixed(2)}`}
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <Typography.Text strong>Precio total del servicio</Typography.Text>
+                        <Input className="mt-1" value={`Bs. ${Number(row.precio_total || 0).toFixed(2)}`} readOnly />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <div className="flex flex-col md:flex-row md:justify-end gap-2">
             <Button
               onClick={() => {
                 setPackageCount(MIN_PACKAGES);

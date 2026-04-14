@@ -26,6 +26,7 @@ const ExternalShippingInfoModal = ({
     () => Number(externalShipping?.precio_paquete ?? externalShipping?.precio_total ?? 0),
     [externalShipping]
   );
+  const serviceLabel = String(externalShipping?.service_origin || "") === "simple_package" ? "Simple" : "Externo";
 
   const paidStatus = Form.useWatch("esta_pagado", form);
   const montoPagaVendedor = Number(Form.useWatch("monto_paga_vendedor", form) || 0);
@@ -159,7 +160,7 @@ const ExternalShippingInfoModal = ({
         return;
       }
 
-      message.success("Entrega externa actualizada");
+      message.success(`Entrega ${serviceLabel.toLowerCase()} actualizada`);
       onSaved();
     } catch (error) {
       console.error(error);
@@ -171,7 +172,7 @@ const ExternalShippingInfoModal = ({
 
   return (
     <Modal
-      title={`Detalle Externo ${externalShipping?._id || ""}`}
+      title={`Detalle ${serviceLabel} ${externalShipping?._id || ""}`}
       open={visible}
       onCancel={onClose}
       footer={null}
