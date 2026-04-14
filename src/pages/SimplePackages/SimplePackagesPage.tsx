@@ -246,6 +246,7 @@ const SimplePackagesPage = () => {
       descripcion_paquete: String(row.descripcion_paquete || "").trim(),
       destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
       package_size: row.package_size,
+      amortizacion_vendedor: Number(row.amortizacion_vendedor || 0),
       saldo_por_paquete: Number(row.saldo_por_paquete || 0),
     }));
 
@@ -261,6 +262,17 @@ const SimplePackagesPage = () => {
       }
       if (!row.destino_sucursal_id) {
         message.error(`Paquete ${index + 1}: selecciona la sucursal destino`);
+        return;
+      }
+      if (Number(row.amortizacion_vendedor || 0) <= 0) {
+        message.error(`Paquete ${index + 1}: el monto que cubriras del servicio debe ser mayor a 0`);
+        return;
+      }
+      const precioPaqueteActual = Number(rows[index]?.precio_paquete || 0);
+      if (Number(row.amortizacion_vendedor || 0) > precioPaqueteActual) {
+        message.error(
+          `Paquete ${index + 1}: el monto que cubriras del servicio no puede ser mayor al precio del paquete`
+        );
         return;
       }
     }
@@ -364,6 +376,7 @@ const SimplePackagesPage = () => {
                     <th style={tableCellStyle}>Descripcion del paquete</th>
                     <th style={tableCellStyle}>Celular</th>
                     <th style={tableCellStyle}>Sucursal destino</th>
+                    <th style={tableCellStyle}>Monto que cubriras del servicio</th>
                     <th style={tableCellStyle}>Saldo del paquete</th>
                     <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
                     <th style={tableCellStyle}>Precio total del servicio por paquete (sujeto a variacion segun el tamaño del paquete)</th>
@@ -409,6 +422,22 @@ const SimplePackagesPage = () => {
                           disabled={!selectedOriginId}
                           onChange={(value) =>
                             updateRow(index, { destino_sucursal_id: String(value || "") })
+                          }
+                        />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <InputNumber
+                          min={0.01}
+                          style={{ width: "100%" }}
+                          addonBefore="Bs."
+                          value={Number(row.amortizacion_vendedor || 0)}
+                          onChange={(value) =>
+                            updateRow(index, {
+                              amortizacion_vendedor: Math.min(
+                                Number(row.precio_paquete || 0),
+                                Math.max(0.01, Number(value || 0))
+                              ),
+                            })
                           }
                         />
                       </td>
@@ -493,6 +522,24 @@ const SimplePackagesPage = () => {
                       />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Typography.Text strong>Monto que cubriras del servicio</Typography.Text>
+                        <InputNumber
+                          className="mt-1"
+                          min={0.01}
+                          style={{ width: "100%" }}
+                          addonBefore="Bs."
+                          value={Number(row.amortizacion_vendedor || 0)}
+                          onChange={(value) =>
+                            updateRow(index, {
+                              amortizacion_vendedor: Math.min(
+                                Number(row.precio_paquete || 0),
+                                Math.max(0.01, Number(value || 0))
+                              ),
+                            })
+                          }
+                        />
+                      </div>
                       <div>
                         <Typography.Text strong>Saldo del paquete</Typography.Text>
                         <InputNumber

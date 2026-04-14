@@ -463,7 +463,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             render: (_: any, record: any) => {
                 if (record.is_external) {
                     if (String(record?.service_origin || "") === "simple_package") {
-                        return <span style={{ color: '#fa8c16', fontWeight: 700 }}>Simple</span>;
+                        return record?.vendedor || 'Sin vendedor';
                     }
                     return <span style={{ color: '#cf1322', fontWeight: 700 }}>Externo</span>;
                 }

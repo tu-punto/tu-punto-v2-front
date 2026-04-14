@@ -30,8 +30,8 @@ export const buildPackagePricing = (
   const precioPaqueteUnitario = roundCurrency(unitPrice);
   const precioPaquete = roundCurrency(precioPaqueteUnitario * multiplier);
   const deudaVendedor = roundCurrency(amortizacion);
-  const deudaComprador = roundCurrency(Math.max(0, precioPaquete - deudaVendedor));
   const precioEntreSucursal = roundCurrency(branchRoutePrice);
+  const deudaComprador = roundCurrency(Math.max(0, precioPaquete + precioEntreSucursal - deudaVendedor));
 
   return {
     precio_paquete_unitario: precioPaqueteUnitario,
@@ -52,6 +52,7 @@ export const createDraftRow = (
   const packageSize = existing?.package_size === "grande" ? "grande" : "estandar";
   const routePrice = Number(existing?.precio_entre_sucursal || 0);
   const saldoPorPaquete = Number(existing?.saldo_por_paquete ?? config.saldo_por_paquete ?? 0);
+  const amortizacion = Number(existing?.amortizacion_vendedor ?? config.amortizacion ?? 0);
   return {
     key: existing?.key || existing?._id || `draft-${index}-${Date.now()}`,
     comprador: existing?.comprador || "",
@@ -64,7 +65,7 @@ export const createDraftRow = (
     _id: existing?._id,
     ...buildPackagePricing(
       config.precio_paquete,
-      config.amortizacion,
+      amortizacion,
       saldoPorPaquete,
       packageSize,
       routePrice
@@ -116,7 +117,9 @@ export const applyPackagePatch = (
         ? "estandar"
         : row.package_size;
   const unitPrice = Number(config?.precio_paquete ?? (row?.precio_paquete_unitario || 0));
-  const amortizacion = Number(config?.amortizacion ?? (row?.amortizacion_vendedor || 0));
+  const amortizacion = Number(
+    patch.amortizacion_vendedor ?? config?.amortizacion ?? (row?.amortizacion_vendedor || 0)
+  );
   const saldoPorPaquete = Number(
     patch.saldo_por_paquete ?? config?.saldo_por_paquete ?? (row?.saldo_por_paquete || 0)
   );

@@ -241,7 +241,27 @@ export default function SellerFormModal({
             </Form.Item>
           </Col>
           <Col xs={24} md={6}>
-            <Form.Item label="Amortización" name="amortizacion">
+            <Form.Item
+              label="Amortización"
+              name="amortizacion"
+              dependencies={["precio_paquete"]}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!serviceFlags.hasSimplePackageService) {
+                      return Promise.resolve();
+                    }
+                    const precioPaquete = Number(getFieldValue("precio_paquete") || 0);
+                    if (Number(value || 0) <= precioPaquete) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error("La amortización no puede ser mayor al precio por paquete")
+                    );
+                  },
+                }),
+              ]}
+            >
               <InputNumber
                 min={0}
                 addonBefore="Bs."

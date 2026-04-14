@@ -474,7 +474,27 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={6}>
-              <Form.Item name="amortizacion" label="Amortización">
+              <Form.Item
+                name="amortizacion"
+                label="Amortización"
+                dependencies={["precio_paquete"]}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!serviceFlags.hasSimplePackageServiceEnabled) {
+                        return Promise.resolve();
+                      }
+                      const precioPaquete = Number(getFieldValue("precio_paquete") || 0);
+                      if (Number(value || 0) <= precioPaquete) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(
+                        new Error("La amortización no puede ser mayor al precio por paquete")
+                      );
+                    },
+                  }),
+                ]}
+              >
                 <InputNumber
                   min={0}
                   disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
