@@ -255,7 +255,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       });
       setSelectedSellerBranches(
         Array.isArray(sellerResponse?.pago_sucursales)
-          ? sellerResponse.pago_sucursales.filter((branch: any) => Number(branch?.entrega_simple || 0) > 0)
+          ? sellerResponse.pago_sucursales.filter(
+              (branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0
+            )
           : []
       );
     } catch (error) {
@@ -277,7 +279,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     try {
       const sellerResponse = await getSellerAPI(sellerId);
       const nextBranches = Array.isArray(sellerResponse?.pago_sucursales)
-        ? sellerResponse.pago_sucursales.filter((branch: any) => Number(branch?.entrega_simple || 0) > 0)
+        ? sellerResponse.pago_sucursales.filter(
+            (branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0
+          )
         : [];
       const branchIds = new Set(
         nextBranches.map((branch: any) => String(branch?.id_sucursal?._id || branch?.id_sucursal || "")).filter(Boolean)

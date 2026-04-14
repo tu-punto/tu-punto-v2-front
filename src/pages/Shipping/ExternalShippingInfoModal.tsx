@@ -26,6 +26,15 @@ const ExternalShippingInfoModal = ({
     () => Number(externalShipping?.precio_paquete ?? externalShipping?.precio_total ?? 0),
     [externalShipping]
   );
+  const shippingPrice = useMemo(
+    () => Number(externalShipping?.precio_entre_sucursal ?? externalShipping?.cargo_delivery ?? 0),
+    [externalShipping]
+  );
+  const packageSaldo = useMemo(() => Number(externalShipping?.saldo_por_paquete ?? 0), [externalShipping]);
+  const totalServicePrice = useMemo(
+    () => Number(externalShipping?.precio_total ?? packagePrice + shippingPrice),
+    [externalShipping, packagePrice, shippingPrice]
+  );
   const serviceLabel = String(externalShipping?.service_origin || "") === "simple_package" ? "Simple" : "Externo";
 
   const paidStatus = Form.useWatch("esta_pagado", form);
@@ -222,9 +231,24 @@ const ExternalShippingInfoModal = ({
                 <Input.TextArea rows={3} readOnly />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item label="Precio del paquete" name="precio_paquete">
                 <InputNumber prefix="Bs." style={{ width: "100%" }} readOnly />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Saldo del paquete">
+                <Input value={`Bs. ${packageSaldo.toFixed(2)}`} readOnly />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Precio del envio">
+                <Input value={`Bs. ${shippingPrice.toFixed(2)}`} readOnly />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Precio total del servicio">
+                <Input value={`Bs. ${totalServicePrice.toFixed(2)}`} readOnly />
               </Form.Item>
             </Col>
           </Row>

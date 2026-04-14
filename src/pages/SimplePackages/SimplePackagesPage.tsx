@@ -115,7 +115,9 @@ const SimplePackagesPage = () => {
           saldo_por_paquete: 0,
         };
         const nextBranches = Array.isArray(seller?.pago_sucursales)
-          ? seller.pago_sucursales.filter((branch: any) => Number(branch?.entrega_simple || 0) > 0)
+          ? seller.pago_sucursales.filter(
+              (branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0
+            )
           : [];
         const currentBranchId = localStorage.getItem("sucursalId") || "";
         const defaultOriginId =
