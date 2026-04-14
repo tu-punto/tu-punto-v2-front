@@ -225,7 +225,8 @@ const CustomTable = ({
           {
             title: "Acción",
             key: "action",
-            render: (_: any, record: any) => (
+            render: (_: any, record: any) =>
+              record.es_entrega_simple ? null : (
               <div className="flex gap-2">
                 {/* Confirmación de guardar */}
                 <Popconfirm

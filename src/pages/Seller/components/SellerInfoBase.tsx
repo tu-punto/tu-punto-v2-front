@@ -39,6 +39,7 @@ import {
 } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
+import { getSellerAccountingSimplePackagesAPI } from "../../../api/simplePackage";
 
 import { UserContext } from "../../../context/userContext";
 
@@ -162,20 +163,6 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     syncServiceFlags(values.sucursales || []);
   }, [form, seller]);
 
-  useEffect(() => {
-    if (!serviceFlags.hasCommissionService) {
-      form.setFieldValue("comision_porcentual", 0);
-    }
-  }, [form, serviceFlags.hasCommissionService]);
-
-  useEffect(() => {
-    if (!serviceFlags.hasSimplePackageServiceEnabled) {
-      form.setFieldsValue({
-        amortizacion: 0,
-        precio_paquete: 0,
-      });
-    }
-  }, [form, serviceFlags.hasSimplePackageServiceEnabled]);
 
   /* ─────────── solicitudes ─────────── */
   const fetchSucursales = async () => {
@@ -198,18 +185,49 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
   const fetchSales = async () => {
     try {
-      const res = await getSalesBySellerIdAPI(seller.key);
-      const sales: any[] = Array.isArray(res)
+      const [res, simpleRes] = await Promise.all([
+        getSalesBySellerIdAPI(seller.key),
+        getSellerAccountingSimplePackagesAPI({ sellerId: String(seller.key) }),
+      ]);
+      const regularSales: any[] = Array.isArray(res)
         ? res.filter((sale) => sale.id_pedido.estado_pedido !== "En Espera")
         : [];
-      const pedidosIds = sales.map((s) => s.id_pedido);
+      const simpleSales: any[] = Array.isArray(simpleRes?.rows)
+        ? simpleRes.rows.map((row: any) => ({
+            key: `simple-${row._id}`,
+            producto: "Entrega simple",
+            nombre_variante: row.descripcion_paquete || "Paquete simple",
+            precio_unitario: Number(row.accounting_amount ?? 0),
+            cantidad: 1,
+            utilidad: Number(row.amortizacion_vendedor || 0),
+            id_venta: `simple-${row._id}`,
+            id_vendedor: seller.key,
+            id_pedido: {
+              _id: `simple-${row._id}`,
+              estado_pedido: row.estado_pedido || "Entregado",
+              pagado_al_vendedor: false,
+              cargo_delivery: 0,
+              adelanto_cliente: 0,
+            },
+            id_sucursal:
+              String(row?.origen_sucursal?._id || row?.origen_sucursal || row?.sucursal || ""),
+            deposito_realizado: !!row.deposito_realizado,
+            cliente: row.comprador || "",
+            fecha_pedido: row.fecha_pedido,
+            tipo: "Simple",
+            es_entrega_simple: true,
+            sucursal: row?.origen_sucursal?.nombre || "Sucursal no encontrada",
+          }))
+        : [];
+      const pedidosIds = regularSales.map((s) => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
 
-      const shipRes = await getShipingByIdsAPI(
-        uniquePedidos.map((pedido) => pedido._id)
-      );
+      const shipRes =
+        uniquePedidos.length > 0
+          ? await getShipingByIdsAPI(uniquePedidos.map((pedido) => pedido._id))
+          : { success: true, data: [] };
 
-      const final = sales.map((sale) => {
+      const finalRegular = regularSales.map((sale) => {
         const lugarEntrega =
           shipRes.success &&
           shipRes.data.find((s: any) => s.id_pedido === sale.id_pedido)
@@ -233,7 +251,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         };
       });
 
-      setSalesData(final);
+      setSalesData([...finalRegular, ...simpleSales]);
     } catch (e) {
       console.error("Error ventas", e);
     }

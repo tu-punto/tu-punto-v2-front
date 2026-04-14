@@ -72,20 +72,6 @@ export default function SellerFormModal({
     }
   }, [form, visible]);
 
-  useEffect(() => {
-    if (!serviceFlags.hasCommissionService) {
-      form.setFieldValue("comision_porcentual", 0);
-    }
-  }, [form, serviceFlags.hasCommissionService]);
-
-  useEffect(() => {
-    if (!serviceFlags.hasSimplePackageService) {
-      form.setFieldsValue({
-        amortizacion: 0,
-        precio_paquete: 0,
-      });
-    }
-  }, [form, serviceFlags.hasSimplePackageService]);
 
   /* añadir card */
   const addBranch = () => {

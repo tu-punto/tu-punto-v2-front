@@ -31,9 +31,17 @@ const ExternalShippingInfoModal = ({
     [externalShipping]
   );
   const packageSaldo = useMemo(() => Number(externalShipping?.saldo_por_paquete ?? 0), [externalShipping]);
+  const amortizacion = useMemo(
+    () => Number(externalShipping?.amortizacion_vendedor ?? 0),
+    [externalShipping]
+  );
   const totalServicePrice = useMemo(
     () => Number(externalShipping?.precio_total ?? packagePrice + shippingPrice),
     [externalShipping, packagePrice, shippingPrice]
+  );
+  const totalAmountToCharge = useMemo(
+    () => Math.max(0, roundCurrency(packagePrice + packageSaldo + shippingPrice - amortizacion)),
+    [packagePrice, packageSaldo, shippingPrice, amortizacion]
   );
   const serviceLabel = String(externalShipping?.service_origin || "") === "simple_package" ? "Simple" : "Externo";
 
@@ -43,11 +51,11 @@ const ExternalShippingInfoModal = ({
   const saldoACobrar = useMemo(() => {
     if (paidStatus === "si") return 0;
     if (paidStatus === "mixto") return Math.max(0, roundCurrency(montoPagaComprador));
-    return packagePrice;
-  }, [paidStatus, packagePrice, montoPagaComprador, montoPagaVendedor]);
+    return totalAmountToCharge;
+  }, [paidStatus, totalAmountToCharge, montoPagaComprador, montoPagaVendedor]);
 
   const applyPaymentMode = (mode: "si" | "no" | "mixto", notifyPriceRequired = false) => {
-    if (packagePrice <= 0 && mode !== "no") {
+    if (totalAmountToCharge <= 0 && mode !== "no") {
       if (notifyPriceRequired) message.warning("Primero ingresa un precio del paquete valido");
       form.setFieldValue("esta_pagado", "no");
       form.setFieldValue("monto_paga_vendedor", 0);
@@ -57,7 +65,7 @@ const ExternalShippingInfoModal = ({
 
     if (mode === "si") {
       form.setFieldValue("monto_paga_vendedor", 0);
-      form.setFieldValue("monto_paga_comprador", roundCurrency(packagePrice));
+      form.setFieldValue("monto_paga_comprador", roundCurrency(totalAmountToCharge));
       return;
     }
 
@@ -67,24 +75,24 @@ const ExternalShippingInfoModal = ({
       return;
     }
 
-    const half = roundCurrency(packagePrice / 2);
+    const half = roundCurrency(totalAmountToCharge / 2);
     form.setFieldValue("monto_paga_vendedor", half);
-    form.setFieldValue("monto_paga_comprador", roundCurrency(packagePrice - half));
+    form.setFieldValue("monto_paga_comprador", roundCurrency(totalAmountToCharge - half));
   };
 
   const handleMixedSellerChange = (value: number | null) => {
     if (paidStatus !== "mixto") return;
-    if (packagePrice <= 0) {
+    if (totalAmountToCharge <= 0) {
       form.setFieldValue("monto_paga_vendedor", 0);
       form.setFieldValue("monto_paga_comprador", 0);
       return;
     }
     let seller = roundCurrency(Number(value || 0));
     if (seller < 0) seller = 0;
-    if (seller > packagePrice) seller = packagePrice;
+    if (seller > totalAmountToCharge) seller = totalAmountToCharge;
 
     form.setFieldValue("monto_paga_vendedor", seller);
-    form.setFieldValue("monto_paga_comprador", roundCurrency(packagePrice - seller));
+    form.setFieldValue("monto_paga_comprador", roundCurrency(totalAmountToCharge - seller));
   };
 
   useEffect(() => {
@@ -97,16 +105,16 @@ const ExternalShippingInfoModal = ({
 
     if (initialStatus === "si") {
       montoVendedor = 0;
-      montoComprador = roundCurrency(packagePrice);
+      montoComprador = roundCurrency(totalAmountToCharge);
     } else if (initialStatus === "no") {
       montoVendedor = 0;
       montoComprador = 0;
     } else {
       const mixedSum = roundCurrency(initialVendedor + initialComprador);
-      if (mixedSum <= 0 || Math.abs(mixedSum - packagePrice) > 0.01) {
-        const half = roundCurrency(packagePrice / 2);
+      if (mixedSum <= 0 || Math.abs(mixedSum - totalAmountToCharge) > 0.01) {
+        const half = roundCurrency(totalAmountToCharge / 2);
         montoVendedor = half;
-        montoComprador = roundCurrency(packagePrice - half);
+        montoComprador = roundCurrency(totalAmountToCharge - half);
       }
     }
 
@@ -124,14 +132,14 @@ const ExternalShippingInfoModal = ({
       estado_pedido: externalShipping.estado_pedido || "En Espera",
       saldo_cobrar: Number(externalShipping.saldo_cobrar ?? saldoACobrar),
     });
-  }, [externalShipping, form, packagePrice, visible]);
+  }, [externalShipping, form, packagePrice, totalAmountToCharge, visible]);
 
   const handleSave = async (values: any) => {
     if (!externalShipping?._id) return;
     setLoading(true);
     try {
       if (values.esta_pagado === "mixto") {
-        const precio = roundCurrency(Number(values.precio_paquete || packagePrice || 0));
+        const precio = roundCurrency(totalAmountToCharge);
         const pagoVendedor = roundCurrency(Number(values.monto_paga_vendedor || 0));
         const pagoComprador = roundCurrency(Number(values.monto_paga_comprador || 0));
         const sumaMixta = roundCurrency(pagoVendedor + pagoComprador);
@@ -237,18 +245,18 @@ const ExternalShippingInfoModal = ({
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item label="Saldo del paquete">
-                <Input value={`Bs. ${packageSaldo.toFixed(2)}`} readOnly />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
               <Form.Item label="Precio del envio">
                 <Input value={`Bs. ${shippingPrice.toFixed(2)}`} readOnly />
               </Form.Item>
             </Col>
-            <Col span={24}>
+            <Col span={8}>
               <Form.Item label="Precio total del servicio">
                 <Input value={`Bs. ${totalServicePrice.toFixed(2)}`} readOnly />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Saldo del paquete">
+                <Input value={`Bs. ${packageSaldo.toFixed(2)}`} readOnly />
               </Form.Item>
             </Col>
           </Row>
@@ -275,7 +283,7 @@ const ExternalShippingInfoModal = ({
                 <Form.Item name="monto_paga_vendedor" label="Cuanto paga vendedor">
                   <InputNumber
                     min={0}
-                    max={Math.max(0, roundCurrency(packagePrice - 0.01))}
+                    max={Math.max(0, roundCurrency(totalAmountToCharge - 0.01))}
                     precision={2}
                     prefix="Bs."
                     style={{ width: "100%" }}
@@ -303,7 +311,7 @@ const ExternalShippingInfoModal = ({
           </Row>
           <Row gutter={16}>
             <Col span={24}>
-              <Form.Item label="Saldo a cobrar">
+              <Form.Item label="Monto total a cobrar">
                 <Input value={`Bs. ${saldoACobrar.toFixed(2)}`} readOnly />
               </Form.Item>
             </Col>
