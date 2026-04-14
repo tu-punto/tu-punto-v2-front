@@ -561,15 +561,13 @@ export const Sales = () => {
                         {productOptions}
                       </Select>
                     )}
-                    {(isAdmin || isOperator) && (
                     <Button
                       type="primary"
                       onClick={() => setProductAddModal(true)}
                       className="text-mobile-base xl:text-desktop-sm "
                     >
-                      Añadir nuevo producto
+                      {isAdmin || isOperator ? "Añadir nuevo producto" : "Añadir temporal"}
                     </Button>
-                    )}
                     {(isAdmin || isOperator) && (
                       <Select
                         placeholder="Selecciona un vendedor"
