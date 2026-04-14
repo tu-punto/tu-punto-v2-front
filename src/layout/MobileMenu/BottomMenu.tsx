@@ -24,7 +24,6 @@ const BottomMenu = () => {
               i.roles.includes(role) &&
               (i.path !== "/simple-packages" || hasSimplePackageService(user)) &&
               (i.path !== "/stock" || canSellerAccessInventory(user)) &&
-              (i.path !== "/shop" || !hasSimplePackageService(user)) &&
               (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
               (!i.requiresSuperadmin || isSuperadminUser(user))
         );

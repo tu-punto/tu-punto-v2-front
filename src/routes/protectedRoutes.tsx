@@ -53,12 +53,6 @@ const StockRoute = () => {
 };
 
 const ShopRoute = () => {
-  const { user } = useContext(UserContext);
-
-  if (hasSimplePackageService(user)) {
-    return <Navigate to="/simple-packages" replace />;
-  }
-
   return <Sales />;
 };
 

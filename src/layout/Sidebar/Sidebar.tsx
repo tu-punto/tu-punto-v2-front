@@ -40,7 +40,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     item.roles.includes(normalizeRole(user?.role)) &&
     (item.path !== "/simple-packages" || hasSimplePackageService(user)) &&
     (item.path !== "/stock" || canSellerAccessInventory(user)) &&
-    (item.path !== "/shop" || !hasSimplePackageService(user)) &&
     (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
     (!item.requiresSuperadmin || isSuperadminUser(user))
   );
