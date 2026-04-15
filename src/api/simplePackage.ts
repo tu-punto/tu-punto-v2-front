@@ -81,6 +81,15 @@ export const updateSimplePackageAPI = async (id: string, payload: any) => {
   }
 };
 
+export const createSimplePackageOrdersAPI = async (payload: { packageIds: string[] }) => {
+  try {
+    const res = await apiClient.post("/simple-packages/create-orders", payload);
+    return { success: true, ...res.data };
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
 export const deleteSimplePackageAPI = async (id: string) => {
   try {
     const res = await apiClient.delete(`/simple-packages/${id}`);

@@ -166,6 +166,17 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }
         return origenBranchId || paymentBranchId;
     }, [tipoDestino, destinoSucursalId, paymentBranchId, origenBranchId]);
+    const isSimplePackageOrder = Boolean(shipping?.simple_package_order || shipping?.simple_package_source_id);
+    const simplePackagePrice = useMemo(() => Number(shipping?.precio_paquete ?? 0), [shipping]);
+    const simplePackageSaldo = useMemo(() => Number(shipping?.saldo_por_paquete ?? 0), [shipping]);
+    const simplePackageShippingPrice = useMemo(
+        () => Number(shipping?.precio_entre_sucursal ?? shipping?.cargo_delivery ?? 0),
+        [shipping]
+    );
+    const simplePackageTotalServicePrice = useMemo(
+        () => Number((simplePackagePrice + simplePackageShippingPrice).toFixed(2)),
+        [simplePackagePrice, simplePackageShippingPrice]
+    );
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryOwnerBranchId || String(deliveryOwnerBranchId) === String(currentSucursalId);
     }, [deliveryOwnerBranchId, currentSucursalId]);
@@ -349,7 +360,24 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
         }));
 
-        setProducts(ventasNormales);
+        const shouldRenderTemporaryProducts = isSimplePackageOrder || ventasNormales.length === 0;
+
+        const productosTemporales = (!shouldRenderTemporaryProducts ? [] : (shipping.productos_temporales || [])).map((item: any, index: number) => ({
+            ...item,
+            id_venta: null,
+            key: `temp-${shipping._id || "pedido"}-${index}`,
+            esTemporal: true,
+            producto: item?.nombre_producto || item?.producto || item?.nombre_variante || "Producto temporal",
+            nombre_variante: item?.nombre_variante || item?.nombre_producto || item?.producto || "Producto temporal",
+            cantidad: Number(item?.cantidad || 1),
+            precio_unitario: Number(item?.precio_unitario || 0),
+            utilidad: Number(item?.utilidad || 0),
+        }));
+
+        const mergedProducts = [...ventasNormales, ...productosTemporales];
+
+        setProducts(mergedProducts);
+        setOriginalProducts(JSON.parse(JSON.stringify(mergedProducts)));
 
     }, [visible, shipping, sucursals]);
 
@@ -818,7 +846,34 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         </Col>
                     </Row>
                 </Card>
+                {isSimplePackageOrder && (
+                    <Card title="Detalle del Servicio" bordered={false} style={{ marginTop: 16 }}>
+                        <Row gutter={16}>
+                            <Col span={8}>
+                                <Form.Item label="Precio del paquete">
+                                    <Input value={`Bs. ${simplePackagePrice.toFixed(2)}`} readOnly />
+                                </Form.Item>
+                            </Col>
+                            <Col span={8}>
+                                <Form.Item label="Precio del envio">
+                                    <Input value={`Bs. ${simplePackageShippingPrice.toFixed(2)}`} readOnly />
+                                </Form.Item>
+                            </Col>
+                            <Col span={8}>
+                                <Form.Item label="Precio total del servicio">
+                                    <Input value={`Bs. ${simplePackageTotalServicePrice.toFixed(2)}`} readOnly />
+                                </Form.Item>
+                            </Col>
+                            <Col span={24}>
+                                <Form.Item label="Saldo del paquete">
+                                    <Input value={`Bs. ${simplePackageSaldo.toFixed(2)}`} readOnly />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
+                )}
                 {/* DATOS DEL PEDIDO */}
+                {!isSimplePackageOrder && (
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
                     <Row gutter={16}>
                         <Col span={12}>
@@ -979,6 +1034,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         </Col>
                     </Row>
                 </Card>
+                )}
                 {/* PRODUCTOS */}
                 <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}
                     extra={

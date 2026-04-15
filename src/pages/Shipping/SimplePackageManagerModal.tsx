@@ -1,6 +1,7 @@
 import { Button, Empty, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
 import { useContext, useEffect, useMemo, useState } from "react";
 import {
+  createSimplePackageOrdersAPI,
   deleteSimplePackageAPI,
   getSimplePackageBranchPricesAPI,
   getSimplePackagesListAPI,
@@ -616,17 +617,16 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       cancelText: "Cancelar",
       onOk: async () => {
         try {
-          const responses = await Promise.all(
-            pendingRows.map((row) => updateSimplePackageAPI(String(row._id), { is_external: true }))
-          );
-          const failed = responses.find((response: any) => !response?.success);
-          if (failed) {
-            message.error(failed.message || "No se pudieron crear los pedidos simples");
+          const response = await createSimplePackageOrdersAPI({
+            packageIds: pendingRows.map((row) => String(row._id)),
+          });
+          if (!response?.success) {
+            message.error(response.message || "No se pudieron crear los pedidos simples");
             return;
           }
 
           message.success(`Se crearon ${pendingRows.length} pedidos simples`);
-          await fetchPackages(selectedSellerId);
+          await Promise.all([fetchPackages(selectedSellerId), fetchSellers()]);
           onChanged?.();
         } catch (error) {
           console.error(error);
