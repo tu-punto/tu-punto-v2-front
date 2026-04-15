@@ -7,7 +7,7 @@ import { Button, message } from "antd";
 import { logoutUserAPI } from "../../api/user";
 import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
-import { canSellerAccessInventory } from "../../utils/sellerServiceAccess";
+import { canSellerAccessInventory, canSellerAccessShop } from "../../utils/sellerServiceAccess";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const filteredMenuItems = menu.filter((item) =>
     item.roles.includes(normalizeRole(user?.role)) &&
     (item.path !== "/stock" || canSellerAccessInventory(user)) &&
-    (item.path !== "/shop" || canSellerAccessInventory(user)) &&
+    (item.path !== "/shop" || canSellerAccessShop(user)) &&
     (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
     (!item.requiresSuperadmin || isSuperadminUser(user))
   );

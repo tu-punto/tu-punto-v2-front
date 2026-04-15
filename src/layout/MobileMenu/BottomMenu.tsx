@@ -8,7 +8,7 @@ import minusIcon from "../../assets/minusIcon.svg";
 import "./bottom-menu.css";
 import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
-import { canSellerAccessInventory } from "../../utils/sellerServiceAccess";
+import { canSellerAccessInventory, canSellerAccessShop } from "../../utils/sellerServiceAccess";
 
 const BottomMenu = () => {
     const { user } = useContext(UserContext)!;
@@ -23,7 +23,7 @@ const BottomMenu = () => {
             i =>
               i.roles.includes(role) &&
               (i.path !== "/stock" || canSellerAccessInventory(user)) &&
-              (i.path !== "/shop" || canSellerAccessInventory(user)) &&
+              (i.path !== "/shop" || canSellerAccessShop(user)) &&
               (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
               (!i.requiresSuperadmin || isSuperadminUser(user))
         );

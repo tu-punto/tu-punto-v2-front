@@ -20,5 +20,11 @@ export const branchesEnableSimplePackageService = (branches: any[] = []) =>
 export const hasSimplePackageService = (user?: any) =>
   normalizeRole(user?.role) === "seller" && user?.seller_has_simple_package_service === true;
 
+// Temporal: permitir carrito a todos los vendedores sin tocar la regla de stock.
+export const TEMP_ALLOW_ALL_SELLERS_SHOP = true;
+
 export const canSellerAccessInventory = (user?: any) =>
   normalizeRole(user?.role) !== "seller" || user?.seller_has_commission_service === true;
+
+export const canSellerAccessShop = (user?: any) =>
+  TEMP_ALLOW_ALL_SELLERS_SHOP || canSellerAccessInventory(user);
