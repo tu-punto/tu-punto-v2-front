@@ -26,7 +26,7 @@ import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
 import { isSuperadminUser, normalizeRole } from "../utils/role";
-import { canSellerAccessInventory, hasSimplePackageService } from "../utils/sellerServiceAccess";
+import { canSellerAccessInventory } from "../utils/sellerServiceAccess";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
@@ -53,6 +53,12 @@ const StockRoute = () => {
 };
 
 const ShopRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!canSellerAccessInventory(user)) {
+    return <Navigate to="/seller-info" replace />;
+  }
+
   return <Sales />;
 };
 

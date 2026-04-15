@@ -352,6 +352,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const saldoPendienteValue = Number(
     sellerMetrics?.saldo_pendiente ?? (seller as any)?.saldo_pendiente ?? 0
   );
+  const subtotalDeudasPendientes = salesData.reduce((acc: number, row: any) => {
+    if (row?.deposito_realizado) return acc;
+
+    const subtotalVenta = Number(row?.cantidad || 0) * Number(row?.precio_unitario || 0);
+    const utilidad = Number(row?.utilidad || 0);
+    const subtotalDeuda = row?.id_pedido?.pagado_al_vendedor
+      ? -utilidad
+      : subtotalVenta - utilidad;
+
+    return acc + subtotalDeuda;
+  }, 0);
+  const saldoAcumuladoValue = Number((saldoPendienteValue + subtotalDeudasPendientes).toFixed(2));
   const deudaValue = Number(
     sellerMetrics?.deuda ?? (seller as any)?.deuda ?? 0
   );
@@ -363,7 +375,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     ? pagoPendienteFromApi
     : Number.isFinite(pagoPendienteFromTable)
       ? pagoPendienteFromTable
-      : saldoPendienteValue - deudaValue;
+      : saldoAcumuladoValue - deudaValue;
   const ultimaFechaPago = paymentProofs.reduce<dayjs.Dayjs | null>(
     (latestProofDate, proof) => {
       const rawDate = proof?.createdAt ?? proof?.fecha_emision;
@@ -394,7 +406,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       <StatsCards
         pagoPendiente={pagoPendienteValue}
         deuda={deudaValue}
-        saldoPendiente={saldoPendienteValue}
+        saldoPendiente={saldoAcumuladoValue}
         ultimaFechaPago={ultimaFechaPagoLabel}
       />
 
