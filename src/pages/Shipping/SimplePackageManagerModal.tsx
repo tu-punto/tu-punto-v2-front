@@ -88,11 +88,11 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
   const generalPaymentMethod = useMemo(() => {
     if (!rows.length) return "";
-    const paidRows = rows.filter((row) => row.esta_pagado === "si");
-    if (!paidRows.length) return "";
-    const firstMethod = String(paidRows[0]?.metodo_pago || "");
+    const rowsWithMethod = rows.filter((row) => String(row.metodo_pago || ""));
+    if (!rowsWithMethod.length) return "";
+    const firstMethod = String(rowsWithMethod[0]?.metodo_pago || "");
     if (!firstMethod) return "";
-    return paidRows.every((row) => String(row.metodo_pago || "") === firstMethod) ? firstMethod : "mixed";
+    return rowsWithMethod.every((row) => String(row.metodo_pago || "") === firstMethod) ? firstMethod : "mixed";
   }, [rows]);
 
   const originSummary = useMemo(() => {
@@ -433,7 +433,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       applyPackagePatch(
         row,
         {
-          esta_pagado: method ? "si" : "no",
+          esta_pagado: "no",
           metodo_pago: method,
         },
         sellerConfig
@@ -447,7 +447,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       const responses = await Promise.all(
         rows.map((row) =>
           updateSimplePackageAPI(String(row._id), {
-            esta_pagado: method ? "si" : "no",
+            esta_pagado: "no",
             metodo_pago: method,
           })
         )

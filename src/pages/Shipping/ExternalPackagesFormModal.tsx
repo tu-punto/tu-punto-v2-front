@@ -60,6 +60,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const handlePackagePriceChange = (rowIndex: number, value: number | null) => {
     const price = roundCurrency(Number(value || 0));
     const mode = form.getFieldValue(["paquetes", rowIndex, "esta_pagado"]) || "no";
+    const currentSellerAmount = roundCurrency(
+      Number(form.getFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"]) || 0)
+    );
+    const currentBuyerAmount = roundCurrency(
+      Number(form.getFieldValue(["paquetes", rowIndex, "monto_paga_comprador"]) || 0)
+    );
 
     if (price <= 0) {
       form.setFieldValue(["paquetes", rowIndex, "esta_pagado"], "no");
@@ -75,6 +81,18 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
 
     if (mode === "mixto") {
+      const hasManualSplit = currentSellerAmount > 0 && currentBuyerAmount > 0;
+
+      if (hasManualSplit) {
+        const nextSellerAmount = Math.min(currentSellerAmount, roundCurrency(Math.max(0, price - 0.01)));
+        form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], nextSellerAmount);
+        form.setFieldValue(
+          ["paquetes", rowIndex, "monto_paga_comprador"],
+          roundCurrency(price - nextSellerAmount)
+        );
+        return;
+      }
+
       const half = roundCurrency(price / 2);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], half);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(price - half));

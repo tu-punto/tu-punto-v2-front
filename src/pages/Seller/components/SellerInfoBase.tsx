@@ -197,7 +197,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
             key: `simple-${row._id}`,
             producto: "Entrega simple",
             nombre_variante: row.descripcion_paquete || "Paquete simple",
-            precio_unitario: Number(row.accounting_amount ?? 0),
+            precio_unitario: Number(row.saldo_por_paquete ?? 0),
             cantidad: 1,
             utilidad: 0,
             id_venta: `simple-${row._id}`,
@@ -367,15 +367,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const deudaValue = Number(
     sellerMetrics?.deuda ?? (seller as any)?.deuda ?? 0
   );
-  const pagoPendienteFromApi = Number(
-    sellerMetrics?.pago_pendiente ?? (seller as any)?.pago_pendiente
-  );
-  const pagoPendienteFromTable = Number((seller as any)?.pagoTotalInt);
-  const pagoPendienteValue = Number.isFinite(pagoPendienteFromApi)
-    ? pagoPendienteFromApi
-    : Number.isFinite(pagoPendienteFromTable)
-      ? pagoPendienteFromTable
-      : saldoAcumuladoValue - deudaValue;
+  const pagoPendienteValue = Number((saldoAcumuladoValue - deudaValue).toFixed(2));
   const ultimaFechaPago = paymentProofs.reduce<dayjs.Dayjs | null>(
     (latestProofDate, proof) => {
       const rawDate = proof?.createdAt ?? proof?.fecha_emision;
