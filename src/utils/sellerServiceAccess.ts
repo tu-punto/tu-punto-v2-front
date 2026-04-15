@@ -8,7 +8,7 @@ const toNumber = (value: unknown) => {
 export const branchesEnableCommissionService = (branches: any[] = []) =>
   (Array.isArray(branches) ? branches : []).some(
     (branch) =>
-      toNumber(branch?.almacenamiento ?? branch?.alquiler) > 0 &&
+      toNumber(branch?.almacenamiento ?? branch?.alquiler) > 0 ||
       toNumber(branch?.exhibicion) > 0
   );
 

@@ -199,7 +199,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
             nombre_variante: row.descripcion_paquete || "Paquete simple",
             precio_unitario: Number(row.accounting_amount ?? 0),
             cantidad: 1,
-            utilidad: Number(row.amortizacion_vendedor || 0),
+            utilidad: 0,
             id_venta: `simple-${row._id}`,
             id_vendedor: seller.key,
             id_pedido: {
