@@ -39,9 +39,19 @@ const ExternalShippingInfoModal = ({
     () => Number(externalShipping?.precio_total ?? packagePrice + shippingPrice),
     [externalShipping, packagePrice, shippingPrice]
   );
+  
+  // Para entregas externas puras, el monto a cobrar es solo el precio total
+  // Para simple packages, se incluyen saldo y amortización
+  const isSimplePackage = String(externalShipping?.service_origin || "") === "simple_package";
   const totalAmountToCharge = useMemo(
-    () => Math.max(0, roundCurrency(packagePrice + packageSaldo + shippingPrice - amortizacion)),
-    [packagePrice, packageSaldo, shippingPrice, amortizacion]
+    () => {
+      if (isSimplePackage) {
+        return Math.max(0, roundCurrency(packagePrice + packageSaldo + shippingPrice - amortizacion));
+      }
+      // Para entregas externas, usar el precio total directamente
+      return roundCurrency(externalShipping?.precio_total ?? packagePrice);
+    },
+    [packagePrice, packageSaldo, shippingPrice, amortizacion, externalShipping, isSimplePackage]
   );
   const serviceLabel = String(externalShipping?.service_origin || "") === "simple_package" ? "Simple" : "Externo";
 
@@ -109,13 +119,23 @@ const ExternalShippingInfoModal = ({
     } else if (initialStatus === "no") {
       montoVendedor = 0;
       montoComprador = 0;
-    } else {
+    } else if (initialStatus === "mixto") {
+      // Validar si los montos guardados son consistentes con el monto a cobrar actual
       const mixedSum = roundCurrency(initialVendedor + initialComprador);
-      if (mixedSum <= 0 || Math.abs(mixedSum - totalAmountToCharge) > 0.01) {
-        const half = roundCurrency(totalAmountToCharge / 2);
+      const currentTotal = roundCurrency(totalAmountToCharge);
+      
+      // Si los montos guardados son válidos y coinciden con el total, NO redividir
+      if (mixedSum > 0 && Math.abs(mixedSum - currentTotal) <= 0.01) {
+        // Mantener los valores guardados, no recalcular
+        montoVendedor = initialVendedor;
+        montoComprador = initialComprador;
+      } else if (mixedSum <= 0) {
+        // Si no hay montos guardados, dividir por la mitad
+        const half = roundCurrency(currentTotal / 2);
         montoVendedor = half;
-        montoComprador = roundCurrency(totalAmountToCharge - half);
+        montoComprador = roundCurrency(currentTotal - half);
       }
+      // Si la suma no coincide, tampoco recalcular automáticamente
     }
 
     form.setFieldsValue({
@@ -132,7 +152,7 @@ const ExternalShippingInfoModal = ({
       estado_pedido: externalShipping.estado_pedido || "En Espera",
       saldo_cobrar: Number(externalShipping.saldo_cobrar ?? saldoACobrar),
     });
-  }, [externalShipping, form, packagePrice, totalAmountToCharge, visible]);
+  }, [externalShipping, form, packagePrice, totalAmountToCharge, visible, saldoACobrar]);
 
   const handleSave = async (values: any) => {
     if (!externalShipping?._id) return;
