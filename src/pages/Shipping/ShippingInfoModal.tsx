@@ -177,6 +177,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         () => Number((simplePackagePrice + simplePackageShippingPrice).toFixed(2)),
         [simplePackagePrice, simplePackageShippingPrice]
     );
+    const simplePackageDebtAmount = useMemo(
+        () => Number(shipping?.amortizacion_vendedor ?? 0),
+        [shipping]
+    );
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryOwnerBranchId || String(deliveryOwnerBranchId) === String(currentSucursalId);
     }, [deliveryOwnerBranchId, currentSucursalId]);
@@ -360,7 +364,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
         }));
 
-        const shouldRenderTemporaryProducts = isSimplePackageOrder || ventasNormales.length === 0;
+        const shouldRenderTemporaryProducts = ventasNormales.length === 0;
 
         const productosTemporales = (!shouldRenderTemporaryProducts ? [] : (shipping.productos_temporales || [])).map((item: any, index: number) => ({
             ...item,
@@ -453,7 +457,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         });
     }, [data, origenBranchId]);
     const temporaryLabelItems = useMemo(() => {
-        const fromShipping = (shipping?.productos_temporales || []).map((item: any, index: number) => ({
+        const shouldUseShippingTemporaryLabels =
+            !(isSimplePackageOrder && (products || []).some((item: any) => Boolean(item?.esTemporal || item?.producto?.esTemporal)));
+
+        const fromShipping = (!shouldUseShippingTemporaryLabels ? [] : (shipping?.productos_temporales || [])).map((item: any, index: number) => ({
             key: `temp-${index}-${item?.nombre_producto || item?.producto || "item"}`,
             name: String(item?.nombre_producto || item?.producto || item?.nombre_variante || "Producto temporal"),
             quantity: Number(item?.cantidad || 1)
@@ -622,20 +629,26 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             // Forzar subtotales según el tipo de pago
             switch (effectivePaymentType) {
                 case '1':
-                    updateShippingInfo.subtotal_qr = saldoACobrar;
+                    updateShippingInfo.subtotal_qr = isSimplePackageOrder ? simplePackageDebtAmount : saldoACobrar;
                     updateShippingInfo.subtotal_efectivo = 0;
                     break;
                 case '2':
                     updateShippingInfo.subtotal_qr = 0;
-                    updateShippingInfo.subtotal_efectivo = saldoACobrar;
+                    updateShippingInfo.subtotal_efectivo = isSimplePackageOrder ? simplePackageDebtAmount : saldoACobrar;
                     break;
                 case '3':
                     updateShippingInfo.subtotal_qr = 0;
                     updateShippingInfo.subtotal_efectivo = 0;
                     break;
                 case '4':
-                    updateShippingInfo.subtotal_qr = qrInput;
-                    updateShippingInfo.subtotal_efectivo = efectivoInput;
+                    if (isSimplePackageOrder) {
+                        const mitad = parseFloat((simplePackageDebtAmount / 2).toFixed(2));
+                        updateShippingInfo.subtotal_qr = mitad;
+                        updateShippingInfo.subtotal_efectivo = parseFloat((simplePackageDebtAmount - mitad).toFixed(2));
+                    } else {
+                        updateShippingInfo.subtotal_qr = qrInput;
+                        updateShippingInfo.subtotal_efectivo = efectivoInput;
+                    }
                     break;
             }
 

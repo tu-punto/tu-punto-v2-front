@@ -158,3 +158,15 @@ export const getMerchandiseSoldAPI = async (options?: {
     }
 };
 
+export const getDailyServiceIncomeAPI = async (date: string, sucursalId: string) => {
+    try {
+        const res = await apiClient.get(`/financeFlux/daily-service-income`, {
+            params: { date, sucursalId }
+        });
+        return res.data;
+    } catch (error) {
+        parseError(error as AxiosError);
+        return [];
+    }
+};
+

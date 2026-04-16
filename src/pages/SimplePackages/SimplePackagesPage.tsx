@@ -264,8 +264,8 @@ const SimplePackagesPage = () => {
         message.error(`Paquete ${index + 1}: selecciona la sucursal destino`);
         return;
       }
-      if (Number(row.amortizacion_vendedor || 0) <= 0) {
-        message.error(`Paquete ${index + 1}: el monto que cubriras del servicio debe ser mayor a 0`);
+      if (Number(row.amortizacion_vendedor || 0) < 0) {
+        message.error(`Paquete ${index + 1}: el monto que cubriras del servicio no puede ser menor a 0`);
         return;
       }
       const precioPaqueteActual = Number(rows[index]?.precio_paquete || 0);
@@ -326,7 +326,7 @@ const SimplePackagesPage = () => {
                 />
               </div>
               <div>
-                <Typography.Text strong>Sucursal de origen</Typography.Text>
+                <Typography.Text strong>Sucursal origen (Donde dejarás el paquete)</Typography.Text>
                 <Select
                   style={{ width: "100%", marginTop: 8 }}
                   value={selectedOriginId || undefined}
@@ -336,7 +336,7 @@ const SimplePackagesPage = () => {
                 />
               </div>
               <div>
-                <Typography.Text strong>Sucursal destino para todos</Typography.Text>
+                <Typography.Text strong>Sucursal destino (Donde recogerá tu cliente)</Typography.Text>
                 <Select
                   style={{ width: "100%", marginTop: 8 }}
                   value={selectedDestinationId || undefined}
@@ -427,7 +427,7 @@ const SimplePackagesPage = () => {
                       </td>
                       <td style={tableCellStyle}>
                         <InputNumber
-                          min={0.01}
+                          min={0}
                           style={{ width: "100%" }}
                           addonBefore="Bs."
                           value={Number(row.amortizacion_vendedor || 0)}
@@ -435,7 +435,7 @@ const SimplePackagesPage = () => {
                             updateRow(index, {
                               amortizacion_vendedor: Math.min(
                                 Number(row.precio_paquete || 0),
-                                Math.max(0.01, Number(value || 0))
+                                Math.max(0, Number(value || 0))
                               ),
                             })
                           }
@@ -526,7 +526,7 @@ const SimplePackagesPage = () => {
                         <Typography.Text strong>Monto que cubriras del servicio</Typography.Text>
                         <InputNumber
                           className="mt-1"
-                          min={0.01}
+                          min={0}
                           style={{ width: "100%" }}
                           addonBefore="Bs."
                           value={Number(row.amortizacion_vendedor || 0)}
@@ -534,7 +534,7 @@ const SimplePackagesPage = () => {
                             updateRow(index, {
                               amortizacion_vendedor: Math.min(
                                 Number(row.precio_paquete || 0),
-                                Math.max(0.01, Number(value || 0))
+                                Math.max(0, Number(value || 0))
                               ),
                             })
                           }

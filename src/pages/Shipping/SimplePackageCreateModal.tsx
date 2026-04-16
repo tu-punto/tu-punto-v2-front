@@ -306,7 +306,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                 />
               </div>
               <div>
-                <Typography.Text strong>Sucursal de origen</Typography.Text>
+                <Typography.Text strong>Sucursal origen (Donde dejarás el paquete)</Typography.Text>
                 <Select
                   style={{ width: "100%", marginTop: 8 }}
                   value={selectedOriginId || undefined}
@@ -316,7 +316,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                 />
               </div>
               <div>
-                <Typography.Text strong>Sucursal destino para todos</Typography.Text>
+                <Typography.Text strong>Sucursal destino (Donde recogerá tu cliente)</Typography.Text>
                 <Select
                   style={{ width: "100%", marginTop: 8 }}
                   value={selectedDestinationId || undefined}

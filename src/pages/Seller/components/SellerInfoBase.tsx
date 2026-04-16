@@ -192,32 +192,42 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       const regularSales: any[] = Array.isArray(res)
         ? res.filter((sale) => sale.id_pedido.estado_pedido !== "En Espera")
         : [];
+      const regularPedidoIds = new Set(
+        regularSales
+          .map((sale) => String(sale?.id_pedido?._id || sale?.id_pedido || "").trim())
+          .filter(Boolean)
+      );
       const simpleSales: any[] = Array.isArray(simpleRes?.rows)
-        ? simpleRes.rows.map((row: any) => ({
-            key: `simple-${row._id}`,
-            producto: "Entrega simple",
-            nombre_variante: row.descripcion_paquete || "Paquete simple",
-            precio_unitario: Number(row.saldo_por_paquete ?? 0),
-            cantidad: 1,
-            utilidad: 0,
-            id_venta: `simple-${row._id}`,
-            id_vendedor: seller.key,
-            id_pedido: {
-              _id: `simple-${row._id}`,
-              estado_pedido: row.estado_pedido || "Entregado",
-              pagado_al_vendedor: false,
-              cargo_delivery: 0,
-              adelanto_cliente: 0,
-            },
-            id_sucursal:
-              String(row?.origen_sucursal?._id || row?.origen_sucursal || row?.sucursal || ""),
-            deposito_realizado: !!row.deposito_realizado,
-            cliente: row.comprador || "",
-            fecha_pedido: row.fecha_pedido,
-            tipo: "Simple",
-            es_entrega_simple: true,
-            sucursal: row?.origen_sucursal?.nombre || "Sucursal no encontrada",
-          }))
+        ? simpleRes.rows
+            .filter((row: any) => {
+              const pedidoRef = String(row?.pedido_ref?._id || row?.pedido_ref || "").trim();
+              return !pedidoRef || !regularPedidoIds.has(pedidoRef);
+            })
+            .map((row: any) => ({
+              key: `simple-${row._id}`,
+              producto: "Entrega simple",
+              nombre_variante: row.descripcion_paquete || "Paquete simple",
+              precio_unitario: Number(row.saldo_por_paquete ?? 0),
+              cantidad: 1,
+              utilidad: 0,
+              id_venta: `simple-${row._id}`,
+              id_vendedor: seller.key,
+              id_pedido: {
+                _id: `simple-${row._id}`,
+                estado_pedido: row.estado_pedido || "Entregado",
+                pagado_al_vendedor: false,
+                cargo_delivery: 0,
+                adelanto_cliente: 0,
+              },
+              id_sucursal:
+                String(row?.origen_sucursal?._id || row?.origen_sucursal || row?.sucursal || ""),
+              deposito_realizado: !!row.deposito_realizado,
+              cliente: row.comprador || "",
+              fecha_pedido: row.fecha_pedido,
+              tipo: "Simple",
+              es_entrega_simple: true,
+              sucursal: row?.origen_sucursal?.nombre || "Sucursal no encontrada",
+            }))
         : [];
       const pedidosIds = regularSales.map((s) => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));

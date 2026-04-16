@@ -610,15 +610,20 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       return;
     }
 
+    const paymentMethod = generalPaymentMethod === "mixed" || generalPaymentMethod === "efectivo" ? "efectivo" : generalPaymentMethod === "qr" ? "qr" : "";
+
     Modal.confirm({
       title: "Crear pedidos simples",
-      content: `Se crearán ${pendingRows.length} pedidos simples en la tabla de pedidos. ¿Continuar?`,
+      content: `Se crearán ${pendingRows.length} pedidos simples con método de pago: ${
+        paymentMethod === "efectivo" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "No pagado"
+      }. ¿Continuar?`,
       okText: "Crear",
       cancelText: "Cancelar",
       onOk: async () => {
         try {
           const response = await createSimplePackageOrdersAPI({
             packageIds: pendingRows.map((row) => String(row._id)),
+            paymentMethod,
           });
           if (!response?.success) {
             message.error(response.message || "No se pudieron crear los pedidos simples");
