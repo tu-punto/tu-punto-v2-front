@@ -89,7 +89,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const generalPaymentMethod = useMemo(() => {
     if (!rows.length) return "";
     const rowsWithMethod = rows.filter((row) => String(row.metodo_pago || ""));
-    if (!rowsWithMethod.length) return "";
+    if (!rowsWithMethod.length) return "efectivo";
     const firstMethod = String(rowsWithMethod[0]?.metodo_pago || "");
     if (!firstMethod) return "";
     return rowsWithMethod.every((row) => String(row.metodo_pago || "") === firstMethod) ? firstMethod : "mixed";
@@ -988,7 +988,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                   </div>
                   <Space wrap>
                     <Button
-                      disabled={savingGeneralPayment}
+                      disabled
                       type={!generalPaymentMethod ? "primary" : "default"}
                       onClick={() => applyGeneralPaymentMethod("")}
                     >

@@ -177,6 +177,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         () => Number((simplePackagePrice + simplePackageShippingPrice).toFixed(2)),
         [simplePackagePrice, simplePackageShippingPrice]
     );
+    const simplePackageBuyerDebt = useMemo(
+        () => Number(shipping?.deuda_comprador ?? 0),
+        [shipping]
+    );
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryOwnerBranchId || String(deliveryOwnerBranchId) === String(currentSucursalId);
     }, [deliveryOwnerBranchId, currentSucursalId]);
@@ -190,8 +194,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             : 0;
 
         const adelanto = adelantoCliente || 0;
-        return parseFloat((totalAmount - adelanto + deliveryAdicional).toFixed(2));
-    }, [totalAmount, adelantoCliente, cargoDelivery, quienPagaDelivery, estaPagado]);
+        const buyerDebt = isSimplePackageOrder ? simplePackageBuyerDebt : 0;
+        return parseFloat((totalAmount + buyerDebt - adelanto + deliveryAdicional).toFixed(2));
+    }, [totalAmount, simplePackageBuyerDebt, isSimplePackageOrder, adelantoCliente, cargoDelivery, quienPagaDelivery, estaPagado]);
     const handleDeleteProduct = (key: any) => {
         setProducts((prev: any) => {
             const toDelete = prev.find((p: any) => p.key === key);
@@ -876,6 +881,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             <Col span={24}>
                                 <Form.Item label="Saldo del paquete">
                                     <Input value={`Bs. ${simplePackageSaldo.toFixed(2)}`} readOnly />
+                                </Form.Item>
+                            </Col>
+                            <Col span={24}>
+                                <Form.Item label="Deuda del comprador">
+                                    <Input value={`Bs. ${simplePackageBuyerDebt.toFixed(2)}`} readOnly />
                                 </Form.Item>
                             </Col>
                         </Row>

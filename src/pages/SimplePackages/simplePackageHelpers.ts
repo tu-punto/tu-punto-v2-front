@@ -53,6 +53,10 @@ export const createDraftRow = (
   const routePrice = Number(existing?.precio_entre_sucursal || 0);
   const saldoPorPaquete = Number(existing?.saldo_por_paquete ?? config.saldo_por_paquete ?? 0);
   const amortizacion = Number(existing?.amortizacion_vendedor ?? config.amortizacion ?? 0);
+  const initialPaymentMethod =
+    existing?.metodo_pago === "qr" || existing?.metodo_pago === "efectivo"
+      ? existing.metodo_pago
+      : "efectivo";
   return {
     key: existing?.key || existing?._id || `draft-${index}-${Date.now()}`,
     comprador: existing?.comprador || "",
@@ -61,7 +65,7 @@ export const createDraftRow = (
     package_size: packageSize,
     destino_sucursal_id: existing?.destino_sucursal_id || "",
     esta_pagado: existing?.esta_pagado || "no",
-    metodo_pago: existing?.metodo_pago || "",
+    metodo_pago: initialPaymentMethod,
     _id: existing?._id,
     ...buildPackagePricing(
       config.precio_paquete,
@@ -135,7 +139,7 @@ export const applyPackagePatch = (
   const metodoPago =
     paid === "si"
       ? String(patch.metodo_pago ?? row.metodo_pago ?? "").trim().toLowerCase()
-      : "";
+      : String(patch.metodo_pago ?? row.metodo_pago ?? "efectivo").trim().toLowerCase();
 
   return {
     ...row,
@@ -143,7 +147,7 @@ export const applyPackagePatch = (
     package_size: nextSize,
     ...pricing,
     esta_pagado: paid,
-    metodo_pago: metodoPago === "efectivo" || metodoPago === "qr" ? metodoPago : "",
+    metodo_pago: metodoPago === "qr" ? "qr" : "efectivo",
     saldo_cobrar: paid === "si" ? 0 : pricing.deuda_comprador,
   };
 };

@@ -30,6 +30,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [adelantoVisible, setAdelantoVisible] = useState(false);
   const [adelantoCliente, setAdelantoCliente] = useState<number>(0);
   const [sellers, setSellers] = useState([]);
+  const isSimplePackageOrder = Boolean(shipping?.simple_package_order || shipping?.simple_package_source_id);
+  const buyerDebt = Number(shipping?.deuda_comprador ?? 0);
   const originBranchId = resolveBranchId(shipping?.lugar_origen) || resolveBranchId(shipping?.sucursal);
 
   const normalizarTipoPago = (valor: string): string | null => {
@@ -48,10 +50,11 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     return mapping[clave] || null;
   };
 
-  const montoTotal = products.reduce(
+  const montoBase = products.reduce(
     (acc, item) => acc + (item.precio_unitario || 0) * (item.cantidad || 0),
     0
   );
+  const montoTotal = montoBase + (isSimplePackageOrder ? buyerDebt : 0);
 
   const saldoACobrar = useMemo(() => {
     if (estaPagado === 'si') return 0;
@@ -440,6 +443,13 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
             <span>Monto total:</span>
             <span style={{ fontWeight: 'bold' }}>Bs. {montoTotal.toFixed(2)}</span>
           </div>
+
+          {isSimplePackageOrder && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span>Deuda del comprador:</span>
+              <span style={{ fontWeight: 'bold' }}>Bs. {buyerDebt.toFixed(2)}</span>
+            </div>
+          )}
 
           {/* ¿Está ya pagado? */}
           <Row gutter={16}>
