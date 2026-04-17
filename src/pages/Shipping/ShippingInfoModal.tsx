@@ -177,10 +177,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         () => Number((simplePackagePrice + simplePackageShippingPrice).toFixed(2)),
         [simplePackagePrice, simplePackageShippingPrice]
     );
-    const simplePackageDebtAmount = useMemo(
-        () => Number(shipping?.amortizacion_vendedor ?? 0),
-        [shipping]
-    );
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryOwnerBranchId || String(deliveryOwnerBranchId) === String(currentSucursalId);
     }, [deliveryOwnerBranchId, currentSucursalId]);
@@ -629,12 +625,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             // Forzar subtotales según el tipo de pago
             switch (effectivePaymentType) {
                 case '1':
-                    updateShippingInfo.subtotal_qr = isSimplePackageOrder ? simplePackageDebtAmount : saldoACobrar;
+                    updateShippingInfo.subtotal_qr = saldoACobrar;
                     updateShippingInfo.subtotal_efectivo = 0;
                     break;
                 case '2':
                     updateShippingInfo.subtotal_qr = 0;
-                    updateShippingInfo.subtotal_efectivo = isSimplePackageOrder ? simplePackageDebtAmount : saldoACobrar;
+                    updateShippingInfo.subtotal_efectivo = saldoACobrar;
                     break;
                 case '3':
                     updateShippingInfo.subtotal_qr = 0;
@@ -642,9 +638,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     break;
                 case '4':
                     if (isSimplePackageOrder) {
-                        const mitad = parseFloat((simplePackageDebtAmount / 2).toFixed(2));
+                        const mitad = parseFloat((saldoACobrar / 2).toFixed(2));
                         updateShippingInfo.subtotal_qr = mitad;
-                        updateShippingInfo.subtotal_efectivo = parseFloat((simplePackageDebtAmount - mitad).toFixed(2));
+                        updateShippingInfo.subtotal_efectivo = parseFloat((saldoACobrar - mitad).toFixed(2));
                     } else {
                         updateShippingInfo.subtotal_qr = qrInput;
                         updateShippingInfo.subtotal_efectivo = efectivoInput;
