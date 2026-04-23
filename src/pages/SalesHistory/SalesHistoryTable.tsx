@@ -3,7 +3,9 @@ import { Table, DatePicker, message, Tag } from "antd";
 import dayjs from "dayjs";
 import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
 import { getShippingByIdAPI } from "../../api/shipping";
+import { getExternalSaleByIdAPI } from "../../api/externalSale";
 import ModalSalesHistory from "./ModalSalesHistory";
+import ExternalShippingInfoModal from "../Shipping/ExternalShippingInfoModal";
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
@@ -13,13 +15,24 @@ const SalesHistoryTable = () => {
 
     const sucursalId = localStorage.getItem("sucursalId");
     const [selectedSale, setSelectedSale] = useState<any | null>(null);
+    const [selectedExternalSale, setSelectedExternalSale] = useState<any | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isExternalModalOpen, setIsExternalModalOpen] = useState(false);
     const [modalProducts, setModalProducts] = useState<any[]>([]);
 
     const handleRowClick = async (record: any) => {
         if (record.isSummary || !record._id) return;
 
         try {
+            if (record.is_external) {
+                const res = await getExternalSaleByIdAPI(record._id);
+                if (res && res._id) {
+                    setSelectedExternalSale(res);
+                    setIsExternalModalOpen(true);
+                }
+                return;
+            }
+
             const res = await getShippingByIdAPI(record._id);
             if (res) {
                 const ventasNormales = (res.venta || []).map((v: any) => ({
@@ -206,7 +219,7 @@ const SalesHistoryTable = () => {
             <Table
                 columns={columns}
                 dataSource={getGroupedData()}
-                rowKey={(r) => r._id || `${r.fecha}-${r.hora}`}
+                rowKey={(r: any) => r._id ? (r.is_external ? `external-${r._id}` : r._id) : `${r.fecha}-${r.hora}`}
                 rowClassName={(record) =>
                     record.isSummary ? "bg-gray-50 text-center text-sm !align-middle" : "hover:bg-gray-100"
                 }
@@ -221,6 +234,13 @@ const SalesHistoryTable = () => {
                 onClose={() => setIsModalOpen(false)}
                 shipping={selectedSale}
                 onSave={fetchSales}
+                isAdmin={true}
+            />
+            <ExternalShippingInfoModal
+                visible={isExternalModalOpen}
+                onClose={() => setIsExternalModalOpen(false)}
+                onSaved={fetchSales}
+                externalShipping={selectedExternalSale}
                 isAdmin={true}
             />
         </>

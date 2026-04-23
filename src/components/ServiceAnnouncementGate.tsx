@@ -3,6 +3,7 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
 import { normalizeRole } from "../utils/role";
+import AnnouncementAttachments, { type AnnouncementAttachment } from "./AnnouncementAttachments";
 import {
   acceptServiceAnnouncementAPI,
   getPendingServiceAnnouncementAPI,
@@ -16,6 +17,7 @@ type Announcement = {
   body: string;
   regulation?: string;
   policyText?: string;
+  attachments?: AnnouncementAttachment[];
 };
 
 const { Paragraph, Text } = Typography;
@@ -118,6 +120,8 @@ const ServiceAnnouncementGate = () => {
             </Paragraph>
           </div>
         ) : null}
+
+        <AnnouncementAttachments attachments={announcement.attachments} />
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
           <Button onClick={handleGoToAnnouncements}>Ir a los comunicados</Button>

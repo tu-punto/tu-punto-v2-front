@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -17,11 +17,21 @@ import {
   Typography,
   message,
 } from "antd";
+import {
+  CloseOutlined,
+  FileImageOutlined,
+  FilePdfOutlined,
+  FileTextOutlined,
+  LinkOutlined,
+  PaperClipOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 import ServiciosResumenTable from "./components/ServicesSummaryTable";
 import { getServicesSummaryAPI } from "../../api/services";
 import servicesIcon from "../../assets/services2.png";
 import { UserContext } from "../../context/userContext";
 import { normalizeRole } from "../../utils/role";
+import AnnouncementAttachments, { type AnnouncementAttachment } from "../../components/AnnouncementAttachments";
 import {
   acknowledgeServiceAnnouncementAPI,
   acceptServiceAnnouncementAPI,
@@ -30,6 +40,14 @@ import {
   getMyServiceAnnouncementsAPI,
   publishServiceAnnouncementAPI,
 } from "../../api/serviceAnnouncements";
+
+import "./ServicePanelPage.css";
+
+type PendingAttachmentFile = {
+  uid: string;
+  file: File;
+  previewUrl?: string;
+};
 
 type Announcement = {
   _id: string;
@@ -49,6 +67,7 @@ type Announcement = {
   pendingAcceptance?: boolean;
   isAcknowledged?: boolean;
   isAccepted?: boolean;
+  attachments?: AnnouncementAttachment[];
 };
 
 const { Paragraph, Text } = Typography;
@@ -57,6 +76,25 @@ const roleOptions = [
   { label: "Operador", value: "operator" },
   { label: "Vendedor", value: "seller" },
 ];
+const MAX_ATTACHMENT_FILES = 6;
+const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024;
+const allowedAttachmentMimeTypes = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+]);
+const attachmentAccept =
+  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -68,6 +106,24 @@ const formatDate = (value?: string | null) => {
     timeZone: "America/La_Paz",
   });
 };
+
+const formatBytes = (value?: number) => {
+  const size = Number(value || 0);
+  if (!size) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const isPreviewImageFile = (file: File) => file.type.startsWith("image/");
+
+const getFileExtension = (fileName: string) => {
+  const raw = String(fileName || "").split(".").pop() || "";
+  return raw.toUpperCase();
+};
+
+const buildPendingAttachmentKey = (file: File) =>
+  `${file.name}-${file.size}-${file.lastModified}`;
 
 const AudienceTags = ({ roles }: { roles?: string[] }) => (
   <Space size={[4, 4]} wrap>
@@ -156,6 +212,8 @@ const ServiceAnnouncementCard = ({
           </div>
         ) : null}
 
+        <AnnouncementAttachments attachments={announcement.attachments} />
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
           {showAdminActions && announcement.status !== "published" ? (
             <Button loading={isBusy} onClick={() => onPublish && void onPublish(announcement._id)}>
@@ -193,6 +251,11 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const [busyAnnouncementId, setBusyAnnouncementId] = useState<string | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [adminAnnouncements, setAdminAnnouncements] = useState<Announcement[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<PendingAttachmentFile[]>([]);
+  const [attachmentDragActive, setAttachmentDragActive] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentFilesRef = useRef<PendingAttachmentFile[]>([]);
+  const watchedLinkAttachments = Form.useWatch("linkAttachments", form) || [];
 
   const pendingCount = useMemo(
     () => announcements.filter((item) => item.pendingRead || item.pendingAcceptance).length,
@@ -202,6 +265,100 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const pageSubtitle = isSeller
     ? "Mensajes, reglamento, politicas y cambios publicados para tu cuenta."
     : "Comunicados, reglamento, politicas y aceptaciones del servicio.";
+
+  useEffect(() => {
+    attachmentFilesRef.current = attachmentFiles;
+  }, [attachmentFiles]);
+
+  useEffect(() => {
+    return () => {
+      attachmentFilesRef.current.forEach((item) => {
+        if (item.previewUrl) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+    };
+  }, []);
+
+  const resetAttachmentFiles = () => {
+    setAttachmentFiles((current) => {
+      current.forEach((item) => {
+        if (item.previewUrl) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+      return [];
+    });
+    setAttachmentDragActive(false);
+  };
+
+  const handleAttachmentFilesAdd = (files: File[]) => {
+    if (!files.length) return;
+
+    setAttachmentFiles((current) => {
+      const next = [...current];
+      const duplicateKeys = new Set(current.map((item) => buildPendingAttachmentKey(item.file)));
+      let invalidTypeCount = 0;
+      let invalidSizeCount = 0;
+      let duplicateCount = 0;
+      let skippedByLimit = 0;
+
+      for (const file of files) {
+        if (!allowedAttachmentMimeTypes.has(file.type)) {
+          invalidTypeCount += 1;
+          continue;
+        }
+
+        if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
+          invalidSizeCount += 1;
+          continue;
+        }
+
+        const fileKey = buildPendingAttachmentKey(file);
+        if (duplicateKeys.has(fileKey)) {
+          duplicateCount += 1;
+          continue;
+        }
+
+        if (next.length >= MAX_ATTACHMENT_FILES) {
+          skippedByLimit += 1;
+          continue;
+        }
+
+        duplicateKeys.add(fileKey);
+        next.push({
+          uid: `${fileKey}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          previewUrl: isPreviewImageFile(file) ? URL.createObjectURL(file) : undefined,
+        });
+      }
+
+      if (invalidTypeCount > 0) {
+        message.warning("Solo se permiten PDF, Office, texto, CSV o imagenes.");
+      }
+      if (invalidSizeCount > 0) {
+        message.warning("Cada documento puede pesar hasta 10 MB.");
+      }
+      if (duplicateCount > 0) {
+        message.info("Algunos archivos repetidos no se agregaron.");
+      }
+      if (skippedByLimit > 0) {
+        message.warning(`Solo puedes adjuntar hasta ${MAX_ATTACHMENT_FILES} documentos.`);
+      }
+
+      return next;
+    });
+  };
+
+  const handleRemoveAttachment = (uid: string) => {
+    setAttachmentFiles((current) => {
+      const fileToRemove = current.find((item) => item.uid === uid);
+      if (fileToRemove?.previewUrl) {
+        URL.revokeObjectURL(fileToRemove.previewUrl);
+      }
+      return current.filter((item) => item.uid !== uid);
+    });
+  };
 
   const loadSummary = async () => {
     if (!isAdmin) return;
@@ -256,6 +413,10 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       setSubmitting(true);
       const res = await createServiceAnnouncementAPI({
         ...values,
+        linkAttachments: Array.isArray(values.linkAttachments)
+          ? values.linkAttachments.filter((item: any) => String(item?.url || "").trim())
+          : [],
+        attachmentFiles: attachmentFiles.map((item) => item.file),
         publishNow,
       });
 
@@ -269,7 +430,9 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
         targetRoles: ["seller"],
         requireAcceptance: true,
         sendPush: true,
+        linkAttachments: [],
       });
+      resetAttachmentFiles();
       await loadAnnouncements();
     } catch (error: any) {
       if (error?.errorFields) return;
@@ -357,6 +520,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               targetRoles: ["seller"],
               requireAcceptance: true,
               sendPush: true,
+              linkAttachments: [],
             }}
           >
             <Row gutter={16}>
@@ -384,6 +548,164 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
             <Form.Item name="policyText" label="Politicas de uso">
               <Input.TextArea rows={3} placeholder="Politicas que el usuario debe aceptar" />
             </Form.Item>
+
+            <div className="service-announcement-editor-section">
+              <div className="service-announcement-editor-header">
+                <div>
+                  <div className="service-announcement-editor-title">Links y documentos</div>
+                  <div className="service-announcement-editor-subtitle">
+                    Adjunta enlaces externos o documentos en S3 para abrirlos o descargarlos desde el comunicado.
+                  </div>
+                </div>
+                <Text type="secondary">
+                  {watchedLinkAttachments.length} link(s) · {attachmentFiles.length} documento(s)
+                </Text>
+              </div>
+
+              <Form.List name="linkAttachments">
+                {(fields, { add, remove }) => (
+                  <div className="service-announcement-link-list">
+                    {fields.map((field) => (
+                      <div className="service-announcement-link-card" key={field.key}>
+                        <div className="service-announcement-link-icon">
+                          <LinkOutlined />
+                        </div>
+                        <div className="service-announcement-link-fields">
+                          <Form.Item
+                            {...field}
+                            name={[field.name, "title"]}
+                            label="Etiqueta"
+                            style={{ marginBottom: 0 }}
+                          >
+                            <Input placeholder="Ej. Reglamento completo" />
+                          </Form.Item>
+                          <Form.Item
+                            {...field}
+                            name={[field.name, "url"]}
+                            label="URL"
+                            style={{ marginBottom: 0 }}
+                            rules={[
+                              { required: true, message: "Ingresa una URL" },
+                              { type: "url", message: "Ingresa una URL valida" },
+                            ]}
+                          >
+                            <Input placeholder="https://..." />
+                          </Form.Item>
+                        </div>
+                        <Button type="text" danger icon={<CloseOutlined />} onClick={() => remove(field.name)} />
+                      </div>
+                    ))}
+
+                    <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({ title: "", url: "" })}>
+                      Añadir link
+                    </Button>
+                  </div>
+                )}
+              </Form.List>
+
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                accept={attachmentAccept}
+                multiple
+                style={{ display: "none" }}
+                onChange={(event) => {
+                  const files = Array.from(event.target.files || []);
+                  handleAttachmentFilesAdd(files);
+                  event.target.value = "";
+                }}
+              />
+
+              <div
+                className={`service-announcement-upload-zone ${
+                  attachmentDragActive ? "service-announcement-upload-zone-active" : ""
+                }`}
+                onClick={() => attachmentInputRef.current?.click()}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setAttachmentDragActive(true);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setAttachmentDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (event.currentTarget === event.target) {
+                    setAttachmentDragActive(false);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setAttachmentDragActive(false);
+                  handleAttachmentFilesAdd(Array.from(event.dataTransfer.files || []));
+                }}
+              >
+                <div className="service-announcement-upload-zone-copy">
+                  <div className="service-announcement-upload-zone-icon">
+                    <PaperClipOutlined />
+                  </div>
+                  <div>
+                    <div className="service-announcement-upload-zone-title">
+                      Arrastra documentos aqui o haz clic para seleccionarlos
+                    </div>
+                    <div className="service-announcement-upload-zone-subtitle">
+                      PDF, Word, Excel, PowerPoint, TXT, CSV o imagenes. Maximo {MAX_ATTACHMENT_FILES} archivos de 10 MB.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {attachmentFiles.length ? (
+                <div className="service-announcement-files-grid">
+                  {attachmentFiles.map((item) => (
+                    <div className="service-announcement-file-card" key={item.uid}>
+                      <div
+                        className={`service-announcement-file-thumb ${
+                          item.previewUrl ? "service-announcement-file-thumb-image" : ""
+                        }`}
+                      >
+                        {item.previewUrl ? (
+                          <img src={item.previewUrl} alt={item.file.name} />
+                        ) : String(item.file.type || "").includes("pdf") ? (
+                          <FilePdfOutlined style={{ fontSize: 24 }} />
+                        ) : String(item.file.type || "").includes("word") ? (
+                          <FileTextOutlined style={{ fontSize: 24 }} />
+                        ) : String(item.file.type || "").startsWith("image/") ? (
+                          <FileImageOutlined style={{ fontSize: 24 }} />
+                        ) : (
+                          <span>{getFileExtension(item.file.name) || "FILE"}</span>
+                        )}
+                      </div>
+
+                      <div className="service-announcement-file-copy">
+                        <Typography.Text strong ellipsis={{ tooltip: item.file.name }}>
+                          {item.file.name}
+                        </Typography.Text>
+                        <Typography.Text type="secondary">
+                          {getFileExtension(item.file.name) || "Archivo"} · {formatBytes(item.file.size)}
+                        </Typography.Text>
+                        <Tag bordered={false} color="default" style={{ width: "fit-content" }}>
+                          Pendiente de subir
+                        </Tag>
+                      </div>
+
+                      <Button
+                        type="text"
+                        danger
+                        icon={<CloseOutlined />}
+                        className="service-announcement-file-remove"
+                        onClick={() => handleRemoveAttachment(item.uid)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
             <Row gutter={16}>
               <Col xs={24} md={12}>

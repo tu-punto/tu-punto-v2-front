@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient";
+import { apiClient, apiClientNoJSON } from "./apiClient";
 
 export const getMyServiceAnnouncementsAPI = async () => {
   const response = await apiClient.get("/service-announcements/mine");
@@ -15,8 +15,45 @@ export const getAdminServiceAnnouncementsAPI = async () => {
   return response.data;
 };
 
-export const createServiceAnnouncementAPI = async (payload: Record<string, unknown>) => {
-  const response = await apiClient.post("/service-announcements", payload);
+export const createServiceAnnouncementAPI = async (payload: {
+  title: string;
+  version: string;
+  summary?: string;
+  body: string;
+  regulation?: string;
+  policyText?: string;
+  targetRoles: string[];
+  requireAcceptance?: boolean;
+  sendPush?: boolean;
+  publishNow?: boolean;
+  linkAttachments?: Array<{
+    title?: string;
+    url: string;
+  }>;
+  attachmentFiles?: File[];
+}) => {
+  const formData = new FormData();
+
+  formData.append("title", payload.title);
+  formData.append("version", payload.version);
+  formData.append("body", payload.body);
+  formData.append("targetRoles", JSON.stringify(payload.targetRoles || []));
+  formData.append("requireAcceptance", String(payload.requireAcceptance !== false));
+  formData.append("sendPush", String(payload.sendPush !== false));
+  formData.append("publishNow", String(Boolean(payload.publishNow)));
+
+  if (payload.summary !== undefined) formData.append("summary", payload.summary);
+  if (payload.regulation !== undefined) formData.append("regulation", payload.regulation);
+  if (payload.policyText !== undefined) formData.append("policyText", payload.policyText);
+  if (payload.linkAttachments !== undefined) {
+    formData.append("linkAttachments", JSON.stringify(payload.linkAttachments));
+  }
+
+  (payload.attachmentFiles || []).forEach((file) => {
+    formData.append("attachments", file);
+  });
+
+  const response = await apiClientNoJSON.post("/service-announcements", formData);
   return response.data;
 };
 

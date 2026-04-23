@@ -1,4 +1,4 @@
-import { Button, InputNumber, Modal, Space, Table, Typography, message } from 'antd';
+import { Button, Input, InputNumber, Modal, Space, Table, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { updateProductPriceAPI } from '../../api/product';
 
@@ -21,12 +21,14 @@ const ProductPriceMatrixModal = ({
 }) => {
     const [rows, setRows] = useState<any[]>([]);
     const [bulkPrice, setBulkPrice] = useState<number | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (!visible) {
             setRows([]);
             setBulkPrice(null);
+            setSearchTerm('');
             return;
         }
 
@@ -47,17 +49,26 @@ const ProductPriceMatrixModal = ({
 
         setRows(nextRows);
         setBulkPrice(null);
+        setSearchTerm('');
     }, [visible, producto]);
 
     const hasRows = rows.length > 0;
+    const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+    const filteredRows = useMemo(() => {
+        if (!normalizedSearchTerm) return rows;
+
+        return rows.filter((row) => row.label.toLowerCase().includes(normalizedSearchTerm));
+    }, [normalizedSearchTerm, rows]);
+    const visibleRowKeys = useMemo(() => new Set(filteredRows.map((row) => row.key)), [filteredRows]);
+    const hasVisibleRows = filteredRows.length > 0;
 
     const applyBulkPrice = () => {
-        if (bulkPrice === null || bulkPrice < 0) return;
+        if (bulkPrice === null || bulkPrice < 0 || !hasVisibleRows) return;
 
         setRows((currentRows) =>
             currentRows.map((row) => ({
                 ...row,
-                precio: bulkPrice
+                precio: visibleRowKeys.has(row.key) ? bulkPrice : row.precio
             }))
         );
         setBulkPrice(null);
@@ -146,19 +157,30 @@ const ProductPriceMatrixModal = ({
                                 <Typography.Text strong>Precio masivo</Typography.Text>
                                 <br />
                                 <Typography.Text type="secondary">
-                                    Aplica un mismo precio a todas las variantes visibles.
+                                    Filtra por variante o subvariante y aplica un mismo precio solo a las visibles.
                                 </Typography.Text>
                             </div>
 
                             <Space wrap size={[8, 8]}>
+                                <Input
+                                    value={searchTerm}
+                                    onChange={(event) => setSearchTerm(event.target.value)}
+                                    placeholder="Buscar variante o subvariante"
+                                    allowClear
+                                    style={{ width: 240 }}
+                                />
                                 <InputNumber
                                     min={0}
                                     value={bulkPrice}
                                     onChange={(value) => setBulkPrice(value ?? null)}
-                                    placeholder="Precio para todas"
+                                    placeholder="Precio para visibles"
                                 />
-                                <Button type="primary" onClick={applyBulkPrice} disabled={bulkPrice === null}>
-                                    Aplicar a todas
+                                <Button
+                                    type="primary"
+                                    onClick={applyBulkPrice}
+                                    disabled={bulkPrice === null || !hasVisibleRows}
+                                >
+                                    Aplicar
                                 </Button>
                             </Space>
                         </Space>
@@ -168,8 +190,12 @@ const ProductPriceMatrixModal = ({
                 <Table
                     rowKey="key"
                     pagination={false}
-                    dataSource={rows}
-                    locale={{ emptyText: 'Este producto no tiene variantes para editar.' }}
+                    dataSource={filteredRows}
+                    locale={{
+                        emptyText: hasRows
+                            ? 'No hay variantes que coincidan con el filtro.'
+                            : 'Este producto no tiene variantes para editar.'
+                    }}
                     columns={[
                         {
                             title: 'Variante',
