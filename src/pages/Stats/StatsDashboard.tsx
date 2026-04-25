@@ -35,6 +35,9 @@ const EMPTY_STATS = {
   deliveryExpenses: 0,
   deliveryBalance: 0,
   externalDeliveryIncome: 0,
+  externalDeliveredPackageTotal: 0,
+  simplePackagesNoDeliveryTotal: 0,
+  simplePackagesInterbranchTotal: 0,
   caja: 0,
 };
 
@@ -310,6 +313,44 @@ const StatisticsDashboard = () => {
                   value={stats?.deliveryBalance ?? 0}
                   prefix={<CarOutlined />}
                   color="#20c997"
+                />
+              </Spin>
+            </Col>
+          </Row>
+        </div>
+
+        <div>
+          <Typography.Title level={3} className="!mb-6">
+            Estadisticas de Paquetes
+          </Typography.Title>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loading.utility} tip="Cargando...">
+                <StatisticCard
+                  title="PRECIO PAQUETE EXTERNAS ENTREGADAS"
+                  value={stats?.externalDeliveredPackageTotal ?? 0}
+                  prefix={<DollarOutlined />}
+                  color="#0ea5e9"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loading.utility} tip="Cargando...">
+                <StatisticCard
+                  title="PAQUETES SIMPLES SIN DELIVERY"
+                  value={stats?.simplePackagesNoDeliveryTotal ?? 0}
+                  prefix={<ShoppingCartOutlined />}
+                  color="#f59e0b"
+                />
+              </Spin>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Spin spinning={loading.utility} tip="Cargando...">
+                <StatisticCard
+                  title="PAQUETES ENTRE SUCURSALES + ENVIO"
+                  value={stats?.simplePackagesInterbranchTotal ?? 0}
+                  prefix={<CarOutlined />}
+                  color="#14b8a6"
                 />
               </Spin>
             </Col>

@@ -327,7 +327,6 @@ function ShippingFormModal({
                 layout="vertical"
                 initialValues={{
                     tipo_destino: "esta_sucursal",
-                    destino_sucursal_id: branchIdFromProps,
                     estado_pedido: "En Espera"
                 }}
             >
@@ -442,6 +441,7 @@ function ShippingFormModal({
                                             });
                                         } else {
                                             form.setFieldsValue({
+                                                destino_sucursal_id: undefined,
                                                 lugar_entrega_input: undefined,
                                                 ubicacion_link: undefined
                                             });

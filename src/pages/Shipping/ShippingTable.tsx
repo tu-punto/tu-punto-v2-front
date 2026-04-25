@@ -179,7 +179,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             estado_pedido: estadoPedido,
             esta_pagado: estaPagado,
             saldo_cobrar: Number(
-                externalSale?.saldo_cobrar ?? (estaPagado === "si" ? 0 : estaPagado === "mixto" ? pagaComprador : precioPaquete)
+                externalSale?.deuda_comprador ??
+                externalSale?.saldo_cobrar ??
+                (estaPagado === "si" ? 0 : estaPagado === "mixto" ? pagaComprador : precioPaquete)
             ),
             observaciones: externalSale?.descripcion_paquete || "",
             venta: [],

@@ -30,6 +30,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
   const watchedPackages = Form.useWatch("paquetes", form) || [];
+  const hasMixedPackages = useMemo(
+    () => watchedPackages.slice(0, packageCount).some((row: any) => row?.esta_pagado === "mixto"),
+    [packageCount, watchedPackages]
+  );
 
   const handlePaymentModeChange = (rowIndex: number, mode: "si" | "no" | "mixto") => {
     const price = Number(form.getFieldValue(["paquetes", rowIndex, "precio_paquete"]) || 0);
@@ -134,6 +138,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     if (!visible) return;
     form.setFieldsValue({
       numero_paquetes: MIN_PACKAGES,
+      metodo_pago: undefined,
       paquetes: buildPackages(MIN_PACKAGES),
     });
   }, [form, visible]);
@@ -198,12 +203,19 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         }
       }
 
+      const sellerPaymentMethod = hasMixedPackages ? String(values.metodo_pago || "").trim().toLowerCase() : "";
+      if (hasMixedPackages && sellerPaymentMethod !== "efectivo" && sellerPaymentMethod !== "qr") {
+        message.error("Debes indicar si los pagos mixtos del vendedor seran en efectivo o QR");
+        return;
+      }
+
       const payload = {
         carnet_vendedor: values.carnet_vendedor,
         vendedor: values.vendedor,
         telefono_vendedor: values.telefono_vendedor,
         id_sucursal: currentSucursal?._id,
         lugar_entrega: currentSucursal?.nombre || "Externo",
+        metodo_pago: sellerPaymentMethod,
         numero_paquetes: packageCount,
         paquetes,
       };
@@ -275,6 +287,24 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             <InputNumber min={MIN_PACKAGES} style={{ width: "100%" }} onChange={handlePackageCountChange} />
           </Form.Item>
         </div>
+
+        {hasMixedPackages && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Form.Item
+              name="metodo_pago"
+              label="Pago del vendedor para mixtos"
+              rules={[{ required: true, message: "Selecciona efectivo o QR" }]}
+            >
+              <Select
+                placeholder="Selecciona como se recibio el pago del vendedor"
+                options={[
+                  { label: "Efectivo", value: "efectivo" },
+                  { label: "QR", value: "qr" },
+                ]}
+              />
+            </Form.Item>
+          </div>
+        )}
 
         <div style={{ overflowX: "auto", marginTop: 8 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>

@@ -354,9 +354,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
         setEstadoPedido(shipping.estado_pedido || "En Espera");
         setEstadoInicialPedido(shipping.estado_pedido || "En Espera");
-        if (inferredDestinationType !== "sucursal" || inferredDestinationBranchId !== originId) {
-            internalForm.setFieldValue('quien_paga_delivery', 'comprador');
-        }
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
             ...p,
             id_venta: p._id ?? null,

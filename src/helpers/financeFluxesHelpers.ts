@@ -57,6 +57,9 @@ export const getFilteredStats = async (
     deliveryExpenses: deliveryExpenses,
     deliveryBalance: deliveryBalance,
     externalDeliveryIncome: summary?.externalDeliveryIncome ?? 0,
+    externalDeliveredPackageTotal: summary?.externalDeliveredPackageTotal ?? 0,
+    simplePackagesNoDeliveryTotal: summary?.simplePackagesNoDeliveryTotal ?? 0,
+    simplePackagesInterbranchTotal: summary?.simplePackagesInterbranchTotal ?? 0,
     caja: summary?.caja ?? 0,
   };
 };
