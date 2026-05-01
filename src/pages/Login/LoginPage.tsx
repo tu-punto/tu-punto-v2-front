@@ -37,7 +37,7 @@ const LoginPage = () => {
 
       const loginRes = await checkLoginAPI(values);
       if (!loginRes?.success) {
-        message.error("Error al iniciar sesión");
+        message.error(loginRes?.msg || loginRes?.error || "Error al iniciar sesión");
         return;
       }
 
