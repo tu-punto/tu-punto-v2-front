@@ -30,8 +30,11 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
   const watchedPackages = Form.useWatch("paquetes", form) || [];
-  const hasMixedPackages = useMemo(
-    () => watchedPackages.slice(0, packageCount).some((row: any) => row?.esta_pagado === "mixto"),
+  const hasSellerPayment = useMemo(
+    () =>
+      watchedPackages
+        .slice(0, packageCount)
+        .some((row: any) => row?.esta_pagado !== "no" && Number(row?.monto_paga_vendedor || 0) > 0),
     [packageCount, watchedPackages]
   );
 
@@ -46,8 +49,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
 
     if (mode === "si") {
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], price);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], price);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
       return;
     }
     if (mode === "no") {
@@ -79,8 +82,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
 
     if (mode === "si") {
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], price);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], price);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
       return;
     }
 
@@ -158,8 +161,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         let buyerAmount = roundCurrency(Number(row.monto_paga_comprador || 0));
 
         if (paidStatus === "si") {
-          sellerAmount = 0;
-          buyerAmount = price;
+          sellerAmount = price;
+          buyerAmount = 0;
         } else if (paidStatus === "no") {
           sellerAmount = 0;
           buyerAmount = 0;
@@ -203,9 +206,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         }
       }
 
-      const sellerPaymentMethod = hasMixedPackages ? String(values.metodo_pago || "").trim().toLowerCase() : "";
-      if (hasMixedPackages && sellerPaymentMethod !== "efectivo" && sellerPaymentMethod !== "qr") {
-        message.error("Debes indicar si los pagos mixtos del vendedor seran en efectivo o QR");
+      const totalSellerPayment = roundCurrency(
+        paquetes.reduce((sum: number, p: any) => sum + Number(p.monto_paga_vendedor || 0), 0)
+      );
+      const sellerPaymentMethod = totalSellerPayment > 0 ? String(values.metodo_pago || "").trim().toLowerCase() : "";
+      if (totalSellerPayment > 0 && sellerPaymentMethod !== "efectivo" && sellerPaymentMethod !== "qr") {
+        message.error("Debes indicar si el pago del vendedor sera en efectivo o QR");
         return;
       }
 
@@ -288,23 +294,22 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Form.Item>
         </div>
 
-        {hasMixedPackages && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Form.Item
-              name="metodo_pago"
-              label="Pago del vendedor para mixtos"
-              rules={[{ required: true, message: "Selecciona efectivo o QR" }]}
-            >
-              <Select
-                placeholder="Selecciona como se recibio el pago del vendedor"
-                options={[
-                  { label: "Efectivo", value: "efectivo" },
-                  { label: "QR", value: "qr" },
-                ]}
-              />
-            </Form.Item>
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Form.Item
+            name="metodo_pago"
+            label="Pago del vendedor"
+            rules={hasSellerPayment ? [{ required: true, message: "Selecciona efectivo o QR" }] : []}
+          >
+            <Select
+              allowClear
+              placeholder="Selecciona como se recibio el pago del vendedor"
+              options={[
+                { label: "Efectivo", value: "efectivo" },
+                { label: "QR", value: "qr" },
+              ]}
+            />
+          </Form.Item>
+        </div>
 
         <div style={{ overflowX: "auto", marginTop: 8 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
@@ -406,7 +411,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                         >
                           <Select
                             options={[
-                              { label: "Ya pagado", value: "si" },
+                              { label: "Pagado por vendedor", value: "si" },
                               { label: "No pagado", value: "no" },
                               { label: "Mixto", value: "mixto" },
                             ]}

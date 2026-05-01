@@ -35,6 +35,15 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
       key: "role",
     },
     {
+      title: "Sucursal",
+      key: "sucursal",
+      render: (_: any, record: any) => {
+        if (record.role === "admin" || record.is_superadmin) return "Todas";
+        if (record.role === "seller") return "-";
+        return record.sucursal?.nombre || "Sin asignar";
+      },
+    },
+    {
       title: "Acciones",
       key: "actions",
       render: (_, record) => (

@@ -1,11 +1,13 @@
 import { Modal, Form, Input, Select, Checkbox } from "antd";
 import { useEffect, useState } from "react";
+import { getSucursalsAPI } from "../../api/sucursal";
 
 interface UserFormModalProps {
   visible: boolean;
   onCancel: () => void;
   onSubmit: (values: any) => Promise<boolean>;
   editingUser?: any;
+  canAssignRoles?: boolean;
 }
 
 const UserFormModal = ({
@@ -13,9 +15,20 @@ const UserFormModal = ({
   onCancel,
   onSubmit,
   editingUser,
+  canAssignRoles = false,
 }: UserFormModalProps) => {
   const [form] = Form.useForm();
   const [changePassword, setChangePassword] = useState(false);
+  const [sucursales, setSucursales] = useState<any[]>([]);
+  const selectedRole = Form.useWatch("role", form);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    getSucursalsAPI()
+      .then((data) => setSucursales(Array.isArray(data) ? data : []))
+      .catch(() => setSucursales([]));
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -23,6 +36,7 @@ const UserFormModal = ({
         form.setFieldsValue({
           email: editingUser.email,
           role: editingUser.role,
+          sucursal: editingUser.sucursal?._id || editingUser.sucursal || editingUser.sucursalId,
         });
         setChangePassword(false);
       } else {
@@ -34,6 +48,10 @@ const UserFormModal = ({
 
   const handleSubmit = async (values: any) => {
     const submitData = { ...values };
+    if (submitData.role !== "operator") {
+      submitData.sucursal = null;
+    }
+
     if (editingUser && !changePassword) {
       delete submitData.password;
       delete submitData.confirmPassword;
@@ -87,7 +105,7 @@ const UserFormModal = ({
           label="Rol"
           rules={[{ required: true, message: "Rol requerido" }]}
         >
-          <Select size="large">
+          <Select size="large" disabled={!canAssignRoles}>
             <Select.Option value="admin">Administrador</Select.Option>
             <Select.Option value="operator">Operador</Select.Option>
             <Select.Option value="seller">Vendedor</Select.Option>
@@ -95,6 +113,23 @@ const UserFormModal = ({
         </Form.Item>
 
         {/* Checkbox para cambiar contraseña en modo edición */}
+        {selectedRole === "operator" && (
+          <Form.Item
+            name="sucursal"
+            label="Sucursal asignada"
+            rules={[{ required: true, message: "Sucursal requerida para operadores" }]}
+          >
+            <Select
+              size="large"
+              placeholder="Selecciona una sucursal"
+              options={sucursales.map((sucursal) => ({
+                label: sucursal.nombre,
+                value: sucursal._id,
+              }))}
+            />
+          </Form.Item>
+        )}
+
         {editingUser && (
           <Form.Item>
             <Checkbox

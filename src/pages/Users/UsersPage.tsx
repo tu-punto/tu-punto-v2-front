@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Button, Row, Col, Typography, Card } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import UsersTable from "./UsersTable";
 import UserFormModal from "./UserFormModal";
 import { useUserStore } from "../../stores/userStore";
+import { UserContext } from "../../context/userContext";
+import { isSuperadminUser } from "../../utils/role";
 
 const { Title } = Typography;
 
@@ -13,6 +15,8 @@ const UsersPage = () => {
   const createUser = useUserStore((state) => state.createUser);
   const updateUser = useUserStore((state) => state.updateUser);
   const fetchUsers = useUserStore((state) => state.fetchUsers);
+  const { user } = useContext(UserContext)!;
+  const canAssignRoles = isSuperadminUser(user);
 
   useEffect(() => {
     fetchUsers();
@@ -51,16 +55,18 @@ const UsersPage = () => {
             </Title>
           </Card>
         </Col>
-        <Col>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleNewUser}
-            size="large"
-          >
-            Nuevo Usuario
-          </Button>
-        </Col>
+        {canAssignRoles && (
+          <Col>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleNewUser}
+              size="large"
+            >
+              Nuevo Usuario
+            </Button>
+          </Col>
+        )}
       </Row>
 
       <UsersTable onEdit={handleEdit} />
@@ -70,6 +76,7 @@ const UsersPage = () => {
         onCancel={handleCancel}
         onSubmit={handleSubmit}
         editingUser={editingUser}
+        canAssignRoles={canAssignRoles}
       />
     </>
   );

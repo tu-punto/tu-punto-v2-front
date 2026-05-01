@@ -39,7 +39,7 @@ export const useUserStore = create<UserStore>((set) => ({
     try {
       const response = await registerUserAPI(userData);
       if (response?.success) {
-        const newUser = response.data.user._doc;
+        const newUser = response.data.user || response.data.data;
         console.log("Nuevo usuario creado:", newUser);
         set((state) => ({
           users: [...state.users, newUser],
@@ -59,9 +59,10 @@ export const useUserStore = create<UserStore>((set) => ({
     try {
       const response = await updateUserAPI(id, userData);
       if (response?.success) {
+        const updatedUser = response.data?.data || userData;
         set((state) => ({
           users: state.users.map((user) =>
-            user._id === id ? { ...user, ...userData } : user
+            user._id === id ? { ...user, ...updatedUser } : user
           ),
         }));
 
