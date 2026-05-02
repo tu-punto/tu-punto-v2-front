@@ -1,6 +1,10 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Button, Form, Input, InputNumber, Modal, Select, message } from "antd";
-import { registerExternalPackagesAPI } from "../../api/externalSale";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { AutoComplete, Button, Form, Input, InputNumber, Modal, Select, message } from "antd";
+import {
+  ExternalContactSuggestion,
+  getExternalContactSuggestionsAPI,
+  registerExternalPackagesAPI,
+} from "../../api/externalSale";
 
 interface ExternalPackagesFormModalProps {
   visible: boolean;
@@ -11,6 +15,13 @@ interface ExternalPackagesFormModalProps {
 
 const MIN_PACKAGES = 1;
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+
+type SuggestionField = "seller_carnet" | "name" | "phone";
+type SuggestionOption = {
+  value: string;
+  label: JSX.Element;
+  contact: ExternalContactSuggestion;
+};
 
 const buildPackages = (count: number, existing: any[] = []) =>
   Array.from({ length: count }, (_, index) => ({
@@ -23,10 +34,32 @@ const buildPackages = (count: number, existing: any[] = []) =>
     monto_paga_comprador: existing[index]?.monto_paga_comprador ?? 0,
   }));
 
+const getSuggestionValue = (contact: ExternalContactSuggestion, field: SuggestionField) => {
+  if (field === "seller_carnet") return contact.carnet_vendedor || "";
+  if (field === "phone") return contact.telefono || "";
+  return contact.nombre || "";
+};
+
+const normalizeSearchText = (value: string) => String(value || "").trim().toLowerCase();
+
+const buildSuggestionLabel = (contact: ExternalContactSuggestion) => (
+  <div style={{ display: "flex", flexDirection: "column" }}>
+    <span>{contact.nombre || "Sin nombre"}</span>
+    <small style={{ color: "#666" }}>
+      {[contact.carnet_vendedor ? `CI: ${contact.carnet_vendedor}` : "", contact.telefono ? `Cel: ${contact.telefono}` : ""]
+        .filter(Boolean)
+        .join(" | ")}
+      {contact.source === "buyer" ? " comprador historico" : " vendedor historico"}
+    </small>
+  </div>
+);
+
 const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursal }: ExternalPackagesFormModalProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [packageCount, setPackageCount] = useState<number>(MIN_PACKAGES);
+  const [suggestionOptions, setSuggestionOptions] = useState<Record<string, SuggestionOption[]>>({});
+  const suggestionRequestIds = useRef<Record<string, number>>({});
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
   const watchedPackages = Form.useWatch("paquetes", form) || [];
@@ -37,6 +70,45 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         .some((row: any) => row?.esta_pagado !== "no" && Number(row?.monto_paga_vendedor || 0) > 0),
     [packageCount, watchedPackages]
   );
+
+  const searchContactSuggestions = async (key: string, field: SuggestionField, value: string) => {
+    const query = String(value || "").trim();
+    if (query.length < 2) {
+      setSuggestionOptions((current) => ({ ...current, [key]: [] }));
+      return;
+    }
+
+    const requestId = (suggestionRequestIds.current[key] || 0) + 1;
+    suggestionRequestIds.current[key] = requestId;
+
+    const response = await getExternalContactSuggestionsAPI({ query, field, limit: 8 });
+    if (suggestionRequestIds.current[key] !== requestId) return;
+
+    const normalizedQuery = normalizeSearchText(query);
+    const contacts: ExternalContactSuggestion[] = response?.success ? response.data || [] : [];
+    const options = contacts
+      .map((contact) => ({
+        value: getSuggestionValue(contact, field),
+        label: buildSuggestionLabel(contact),
+        contact,
+      }))
+      .filter((option) => normalizeSearchText(option.value).includes(normalizedQuery));
+
+    setSuggestionOptions((current) => ({ ...current, [key]: options }));
+  };
+
+  const applySellerSuggestion = (contact: ExternalContactSuggestion) => {
+    form.setFieldsValue({
+      carnet_vendedor: contact.carnet_vendedor || form.getFieldValue("carnet_vendedor"),
+      vendedor: contact.nombre || form.getFieldValue("vendedor"),
+      telefono_vendedor: contact.telefono || form.getFieldValue("telefono_vendedor"),
+    });
+  };
+
+  const applyBuyerSuggestion = (rowIndex: number, contact: ExternalContactSuggestion) => {
+    form.setFieldValue(["paquetes", rowIndex, "comprador"], contact.nombre || "");
+    form.setFieldValue(["paquetes", rowIndex, "telefono_comprador"], contact.telefono || "");
+  };
 
   const handlePaymentModeChange = (rowIndex: number, mode: "si" | "no" | "mixto") => {
     const price = Number(form.getFieldValue(["paquetes", rowIndex, "precio_paquete"]) || 0);
@@ -263,27 +335,45 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             label="Carnet del vendedor"
             rules={[{ required: true, message: "El carnet es obligatorio" }]}
           >
-            <Input placeholder="Ej: 1234567" />
+            <AutoComplete
+              options={suggestionOptions.sellerCarnet || []}
+              onSearch={(value) => searchContactSuggestions("sellerCarnet", "seller_carnet", value)}
+              onSelect={(_, option) => applySellerSuggestion((option as SuggestionOption).contact)}
+            >
+              <Input placeholder="Ej: 1234567" />
+            </AutoComplete>
           </Form.Item>
           <Form.Item
             name="vendedor"
             label="Nombre del vendedor"
             rules={[{ required: true, message: "El nombre es obligatorio" }]}
           >
-            <Input placeholder="Nombre completo" />
+            <AutoComplete
+              options={suggestionOptions.sellerName || []}
+              onSearch={(value) => searchContactSuggestions("sellerName", "name", value)}
+              onSelect={(_, option) => applySellerSuggestion((option as SuggestionOption).contact)}
+            >
+              <Input placeholder="Nombre completo" />
+            </AutoComplete>
           </Form.Item>
           <Form.Item
             name="telefono_vendedor"
             label="Celular del vendedor"
           >
-            <Input
-              placeholder="Ej: 7XXXXXXX"
-              onKeyDown={(e) => {
-                if (!/[0-9]/.test(e.key) && !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)) {
-                  e.preventDefault();
-                }
-              }}
-            />
+            <AutoComplete
+              options={suggestionOptions.sellerPhone || []}
+              onSearch={(value) => searchContactSuggestions("sellerPhone", "phone", value)}
+              onSelect={(_, option) => applySellerSuggestion((option as SuggestionOption).contact)}
+            >
+              <Input
+                placeholder="Ej: 7XXXXXXX"
+                onKeyDown={(e) => {
+                  if (!/[0-9]/.test(e.key) && !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+              />
+            </AutoComplete>
           </Form.Item>
           <Form.Item
             name="numero_paquetes"
@@ -344,7 +434,13 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                           ]}
                           style={{ marginBottom: 0 }}
                         >
-                          <Input placeholder="Comprador" />
+                          <AutoComplete
+                            options={suggestionOptions[`buyerName-${rowIndex}`] || []}
+                            onSearch={(value) => searchContactSuggestions(`buyerName-${rowIndex}`, "name", value)}
+                            onSelect={(_, option) => applyBuyerSuggestion(rowIndex, (option as SuggestionOption).contact)}
+                          >
+                            <Input placeholder="Comprador" />
+                          </AutoComplete>
                         </Form.Item>
                       </td>
                       <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
@@ -376,17 +472,23 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                           ]}
                           style={{ marginBottom: 0 }}
                         >
-                          <Input
-                            placeholder="Celular"
-                            onKeyDown={(e) => {
-                              if (
-                                !/[0-9]/.test(e.key) &&
-                                !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)
-                              ) {
-                                e.preventDefault();
-                              }
-                            }}
-                          />
+                          <AutoComplete
+                            options={suggestionOptions[`buyerPhone-${rowIndex}`] || []}
+                            onSearch={(value) => searchContactSuggestions(`buyerPhone-${rowIndex}`, "phone", value)}
+                            onSelect={(_, option) => applyBuyerSuggestion(rowIndex, (option as SuggestionOption).contact)}
+                          >
+                            <Input
+                              placeholder="Celular"
+                              onKeyDown={(e) => {
+                                if (
+                                  !/[0-9]/.test(e.key) &&
+                                  !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)
+                                ) {
+                                  e.preventDefault();
+                                }
+                              }}
+                            />
+                          </AutoComplete>
                         </Form.Item>
                       </td>
                       <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>

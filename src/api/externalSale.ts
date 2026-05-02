@@ -48,6 +48,31 @@ const getExternalSaleByIdAPI = async (id: string) => {
     }
 }
 
+export type ExternalContactSuggestion = {
+    carnet_vendedor?: string;
+    nombre?: string;
+    telefono?: string;
+    source: "seller" | "buyer";
+    lastUsed?: string;
+};
+
+const getExternalContactSuggestionsAPI = async (params: {
+    query: string;
+    field: "seller_carnet" | "name" | "phone";
+    limit?: number;
+}) => {
+    try {
+        const res = await apiClient.get("/external/contact-suggestions", { params });
+        return res.data;
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false, data: [] };
+    }
+}
+
 const registerExternalSaleAPI = async (saleData: any) => {
     try {
         const res = await apiClient.post("/external/register", saleData);
@@ -92,6 +117,7 @@ const updateExternalSaleAPI = async (saleId: any, saleData: any) => {
 export {
     getExternalSalesAPI,
     getExternalSalesListAPI,
+    getExternalContactSuggestionsAPI,
     getExternalSaleByIdAPI,
     registerExternalSaleAPI,
     registerExternalPackagesAPI,
