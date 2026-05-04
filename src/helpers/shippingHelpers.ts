@@ -7,12 +7,32 @@ export interface IDailySummary {
   total: number;
 }
 
-export const getDailySummary = async (dateISO?: string): Promise<IDailySummary> => {
+export const toLocalNaiveISOString = (value: Date) =>
+  new Date(
+    Date.UTC(
+      value.getFullYear(),
+      value.getMonth(),
+      value.getDate(),
+      value.getHours(),
+      value.getMinutes(),
+      value.getSeconds(),
+      value.getMilliseconds()
+    )
+  ).toISOString();
+
+export const getDailySummary = async (
+  dateISO?: string,
+  closingAtISO?: string
+): Promise<IDailySummary> => {
   const sucursalId = localStorage.getItem("sucursalId");
   const date = dateISO || new Date().toISOString();
+  const closeAt = closingAtISO || toLocalNaiveISOString(new Date());
 
   // Get sales history
-  const response = await getSalesHistoryAPI(date, sucursalId, { fromLastClose: true });
+  const response = await getSalesHistoryAPI(date, sucursalId, {
+    fromLastClose: true,
+    to: closeAt,
+  });
   
   let efectivoTotal = 0;
   let qrTotal = 0;
@@ -25,7 +45,10 @@ export const getDailySummary = async (dateISO?: string): Promise<IDailySummary> 
 
   // Get service income from FinanceFlux
   try {
-    const serviceIncomes = await getDailyServiceIncomeAPI(date, sucursalId || "");
+    const serviceIncomes = await getDailyServiceIncomeAPI(date, sucursalId || "", {
+      fromLastClose: true,
+      to: closeAt,
+    });
     
     if (Array.isArray(serviceIncomes)) {
       serviceIncomes.forEach((flux: any) => {

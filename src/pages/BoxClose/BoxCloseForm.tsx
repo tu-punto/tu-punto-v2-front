@@ -16,7 +16,11 @@ import {
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { IBoxClose } from "../../models/boxClose";
-import { getDailySummary, IDailySummary } from "../../helpers/shippingHelpers";
+import {
+  getDailySummary,
+  IDailySummary,
+  toLocalNaiveISOString,
+} from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
 const { Title } = Typography;
@@ -69,6 +73,7 @@ const BoxCloseForm = ({
   const [coinTotals, setCoinTotals] = useState(0);
   const [billTotals, setBillTotals] = useState(0);
   const [salesSummary, setSalesSummary] = useState<IDailySummary>();
+  const [closingAtISO, setClosingAtISO] = useState(() => toLocalNaiveISOString(new Date()));
   const [form] = Form.useForm<IBoxClose>();
   const coins = Form.useWatch("coins", form) || {};
   const bills = Form.useWatch("bills", form) || {};
@@ -159,9 +164,29 @@ const BoxCloseForm = ({
     };
     fetchAdmins();
   }, []);
+  const buildClosingAtISO = () => {
+    const now = new Date();
+    const selected = selectedDate?.toDate();
+    const closingAt = selected
+      ? new Date(
+          selected.getFullYear(),
+          selected.getMonth(),
+          selected.getDate(),
+          now.getHours(),
+          now.getMinutes(),
+          now.getSeconds(),
+          now.getMilliseconds()
+        )
+      : now;
+
+    return toLocalNaiveISOString(closingAt);
+  };
+
   const fetchSalesSummary = async () => {
     try {
-      const summary = await getDailySummary(selectedDate?.format("YYYY-MM-DD"));
+      const nextClosingAtISO = buildClosingAtISO();
+      setClosingAtISO(nextClosingAtISO);
+      const summary = await getDailySummary(selectedDate?.format("YYYY-MM-DD"), nextClosingAtISO);
       setSalesSummary(summary || { cash: 0, bank: 0, total: 0 });
       const efectivoInicial = parseFloat(lastClosingBalance.efectivo_real) || 0;
 
@@ -224,6 +249,8 @@ const BoxCloseForm = ({
 
   useEffect(() => {
     if (mode !== "edit" || !initialData) return;
+
+    setClosingAtISO(initialData.closed_at || initialData.created_at || toLocalNaiveISOString(new Date()));
 
     const efectivo_diario = initialData.efectivo_diario || [];
     const coinsValues: Record<string, number> = {};
@@ -362,6 +389,7 @@ const BoxCloseForm = ({
             nombre: values.responsable.label,
           },
           cambios_externos: form.getFieldValue("cambios_externos") || 0,
+          closed_at: closingAtISO,
           ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
           ventas_efectivo: salesSummary?.cash ?? 0,
           ventas_qr:       salesSummary?.bank ?? 0,
@@ -504,8 +532,8 @@ const BoxCloseForm = ({
                   readOnly
                   disabled={mode === "edit"}
                   value={
-                    mode === "edit" && initialData?.created_at
-                      ? dayjs(initialData.created_at).format("DD/MM/YYYY")
+                    mode === "edit" && (initialData?.closed_at || initialData?.created_at)
+                      ? dayjs(initialData.closed_at || initialData.created_at).format("DD/MM/YYYY")
                       : dayjs().format("DD/MM/YYYY")
                   }
                   className="w-full bg-gray-200 text-gray-700"

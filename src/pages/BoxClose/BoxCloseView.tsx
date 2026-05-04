@@ -20,6 +20,8 @@ interface Props {
 }
 
 const BoxCloseView = ({ boxClose }: Props) => {
+    const closeDate = boxClose.closed_at || boxClose.created_at;
+
     const tipoLabel = (tipo: string) => {
         if (tipo === "gasto" || tipo === "gasto_profit") return "Gastos (Salidas)";
         return "Ingresos (Entradas)";
@@ -101,7 +103,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
                         <Card className="mb-4">
                             <Form layout="vertical">
                                 <Form.Item label="Fecha">
-                                    <Input value={dayjs(boxClose.created_at).format("DD/MM/YYYY")} readOnly />
+                                    <Input value={dayjs(closeDate).format("DD/MM/YYYY HH:mm")} readOnly />
                                 </Form.Item>
                                 <Form.Item label="Responsable del cierre">
                                     <Input value={boxClose?.responsable?.nombre || ""} readOnly />

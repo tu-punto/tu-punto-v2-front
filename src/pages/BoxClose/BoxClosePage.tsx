@@ -28,6 +28,9 @@ function round(num: number) {
   return Math.round(num * 100) / 100;
 }
 
+const getBoxCloseDate = (boxClose: Pick<IBoxClose, "closed_at" | "created_at"> | any) =>
+  boxClose?.closed_at || boxClose?.created_at;
+
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
@@ -55,7 +58,7 @@ const BoxClosePage = () => {
         })
         .sort(
           (a: any, b: any) =>
-            dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf()
+            dayjs(getBoxCloseDate(a)).valueOf() - dayjs(getBoxCloseDate(b)).valueOf()
         );
 
       const formattedData = filteredBySucursal.map((boxClose: IBoxClose | any) => {
@@ -90,7 +93,7 @@ const BoxClosePage = () => {
     if (!selectedDate) return boxClosings;
 
     return boxClosings.filter((boxClose) => {
-      const currDate = dayjs(boxClose.created_at);
+      const currDate = dayjs(getBoxCloseDate(boxClose));
       return currDate.isSame(selectedDate, "day");
     });
   };
@@ -101,9 +104,9 @@ const BoxClosePage = () => {
   const columns = [
     {
       title: "Fecha",
-      dataIndex: "created_at",
-      key: "created_at",
-      render: (date: string) => dayjs(date).format("DD/MM/YYYY"),
+      key: "closed_at",
+      render: (_: string, record: IBoxClose) =>
+        dayjs(getBoxCloseDate(record)).format("DD/MM/YYYY HH:mm"),
     },
     {
       title: "Responsable",
@@ -259,7 +262,7 @@ const BoxClosePage = () => {
           {formMode === "view" && selectedReconciliation && (
             <div className="flex justify-end mb-4">
               {(() => {
-                const isToday = dayjs(selectedReconciliation.created_at).isSame(dayjs(), "day");
+                const isToday = dayjs(getBoxCloseDate(selectedReconciliation)).isSame(dayjs(), "day");
                 return (
                   <Tooltip title={!isToday ? "Solo se pueden editar cierres del día actual" : ""}>
                     <Button
