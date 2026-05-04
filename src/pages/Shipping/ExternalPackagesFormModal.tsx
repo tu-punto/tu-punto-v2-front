@@ -8,7 +8,12 @@ import {
 import { getSimplePackageBranchPricesAPI } from "../../api/simplePackage";
 import { getSucursalsBasicAPI } from "../../api/sucursal";
 import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
-import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
+import {
+  buildDirectShippingLabelImageData,
+  DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS,
+  ShippingLabelPrintOptions,
+  toBase64Png,
+} from "./shippingQrLabel";
 
 interface ExternalPackagesFormModalProps {
   visible: boolean;
@@ -19,6 +24,40 @@ interface ExternalPackagesFormModalProps {
 
 const MIN_PACKAGES = 1;
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+const waitMs = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
+
+const ticketWidthOptions = [
+  { value: 40, label: "40 mm (papel pequeno)" },
+  { value: 58, label: "58 mm" },
+  { value: 80, label: "80 mm" },
+];
+
+const qrSizeOptions = [
+  { value: 14, label: "14 mm" },
+  { value: 16, label: "16 mm" },
+  { value: 18, label: "18 mm" },
+  { value: 20, label: "20 mm" },
+  { value: 22, label: "22 mm" },
+];
+
+const printDelayOptions = [
+  { value: 0, label: "Sin pausa" },
+  { value: 250, label: "250 ms" },
+  { value: 500, label: "500 ms" },
+  { value: 800, label: "800 ms" },
+];
+
+const getStoredLabelPrintOptions = (): ShippingLabelPrintOptions => ({
+  ticketWidthMm: Number(localStorage.getItem("shippingLabelTicketWidthMm")) || DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.ticketWidthMm,
+  qrSizeMm: Number(localStorage.getItem("shippingLabelQrSizeMm")) || DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.qrSizeMm,
+  printDelayMs: Number(localStorage.getItem("shippingLabelPrintDelayMs")) || DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.printDelayMs,
+});
+
+const persistLabelPrintOptions = (options: ShippingLabelPrintOptions) => {
+  localStorage.setItem("shippingLabelTicketWidthMm", String(options.ticketWidthMm));
+  localStorage.setItem("shippingLabelQrSizeMm", String(options.qrSizeMm));
+  localStorage.setItem("shippingLabelPrintDelayMs", String(options.printDelayMs));
+};
 
 type SuggestionField = "seller_carnet" | "name" | "phone";
 type SuggestionOption = {
@@ -68,6 +107,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const [suggestionOptions, setSuggestionOptions] = useState<Record<string, SuggestionOption[]>>({});
   const [branchOptions, setBranchOptions] = useState<{ value: string; label: string }[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
+  const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
   const suggestionRequestIds = useRef<Record<string, number>>({});
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
@@ -298,21 +338,60 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     return selectedPrinter;
   };
 
-  const printExternalRows = async (rowsToPrint: any[]) => {
+  const buildPrintOptionsContent = (draftOptions: ShippingLabelPrintOptions) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
+      <div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Ancho ticket</div>
+        <Select
+          defaultValue={draftOptions.ticketWidthMm}
+          style={{ width: "100%" }}
+          options={ticketWidthOptions}
+          onChange={(value) => {
+            draftOptions.ticketWidthMm = value;
+          }}
+        />
+      </div>
+      <div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Tamano QR</div>
+        <Select
+          defaultValue={draftOptions.qrSizeMm}
+          style={{ width: "100%" }}
+          options={qrSizeOptions}
+          onChange={(value) => {
+            draftOptions.qrSizeMm = value;
+          }}
+        />
+      </div>
+      <div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Pausa</div>
+        <Select
+          defaultValue={draftOptions.printDelayMs}
+          style={{ width: "100%" }}
+          options={printDelayOptions}
+          onChange={(value) => {
+            draftOptions.printDelayMs = value;
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const printExternalRows = async (rowsToPrint: any[], options = labelPrintOptions) => {
     const printerName = await resolveDirectPrintPrinter();
     if (!printerName) {
       message.warning("No se encontraron impresoras en QZ Tray");
       return false;
     }
 
-    for (const row of rowsToPrint) {
+    for (const [index, row] of rowsToPrint.entries()) {
       const labelImage = await buildDirectShippingLabelImageData({
         guideNumber: String(row?.numero_guia || ""),
         clientName: row?.comprador,
         clientPhone: row?.telefono_comprador,
         origin: row?.origen_sucursal?.nombre || row?.sucursal?.nombre || currentSucursal?.nombre || "Externo",
         destination: row?.destino_sucursal?.nombre || row?.lugar_entrega || currentSucursal?.nombre || "Externo",
-        ticketWidthMm: 40,
+        ticketWidthMm: options.ticketWidthMm,
+        qrSizeMm: options.qrSizeMm,
       });
 
       const pixelConfig = await createPixelConfig(printerName, {
@@ -329,6 +408,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           options: { interpolation: "nearest-neighbor" },
         },
       ]);
+
+      if (options.printDelayMs > 0 && index < rowsToPrint.length - 1) {
+        await waitMs(options.printDelayMs);
+      }
     }
 
     return true;
@@ -498,12 +581,23 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       paquetes,
     };
 
+    const draftPrintOptions = { ...labelPrintOptions };
     Modal.confirm({
       title: "Registrar e imprimir entregas externas",
-      content: `Se registraran ${packageCount} entrega(s) externa(s), se asignara su numero de guia y se imprimiran sus etiquetas. Continuar?`,
+      content: (
+        <div>
+          <div>
+            Se registraran {packageCount} entrega(s) externa(s), se asignara su numero de guia y se imprimiran sus etiquetas.
+            Continuar?
+          </div>
+          {buildPrintOptionsContent(draftPrintOptions)}
+        </div>
+      ),
       okText: "Guardar e imprimir",
       cancelText: "Cancelar",
       onOk: async () => {
+        persistLabelPrintOptions(draftPrintOptions);
+        setLabelPrintOptions({ ...draftPrintOptions });
         setLoading(true);
         let createdRows: any[] = [];
         try {
@@ -521,7 +615,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             throw new Error("No se pudieron generar todas las guias");
           }
 
-          const printed = await printExternalRows(createdRows);
+          const printed = await printExternalRows(createdRows, draftPrintOptions);
           if (!printed) {
             throw new Error("No se pudo imprimir las etiquetas");
           }

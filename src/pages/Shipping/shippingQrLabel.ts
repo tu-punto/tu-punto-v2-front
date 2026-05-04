@@ -9,6 +9,19 @@ const escapeHtml = (value: string) =>
 const MM_TO_INCH = 1 / 25.4;
 const TM_L90_DPI = 203;
 const mmToPx = (mm: number) => Math.max(1, Math.round(mm * MM_TO_INCH * TM_L90_DPI));
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
+
+export type ShippingLabelPrintOptions = {
+  ticketWidthMm: number;
+  qrSizeMm: number;
+  printDelayMs: number;
+};
+
+export const DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS: ShippingLabelPrintOptions = {
+  ticketWidthMm: 40,
+  qrSizeMm: 16,
+  printDelayMs: 0,
+};
 
 const wrapByWidth = (ctx: CanvasRenderingContext2D, text: string, maxWidthPx: number) => {
   const words = String(text || "").split(" ").filter(Boolean);
@@ -74,14 +87,16 @@ export const buildDirectShippingLabelImageData = async (params: {
   qrSizeMm?: number;
 }): Promise<{ dataUrl: string; heightMm: number; widthMm: number }> => {
   const ticketWidthMm = params.ticketWidthMm ?? 40;
+  const qrSizeMm = params.qrSizeMm ?? DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.qrSizeMm;
+  const sizeScale = clamp(qrSizeMm / 16, 0.92, 1.22);
 
   const widthPx = mmToPx(ticketWidthMm);
-  const sideMarginPx = mmToPx(0.8);
+  const sideMarginPx = mmToPx(ticketWidthMm <= 40 ? 0.9 : 1.3);
   const textStartX = sideMarginPx;
   const textMaxWidth = Math.max(widthPx - textStartX - sideMarginPx, 42);
-  const lineHeight = mmToPx(1.45);
-  const titleFontPx = 11;
-  const bodyFontPx = 9;
+  const lineHeight = mmToPx(1.9 * sizeScale);
+  const titleFontPx = Math.round(13 * sizeScale);
+  const bodyFontPx = Math.round(10.5 * sizeScale);
 
   const rows = [
     cleanLabelValue(params.guideNumber, "Sin guia"),
@@ -104,7 +119,8 @@ export const buildDirectShippingLabelImageData = async (params: {
   });
 
   const textBlockHeight = textLines.length * lineHeight;
-  const heightPx = Math.max(mmToPx(7), textBlockHeight);
+  const verticalPaddingPx = mmToPx(1.4 * sizeScale);
+  const heightPx = Math.max(mmToPx(9), textBlockHeight + verticalPaddingPx * 2);
 
   const canvas = document.createElement("canvas");
   canvas.width = widthPx;
