@@ -79,7 +79,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
             title: '¿Dónde se recogerá?',
             key: 'punto',
             render: (_: any, record: any) => {
-                const sucursal = record.sucursal;
+                const sucursal = record.destino_sucursal || record.sucursal;
                 if (typeof sucursal === 'object' && sucursal !== null) {
                     return (
                         <>
@@ -190,10 +190,11 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     }
 
     const isRowOnShippingStatusFilter = (fila: any) => {
+        const pickupBranch = fila.destino_sucursal || fila.sucursal;
         return !isShippingStatusFilterActive || (isShippingStatusFilterActive && (
-            (shippingStatus === "Por sucursal" && fila.sucursal) ||
+            (shippingStatus === "Por sucursal" && pickupBranch) ||
             (shippingStatus === "Por flota" && fila.nombre_flota && fila.nombre_flota.trim().length > 0) ||
-            (shippingStatus === "Sin envío" && !fila.sucursal && !(fila.nombre_flota.trim().length > 0))
+            (shippingStatus === "Sin envío" && !pickupBranch && !(fila.nombre_flota.trim().length > 0))
         ))
     }
 

@@ -5,6 +5,8 @@ import {
   getExternalContactSuggestionsAPI,
   registerExternalPackagesAPI,
 } from "../../api/externalSale";
+import { getSimplePackageBranchPricesAPI } from "../../api/simplePackage";
+import { getSucursalsBasicAPI } from "../../api/sucursal";
 import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
 import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
 
@@ -34,6 +36,8 @@ const buildPackages = (count: number, existing: any[] = []) =>
     esta_pagado: existing[index]?.esta_pagado ?? "no",
     monto_paga_vendedor: existing[index]?.monto_paga_vendedor ?? 0,
     monto_paga_comprador: existing[index]?.monto_paga_comprador ?? 0,
+    destino_sucursal_id: existing[index]?.destino_sucursal_id || "",
+    precio_entre_sucursal: existing[index]?.precio_entre_sucursal ?? 0,
   }));
 
 const getSuggestionValue = (contact: ExternalContactSuggestion, field: SuggestionField) => {
@@ -59,8 +63,11 @@ const buildSuggestionLabel = (contact: ExternalContactSuggestion) => (
 const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursal }: ExternalPackagesFormModalProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   const [packageCount, setPackageCount] = useState<number>(MIN_PACKAGES);
   const [suggestionOptions, setSuggestionOptions] = useState<Record<string, SuggestionOption[]>>({});
+  const [branchOptions, setBranchOptions] = useState<{ value: string; label: string }[]>([]);
+  const [branchPrices, setBranchPrices] = useState<any[]>([]);
   const suggestionRequestIds = useRef<Record<string, number>>({});
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
@@ -72,6 +79,42 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         .some((row: any) => row?.esta_pagado !== "no" && Number(row?.monto_paga_vendedor || 0) > 0),
     [packageCount, watchedPackages]
   );
+  const watchedOriginBranchId = Form.useWatch("origen_sucursal_id", form);
+  const watchedDestinationBranchId = Form.useWatch("destino_sucursal_id", form);
+
+  const routePriceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    branchPrices.forEach((row: any) => {
+      const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
+      const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
+      if (!originId || !destinationId) return;
+      map.set(`${originId}::${destinationId}`, Number(row?.precio || 0));
+    });
+    return map;
+  }, [branchPrices]);
+
+  const destinationOptions = useMemo(() => {
+    const originId = String(watchedOriginBranchId || "");
+    if (!originId) return [];
+    const originOption = branchOptions.find((option) => String(option.value) === originId);
+    const pricedOptions = branchPrices
+      .filter((row: any) => String(row?.origen_sucursal?._id || row?.origen_sucursal || "") === originId)
+      .map((row: any) => ({
+        value: String(row?.destino_sucursal?._id || row?.destino_sucursal || ""),
+        label: String(row?.destino_sucursal?.nombre || "Sucursal destino"),
+      }))
+      .filter((option) => option.value);
+
+    return [
+      ...(originOption ? [{ value: originOption.value, label: originOption.label }] : []),
+      ...pricedOptions.filter((option) => String(option.value) !== originId),
+    ];
+  }, [branchOptions, branchPrices, watchedOriginBranchId]);
+
+  const getBranchRoutePrice = (originId?: string, destinationId?: string) =>
+    String(originId || "") === String(destinationId || "")
+      ? 0
+      : Number(routePriceMap.get(`${originId || ""}::${destinationId || ""}`) || 0);
 
   const searchContactSuggestions = async (key: string, field: SuggestionField, value: string) => {
     const query = String(value || "").trim();
@@ -110,6 +153,31 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const applyBuyerSuggestion = (rowIndex: number, contact: ExternalContactSuggestion) => {
     form.setFieldValue(["paquetes", rowIndex, "comprador"], contact.nombre || "");
     form.setFieldValue(["paquetes", rowIndex, "telefono_comprador"], contact.telefono || "");
+  };
+
+  const handlePackageDestinationChange = (rowIndex: number, destinationId: string) => {
+    form.setFieldValue(["paquetes", rowIndex, "destino_sucursal_id"], destinationId);
+    form.setFieldValue(
+      ["paquetes", rowIndex, "precio_entre_sucursal"],
+      getBranchRoutePrice(watchedOriginBranchId, destinationId)
+    );
+  };
+
+  const applyDestinationToAll = () => {
+    if (!watchedDestinationBranchId) {
+      message.warning("Selecciona una sucursal destino para aplicarla");
+      return;
+    }
+
+    const currentRows = form.getFieldValue("paquetes") || [];
+    form.setFieldValue(
+      "paquetes",
+      buildPackages(packageCount, currentRows).map((row) => ({
+        ...row,
+        destino_sucursal_id: watchedDestinationBranchId,
+        precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, watchedDestinationBranchId),
+      }))
+    );
   };
 
   const handlePaymentModeChange = (rowIndex: number, mode: "si" | "no" | "mixto") => {
@@ -201,7 +269,14 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const currentRows = form.getFieldValue("paquetes") || [];
     form.setFieldsValue({
       numero_paquetes: nextCount,
-      paquetes: buildPackages(nextCount, currentRows),
+      paquetes: buildPackages(nextCount, currentRows).map((row) => {
+        const destinationId = row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "";
+        return {
+          ...row,
+          destino_sucursal_id: destinationId,
+          precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, destinationId),
+        };
+      }),
     });
     setPackageCount(nextCount);
   };
@@ -235,8 +310,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         guideNumber: String(row?.numero_guia || ""),
         clientName: row?.comprador,
         clientPhone: row?.telefono_comprador,
-        origin: row?.sucursal?.nombre || currentSucursal?.nombre || "Externo",
-        destination: row?.lugar_entrega || currentSucursal?.nombre || "Externo",
+        origin: row?.origen_sucursal?.nombre || row?.sucursal?.nombre || currentSucursal?.nombre || "Externo",
+        destination: row?.destino_sucursal?.nombre || row?.lugar_entrega || currentSucursal?.nombre || "Externo",
         ticketWidthMm: 40,
       });
 
@@ -261,21 +336,88 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
   useEffect(() => {
     if (!visible) return;
+    const loadBranches = async () => {
+      setLoadingBranches(true);
+      try {
+        const [sucursalesResponse, pricesResponse] = await Promise.all([
+          getSucursalsBasicAPI(),
+          getSimplePackageBranchPricesAPI(),
+        ]);
+
+        const sucursales = Array.isArray(sucursalesResponse) ? sucursalesResponse : [];
+        setBranchOptions(
+          sucursales
+            .map((branch: any) => ({
+              value: String(branch?._id || ""),
+              label: String(branch?.nombre || "Sucursal"),
+            }))
+            .filter((option) => option.value)
+        );
+        setBranchPrices(Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : []);
+      } catch (error) {
+        console.error(error);
+        message.error("No se pudieron cargar las sucursales");
+      } finally {
+        setLoadingBranches(false);
+      }
+    };
+
+    void loadBranches();
     form.setFieldsValue({
+      origen_sucursal_id: currentSucursal?._id,
+      destino_sucursal_id: currentSucursal?._id,
       numero_paquetes: MIN_PACKAGES,
       metodo_pago: undefined,
-      paquetes: buildPackages(MIN_PACKAGES),
+      paquetes: buildPackages(MIN_PACKAGES).map((row) => ({
+        ...row,
+        destino_sucursal_id: currentSucursal?._id || "",
+        precio_entre_sucursal: 0,
+      })),
     });
-  }, [form, visible]);
+  }, [currentSucursal?._id, form, visible]);
+
+  useEffect(() => {
+    if (!visible || !watchedOriginBranchId) return;
+
+    const nextGeneralDestination = destinationOptions.some(
+      (option) => String(option.value) === String(watchedDestinationBranchId)
+    )
+      ? watchedDestinationBranchId
+      : watchedOriginBranchId;
+    form.setFieldValue("destino_sucursal_id", nextGeneralDestination);
+
+    const currentRows = form.getFieldValue("paquetes") || [];
+    form.setFieldValue(
+      "paquetes",
+      buildPackages(packageCount, currentRows).map((row) => {
+        const destinationId = destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
+          ? row.destino_sucursal_id
+          : nextGeneralDestination;
+
+        return {
+          ...row,
+          destino_sucursal_id: destinationId,
+          precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, destinationId),
+        };
+      })
+    );
+  }, [destinationOptions, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
 
   const onFinish = async (values: any) => {
     if (!currentSucursal?._id || !currentSucursal?.nombre) {
       message.error("No se pudo identificar la sucursal actual para registrar la entrega externa");
       return;
     }
+    if (!values.origen_sucursal_id) {
+      message.error("Selecciona la sucursal donde el vendedor dejara el producto");
+      return;
+    }
 
     const paquetes = (values.paquetes || []).slice(0, packageCount).map((row: any, index: number) => {
       const price = roundCurrency(Number(row.precio_paquete || 0));
+      const branchRoutePrice = roundCurrency(
+        getBranchRoutePrice(values.origen_sucursal_id, row.destino_sucursal_id)
+      );
       const paidStatus = row.esta_pagado || "no";
       let sellerAmount = roundCurrency(Number(row.monto_paga_vendedor || 0));
       let buyerAmount = roundCurrency(Number(row.monto_paga_comprador || 0));
@@ -293,6 +435,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         comprador: row.comprador || "",
         descripcion_paquete: row.descripcion_paquete,
         telefono_comprador: row.telefono_comprador || "",
+        destino_sucursal_id: row.destino_sucursal_id || "",
+        precio_entre_sucursal: branchRoutePrice,
         precio_paquete: price,
         esta_pagado: paidStatus,
         monto_paga_vendedor: sellerAmount,
@@ -300,7 +444,11 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       };
     });
 
-    for (const p of paquetes) {
+    for (const [index, p] of paquetes.entries()) {
+      if (!p.destino_sucursal_id) {
+        message.error(`Paquete ${index + 1}: selecciona la sucursal donde recogera el comprador`);
+        return;
+      }
       if (p.esta_pagado === "mixto") {
         const price = Number(p.precio_paquete || 0);
         const montoVendedor = Number(p.monto_paga_vendedor || 0);
@@ -339,8 +487,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       carnet_vendedor: values.carnet_vendedor,
       vendedor: values.vendedor,
       telefono_vendedor: values.telefono_vendedor,
-      id_sucursal: currentSucursal?._id,
-      lugar_entrega: currentSucursal?.nombre || "Externo",
+      id_sucursal: values.origen_sucursal_id,
+      origen_sucursal_id: values.origen_sucursal_id,
+      lugar_entrega:
+        destinationOptions.find((option) => String(option.value) === String(values.destino_sucursal_id))?.label ||
+        currentSucursal?.nombre ||
+        "Externo",
       metodo_pago: sellerPaymentMethod,
       numero_paquetes: packageCount,
       paquetes,
@@ -479,6 +631,42 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Form.Item>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <Form.Item
+            name="origen_sucursal_id"
+            label="Sucursal origen (donde el vendedor dejara el producto)"
+            rules={[{ required: true, message: "Selecciona sucursal origen" }]}
+          >
+            <Select
+              loading={loadingBranches}
+              options={branchOptions}
+              placeholder="Origen"
+              showSearch
+              optionFilterProp="label"
+            />
+          </Form.Item>
+          <Form.Item
+            name="destino_sucursal_id"
+            label="Sucursal destino (donde recogera el comprador)"
+          >
+            <Select
+              loading={loadingBranches}
+              options={destinationOptions}
+              placeholder="Destino"
+              disabled={!watchedOriginBranchId}
+              showSearch
+              optionFilterProp="label"
+            />
+          </Form.Item>
+          <Button
+            style={{ marginBottom: 24 }}
+            disabled={!watchedOriginBranchId || !watchedDestinationBranchId}
+            onClick={applyDestinationToAll}
+          >
+            Usar destino en todos
+          </Button>
+        </div>
+
         <div style={{ overflowX: "auto", marginTop: 8 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead>
@@ -486,6 +674,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Nombre del comprador</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Descripcion del paquete</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Celular</th>
+                <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Sucursal destino</th>
+                <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Precio entre sucursal</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Precio paquete</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Estado pago</th>
               </tr>
@@ -571,6 +761,25 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                       </td>
                       <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
                         <Form.Item
+                          name={["paquetes", rowIndex, "destino_sucursal_id"]}
+                          rules={[{ required: true, message: "Requerido" }]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Select
+                            options={destinationOptions}
+                            placeholder="Destino"
+                            disabled={!watchedOriginBranchId}
+                            onChange={(value) => handlePackageDestinationChange(rowIndex, String(value || ""))}
+                          />
+                        </Form.Item>
+                      </td>
+                      <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
+                        <Form.Item name={["paquetes", rowIndex, "precio_entre_sucursal"]} style={{ marginBottom: 0 }}>
+                          <InputNumber prefix="Bs." min={0} style={{ width: "100%" }} readOnly />
+                        </Form.Item>
+                      </td>
+                      <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
+                        <Form.Item
                           name={["paquetes", rowIndex, "precio_paquete"]}
                           rules={[{ required: true, message: "Requerido" }]}
                           style={{ marginBottom: 0 }}
@@ -602,7 +811,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                     </tr>
                     {isMixedRow && (
                       <tr>
-                        <td colSpan={5} style={{ border: "1px solid #d9d9d9", padding: 8, background: "#fafafa" }}>
+                        <td colSpan={7} style={{ border: "1px solid #d9d9d9", padding: 8, background: "#fafafa" }}>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <Form.Item
                               label="Paga vendedor"
