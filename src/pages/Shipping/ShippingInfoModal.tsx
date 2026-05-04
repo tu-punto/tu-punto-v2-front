@@ -18,10 +18,14 @@ import useRawProducts from "../../hooks/useRawProducts.tsx";
 import { getSellersBasicAPI } from "../../api/seller.ts";
 import { updateShippingAPI } from '../../api/shipping.ts';
 import { deleteShippingAPI } from '../../api/shipping';
-import { generateShippingLabelQRAPI } from '../../api/qr.ts';
 import moment from "moment-timezone";
 import { updateProductsByShippingAPI } from "../../api/sales.ts";
-import { printShippingTemporaryLabel } from "./shippingQrLabel";
+import {
+    buildDirectShippingLabelImageData,
+    printShippingTemporaryLabel,
+    toBase64Png
+} from "./shippingQrLabel";
+import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
 
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
@@ -43,6 +47,17 @@ const findBranchByName = (branches: any[], value: unknown) => {
     if (!normalizedName) return null;
 
     return branches.find((branch: any) => normalizeBranchName(branch?.nombre) === normalizedName) || null;
+};
+
+const resolveBranchName = (branches: any[], value: any, fallback = ""): string => {
+    if (!value) return fallback;
+    if (typeof value === "object" && value?.nombre) return String(value.nombre);
+
+    const id = resolveBranchId(value);
+    if (!id) return fallback;
+
+    const branch = branches.find((item: any) => String(item?._id) === String(id));
+    return String(branch?.nombre || fallback);
 };
 
 const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [], isAdmin }: any) => {
@@ -67,11 +82,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [showWarning, setShowWarning] = useState(false);
     const [loading, setLoading] = useState(false);
     const [qrLoading, setQrLoading] = useState(false);
-    const [shippingQrData, setShippingQrData] = useState<{
-        shippingQrCode?: string;
-        shippingQrPayload?: string;
-        shippingQrImagePath?: string;
-    } | null>(null);
     const { rawProducts: data } = useRawProducts(); const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
     const adelantoCliente = useWatch('adelanto_cliente', internalForm);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
@@ -384,19 +394,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }, [visible, shipping, sucursals]);
 
     useEffect(() => {
-        if (!visible || !shipping?._id) {
-            setShippingQrData(null);
-            return;
-        }
-
-        setShippingQrData({
-            shippingQrCode: shipping?.shipping_qr_code,
-            shippingQrPayload: shipping?.shipping_qr_payload,
-            shippingQrImagePath: shipping?.shipping_qr_image_path
-        });
-    }, [visible, shipping]);
-
-    useEffect(() => {
         const monto = saldoACobrar || 0;
         const suma = (qrInput || 0) + (efectivoInput || 0);
         if (tipoPago === '4') {
@@ -485,45 +482,67 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         return Array.from(merged.values());
     }, [products, shipping]);
 
-    const ensureShippingQrData = async () => {
-        const cachedQrPath = shippingQrData?.shippingQrImagePath || shipping?.shipping_qr_image_path;
-        if (cachedQrPath) {
-            return {
-                shippingQrCode: shippingQrData?.shippingQrCode || shipping?.shipping_qr_code,
-                shippingQrPayload: shippingQrData?.shippingQrPayload || shipping?.shipping_qr_payload,
-                shippingQrImagePath: cachedQrPath
-            };
-        }
+    const resolveDirectPrintPrinter = async () => {
+        const printers = await findQzPrinters();
+        if (!printers.length) return "";
 
-        const response = await generateShippingLabelQRAPI(shipping._id);
-        const qrData = response?.qrData;
-        if (!response?.success || !qrData?.shippingQrImagePath) {
-            return null;
-        }
+        const storedPrinter = localStorage.getItem("qzPrinterName") || "";
+        if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
 
-        setShippingQrData(qrData);
-        return qrData;
+        const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
+        localStorage.setItem("qzPrinterName", selectedPrinter);
+        return selectedPrinter;
     };
 
-    const handleGenerateShippingQR = async () => {
+    const handlePrintShippingQRDirect = async () => {
         if (!shipping?._id) return;
+
         setQrLoading(true);
         try {
-            const qrData = await ensureShippingQrData();
-            const qrPath = qrData?.shippingQrImagePath;
-            if (!qrPath) {
-                message.error("No se pudo generar QR de entrega");
+            const printerName = await resolveDirectPrintPrinter();
+            if (!printerName) {
+                message.warning("No se encontraron impresoras en QZ Tray");
                 return;
             }
-            window.open(qrPath, "_blank");
-            message.success("QR de entrega generado");
+
+            const destinationName =
+                tipoDestino === "sucursal" || shipping?.tipo_destino === "sucursal"
+                    ? resolveBranchName(sucursals, destinoSucursalId || paymentBranchId || shipping?.sucursal, shipping?.lugar_entrega)
+                    : String(lugarEntregaInput || shipping?.lugar_entrega || "").trim();
+
+            const labelImage = await buildDirectShippingLabelImageData({
+                guideNumber: String(shipping?.numero_guia || shipping?._id || ""),
+                clientName: shipping?.cliente,
+                clientPhone: shipping?.telefono_cliente,
+                origin: resolveBranchName(sucursals, shipping?.lugar_origen, origenSucursal?.nombre || ""),
+                destination: destinationName,
+                ticketWidthMm: 40,
+            });
+
+            const pixelConfig = await createPixelConfig(printerName, {
+                widthMm: labelImage.widthMm,
+                heightMm: labelImage.heightMm,
+            });
+
+            await qzPrint(pixelConfig, [
+                {
+                    type: "pixel",
+                    format: "image",
+                    flavor: "base64",
+                    data: toBase64Png(labelImage.dataUrl),
+                    options: { interpolation: "nearest-neighbor" },
+                },
+            ]);
+
+            message.success("Etiqueta del pedido enviada a imprimir");
         } catch (error) {
-            console.error(error);
-            message.error("Error generando QR de entrega");
+            console.error("Error imprimiendo etiqueta del pedido:", error);
+            message.error("No se pudo imprimir la etiqueta. Revisa QZ Tray o la impresora.");
         } finally {
             setQrLoading(false);
         }
     };
+
     const handleCancelChanges = () => {
         internalForm.resetFields();
         setProducts(originalProducts);
@@ -681,41 +700,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }
 
     //console.log("📦 enrichedProducts:", enrichedProducts);
-    const handleSendShippingQRToWhatsApp = async () => {
-        const phoneNumber = String(shipping?.telefono_cliente || "").replace(/\D/g, "");
-        if (!phoneNumber) {
-            message.warning("Este pedido no tiene un numero de WhatsApp valido.");
-            return;
-        }
-
-        setQrLoading(true);
-        try {
-            const qrData = await ensureShippingQrData();
-            if (!qrData?.shippingQrImagePath) {
-                message.error("No se pudo obtener el QR del pedido.");
-                return;
-            }
-
-            const deliveryDate = shipping?.hora_entrega_acordada
-                ? moment(shipping.hora_entrega_acordada).format("DD/MM/YYYY HH:mm")
-                : "";
-            const messageText = [
-                `Hola ${shipping?.cliente || ""}, te compartimos el QR de tu pedido ${shipping?._id || ""}.`,
-                deliveryDate ? `Entrega prevista: ${deliveryDate}.` : "",
-                `QR: ${qrData.shippingQrImagePath}`
-            ]
-                .filter(Boolean)
-                .join("\n");
-
-            window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(messageText)}`, "_blank");
-        } catch (error) {
-            console.error("Error enviando QR por WhatsApp:", error);
-            message.error("No se pudo preparar el envio por WhatsApp.");
-        } finally {
-            setQrLoading(false);
-        }
-    };
-
     const handlePrintTemporaryLabel = async () => {
         if (!temporaryLabelItems.length) {
             message.info("Este pedido no tiene productos temporales para etiquetar.");
@@ -724,13 +708,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
         setQrLoading(true);
         try {
-            const qrData = await ensureShippingQrData();
             printShippingTemporaryLabel({
                 shippingId: String(shipping?._id || ""),
                 clientName: shipping?.cliente,
                 clientPhone: shipping?.telefono_cliente,
                 destination: shipping?.lugar_entrega,
-                qrImagePath: qrData?.shippingQrImagePath,
                 items: temporaryLabelItems.map((item) => ({
                     name: item.name,
                     quantity: item.quantity
@@ -747,7 +729,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const id_shipping = shipping?._id || '';
     return (
         <Modal
-            title={`Detalles del Pedido ${shipping?._id || ''}`}
+            title={`Detalles del Pedido ${shipping?.numero_guia || shipping?._id || ''}`}
             open={visible}
             onCancel={onClose}
             footer={null}
@@ -801,24 +783,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         flexWrap: "wrap"
                     }}
                 >
-                    <Button icon={<QrcodeOutlined />} onClick={handleGenerateShippingQR} loading={qrLoading}>
-                        Ver QR de entrega
-                    </Button>
-                    <Button
-                        icon={<CommentOutlined />}
-                        onClick={() => void handleSendShippingQRToWhatsApp()}
-                        loading={qrLoading}
-                        disabled={!shipping?.telefono_cliente}
-                    >
-                        Enviar QR por WhatsApp
-                    </Button>
                     <Button
                         icon={<PrinterOutlined />}
-                        onClick={() => void handlePrintTemporaryLabel()}
+                        onClick={() => void handlePrintShippingQRDirect()}
                         loading={qrLoading}
-                        disabled={!temporaryLabelItems.length}
                     >
-                        Etiqueta temporales
+                        Imprimir etiqueta
                     </Button>
                 </div>
             )}
@@ -830,6 +800,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             >
                 {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false}>
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item label="Numero de guia">
+                                <Input value={shipping?.numero_guia || "Sin guia"} readOnly />
+                            </Form.Item>
+                        </Col>
+                    </Row>
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true }]}>

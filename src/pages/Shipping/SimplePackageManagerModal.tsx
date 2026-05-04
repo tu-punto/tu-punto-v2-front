@@ -6,6 +6,7 @@ import {
   getSimplePackageBranchPricesAPI,
   getSimplePackagesListAPI,
   getUploadedSimplePackageSellersAPI,
+  printSimplePackageGuidesAPI,
   registerSimplePackagesAPI,
   updateSimplePackageAPI,
 } from "../../api/simplePackage";
@@ -20,6 +21,8 @@ import {
 } from "../SimplePackages/simplePackageHelpers";
 import SimplePackageBranchPriceModal from "./SimplePackageBranchPriceModal";
 import { isSuperadminUser } from "../../utils/role";
+import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
+import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
 
 interface SimplePackageManagerModalProps {
   visible: boolean;
@@ -48,6 +51,8 @@ const summaryCardStyle: React.CSSProperties = {
 };
 
 const getBranchId = (value: any) => String(value?._id || value || "").trim();
+const isQrPrintedRow = (row: any) => Boolean(row?.qr_impreso || row?.numero_guia);
+const getBranchName = (value: any, fallback = "") => String(value?.nombre || fallback || "").trim();
 
 const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackageManagerModalProps) => {
   const { user }: any = useContext(UserContext);
@@ -65,6 +70,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const [selectedSellerBranches, setSelectedSellerBranches] = useState<any[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
   const [branchPriceModalVisible, setBranchPriceModalVisible] = useState(false);
+  const [printingQr, setPrintingQr] = useState(false);
 
   const [creating, setCreating] = useState(false);
   const [loadingCreateSellers, setLoadingCreateSellers] = useState(false);
@@ -88,12 +94,21 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
   const generalPaymentMethod = useMemo(() => {
     if (!rows.length) return "";
-    const rowsWithMethod = rows.filter((row) => String(row.metodo_pago || ""));
+    const editableRows = rows.filter((row) => !isQrPrintedRow(row));
+    const targetRows = editableRows.length ? editableRows : rows;
+    const rowsWithMethod = targetRows.filter((row) => String(row.metodo_pago || ""));
     if (!rowsWithMethod.length) return "efectivo";
     const firstMethod = String(rowsWithMethod[0]?.metodo_pago || "");
     if (!firstMethod) return "";
     return rowsWithMethod.every((row) => String(row.metodo_pago || "") === firstMethod) ? firstMethod : "mixed";
   }, [rows]);
+
+  const pendingRows = useMemo(() => rows.filter((row) => !row?.is_external), [rows]);
+  const rowsMissingPrintedQr = useMemo(
+    () => pendingRows.filter((row) => !row?.qr_impreso || !row?.numero_guia),
+    [pendingRows]
+  );
+  const unlockedRows = useMemo(() => rows.filter((row) => !isQrPrintedRow(row)), [rows]);
 
   const originSummary = useMemo(() => {
     const names = Array.from(
@@ -362,6 +377,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   }, [createDestinationOptions, createOriginId, createSellerConfig, creating, routeOptionsByOrigin]);
 
   const commitRowPatch = async (rowId: string, patch: Record<string, unknown>) => {
+    const targetRow = rows.find((row) => String(row._id) === String(rowId));
+    if (isQrPrintedRow(targetRow)) {
+      message.warning("Este paquete ya tiene etiqueta impresa y no puede modificarse");
+      return;
+    }
+
     const previousRows = rows;
     const optimisticRows = rows.map((row) => {
       if (String(row._id) !== String(rowId)) return row;
@@ -398,6 +419,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   };
 
   const handleDelete = (rowId: string) => {
+    const targetRow = rows.find((row) => String(row._id) === String(rowId));
+    if (isQrPrintedRow(targetRow)) {
+      message.warning("Este paquete ya tiene etiqueta impresa y no puede borrarse");
+      return;
+    }
+
     Modal.confirm({
       title: "Eliminar paquete",
       content: "Esta accion quitara el paquete de la lista del vendedor.",
@@ -426,18 +453,24 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   };
 
   const applyGeneralPaymentMethod = async (method: "" | "efectivo" | "qr") => {
-    if (!rows.length) return;
+    const targetRows = rows.filter((row) => !isQrPrintedRow(row));
+    if (!targetRows.length) {
+      message.info("No hay paquetes editables para actualizar");
+      return;
+    }
 
     const previousRows = rows;
     const optimisticRows = rows.map((row) =>
-      applyPackagePatch(
-        row,
-        {
-          esta_pagado: "no",
-          metodo_pago: method,
-        },
-        sellerConfig
-      )
+      isQrPrintedRow(row)
+        ? row
+        : applyPackagePatch(
+            row,
+            {
+              esta_pagado: "no",
+              metodo_pago: method,
+            },
+            sellerConfig
+          )
     );
 
     setRows(optimisticRows);
@@ -445,7 +478,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
     try {
       const responses = await Promise.all(
-        rows.map((row) =>
+        targetRows.map((row) =>
           updateSimplePackageAPI(String(row._id), {
             esta_pagado: "no",
             metodo_pago: method,
@@ -460,7 +493,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         return;
       }
 
-      setRows(responses.map((response: any, index) => response?.data || optimisticRows[index]));
+      const responseById = new Map(
+        targetRows.map((row, index) => [String(row._id), responses[index]?.data || row])
+      );
+      setRows(optimisticRows.map((row) => responseById.get(String(row._id)) || row));
       message.success(method ? `Pago general marcado como ${method}` : "Pago general limpiado");
     } catch (error) {
       console.error(error);
@@ -594,6 +630,134 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     }
   };
 
+  const resolveDirectPrintPrinter = async () => {
+    const printers = await findQzPrinters();
+    if (!printers.length) return "";
+
+    const storedPrinter = localStorage.getItem("qzPrinterName") || "";
+    if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
+
+    const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
+    localStorage.setItem("qzPrinterName", selectedPrinter);
+    return selectedPrinter;
+  };
+
+  const printSimplePackageRows = async (rowsToPrint: any[]) => {
+    const printerName = await resolveDirectPrintPrinter();
+    if (!printerName) {
+      message.warning("No se encontraron impresoras en QZ Tray");
+      return false;
+    }
+
+    for (const row of rowsToPrint) {
+      const labelImage = await buildDirectShippingLabelImageData({
+        guideNumber: String(row?.numero_guia || ""),
+        clientName: row?.comprador,
+        clientPhone: row?.telefono_comprador,
+        origin: getBranchName(row?.origen_sucursal || row?.sucursal, "Sin origen"),
+        destination: getBranchName(row?.destino_sucursal, row?.lugar_entrega || "Sin destino"),
+        ticketWidthMm: 40,
+      });
+
+      const pixelConfig = await createPixelConfig(printerName, {
+        widthMm: labelImage.widthMm,
+        heightMm: labelImage.heightMm,
+      });
+
+      await qzPrint(pixelConfig, [
+        {
+          type: "pixel",
+          format: "image",
+          flavor: "base64",
+          data: toBase64Png(labelImage.dataUrl),
+          options: { interpolation: "nearest-neighbor" },
+        },
+      ]);
+    }
+
+    return true;
+  };
+
+  const handlePrintPendingQrs = async () => {
+    if (!selectedSellerId) {
+      message.warning("Selecciona un vendedor");
+      return;
+    }
+    if (!pendingRows.length) {
+      message.warning("Este vendedor no tiene paquetes pendientes");
+      return;
+    }
+    if (!rowsMissingPrintedQr.length) {
+      message.info("Todos los paquetes pendientes ya tienen etiqueta impresa");
+      return;
+    }
+
+    setPrintingQr(true);
+    try {
+      const response = await printSimplePackageGuidesAPI({
+        packageIds: rowsMissingPrintedQr.map((row) => String(row._id)),
+      });
+
+      if (!response?.success) {
+        message.error(response.message || "No se pudieron preparar las etiquetas");
+        return;
+      }
+
+      const printedRows = Array.isArray(response.rows) ? response.rows : [];
+      if (!printedRows.length) {
+        message.info("No hay etiquetas nuevas para imprimir");
+        await fetchPackages(selectedSellerId);
+        return;
+      }
+
+      const printed = await printSimplePackageRows(printedRows);
+      if (!printed) return;
+
+      const printedById = new Map(printedRows.map((row: any) => [String(row._id), row]));
+      setRows((current) => current.map((row) => printedById.get(String(row._id)) || row));
+      message.success(`Se imprimieron ${printedRows.length} etiqueta(s)`);
+      await fetchPackages(selectedSellerId);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudieron imprimir las etiquetas. Revisa QZ Tray o la impresora.");
+    } finally {
+      setPrintingQr(false);
+    }
+  };
+
+  const prepareRowsForCreateAndPrint = async (targetRows: any[]) => {
+    const missingQrRows = targetRows.filter(
+      (row) => !row?.qr_impreso || !row?.numero_guia
+    );
+
+    let rowsReady = targetRows;
+    if (missingQrRows.length) {
+      const response = await printSimplePackageGuidesAPI({
+        packageIds: missingQrRows.map((row) => String(row._id)),
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.message || "No se pudieron preparar las etiquetas");
+      }
+
+      const preparedRows = Array.isArray(response.rows) ? response.rows : [];
+      const preparedById = new Map(preparedRows.map((row: any) => [String(row._id), row]));
+      rowsReady = targetRows.map((row) => preparedById.get(String(row._id)) || row);
+      setRows((current) => current.map((row) => preparedById.get(String(row._id)) || row));
+    }
+
+    if (rowsReady.some((row) => !row?.numero_guia)) {
+      throw new Error("No se pudieron generar todas las etiquetas");
+    }
+
+    const printed = await printSimplePackageRows(rowsReady);
+    if (!printed) {
+      throw new Error("No se pudo imprimir las etiquetas");
+    }
+
+    return rowsReady;
+  };
+
   const handleCreateCurrentRows = () => {
     if (!selectedSellerId) {
       message.warning("Selecciona un vendedor");
@@ -609,7 +773,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       message.info("Todos los paquetes de esta tabla ya fueron creados en pedidos");
       return;
     }
-
     const paymentMethod = generalPaymentMethod === "mixed" || generalPaymentMethod === "efectivo" ? "efectivo" : generalPaymentMethod === "qr" ? "qr" : "";
 
     Modal.confirm({
@@ -618,11 +781,19 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         paymentMethod === "efectivo" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "No pagado"
       }. ¿Continuar?`,
       okText: "Crear",
+      ...{
+        content: `Se imprimiran ${pendingRows.length} etiqueta(s) y luego se crearan ${pendingRows.length} pedidos simples con metodo de pago: ${
+          paymentMethod === "efectivo" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "No pagado"
+        }. Continuar?`,
+        okText: "Imprimir y crear",
+      },
       cancelText: "Cancelar",
       onOk: async () => {
+        setPrintingQr(true);
         try {
+          const rowsReady = await prepareRowsForCreateAndPrint(pendingRows);
           const response = await createSimplePackageOrdersAPI({
-            packageIds: pendingRows.map((row) => String(row._id)),
+            packageIds: rowsReady.map((row) => String(row._id)),
             paymentMethod,
           });
           if (!response?.success) {
@@ -630,12 +801,14 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             return;
           }
 
-          message.success(`Se crearon ${pendingRows.length} pedidos simples`);
+          message.success(`Se imprimieron y crearon ${rowsReady.length} pedidos simples`);
           await Promise.all([fetchPackages(selectedSellerId), fetchSellers()]);
           onChanged?.();
         } catch (error) {
           console.error(error);
-          message.error("Error creando los pedidos simples");
+          message.error(error instanceof Error ? error.message : "Error creando los pedidos simples");
+        } finally {
+          setPrintingQr(false);
         }
       },
     });
@@ -734,9 +907,16 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
               </div>
               <Space wrap>
                 {!creating ? (
-                  <Button type="primary" onClick={handleCreateCurrentRows}>
-                    Crear paquetes
-                  </Button>
+                  <>
+                    <Button
+                      type="primary"
+                      onClick={handleCreateCurrentRows}
+                      loading={printingQr}
+                      disabled={!pendingRows.length || printingQr}
+                    >
+                      Crear paquetes
+                    </Button>
+                  </>
                 ) : (
                   <Button onClick={resetCreateState}>Cancelar creacion</Button>
                 )}
@@ -995,14 +1175,14 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                       No pagado
                     </Button>
                     <Button
-                      disabled={savingGeneralPayment}
+                      disabled={savingGeneralPayment || !unlockedRows.length}
                       type={generalPaymentMethod === "efectivo" ? "primary" : "default"}
                       onClick={() => applyGeneralPaymentMethod("efectivo")}
                     >
                       Efectivo
                     </Button>
                     <Button
-                      disabled={savingGeneralPayment}
+                      disabled={savingGeneralPayment || !unlockedRows.length}
                       type={generalPaymentMethod === "qr" ? "primary" : "default"}
                       onClick={() => applyGeneralPaymentMethod("qr")}
                     >
@@ -1040,6 +1220,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                           {rows.map((row) => {
                             const rowId = String(row._id);
                             const isSaving = savingRowIds.includes(rowId);
+                            const isPrinted = isQrPrintedRow(row);
                             const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
                             const currentOriginName = String(
                               row?.origen_sucursal?.nombre || row?.sucursal?.nombre || "Sucursal origen"
@@ -1051,7 +1232,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                             );
 
                             return (
-                              <tr key={rowId}>
+                              <tr key={rowId} style={isPrinted ? { background: "#f3f4f6", opacity: 0.72 } : undefined}>
                                 <td style={tableCellStyle}>
                                   <Input value={row.comprador || ""} readOnly style={readonlyBuyerStyle} />
                                 </td>
@@ -1070,7 +1251,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Select
                                     value={getBranchId(row?.destino_sucursal) || undefined}
                                     style={{ width: "100%" }}
-                                    disabled={isSaving}
+                                    disabled={isSaving || isPrinted}
                                     options={destinationOptions}
                                     onChange={(value) => commitRowPatch(rowId, { destino_sucursal: value })}
                                   />
@@ -1079,7 +1260,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Select
                                     value={row.package_size || "estandar"}
                                     style={{ width: "100%" }}
-                                    disabled={isSaving}
+                                    disabled={isSaving || isPrinted}
                                     options={[
                                       { label: "Estandar", value: "estandar" },
                                       { label: "Grande", value: "grande" },
@@ -1092,7 +1273,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                     min={0}
                                     style={{ width: "100%" }}
                                     addonBefore="Bs."
-                                    disabled={isSaving}
+                                    disabled={isSaving || isPrinted}
                                     value={Number(row.precio_entre_sucursal || 0)}
                                     onChange={(value) =>
                                       setRows((current) =>
@@ -1131,9 +1312,15 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Input value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
                                 </td>
                                 <td style={tableCellStyle}>
-                                  <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
-                                    Borrar
-                                  </Button>
+                                  {isPrinted ? (
+                                    <Typography.Text type="secondary">
+                                      Etiqueta impresa<br />{row.numero_guia || ""}
+                                    </Typography.Text>
+                                  ) : (
+                                    <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
+                                      Borrar
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1145,6 +1332,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                       {rows.map((row) => {
                         const rowId = String(row._id);
                         const isSaving = savingRowIds.includes(rowId);
+                        const isPrinted = isQrPrintedRow(row);
                         const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
                         const currentOriginName = String(
                           row?.origen_sucursal?.nombre || row?.sucursal?.nombre || "Sucursal origen"
@@ -1156,11 +1344,15 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                         );
 
                         return (
-                          <div key={rowId} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                          <div
+                            key={rowId}
+                            className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+                            style={isPrinted ? { background: "#f3f4f6", opacity: 0.72 } : undefined}
+                          >
                             <div className="mb-3 flex items-center justify-between gap-3">
                               <Typography.Text strong>{row.comprador || "Sin comprador"}</Typography.Text>
                               <Typography.Text type="secondary">
-                                Total: Bs. {Number(row.precio_total || 0).toFixed(2)}
+                                {isPrinted ? `Etiqueta impresa ${row.numero_guia || ""}` : `Total: Bs. ${Number(row.precio_total || 0).toFixed(2)}`}
                               </Typography.Text>
                             </div>
                             <div className="space-y-3">
@@ -1178,7 +1370,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   className="mt-1"
                                   value={getBranchId(row?.destino_sucursal) || undefined}
                                   style={{ width: "100%" }}
-                                  disabled={isSaving}
+                                  disabled={isSaving || isPrinted}
                                   options={destinationOptions}
                                   onChange={(value) => commitRowPatch(rowId, { destino_sucursal: value })}
                                 />
@@ -1189,7 +1381,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   className="mt-1"
                                   value={row.package_size || "estandar"}
                                   style={{ width: "100%" }}
-                                  disabled={isSaving}
+                                  disabled={isSaving || isPrinted}
                                   options={[
                                     { label: "Estandar", value: "estandar" },
                                     { label: "Grande", value: "grande" },
@@ -1205,7 +1397,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                     min={0}
                                     style={{ width: "100%" }}
                                     addonBefore="Bs."
-                                    disabled={isSaving}
+                                    disabled={isSaving || isPrinted}
                                     value={Number(row.precio_entre_sucursal || 0)}
                                     onChange={(value) =>
                                       setRows((current) =>
@@ -1245,9 +1437,11 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Input className="mt-1" value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
                                 </div>
                               </div>
-                              <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
-                                Borrar
-                              </Button>
+                              {!isPrinted && (
+                                <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
+                                  Borrar
+                                </Button>
+                              )}
                             </div>
                           </div>
                         );

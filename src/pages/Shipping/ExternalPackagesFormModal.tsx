@@ -5,6 +5,8 @@ import {
   getExternalContactSuggestionsAPI,
   registerExternalPackagesAPI,
 } from "../../api/externalSale";
+import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
+import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
 
 interface ExternalPackagesFormModalProps {
   visible: boolean;
@@ -209,6 +211,54 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     form.resetFields();
   };
 
+  const resolveDirectPrintPrinter = async () => {
+    const printers = await findQzPrinters();
+    if (!printers.length) return "";
+
+    const storedPrinter = localStorage.getItem("qzPrinterName") || "";
+    if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
+
+    const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
+    localStorage.setItem("qzPrinterName", selectedPrinter);
+    return selectedPrinter;
+  };
+
+  const printExternalRows = async (rowsToPrint: any[]) => {
+    const printerName = await resolveDirectPrintPrinter();
+    if (!printerName) {
+      message.warning("No se encontraron impresoras en QZ Tray");
+      return false;
+    }
+
+    for (const row of rowsToPrint) {
+      const labelImage = await buildDirectShippingLabelImageData({
+        guideNumber: String(row?.numero_guia || ""),
+        clientName: row?.comprador,
+        clientPhone: row?.telefono_comprador,
+        origin: row?.sucursal?.nombre || currentSucursal?.nombre || "Externo",
+        destination: row?.lugar_entrega || currentSucursal?.nombre || "Externo",
+        ticketWidthMm: 40,
+      });
+
+      const pixelConfig = await createPixelConfig(printerName, {
+        widthMm: labelImage.widthMm,
+        heightMm: labelImage.heightMm,
+      });
+
+      await qzPrint(pixelConfig, [
+        {
+          type: "pixel",
+          format: "image",
+          flavor: "base64",
+          data: toBase64Png(labelImage.dataUrl),
+          options: { interpolation: "nearest-neighbor" },
+        },
+      ]);
+    }
+
+    return true;
+  };
+
   useEffect(() => {
     if (!visible) return;
     form.setFieldsValue({
@@ -219,100 +269,128 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   }, [form, visible]);
 
   const onFinish = async (values: any) => {
-    setLoading(true);
-    try {
-      if (!currentSucursal?._id || !currentSucursal?.nombre) {
-        message.error("No se pudo identificar la sucursal actual para registrar la entrega externa");
-        return;
-      }
-
-      const paquetes = (values.paquetes || []).slice(0, packageCount).map((row: any, index: number) => {
-        const price = roundCurrency(Number(row.precio_paquete || 0));
-        const paidStatus = row.esta_pagado || "no";
-        let sellerAmount = roundCurrency(Number(row.monto_paga_vendedor || 0));
-        let buyerAmount = roundCurrency(Number(row.monto_paga_comprador || 0));
-
-        if (paidStatus === "si") {
-          sellerAmount = price;
-          buyerAmount = 0;
-        } else if (paidStatus === "no") {
-          sellerAmount = 0;
-          buyerAmount = 0;
-        }
-
-        return {
-          numero_paquete: index + 1,
-          comprador: row.comprador || "",
-          descripcion_paquete: row.descripcion_paquete,
-          telefono_comprador: row.telefono_comprador || "",
-          precio_paquete: price,
-          esta_pagado: paidStatus,
-          monto_paga_vendedor: sellerAmount,
-          monto_paga_comprador: buyerAmount,
-        };
-      });
-
-      for (const p of paquetes) {
-        if (p.esta_pagado === "mixto") {
-          const price = Number(p.precio_paquete || 0);
-          const montoVendedor = Number(p.monto_paga_vendedor || 0);
-          const montoComprador = Number(p.monto_paga_comprador || 0);
-          const suma = roundCurrency(montoVendedor + montoComprador);
-
-          if (price <= 0) {
-            message.error("Para pago mixto el precio del paquete debe ser mayor a 0");
-            return;
-          }
-          if (montoVendedor <= 0 || montoComprador <= 0) {
-            message.error("En pago mixto ambos deben pagar un monto mayor a 0");
-            return;
-          }
-          if (montoVendedor >= price || montoComprador >= price) {
-            message.error("En pago mixto ninguna parte puede pagar todo el paquete");
-            return;
-          }
-          if (Math.abs(suma - price) > 0.01) {
-            message.error("En pago mixto la suma debe ser igual al precio del paquete");
-            return;
-          }
-        }
-      }
-
-      const totalSellerPayment = roundCurrency(
-        paquetes.reduce((sum: number, p: any) => sum + Number(p.monto_paga_vendedor || 0), 0)
-      );
-      const sellerPaymentMethod = totalSellerPayment > 0 ? String(values.metodo_pago || "").trim().toLowerCase() : "";
-      if (totalSellerPayment > 0 && sellerPaymentMethod !== "efectivo" && sellerPaymentMethod !== "qr") {
-        message.error("Debes indicar si el pago del vendedor sera en efectivo o QR");
-        return;
-      }
-
-      const payload = {
-        carnet_vendedor: values.carnet_vendedor,
-        vendedor: values.vendedor,
-        telefono_vendedor: values.telefono_vendedor,
-        id_sucursal: currentSucursal?._id,
-        lugar_entrega: currentSucursal?.nombre || "Externo",
-        metodo_pago: sellerPaymentMethod,
-        numero_paquetes: packageCount,
-        paquetes,
-      };
-
-      const response = await registerExternalPackagesAPI(payload);
-      if (!response.success) {
-        message.error(response.message || "No se pudieron registrar las entregas externas");
-        return;
-      }
-
-      message.success(`Se registraron ${response.createdCount || packageCount} entregas externas`);
-      resetModal();
-      onCreated();
-    } catch (error) {
-      console.error(error);
-      message.error("Error registrando entregas externas");
-    } finally {
-      setLoading(false);
+    if (!currentSucursal?._id || !currentSucursal?.nombre) {
+      message.error("No se pudo identificar la sucursal actual para registrar la entrega externa");
+      return;
     }
+
+    const paquetes = (values.paquetes || []).slice(0, packageCount).map((row: any, index: number) => {
+      const price = roundCurrency(Number(row.precio_paquete || 0));
+      const paidStatus = row.esta_pagado || "no";
+      let sellerAmount = roundCurrency(Number(row.monto_paga_vendedor || 0));
+      let buyerAmount = roundCurrency(Number(row.monto_paga_comprador || 0));
+
+      if (paidStatus === "si") {
+        sellerAmount = price;
+        buyerAmount = 0;
+      } else if (paidStatus === "no") {
+        sellerAmount = 0;
+        buyerAmount = 0;
+      }
+
+      return {
+        numero_paquete: index + 1,
+        comprador: row.comprador || "",
+        descripcion_paquete: row.descripcion_paquete,
+        telefono_comprador: row.telefono_comprador || "",
+        precio_paquete: price,
+        esta_pagado: paidStatus,
+        monto_paga_vendedor: sellerAmount,
+        monto_paga_comprador: buyerAmount,
+      };
+    });
+
+    for (const p of paquetes) {
+      if (p.esta_pagado === "mixto") {
+        const price = Number(p.precio_paquete || 0);
+        const montoVendedor = Number(p.monto_paga_vendedor || 0);
+        const montoComprador = Number(p.monto_paga_comprador || 0);
+        const suma = roundCurrency(montoVendedor + montoComprador);
+
+        if (price <= 0) {
+          message.error("Para pago mixto el precio del paquete debe ser mayor a 0");
+          return;
+        }
+        if (montoVendedor <= 0 || montoComprador <= 0) {
+          message.error("En pago mixto ambos deben pagar un monto mayor a 0");
+          return;
+        }
+        if (montoVendedor >= price || montoComprador >= price) {
+          message.error("En pago mixto ninguna parte puede pagar todo el paquete");
+          return;
+        }
+        if (Math.abs(suma - price) > 0.01) {
+          message.error("En pago mixto la suma debe ser igual al precio del paquete");
+          return;
+        }
+      }
+    }
+
+    const totalSellerPayment = roundCurrency(
+      paquetes.reduce((sum: number, p: any) => sum + Number(p.monto_paga_vendedor || 0), 0)
+    );
+    const sellerPaymentMethod = totalSellerPayment > 0 ? String(values.metodo_pago || "").trim().toLowerCase() : "";
+    if (totalSellerPayment > 0 && sellerPaymentMethod !== "efectivo" && sellerPaymentMethod !== "qr") {
+      message.error("Debes indicar si el pago del vendedor sera en efectivo o QR");
+      return;
+    }
+
+    const payload = {
+      carnet_vendedor: values.carnet_vendedor,
+      vendedor: values.vendedor,
+      telefono_vendedor: values.telefono_vendedor,
+      id_sucursal: currentSucursal?._id,
+      lugar_entrega: currentSucursal?.nombre || "Externo",
+      metodo_pago: sellerPaymentMethod,
+      numero_paquetes: packageCount,
+      paquetes,
+    };
+
+    Modal.confirm({
+      title: "Registrar e imprimir entregas externas",
+      content: `Se registraran ${packageCount} entrega(s) externa(s), se asignara su numero de guia y se imprimiran sus etiquetas. Continuar?`,
+      okText: "Guardar e imprimir",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        setLoading(true);
+        let createdRows: any[] = [];
+        try {
+          const response = await registerExternalPackagesAPI(payload);
+          if (!response.success) {
+            message.error(response.message || "No se pudieron registrar las entregas externas");
+            return;
+          }
+
+          createdRows = Array.isArray(response.data) ? response.data : [];
+          if (!createdRows.length) {
+            throw new Error("No se recibieron las etiquetas generadas");
+          }
+          if (createdRows.some((row) => !row?.numero_guia)) {
+            throw new Error("No se pudieron generar todas las guias");
+          }
+
+          const printed = await printExternalRows(createdRows);
+          if (!printed) {
+            throw new Error("No se pudo imprimir las etiquetas");
+          }
+
+          message.success(`Se imprimieron y registraron ${response.createdCount || createdRows.length} entregas externas`);
+          resetModal();
+          onCreated();
+        } catch (error) {
+          console.error(error);
+          if (createdRows.length) {
+            message.error("Las entregas se registraron, pero no se pudieron imprimir. Puedes reimprimir desde el detalle.");
+            resetModal();
+            onCreated();
+          } else {
+            message.error("Error registrando entregas externas");
+          }
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   return (

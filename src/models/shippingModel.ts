@@ -15,6 +15,8 @@ export interface Shipping {
   tipo_destino?: "sucursal" | "otro_lugar";
   lugar_entrega: string;
   ubicacion_link?: string;
+  numero_guia?: string;
+  guia_sequence?: number;
   costo_delivery: number;
   cargo_delivery: number;
   estado_pedido: string;

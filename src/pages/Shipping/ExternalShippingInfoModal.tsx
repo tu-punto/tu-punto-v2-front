@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { PrinterOutlined } from "@ant-design/icons";
 import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, message } from "antd";
 import { updateExternalSaleAPI } from "../../api/externalSale";
+import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
+import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
 
 interface ExternalShippingInfoModalProps {
   visible: boolean;
@@ -38,6 +41,7 @@ const ExternalShippingInfoModal = ({
 }: ExternalShippingInfoModalProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [printingQr, setPrintingQr] = useState(false);
 
   const packagePrice = useMemo(
     () => Number(externalShipping?.precio_paquete ?? externalShipping?.precio_total ?? 0),
@@ -128,6 +132,65 @@ const ExternalShippingInfoModal = ({
 
     form.setFieldValue("subtotal_qr", nextQr);
     form.setFieldValue("subtotal_efectivo", roundCurrency(Math.max(0, buyerDebt - nextQr)));
+  };
+
+  const resolveDirectPrintPrinter = async () => {
+    const printers = await findQzPrinters();
+    if (!printers.length) return "";
+
+    const storedPrinter = localStorage.getItem("qzPrinterName") || "";
+    if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
+
+    const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
+    localStorage.setItem("qzPrinterName", selectedPrinter);
+    return selectedPrinter;
+  };
+
+  const handlePrintExternalQRDirect = async () => {
+    if (!externalShipping?.numero_guia) {
+      message.warning("Esta entrega no tiene numero de guia para imprimir");
+      return;
+    }
+
+    setPrintingQr(true);
+    try {
+      const printerName = await resolveDirectPrintPrinter();
+      if (!printerName) {
+        message.warning("No se encontraron impresoras en QZ Tray");
+        return;
+      }
+
+      const labelImage = await buildDirectShippingLabelImageData({
+        guideNumber: String(externalShipping.numero_guia || ""),
+        clientName: externalShipping.comprador,
+        clientPhone: externalShipping.telefono_comprador,
+        origin: externalShipping?.sucursal?.nombre || "Externo",
+        destination: externalShipping?.lugar_entrega || externalShipping?.sucursal?.nombre || "Externo",
+        ticketWidthMm: 40,
+      });
+
+      const pixelConfig = await createPixelConfig(printerName, {
+        widthMm: labelImage.widthMm,
+        heightMm: labelImage.heightMm,
+      });
+
+      await qzPrint(pixelConfig, [
+        {
+          type: "pixel",
+          format: "image",
+          flavor: "base64",
+          data: toBase64Png(labelImage.dataUrl),
+          options: { interpolation: "nearest-neighbor" },
+        },
+      ]);
+
+      message.success("Etiqueta enviada a la impresora");
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo imprimir. Revisa QZ Tray o la impresora.");
+    } finally {
+      setPrintingQr(false);
+    }
   };
 
   useEffect(() => {
@@ -247,15 +310,32 @@ const ExternalShippingInfoModal = ({
 
   return (
     <Modal
-      title={`Detalle ${serviceLabel} ${externalShipping?._id || ""}`}
+      title={`Detalle ${serviceLabel} ${externalShipping?.numero_guia || externalShipping?._id || ""}`}
       open={visible}
       onCancel={onClose}
       footer={null}
       width={860}
       destroyOnClose
     >
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <Button
+          icon={<PrinterOutlined />}
+          loading={printingQr}
+          disabled={!externalShipping?.numero_guia}
+          onClick={() => void handlePrintExternalQRDirect()}
+        >
+          Imprimir etiqueta
+        </Button>
+      </div>
       <Form form={form} layout="vertical" onFinish={handleSave}>
         <Card title="Informacion del Vendedor" bordered={false}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Numero de guia">
+                <Input value={externalShipping?.numero_guia || "Sin guia"} readOnly />
+              </Form.Item>
+            </Col>
+          </Row>
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item label="Carnet" name="carnet_vendedor">
