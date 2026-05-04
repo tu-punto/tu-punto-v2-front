@@ -33,6 +33,7 @@ import {
   getInventarioActualAPI,
   getIngresosMesesAPI,
   downloadOperacionMensualXlsx,
+  downloadReporteEntregasSimplesExternasXlsx,
   downloadStockProductosXlsx,
   downloadEntregasNuevoServicioXlsx,
   downloadVentasQrXlsx,
@@ -68,6 +69,7 @@ type ReportId =
   | "clientesActivos3m"
   | "ventasVendedores4m"
   | "entregasNuevoServicio"
+  | "reporteEntregasSimplesExternas"
   | "ventasQr"
   | "clientesStatus";
 
@@ -165,7 +167,6 @@ const REPORTS: ReportDefinition[] = [
     previewMode: "operacion",
     requires: { meses: true, sucursales: true },
     operacionKey: "costoEntregaPromedioPorSucursal",
-    isNew: true,
   },
   {
     id: "clientesPorHoraMensual",
@@ -193,7 +194,6 @@ const REPORTS: ReportDefinition[] = [
     previewMode: "operacion",
     requires: { meses: true, sucursales: true, ticketPromedioModo: true },
     operacionKey: "ticketPromedioPorSucursal",
-    isNew: true,
   },
   {
     id: "clientesActivosPorSucursal",
@@ -212,16 +212,6 @@ const REPORTS: ReportDefinition[] = [
     previewMode: "operacion",
     requires: { meses: true, sucursales: true },
     operacionKey: "clientesNuevosPorSucursal",
-  },
-  {
-    id: "entregasExternasRealizadasPorSucursal",
-    title: "Entregas externas realizadas por sucursal",
-    description: "Cantidad de paquetes y monto cobrado por sucursal.",
-    category: "Operacion mensual",
-    previewMode: "operacion",
-    requires: { meses: true, sucursales: true },
-    operacionKey: "entregasExternasRealizadasPorSucursal",
-    isNew: true,
   },
   {
     id: "ventasMensualPorSucursal",
@@ -281,12 +271,12 @@ const REPORTS: ReportDefinition[] = [
     requires: { meses: true },
   },
   {
-    id: "entregasNuevoServicio",
-    title: "Entregas realizadas con el nuevo servicio",
-    description: "Paquetes cargados en el modulo nuevo, con resumen por mes, vendedor y metodo de pago.",
+    id: "reporteEntregasSimplesExternas",
+    title: "Reporte de entregas simples y externas",
+    description: "XLSX con resumen mensual total y por sucursal, detalle de simples y detalle de externas.",
     category: "Reportes adicionales",
-    previewMode: "entregasNuevoServicio",
-    requires: { meses: true, sellerId: true },
+    previewMode: "none",
+    requires: { meses: true, sucursales: true },
     isNew: true,
   },
   {
@@ -683,6 +673,12 @@ export default function ReportsLauncher() {
           break;
         case "entregasNuevoServicio":
           await downloadEntregasNuevoServicioXlsx({ meses, sellerId: vals.sellerId });
+          break;
+        case "reporteEntregasSimplesExternas":
+          await downloadReporteEntregasSimplesExternasXlsx({
+            mes: meses[0],
+            sucursales: vals.sucursales,
+          });
           break;
         case "ventasQr": {
           await downloadVentasQrXlsx({ meses, sucursales: vals.sucursales });

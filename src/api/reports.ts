@@ -36,6 +36,11 @@ type EntregasNuevoServicioParams = {
   sellerId?: string;
 };
 
+type ReporteEntregasSimplesExternasParams = {
+  mes: string;
+  sucursales?: string[];
+};
+
 function extractFilename(contentDisposition?: string) {
   if (!contentDisposition) return null;
 
@@ -252,6 +257,17 @@ export async function downloadEntregasNuevoServicioXlsx(params: EntregasNuevoSer
       sellerId: params.sellerId,
     },
     `entregas_nuevo_servicio_${nombreMeses}.xlsx`,
+  );
+}
+
+export async function downloadReporteEntregasSimplesExternasXlsx(params: ReporteEntregasSimplesExternasParams) {
+  await downloadXlsxFromGet(
+    "/reports/reporte-entregas-simples-externas/xlsx",
+    {
+      mes: params.mes,
+      sucursales: params.sucursales?.join(","),
+    },
+    `reporte_entregas_simples_externas_${params.mes}.xlsx`,
   );
 }
 
