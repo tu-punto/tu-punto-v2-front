@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Checkbox, Popover, Tooltip, message } from "antd";
+import { Button, Checkbox, Image, Popover, Tooltip, message } from "antd";
 import { DollarOutlined } from "@ant-design/icons";
 
 import { paySellerDebtAPI } from "../../../api/seller";
@@ -52,6 +52,22 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   /* contenido del Popover */
   const content = (
     <div>
+      {seller?.qr_pago_url ? (
+        <div className="mb-3">
+          <div className="mb-2 font-medium">QR del vendedor</div>
+          <Image
+            src={seller.qr_pago_url}
+            alt="QR de pago del vendedor"
+            width={180}
+            style={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
+          />
+        </div>
+      ) : (
+        <div className="mb-3 text-sm text-gray-500">
+          Este vendedor no tiene QR cargado.
+        </div>
+      )}
+
       <Checkbox
         checked={checked}
         onChange={(e) => setChecked(e.target.checked)}

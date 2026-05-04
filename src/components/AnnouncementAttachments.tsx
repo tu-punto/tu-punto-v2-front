@@ -6,6 +6,7 @@ import {
   FileTextOutlined,
   LinkOutlined,
   PaperClipOutlined,
+  VideoCameraOutlined,
 } from "@ant-design/icons";
 import { Button, Space, Tag, Typography } from "antd";
 
@@ -42,9 +43,13 @@ const getHostnameLabel = (value: string) => {
 const isImageAttachment = (attachment: AnnouncementAttachment) =>
   attachment.kind === "file" && String(attachment.contentType || "").startsWith("image/");
 
+const isVideoAttachment = (attachment: AnnouncementAttachment) =>
+  attachment.kind === "file" && String(attachment.contentType || "").startsWith("video/");
+
 const getAttachmentIcon = (attachment: AnnouncementAttachment) => {
   if (attachment.kind === "link") return <LinkOutlined />;
   if (isImageAttachment(attachment)) return <FileImageOutlined />;
+  if (isVideoAttachment(attachment)) return <VideoCameraOutlined />;
   if (String(attachment.contentType || "").includes("pdf")) return <FilePdfOutlined />;
   if (String(attachment.contentType || "").includes("word")) return <FileTextOutlined />;
   return <PaperClipOutlined />;
@@ -53,6 +58,7 @@ const getAttachmentIcon = (attachment: AnnouncementAttachment) => {
 const getAttachmentAccent = (attachment: AnnouncementAttachment) => {
   if (attachment.kind === "link") return "announcement-attachment-thumb-link";
   if (isImageAttachment(attachment)) return "announcement-attachment-thumb-image";
+  if (isVideoAttachment(attachment)) return "announcement-attachment-thumb-video";
   if (String(attachment.contentType || "").includes("pdf")) return "announcement-attachment-thumb-pdf";
   return "announcement-attachment-thumb-file";
 };
@@ -81,7 +87,14 @@ const AnnouncementAttachments = ({ attachments = [] }: { attachments?: Announcem
           return (
             <div className="announcement-attachment-card" key={`${attachment.kind}-${attachment.url}-${index}`}>
               <div className={`announcement-attachment-thumb ${getAttachmentAccent(attachment)}`}>
-                {isImageAttachment(attachment) ? (
+                {isVideoAttachment(attachment) ? (
+                  <video
+                    src={attachment.url}
+                    className="announcement-attachment-video"
+                    controls
+                    preload="metadata"
+                  />
+                ) : isImageAttachment(attachment) ? (
                   <img
                     src={attachment.url}
                     alt={title}
@@ -111,6 +124,11 @@ const AnnouncementAttachments = ({ attachments = [] }: { attachments?: Announcem
                   {isImageAttachment(attachment) ? (
                     <Tag bordered={false} color="green">
                       Vista previa
+                    </Tag>
+                  ) : null}
+                  {isVideoAttachment(attachment) ? (
+                    <Tag bordered={false} color="purple">
+                      Video
                     </Tag>
                   ) : null}
                 </Space>

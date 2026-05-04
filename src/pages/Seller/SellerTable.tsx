@@ -16,6 +16,15 @@ type SellerRow = ISeller & {
   deudaInt: number;
   pagoTotalInt: number;
   pago_mensual: string;
+  fecha_pago_asignada_label: string;
+};
+
+const parseSellerDate = (value: any) => {
+  if (typeof value === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [day, month, year] = value.split("/").map(Number);
+    return dayjs(new Date(year, month - 1, day));
+  }
+  return dayjs(value);
 };
 
 export default function SellerTable({
@@ -37,9 +46,12 @@ export default function SellerTable({
 
   const refresh = () => setRefreshKey((k: any) => k + 1);
 
-  const getEstadoVendedor = (fechaVigencia: string) => {
+  const getEstadoVendedor = (row: Pick<ISeller, "fecha_vigencia" | "declinacion_servicio_fecha">) => {
     const hoy = dayjs();
-    const vigencia = dayjs(fechaVigencia, "DD/MM/YYYY");
+    const vigencia = parseSellerDate(row.fecha_vigencia);
+    if (row.declinacion_servicio_fecha && hoy.isBefore(vigencia.add(6, "day"), "day")) {
+      return "Declinando el servicio";
+    }
     const diasVencido = hoy.diff(vigencia, "day");
 
     if (diasVencido <= 0) return "Activo";
@@ -60,6 +72,13 @@ export default function SellerTable({
         return {
           color: "#fa8c16",
           backgroundColor: "#fff7e6",
+          padding: "4px 8px",
+          borderRadius: "4px",
+        };
+      case "Declinando el servicio":
+        return {
+          color: "#0958d9",
+          backgroundColor: "#e6f4ff",
           padding: "4px 8px",
           borderRadius: "4px",
         };
@@ -88,12 +107,12 @@ export default function SellerTable({
       title: "Estado",
       key: "estado",
       render: (_: any, row: SellerRow) => {
-        const estado = getEstadoVendedor(row.fecha_vigencia);
+        const estado = getEstadoVendedor(row);
         return <span style={getEstadoColor(estado)}>{estado}</span>;
       },
       sorter: (a: any, b: any) => {
-        const estadoA = getEstadoVendedor(a.fecha_vigencia);
-        const estadoB = getEstadoVendedor(b.fecha_vigencia);
+        const estadoA = getEstadoVendedor(a);
+        const estadoB = getEstadoVendedor(b);
         return estadoA.localeCompare(estadoB);
       },
     },
@@ -110,6 +129,28 @@ export default function SellerTable({
       sorter: (a: any, b: any) =>
         dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() -
         dayjs(b.fecha_vigencia, "DD/MM/YYYY").unix(),
+    },
+    {
+      title: "Fecha pago asignada",
+      dataIndex: "fecha_pago_asignada_label",
+      key: "fecha_pago_asignada",
+      render: (value: string) => value || "-",
+      filters: [
+        { text: "Sin solicitud", value: "sin_solicitud" },
+        { text: "Dia 8", value: "8" },
+        { text: "Dia 18", value: "18" },
+        { text: "Dia 28", value: "28" },
+      ],
+      onFilter: (value: any, row: SellerRow) => {
+        if (value === "sin_solicitud") return !row.fecha_pago_asignada;
+        const date = dayjs(row.fecha_pago_asignada);
+        return date.isValid() && String(date.date()) === String(value);
+      },
+      sorter: (a: any, b: any) => {
+        const dateA = a.fecha_pago_asignada ? dayjs(a.fecha_pago_asignada).unix() : 0;
+        const dateB = b.fecha_pago_asignada ? dayjs(b.fecha_pago_asignada).unix() : 0;
+        return dateA - dateB;
+      },
     },
     {
       title: "Pago Mensual",
@@ -196,6 +237,8 @@ export default function SellerTable({
             ? "debe_renovar"
             : estadoFilter === "Ya no es cliente"
             ? "ya_no_es_cliente"
+            : estadoFilter === "Declinando el servicio"
+            ? "declinando_servicio"
             : undefined;
         const pendingPaymentParam =
           pagoFilter === "con deuda"
@@ -237,6 +280,9 @@ export default function SellerTable({
               nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
               fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
               fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
+              fecha_pago_asignada_label: seller.fecha_pago_asignada
+                ? dayjs(seller.fecha_pago_asignada).format("DD/MM/YYYY")
+                : "",
               deuda: deuda,
               pagoTotal: `Bs. ${Number.isFinite(pagoPendiente) ? pagoPendiente.toFixed(2) : "0.00"}`,
               pagoTotalInt: Number.isFinite(pagoPendiente) ? pagoPendiente : 0,
@@ -288,6 +334,7 @@ export default function SellerTable({
           options={[
             { value: "todos", label: "Todos" },
             { value: "Activo", label: "Activos" },
+            { value: "Declinando el servicio", label: "Declinando el servicio" },
             { value: "Debe renovar", label: "Debe renovar" },
             { value: "Ya no es cliente", label: "Ya no es cliente" },
           ]}
