@@ -1,13 +1,15 @@
-import { Button } from "antd";
+import { Button, message, Modal } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
 import { useState } from "react";
+import { autoRenewSellersAPI } from "../../api/seller";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
 }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [autoRenewing, setAutoRenewing] = useState(false);
 
   const showModal = () => {
     setIsModalVisible(true);
@@ -26,6 +28,30 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     setRefreshKey((prevKey) => prevKey + 1);
   };
 
+  const handleAutoRenew = () => {
+    Modal.confirm({
+      title: "Renovación automática",
+      content:
+        "Se renovarán por 1 mes los clientes vencidos que no declinaron el servicio.",
+      okText: "Renovar",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        setAutoRenewing(true);
+        try {
+          const res = await autoRenewSellersAPI();
+          if (!res?.success) throw new Error("No se pudo renovar");
+          const data = res.data || {};
+          message.success(`Renovados: ${data.renewed || 0}. Omitidos: ${data.skipped || 0}.`);
+          setRefreshKey((prevKey) => prevKey + 1);
+        } catch {
+          message.error("Error al ejecutar la renovación automática");
+        } finally {
+          setAutoRenewing(false);
+        }
+      },
+    });
+  };
+
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
@@ -36,13 +62,22 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
           </h1>
         </div>
 
-        <Button
-            onClick={showModal}
-            type="primary"
-            className="text-mobile-sm xl:text-desktop-sm"
-        >
-          Agregar Vendedor
-        </Button>
+        <div className="flex gap-2">
+          <Button
+              onClick={handleAutoRenew}
+              loading={autoRenewing}
+              className="text-mobile-sm xl:text-desktop-sm"
+          >
+            Renovación automática
+          </Button>
+          <Button
+              onClick={showModal}
+              type="primary"
+              className="text-mobile-sm xl:text-desktop-sm"
+          >
+            Agregar Vendedor
+          </Button>
+        </div>
       </div>
 
       <SellerTable

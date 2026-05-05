@@ -70,7 +70,11 @@ const FinanceFlux = () => {
                 </div>
             </div>
 
-            <FinanceFluxTable refreshKey={refreshKey} onEdit={handleEdit} />
+            <FinanceFluxTable
+                refreshKey={refreshKey}
+                onEdit={handleEdit}
+                onRefresh={() => setRefreshKey(prevKey => prevKey + 1)}
+            />
             <FinanceFluxFormModal
                 visible={isModalVisible}
                 onCancel={handleCancel}

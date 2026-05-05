@@ -20,6 +20,14 @@ import { renewSellerAPI } from "../../api/seller";
 import BranchFields from "./components/BranchFields";
 import { ISucursalPago } from "../../models/sellerModels";
 
+const parseSellerDate = (value: any) => {
+  if (typeof value === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [day, month, year] = value.split("/").map(Number);
+    return dayjs(new Date(year, month - 1, day));
+  }
+  return dayjs(value);
+};
+
 interface Props {
   visible: boolean;
   onCancel: () => void;
@@ -67,7 +75,9 @@ export default function DebtModal({
       );
 
       form.setFieldsValue({
-        fecha_vigencia: dayjs(seller.fecha_vigencia, "D/M/YYYY/"),
+        fecha_vigencia: parseSellerDate(seller.fecha_vigencia).add(1, "month"),
+        meses_renovacion: 1,
+        descuento_porcentaje: 0,
         comision_porcentual: seller.comision_porcentual,
         comision_fija: seller.comision_fija,
         isDebt: true,
@@ -92,7 +102,8 @@ export default function DebtModal({
           tot +
           Number(p.alquiler || 0) +
           Number(p.exhibicion || 0) +
-          Number(p.delivery || 0),
+          Number(p.delivery || 0) +
+          Number(p.entrega_simple || 0),
         0
       );
 
@@ -102,6 +113,8 @@ export default function DebtModal({
       const payload = {
         ...values,
         fecha_vigencia: values.fecha_vigencia.toISOString(),
+        meses_renovacion: Number(values.meses_renovacion || 1),
+        descuento_porcentaje: Number(values.descuento_porcentaje || 0),
         pago_sucursales: values.sucursales.map((formSucursal: any) => ({
           ...formSucursal,
           alquiler: formSucursal.almacenamiento,
@@ -148,13 +161,39 @@ export default function DebtModal({
       onCancel={onCancel}
       width={850}
     >
-      <Form form={form} layout="vertical" onFinish={onFinish}>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        onValuesChange={(changed, allValues) => {
+          if ("meses_renovacion" in changed) {
+            const baseDate = parseSellerDate(seller.fecha_vigencia);
+            form.setFieldValue(
+              "fecha_vigencia",
+              baseDate.add(Number(allValues.meses_renovacion || 1), "month")
+            );
+          }
+        }}
+      >
         <Form.Item name="isDebt" label="¿Es deuda?">
           <Radio.Group>
             <Radio.Button value={true}>SI</Radio.Button>
             <Radio.Button value={false}>NO</Radio.Button>
           </Radio.Group>
         </Form.Item>
+
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item name="meses_renovacion" label="Meses a renovar" initialValue={1}>
+              <InputNumber className="w-full" min={1} precision={0} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="descuento_porcentaje" label="Descuento solo para esta renovación" initialValue={0}>
+              <InputNumber className="w-full" min={0} max={100} suffix="%" />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Row gutter={16}>
           <Col xs={24} md={12}>

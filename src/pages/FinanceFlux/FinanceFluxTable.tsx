@@ -3,14 +3,21 @@ import { SearchOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { getFinancesFluxAPI } from "../../api/financeFlux";
 import { FLUX_TYPES } from "../../constants/fluxes";
+import ServiceDetailDrawer from "./ServiceDetailDrawer";
 
 const { RangePicker } = DatePicker;
 
-function FinanceFluxTable({ refreshKey, onEdit }: any) {
+const money = (monto: number) =>
+  `Bs. ${Number(monto || 0).toLocaleString("es-ES", {
+    minimumFractionDigits: 2,
+  })}`;
+
+function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
   const [dataWithKey, setDataWithKey] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [selectedType, setSelectedType] = useState();
   const [dateRange, setDateRange] = useState([null, null]);
+  const [detailFlux, setDetailFlux] = useState<any>(null);
 
   const [searchVendedor, setSearchVendedor] = useState("");
   const [searchCategoria, setSearchCategoria] = useState("");
@@ -19,17 +26,29 @@ function FinanceFluxTable({ refreshKey, onEdit }: any) {
   const fetchFinances = async () => {
     try {
       const apiData = await getFinancesFluxAPI();
-      const dataWithKeys = apiData.map((financeFlux: any) => ({
-        ...financeFlux,
-        key: financeFlux._id,
-        id_flujo_financiero: financeFlux._id,
-        vendedor: financeFlux.id_vendedor
-          ? `${financeFlux.id_vendedor.nombre} ${financeFlux.id_vendedor.apellido}`
-          : "N/A",
-        encargado: financeFlux.id_trabajador?.nombre || "N/A",
-        sucursal: financeFlux.id_sucursal?.nombre || "N/A",
-        esDeuda: financeFlux.esDeuda ? "SI" : "NO",
-      }));
+      const dataWithKeys = apiData.map((financeFlux: any) => {
+        const detalleServicios = Array.isArray(financeFlux.detalle_servicios)
+          ? financeFlux.detalle_servicios.map((detail: any, index: number) => ({
+              ...detail,
+              key: `${financeFlux._id}-detail-${index}`,
+              sucursalName:
+                detail.sucursalName || detail.id_sucursal?.nombre || "N/A",
+            }))
+          : [];
+
+        return {
+          ...financeFlux,
+          detalle_servicios: detalleServicios,
+          key: financeFlux._id,
+          id_flujo_financiero: financeFlux._id,
+          vendedor: financeFlux.id_vendedor
+            ? `${financeFlux.id_vendedor.nombre} ${financeFlux.id_vendedor.apellido}`
+            : "N/A",
+          encargado: financeFlux.id_trabajador?.nombre || "N/A",
+          sucursal: financeFlux.id_sucursal?.nombre || "N/A",
+          esDeuda: financeFlux.esDeuda ? "SI" : "NO",
+        };
+      });
 
       setDataWithKey(dataWithKeys);
       setFilteredData(dataWithKeys);
@@ -135,8 +154,15 @@ function FinanceFluxTable({ refreshKey, onEdit }: any) {
       dataIndex: "monto",
       key: "finance_flux_amount",
       className: "text-mobile-sm xl:text-desktop-sm",
-      render: (monto: number) =>
-        `Bs. ${monto.toLocaleString("es-ES", { minimumFractionDigits: 2 })}`,
+      render: (monto: number, record: any) =>
+        Array.isArray(record.detalle_servicios) &&
+        record.detalle_servicios.length > 0 ? (
+          <Button type="link" onClick={() => setDetailFlux(record)} style={{ padding: 0 }}>
+            {money(monto)}
+          </Button>
+        ) : (
+          money(monto)
+        ),
       sorter: (a: any, b: any) => a.monto - b.monto,
     },
     {
@@ -182,6 +208,40 @@ function FinanceFluxTable({ refreshKey, onEdit }: any) {
       ),
       width: 100,
       fixed: "right" as const,
+    },
+  ];
+
+  const detailColumns = [
+    { title: "Sucursal", dataIndex: "sucursalName", key: "sucursalName" },
+    {
+      title: "Almacenamiento",
+      dataIndex: "alquiler",
+      key: "alquiler",
+      render: (value: number) => money(value),
+    },
+    {
+      title: "Exhibición",
+      dataIndex: "exhibicion",
+      key: "exhibicion",
+      render: (value: number) => money(value),
+    },
+    {
+      title: "Entrega Simple",
+      dataIndex: "entrega_simple",
+      key: "entrega_simple",
+      render: (value: number) => money(value),
+    },
+    {
+      title: "Delivery",
+      dataIndex: "delivery",
+      key: "delivery",
+      render: (value: number) => money(value),
+    },
+    {
+      title: "Total",
+      dataIndex: "total",
+      key: "total",
+      render: (value: number) => money(value),
     },
   ];
 
@@ -248,15 +308,38 @@ function FinanceFluxTable({ refreshKey, onEdit }: any) {
       </div>
 
       <Table
-        columns={columns}
-        dataSource={filteredData}
-        scroll={{ x: "max-content" }}
-        pagination={{
-          showSizeChanger: true,
-          showTotal: (total, range) =>
-            `${range[0]}-${range[1]} de ${total} registros`,
-          pageSize: 10,
-          pageSizeOptions: ["10", "20", "50", "100"],
+          columns={columns}
+          dataSource={filteredData}
+          expandable={{
+            expandedRowRender: (record: any) => (
+              <Table
+                columns={detailColumns}
+                dataSource={record.detalle_servicios}
+                pagination={false}
+                size="small"
+              />
+            ),
+            rowExpandable: (record: any) =>
+              Array.isArray(record.detalle_servicios) &&
+              record.detalle_servicios.length > 0,
+          }}
+          scroll={{ x: "max-content" }}
+          pagination={{
+            showSizeChanger: true,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} de ${total} registros`,
+            pageSize: 10,
+            pageSizeOptions: ["10", "20", "50", "100"],
+          }}
+        />
+      <ServiceDetailDrawer
+        open={!!detailFlux}
+        onClose={() => setDetailFlux(null)}
+        flux={detailFlux}
+        sellerName={detailFlux?.vendedor}
+        onSaved={() => {
+          fetchFinances();
+          onRefresh?.();
         }}
       />
     </div>

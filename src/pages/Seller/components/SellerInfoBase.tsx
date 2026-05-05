@@ -821,6 +821,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           data={sellerDebts}
           setRefreshKey={setRefreshKey}
           isSeller={isSeller}
+          sellerName={`${seller?.nombre || ""} ${seller?.apellido || ""}`.trim()}
         />
 
         <PaymentProofSection proofs={paymentProofs} sellerId={seller.key} />

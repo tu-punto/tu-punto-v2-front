@@ -91,6 +91,7 @@ export default function SellerFormModal({
         ...values,
         saldo_pendiente: 0,
         fecha_vigencia: dayjs(values.fecha_vigencia).toISOString(),
+        descuento_porcentaje: Number(values.descuento_porcentaje || 0),
         pago_sucursales: values.sucursales.map((s: any) => ({
           id_sucursal: s.id_sucursal,
           sucursalName:
@@ -298,6 +299,11 @@ export default function SellerFormModal({
               rules={[{ required: true }]}
             >
               <DatePicker className="w-full" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Descuento solo para el alta" name="descuento_porcentaje" initialValue={0}>
+              <InputNumber min={0} max={100} suffix="%" className="w-full" />
             </Form.Item>
           </Col>
         </Row>

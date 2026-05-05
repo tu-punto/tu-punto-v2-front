@@ -2,10 +2,27 @@ import { Table, Input, Button, Switch } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { updateFinanceFluxAPI } from '../../../api/financeFlux';
+import ServiceDetailDrawer from '../../FinanceFlux/ServiceDetailDrawer';
 
-export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data: any[], setRefreshKey: (key: number) => void, isSeller: boolean }) {
+const money = (value: number) =>
+  `Bs. ${Number(value || 0).toLocaleString("es-ES", {
+    minimumFractionDigits: 2,
+  })}`;
+
+export default function SellerDebtTable({
+  data,
+  setRefreshKey,
+  isSeller,
+  sellerName,
+}: {
+  data: any[];
+  setRefreshKey: any;
+  isSeller: boolean;
+  sellerName?: string;
+}) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<any>({});
+  const [detailFlux, setDetailFlux] = useState<any>(null);
 
   const isEditing = (record: any) => record._id === editingKey;
 
@@ -55,6 +72,18 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
       key: 'monto',
       render: (val: number, record: any) => {
         const editable = isEditing(record);
+        const hasDetail =
+          Array.isArray(record.detalle_servicios) &&
+          record.detalle_servicios.length > 0;
+
+        if (hasDetail && !editable) {
+          return (
+            <Button type="link" onClick={() => setDetailFlux(record)} style={{ padding: 0 }}>
+              {money(val)}
+            </Button>
+          );
+        }
+
         return editable ? (
           <Input
             type="number"
@@ -62,7 +91,7 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
             onChange={(e) => handleChange('monto', e.target.value)}
           />
         ) : (
-          `Bs. ${val}`
+          money(val)
         );
       },
     },
@@ -128,17 +157,25 @@ export default function SellerDebtTable({ data, setRefreshKey, isSeller}: { data
     <div style={{ marginTop: 24 }}>
       <h4 className="text-lg font-bold mb-2">Registro de Deudas</h4>
       <Table
-        dataSource={data}
-        columns={columns}
-        rowKey="_id"
-        pagination={{
-          showSizeChanger: true,
-          showTotal: (total, range) =>
-            `${range[0]}-${range[1]} de ${total} registros`,
-          pageSize: 5,
-          pageSizeOptions: ["10", "20", "50", "100"],
-        }}
-        size="small"
+          dataSource={data}
+          columns={columns}
+          rowKey="_id"
+          pagination={{
+            showSizeChanger: true,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} de ${total} registros`,
+            pageSize: 5,
+            pageSizeOptions: ["10", "20", "50", "100"],
+          }}
+          size="small"
+        />
+      <ServiceDetailDrawer
+        open={!!detailFlux}
+        onClose={() => setDetailFlux(null)}
+        flux={detailFlux}
+        sellerName={sellerName}
+        readOnly={isSeller}
+        onSaved={() => setRefreshKey((prevKey: number) => prevKey + 1)}
       />
     </div>
   );

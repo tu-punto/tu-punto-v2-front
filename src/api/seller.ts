@@ -25,6 +25,15 @@ export const renewSellerAPI = async (id: string | number, data: any) => {
     }
 }
 
+export const autoRenewSellersAPI = async () => {
+    try {
+        const res = await apiClient.post(`/seller/auto-renew`);
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
 export const getSellerAPI = async (sellerId: string) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}`)
