@@ -2,6 +2,8 @@ import { Button, Input, InputNumber, Modal, Space, Table, Typography, message } 
 import { useEffect, useMemo, useState } from 'react';
 import { updateProductPriceAPI } from '../../api/product';
 
+const PRICE_MATRIX_PAGE_SIZE = 50;
+
 const getVariantLabel = (variantes: Record<string, string> = {}) =>
     Object.values(variantes || {})
         .map((value) => String(value || '').trim())
@@ -79,6 +81,7 @@ const ProductPriceMatrixModal = ({
     }, [normalizedSearchTerm, rows]);
     const visibleRowKeys = useMemo(() => new Set(filteredRows.map((row) => row.key)), [filteredRows]);
     const hasVisibleRows = filteredRows.length > 0;
+    const shouldPaginate = filteredRows.length > PRICE_MATRIX_PAGE_SIZE;
 
     const applyBulkPrice = () => {
         if (bulkPrice === null || bulkPrice < 0 || !hasVisibleRows) return;
@@ -142,6 +145,8 @@ const ProductPriceMatrixModal = ({
             open={visible}
             onCancel={onClose}
             width={760}
+            style={{ top: 24 }}
+            bodyStyle={{ maxHeight: 'calc(100vh - 170px)', overflowY: 'auto' }}
             footer={[
                 <Button key="cancel" onClick={onClose}>
                     Cancelar
@@ -157,7 +162,7 @@ const ProductPriceMatrixModal = ({
                         {producto?.nombre_producto || 'Producto'}
                     </Typography.Title>
                     <Typography.Text type="secondary">
-                        Edita los precios por variante o aplica un mismo valor a todas.
+                        Edita los precios por variante o aplica un mismo valor a todas. {rows.length} variantes cargadas.
                     </Typography.Text>
                 </div>
 
@@ -207,7 +212,17 @@ const ProductPriceMatrixModal = ({
 
                 <Table
                     rowKey="key"
-                    pagination={false}
+                    pagination={
+                        shouldPaginate
+                            ? {
+                                defaultPageSize: PRICE_MATRIX_PAGE_SIZE,
+                                pageSizeOptions: ['25', '50', '100'],
+                                showSizeChanger: true,
+                                showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} variantes`
+                            }
+                            : false
+                    }
+                    scroll={{ x: true }}
                     dataSource={filteredRows}
                     locale={{
                         emptyText: hasRows

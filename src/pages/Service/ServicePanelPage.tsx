@@ -9,6 +9,7 @@ import {
   Input,
   List,
   Row,
+  Segmented,
   Select,
   Space,
   Spin,
@@ -79,6 +80,13 @@ const roleOptions = [
 ];
 const MAX_ATTACHMENT_FILES = 6;
 const MAX_ATTACHMENT_FILE_SIZE = 200 * 1024 * 1024;
+const tutorialAttachmentMimeTypes = new Set([
+  "application/pdf",
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
+]);
 const allowedAttachmentMimeTypes = new Set([
   "application/pdf",
   "application/msword",
@@ -100,6 +108,7 @@ const allowedAttachmentMimeTypes = new Set([
 ]);
 const attachmentAccept =
   ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp,.mp4,.webm,.ogg,.mov";
+const tutorialAttachmentAccept = ".pdf,.mp4,.webm,.ogg,.mov";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -172,7 +181,9 @@ const ServiceAnnouncementCard = ({
             </Text>
             <div style={{ marginTop: 6 }}>
               <Space wrap>
-                <Tag color="blue">Version {announcement.version}</Tag>
+                <Tag color="blue">
+                  {String(announcement.version || "").startsWith("tutorial-") ? "Tutorial" : `Version ${announcement.version}`}
+                </Tag>
                 <Tag color={announcement.status === "published" ? "green" : "default"}>
                   {announcement.status === "published" ? "Publicado" : "Borrador"}
                 </Tag>
@@ -258,6 +269,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const [adminAnnouncements, setAdminAnnouncements] = useState<Announcement[]>([]);
   const [attachmentFiles, setAttachmentFiles] = useState<PendingAttachmentFile[]>([]);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
+  const [announcementMode, setAnnouncementMode] = useState<"announcement" | "tutorial">("announcement");
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentFilesRef = useRef<PendingAttachmentFile[]>([]);
   const watchedLinkAttachments = Form.useWatch("linkAttachments", form) || [];
@@ -303,13 +315,15 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
     setAttachmentFiles((current) => {
       const next = [...current];
       const duplicateKeys = new Set(current.map((item) => buildPendingAttachmentKey(item.file)));
+      const acceptedMimeTypes =
+        announcementMode === "tutorial" ? tutorialAttachmentMimeTypes : allowedAttachmentMimeTypes;
       let invalidTypeCount = 0;
       let invalidSizeCount = 0;
       let duplicateCount = 0;
       let skippedByLimit = 0;
 
       for (const file of files) {
-        if (!allowedAttachmentMimeTypes.has(file.type)) {
+        if (!acceptedMimeTypes.has(file.type)) {
           invalidTypeCount += 1;
           continue;
         }
@@ -339,7 +353,11 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       }
 
       if (invalidTypeCount > 0) {
+        if (announcementMode === "tutorial") {
+          message.warning("Para tutoriales solo se permiten videos o PDF.");
+        } else {
           message.warning("Solo se permiten PDF, Office, texto, CSV, imagenes o videos.");
+        }
       }
       if (invalidSizeCount > 0) {
           message.warning("Cada archivo puede pesar hasta 200 MB.");
@@ -415,11 +433,24 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const handleCreate = async (publishNow = false) => {
     try {
       const values = await form.validateFields();
+      const isTutorial = announcementMode === "tutorial";
+      if (isTutorial && attachmentFiles.length === 0) {
+        message.warning("Sube al menos un video o PDF para el tutorial.");
+        return;
+      }
       setSubmitting(true);
       const res = await createServiceAnnouncementAPI({
         ...values,
+        version: isTutorial ? `tutorial-${Date.now()}` : values.version,
+        summary: isTutorial ? values.body : values.summary,
+        body: isTutorial ? String(values.body || values.title || "") : values.body,
+        regulation: isTutorial ? "" : values.regulation,
+        policyText: isTutorial ? "" : values.policyText,
+        targetRoles: isTutorial ? ["seller"] : values.targetRoles,
+        requireAcceptance: isTutorial ? false : values.requireAcceptance,
+        sendPush: isTutorial ? true : values.sendPush,
         linkAttachments: Array.isArray(values.linkAttachments)
-          ? values.linkAttachments.filter((item: any) => String(item?.url || "").trim())
+          ? (isTutorial ? [] : values.linkAttachments.filter((item: any) => String(item?.url || "").trim()))
           : [],
         attachmentFiles: attachmentFiles.map((item) => item.file),
         publishNow,
@@ -429,11 +460,19 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
         throw new Error(res?.message || "No se pudo guardar el comunicado");
       }
 
-      message.success(publishNow ? "Comunicado publicado" : "Comunicado guardado como borrador");
+      message.success(
+        publishNow
+          ? isTutorial
+            ? "Tutorial publicado"
+            : "Comunicado publicado"
+          : isTutorial
+            ? "Tutorial guardado como borrador"
+            : "Comunicado guardado como borrador"
+      );
       form.resetFields();
       form.setFieldsValue({
         targetRoles: ["seller"],
-        requireAcceptance: true,
+        requireAcceptance: isTutorial ? false : true,
         sendPush: true,
         linkAttachments: [],
       });
@@ -517,7 +556,33 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       ) : null}
 
       {isAdmin ? (
-        <Card title="Nuevo comunicado" style={{ borderRadius: 14 }}>
+        <Card
+          title={
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <span>{announcementMode === "tutorial" ? "Nuevo tutorial" : "Nuevo comunicado"}</span>
+              <Segmented
+                value={announcementMode}
+                options={[
+                  { label: "Anuncios", value: "announcement" },
+                  { label: "Tutoriales", value: "tutorial" },
+                ]}
+                onChange={(value) => {
+                  const nextMode = value as "announcement" | "tutorial";
+                  setAnnouncementMode(nextMode);
+                  form.resetFields();
+                  form.setFieldsValue({
+                    targetRoles: ["seller"],
+                    requireAcceptance: nextMode === "tutorial" ? false : true,
+                    sendPush: true,
+                    linkAttachments: [],
+                  });
+                  resetAttachmentFiles();
+                }}
+              />
+            </div>
+          }
+          style={{ borderRadius: 14 }}
+        >
           <Form
             form={form}
             layout="vertical"
@@ -529,44 +594,68 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
             }}
           >
             <Row gutter={16}>
-              <Col xs={24} md={12}>
+              <Col xs={24} md={announcementMode === "tutorial" ? 24 : 12}>
                 <Form.Item name="title" label="Titulo" rules={[{ required: true, message: "Ingresa un titulo" }]}>
-                  <Input placeholder="Ej. Actualizacion de reglas de entregas" />
+                  <Input placeholder={announcementMode === "tutorial" ? "Ej. Como preparar una solicitud de salida" : "Ej. Actualizacion de reglas de entregas"} />
                 </Form.Item>
               </Col>
-              <Col xs={24} md={12}>
-                <Form.Item name="version" label="Version" rules={[{ required: true, message: "Ingresa una version" }]}>
-                  <Input placeholder="Ej. 2026.04.01" />
-                </Form.Item>
-              </Col>
+              {announcementMode === "announcement" ? (
+                <Col xs={24} md={12}>
+                  <Form.Item name="version" label="Version" rules={[{ required: true, message: "Ingresa una version" }]}>
+                    <Input placeholder="Ej. 2026.04.01" />
+                  </Form.Item>
+                </Col>
+              ) : null}
             </Row>
 
-            <Form.Item name="summary" label="Resumen corto">
-              <Input.TextArea rows={2} placeholder="Mensaje breve para card y push" />
+            {announcementMode === "announcement" ? (
+              <Form.Item name="summary" label="Resumen corto">
+                <Input.TextArea rows={2} placeholder="Mensaje breve para card y push" />
+              </Form.Item>
+            ) : null}
+            <Form.Item
+              name="body"
+              label={announcementMode === "tutorial" ? "Descripcion" : "Mensaje principal"}
+              rules={announcementMode === "tutorial" ? [] : [{ required: true, message: "Ingresa el mensaje principal" }]}
+            >
+              <Input.TextArea
+                rows={announcementMode === "tutorial" ? 3 : 4}
+                placeholder={announcementMode === "tutorial" ? "Descripcion opcional del tutorial" : "Detalle de cambios o aviso principal"}
+              />
             </Form.Item>
-            <Form.Item name="body" label="Mensaje principal" rules={[{ required: true, message: "Ingresa el mensaje principal" }]}>
-              <Input.TextArea rows={4} placeholder="Detalle de cambios o aviso principal" />
-            </Form.Item>
-            <Form.Item name="regulation" label="Reglamento">
-              <Input.TextArea rows={3} placeholder="Texto de reglamento o condiciones operativas" />
-            </Form.Item>
-            <Form.Item name="policyText" label="Politicas de uso">
-              <Input.TextArea rows={3} placeholder="Politicas que el usuario debe aceptar" />
-            </Form.Item>
+            {announcementMode === "announcement" ? (
+              <>
+                <Form.Item name="regulation" label="Reglamento">
+                  <Input.TextArea rows={3} placeholder="Texto de reglamento o condiciones operativas" />
+                </Form.Item>
+                <Form.Item name="policyText" label="Politicas de uso">
+                  <Input.TextArea rows={3} placeholder="Politicas que el usuario debe aceptar" />
+                </Form.Item>
+              </>
+            ) : null}
 
             <div className="service-announcement-editor-section">
               <div className="service-announcement-editor-header">
                 <div>
-                  <div className="service-announcement-editor-title">Links y documentos</div>
+                  <div className="service-announcement-editor-title">
+                    {announcementMode === "tutorial" ? "Video/PDF" : "Links y documentos"}
+                  </div>
                   <div className="service-announcement-editor-subtitle">
-                    Adjunta enlaces externos o documentos en S3 para abrirlos o descargarlos desde el comunicado.
+                    {announcementMode === "tutorial"
+                      ? "Sube el video o PDF del tutorial para que los usuarios puedan verlo desde el aviso."
+                      : "Adjunta enlaces externos o documentos en S3 para abrirlos o descargarlos desde el comunicado."}
                   </div>
                 </div>
+                {announcementMode === "tutorial" ? (
+                  <Text type="secondary">{attachmentFiles.length} archivo(s)</Text>
+                ) : (
                 <Text type="secondary">
                   {watchedLinkAttachments.length} link(s) · {attachmentFiles.length} documento(s)
                 </Text>
+                )}
               </div>
 
+              {announcementMode === "announcement" ? (
               <Form.List name="linkAttachments">
                 {(fields, { add, remove }) => (
                   <div className="service-announcement-link-list">
@@ -607,11 +696,12 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
                   </div>
                 )}
               </Form.List>
+              ) : null}
 
               <input
                 ref={attachmentInputRef}
                 type="file"
-                accept={attachmentAccept}
+                accept={announcementMode === "tutorial" ? tutorialAttachmentAccept : attachmentAccept}
                 multiple
                 style={{ display: "none" }}
                 onChange={(event) => {
@@ -656,10 +746,14 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
                   </div>
                   <div>
                     <div className="service-announcement-upload-zone-title">
-                      Arrastra documentos aqui o haz clic para seleccionarlos
+                      {announcementMode === "tutorial"
+                        ? "Arrastra un video/PDF aqui o haz clic para seleccionarlo"
+                        : "Arrastra documentos aqui o haz clic para seleccionarlos"}
                     </div>
                     <div className="service-announcement-upload-zone-subtitle">
-                      PDF, Word, Excel, PowerPoint, TXT, CSV, imagenes o videos. Maximo {MAX_ATTACHMENT_FILES} archivos de 200 MB.
+                      {announcementMode === "tutorial"
+                        ? `Videos o PDF. Maximo ${MAX_ATTACHMENT_FILES} archivos de 200 MB.`
+                        : `PDF, Word, Excel, PowerPoint, TXT, CSV, imagenes o videos. Maximo ${MAX_ATTACHMENT_FILES} archivos de 200 MB.`}
                     </div>
                   </div>
                 </div>
@@ -714,30 +808,32 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               ) : null}
             </div>
 
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Form.Item name="targetRoles" label="Dirigido a" rules={[{ required: true, message: "Selecciona al menos un rol" }]}>
-                  <Select mode="multiple" options={roleOptions} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item name="requireAcceptance" label="Requiere aceptacion" valuePropName="checked">
-                  <Switch />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={6}>
-                <Form.Item name="sendPush" label="Enviar push" valuePropName="checked">
-                  <Switch />
-                </Form.Item>
-              </Col>
-            </Row>
+            {announcementMode === "announcement" ? (
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="targetRoles" label="Dirigido a" rules={[{ required: true, message: "Selecciona al menos un rol" }]}>
+                    <Select mode="multiple" options={roleOptions} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={6}>
+                  <Form.Item name="requireAcceptance" label="Requiere aceptacion" valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={6}>
+                  <Form.Item name="sendPush" label="Enviar push" valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                </Col>
+              </Row>
+            ) : null}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
               <Button loading={submitting} onClick={() => void handleCreate(false)}>
-                Guardar borrador
+                {announcementMode === "tutorial" ? "Guardar tutorial" : "Guardar borrador"}
               </Button>
               <Button type="primary" loading={submitting} onClick={() => void handleCreate(true)}>
-                Publicar ahora
+                {announcementMode === "tutorial" ? "Publicar tutorial" : "Publicar ahora"}
               </Button>
             </div>
           </Form>
