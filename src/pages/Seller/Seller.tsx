@@ -3,6 +3,7 @@ import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
 import { useState } from "react";
 import { autoRenewSellersAPI } from "../../api/seller";
+import "./SellerTable.css";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -53,16 +54,16 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   };
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+    <div className="seller-page p-4">
+      <div className="seller-page-header flex justify-between items-center mb-4">
+        <div className="seller-page-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/seller-icon.png" alt="Vendedores" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
             {isFactura ? "Vendedores con factura" : "Vendedores"}
           </h1>
         </div>
 
-        <div className="flex gap-2">
+        <div className="seller-page-actions flex gap-2">
           <Button
               onClick={handleAutoRenew}
               loading={autoRenewing}

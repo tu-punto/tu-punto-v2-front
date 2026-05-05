@@ -12,6 +12,7 @@ export interface ISucursalPago {
   exhibicion: number;
   delivery: number;
   entrega_simple: number;
+  activo?: boolean;
   fecha_ingreso: Date | string;
   fecha_salida?: Date | string; 
   comentario?: string; 

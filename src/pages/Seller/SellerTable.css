@@ -1,0 +1,158 @@
+.seller-filters {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 12px;
+}
+
+.seller-filters .ant-input-affix-wrapper {
+  width: 260px;
+}
+
+.seller-filters .ant-select {
+  width: 210px;
+}
+
+.seller-total-title {
+  margin: 0 0 16px;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.seller-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.seller-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 84px;
+}
+
+.seller-mobile-card {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.seller-mobile-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.seller-mobile-card-header strong {
+  min-width: 0;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.seller-mobile-card-header span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.seller-mobile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.seller-mobile-grid span {
+  color: #6b7280;
+}
+
+.seller-mobile-grid strong {
+  color: #111827;
+  font-weight: 600;
+  text-align: right;
+}
+
+.seller-mobile-grid .ant-btn {
+  justify-self: end;
+  height: auto;
+  padding: 0;
+  line-height: 1.2;
+}
+
+.seller-mobile-pagination {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+@media (max-width: 767px) {
+  .seller-page {
+    padding: 12px 10px 92px;
+    overflow-x: hidden;
+  }
+
+  .seller-page-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .seller-page-title {
+    width: 100%;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .seller-page-title h1 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .seller-page-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .seller-page-actions .ant-btn {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding-inline: 8px;
+    white-space: normal;
+    line-height: 1.1;
+  }
+
+  .seller-filters {
+    gap: 8px;
+  }
+
+  .seller-filters .ant-input-affix-wrapper,
+  .seller-filters .ant-select {
+    width: 100%;
+  }
+
+  .seller-total-title {
+    font-size: 19px;
+    margin-bottom: 12px;
+  }
+
+  .seller-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

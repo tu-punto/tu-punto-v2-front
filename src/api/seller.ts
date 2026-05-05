@@ -6,6 +6,8 @@ export const getSellersAPI = async (params?: {
     q?: string;
     status?: "activo" | "debe_renovar" | "ya_no_es_cliente" | "declinando_servicio";
     pendingPayment?: "con_deuda" | "sin_deuda";
+    page?: number;
+    pageSize?: number;
 }) => {
     try {
         const res = await apiClient.get(`/seller`, { params })
