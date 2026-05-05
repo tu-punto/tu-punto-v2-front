@@ -25,6 +25,7 @@ import {
   LinkOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  VideoCameraOutlined,
 } from "@ant-design/icons";
 import ServiciosResumenTable from "./components/ServicesSummaryTable";
 import { getServicesSummaryAPI } from "../../api/services";
@@ -77,7 +78,7 @@ const roleOptions = [
   { label: "Vendedor", value: "seller" },
 ];
 const MAX_ATTACHMENT_FILES = 6;
-const MAX_ATTACHMENT_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_FILE_SIZE = 200 * 1024 * 1024;
 const allowedAttachmentMimeTypes = new Set([
   "application/pdf",
   "application/msword",
@@ -92,9 +93,13 @@ const allowedAttachmentMimeTypes = new Set([
   "image/jpeg",
   "image/jpg",
   "image/webp",
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
 ]);
 const attachmentAccept =
-  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp";
+  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp,.mp4,.webm,.ogg,.mov";
 
 const formatDate = (value?: string | null) => {
   if (!value) return "";
@@ -334,10 +339,10 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       }
 
       if (invalidTypeCount > 0) {
-        message.warning("Solo se permiten PDF, Office, texto, CSV o imagenes.");
+          message.warning("Solo se permiten PDF, Office, texto, CSV, imagenes o videos.");
       }
       if (invalidSizeCount > 0) {
-        message.warning("Cada documento puede pesar hasta 10 MB.");
+          message.warning("Cada archivo puede pesar hasta 200 MB.");
       }
       if (duplicateCount > 0) {
         message.info("Algunos archivos repetidos no se agregaron.");
@@ -654,7 +659,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
                       Arrastra documentos aqui o haz clic para seleccionarlos
                     </div>
                     <div className="service-announcement-upload-zone-subtitle">
-                      PDF, Word, Excel, PowerPoint, TXT, CSV o imagenes. Maximo {MAX_ATTACHMENT_FILES} archivos de 10 MB.
+                      PDF, Word, Excel, PowerPoint, TXT, CSV, imagenes o videos. Maximo {MAX_ATTACHMENT_FILES} archivos de 200 MB.
                     </div>
                   </div>
                 </div>
@@ -677,6 +682,8 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
                           <FileTextOutlined style={{ fontSize: 24 }} />
                         ) : String(item.file.type || "").startsWith("image/") ? (
                           <FileImageOutlined style={{ fontSize: 24 }} />
+                        ) : String(item.file.type || "").startsWith("video/") ? (
+                          <VideoCameraOutlined style={{ fontSize: 24 }} />
                         ) : (
                           <span>{getFileExtension(item.file.name) || "FILE"}</span>
                         )}

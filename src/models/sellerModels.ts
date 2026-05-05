@@ -41,6 +41,12 @@ export interface ISeller {
   fecha_vigencia: Date | string;
   almacen_caja: number;
   emite_factura: boolean;
+  qr_pago_url?: string;
+  qr_pago_key?: string;
+  fecha_solicitud_pago?: Date | string;
+  fecha_pago_asignada?: Date | string;
+  declinacion_servicio_fecha?: Date | string;
+  declinacion_servicio_fecha_limite_retiro?: Date | string;
   deuda: number;
   id_trabajador: number;
 

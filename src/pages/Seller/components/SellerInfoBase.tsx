@@ -4,17 +4,23 @@ import {
   Col,
   DatePicker,
   Form,
+  Alert,
+  Image,
   Input,
   InputNumber,
   message,
+  Modal,
   Row,
   Space,
+  Tag,
+  Upload,
 } from "antd";
 import {
   PlusOutlined,
   PhoneOutlined,
   MailOutlined,
   PercentageOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -35,6 +41,8 @@ import {
   getPaymentProofsBySellerIdAPI,
   getSellerAPI,
   getSellerDebtsAPI,
+  declineSellerServiceAPI,
+  requestSellerPaymentAPI,
   updateSellerAPI,
 } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
@@ -55,6 +63,14 @@ import {
   branchesEnableCommissionService,
   branchesEnableSimplePackageService,
 } from "../../../utils/sellerServiceAccess";
+
+const parseSellerDate = (value: any) => {
+  if (typeof value === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [day, month, year] = value.split("/").map(Number);
+    return dayjs(new Date(year, month - 1, day));
+  }
+  return dayjs(value);
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
@@ -78,6 +94,19 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     deuda: number;
     pago_pendiente: number;
   } | null>(null);
+  const [paymentRequest, setPaymentRequest] = useState({
+    qr_pago_url: seller?.qr_pago_url || "",
+    fecha_solicitud_pago: seller?.fecha_solicitud_pago || null,
+    fecha_pago_asignada: seller?.fecha_pago_asignada || null,
+  });
+  const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
+  const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
+  const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
+  const [declineServiceLoading, setDeclineServiceLoading] = useState(false);
+  const [declineServiceDate, setDeclineServiceDate] = useState(
+    seller?.declinacion_servicio_fecha || null
+  );
+  const [qrFileList, setQrFileList] = useState<any[]>([]);
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
@@ -161,6 +190,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     form.resetFields();
     form.setFieldsValue(values);
     syncServiceFlags(values.sucursales || []);
+    setPaymentRequest({
+      qr_pago_url: seller?.qr_pago_url || "",
+      fecha_solicitud_pago: seller?.fecha_solicitud_pago || null,
+      fecha_pago_asignada: seller?.fecha_pago_asignada || null,
+    });
+    setDeclineServiceDate(seller?.declinacion_servicio_fecha || null);
   }, [form, seller]);
 
 
@@ -320,6 +355,90 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
+  const paymentDateLabel = paymentRequest.fecha_pago_asignada
+    ? dayjs(paymentRequest.fecha_pago_asignada).format("DD/MM/YYYY")
+    : "";
+  const hasPendingPaymentRequest = Boolean(paymentRequest.fecha_pago_asignada);
+  const selectedQrFile = qrFileList?.[0]?.originFileObj;
+  const serviceEndDate = parseSellerDate(seller?.fecha_vigencia);
+  const serviceDeclineDeadline = serviceEndDate.isValid()
+    ? serviceEndDate.subtract(5, "day").endOf("day")
+    : null;
+  const serviceStockPickupDeadline = serviceEndDate.isValid()
+    ? serviceEndDate.add(5, "day")
+    : null;
+  const canDeclineService =
+    isSeller &&
+    serviceEndDate.isValid() &&
+    !declineServiceDate &&
+    (!serviceDeclineDeadline || !dayjs().isAfter(serviceDeclineDeadline));
+  const serviceDeclineDisabledReason = declineServiceDate
+    ? "Ya informaste que declinaras el servicio."
+    : serviceDeclineDeadline
+    ? `Disponible hasta el ${serviceDeclineDeadline.format("DD/MM/YYYY")}.`
+    : "Fecha de vigencia no valida.";
+
+  const handleRequestPayment = async () => {
+    if (!seller?.key) return;
+    if (!selectedQrFile && !paymentRequest.qr_pago_url) {
+      message.warning("Carga tu QR para solicitar el cobro.");
+      return;
+    }
+
+    const payload = new FormData();
+    if (selectedQrFile) {
+      payload.append("qr_pago", selectedQrFile);
+    }
+
+    setPaymentRequestLoading(true);
+    try {
+      const res = await requestSellerPaymentAPI(String(seller.key), payload);
+      if (!res?.success) throw new Error("No se pudo registrar la solicitud");
+
+      const updatedSeller = res.data?.seller || {};
+      setPaymentRequest({
+        qr_pago_url: updatedSeller.qr_pago_url || paymentRequest.qr_pago_url,
+        fecha_solicitud_pago: updatedSeller.fecha_solicitud_pago || new Date().toISOString(),
+        fecha_pago_asignada: updatedSeller.fecha_pago_asignada || res.data?.fecha_pago_asignada,
+      });
+      setQrFileList([]);
+      setPaymentRequestModalOpen(false);
+
+      const assignedDate = dayjs(
+        updatedSeller.fecha_pago_asignada || res.data?.fecha_pago_asignada
+      ).format("DD/MM/YYYY");
+      message.success(`Solicitud registrada. Tu pago fue asignado para el ${assignedDate}.`);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo solicitar el cobro.");
+    } finally {
+      setPaymentRequestLoading(false);
+    }
+  };
+
+  const handleDeclineService = async () => {
+    if (!seller?.key) return;
+
+    setDeclineServiceLoading(true);
+    try {
+      const res = await declineSellerServiceAPI(String(seller.key));
+      if (!res?.success) throw new Error("No se pudo registrar la declinacion");
+
+      const updatedSeller = res.data?.seller || {};
+      setDeclineServiceDate(
+        updatedSeller.declinacion_servicio_fecha || new Date().toISOString()
+      );
+      setDeclineServiceModalOpen(false);
+      message.success("Declinacion del servicio registrada");
+      onSuccess();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo declinar el servicio.");
+    } finally {
+      setDeclineServiceLoading(false);
+    }
+  };
+
   /* ─────────── submit final ─────────── */
   const handleFinish = async (formValues: any) => {
     setLoading(true);
@@ -400,6 +519,121 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
         saldoPendiente={saldoAcumuladoValue}
         ultimaFechaPago={ultimaFechaPagoLabel}
       />
+
+      {isSeller && (
+        <div className="mb-5 flex flex-col items-center gap-3">
+          {hasPendingPaymentRequest && (
+            <Alert
+              type="info"
+              showIcon
+              message={`Tu pago esta pendiente y fue asignado para el ${paymentDateLabel}.`}
+              style={{ width: "100%", maxWidth: 620 }}
+            />
+          )}
+          <Button
+            type="primary"
+            size="large"
+            disabled={hasPendingPaymentRequest}
+            onClick={() => setPaymentRequestModalOpen(true)}
+          >
+            Solicitar cobro
+          </Button>
+          {declineServiceDate ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="Informaste que declinaras el servicio."
+              description={
+                serviceStockPickupDeadline?.isValid()
+                  ? `Recoge tu stock y pedidos hasta el ${serviceStockPickupDeadline.format("DD/MM/YYYY")}.`
+                  : undefined
+              }
+              style={{ width: "100%", maxWidth: 620 }}
+            />
+          ) : (
+            <Button
+              danger
+              size="large"
+              disabled={!canDeclineService}
+              onClick={() => setDeclineServiceModalOpen(true)}
+            >
+              Declinar servicio
+            </Button>
+          )}
+          {!canDeclineService && !declineServiceDate ? (
+            <Tag color="default">{serviceDeclineDisabledReason}</Tag>
+          ) : null}
+        </div>
+      )}
+
+      <Modal
+        title="Solicitar cobro"
+        open={paymentRequestModalOpen}
+        onCancel={() => {
+          setPaymentRequestModalOpen(false);
+          setQrFileList([]);
+        }}
+        onOk={handleRequestPayment}
+        okText="Enviar solicitud"
+        cancelText="Cancelar"
+        confirmLoading={paymentRequestLoading}
+      >
+        <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+          <Alert
+            type="warning"
+            showIcon
+            message="El QR debe tener una vigencia de al menos 6 meses y en la descripcion del QR debe figurar tu nombre."
+          />
+
+          {paymentRequest.qr_pago_url && (
+            <div>
+              <div className="mb-2 font-medium">QR cargado actualmente</div>
+              <Image
+                src={paymentRequest.qr_pago_url}
+                alt="QR de pago del vendedor"
+                width={220}
+                style={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
+              />
+            </div>
+          )}
+
+          <Upload
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            beforeUpload={() => false}
+            maxCount={1}
+            fileList={qrFileList}
+            onChange={({ fileList }) => setQrFileList(fileList)}
+          >
+            <Button icon={<UploadOutlined />}>
+              {paymentRequest.qr_pago_url ? "Reemplazar QR" : "Cargar QR"}
+            </Button>
+          </Upload>
+
+          {paymentRequest.qr_pago_url && (
+            <Tag color="blue">Puedes enviar la solicitud con el QR guardado si sigue vigente.</Tag>
+          )}
+        </Space>
+      </Modal>
+
+      <Modal
+        title="Declinar el servicio"
+        open={declineServiceModalOpen}
+        onCancel={() => setDeclineServiceModalOpen(false)}
+        onOk={handleDeclineService}
+        okText="Declinar el servicio"
+        okButtonProps={{ danger: true }}
+        cancelText="Cancelar"
+        confirmLoading={declineServiceLoading}
+      >
+        <p>
+          Esta seguro que desea abandonar el servicio? Se notificara a los encargados que a partir del{" "}
+          {serviceEndDate.isValid() ? serviceEndDate.format("DD/MM/YYYY") : "[fecha de vigencia]"} ya no usara el servicio para que no se proceda con la renovacion del mismo. Esto implica que hasta el{" "}
+          {serviceStockPickupDeadline?.isValid()
+            ? serviceStockPickupDeadline.format("DD/MM/YYYY")
+            : "[fecha de vigencia + 5 dias]"}{" "}
+          debe recoger su stock y sus pedidos del punto de entrega.
+        </p>
+      </Modal>
 
       <Form
         form={form}

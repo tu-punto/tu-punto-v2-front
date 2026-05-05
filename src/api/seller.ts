@@ -1,10 +1,10 @@
 import { AxiosError } from "axios"
-import { apiClient } from "./apiClient"
+import { apiClient, apiClientNoJSON } from "./apiClient"
 import { parseError } from "./util"
 
 export const getSellersAPI = async (params?: {
     q?: string;
-    status?: "activo" | "debe_renovar" | "ya_no_es_cliente";
+    status?: "activo" | "debe_renovar" | "ya_no_es_cliente" | "declinando_servicio";
     pendingPayment?: "con_deuda" | "sin_deuda";
 }) => {
     try {
@@ -57,6 +57,24 @@ export const paySellerDebtAPI = async (sellerId: string,
     payload: { payAll: boolean }) => {
     try {
         const res = await apiClient.post(`/seller/${sellerId}/pay`, payload, {responseType: 'blob'});
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const requestSellerPaymentAPI = async (sellerId: string, payload: FormData) => {
+    try {
+        const res = await apiClientNoJSON.post(`/seller/${sellerId}/payment-request`, payload)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const declineSellerServiceAPI = async (sellerId: string) => {
+    try {
+        const res = await apiClient.post(`/seller/${sellerId}/decline-service`)
         return { success: true, data: res.data }
     } catch (error) {
         parseError(error as AxiosError)

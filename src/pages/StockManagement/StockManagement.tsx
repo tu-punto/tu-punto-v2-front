@@ -6,7 +6,7 @@ import ProductTable from './ProductTable';
 import MoveProductsModal from './MoveProductsModal';
 import { getFlatProductListAPI, getSellerInventoryAllAPI, getProductsAPI } from '../../api/product';
 import { Button, Input, Select, Spin } from 'antd';
-import { InfoCircleOutlined, PlusOutlined, QrcodeOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { ExportOutlined, InfoCircleOutlined, PlusOutlined, QrcodeOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 //import ProductInfoModal from '../Product/ProductInfoModal';
 import ProductFormModal from '../Product/ProductFormModal';
 import AddVariantModal from '../Product/AddVariantModal';
@@ -21,6 +21,8 @@ import ProductTableSeller from "./ProductTableSeller.tsx";
 import VariantQRBatchModal from "./VariantQRBatchModal.tsx";
 import InventoryQRModal from "./InventoryQRModal.tsx";
 import StockQRInfoModal from "./StockQRInfoModal.tsx";
+import SellerWithdrawalRequestModal from "./SellerWithdrawalRequestModal.tsx";
+import StockWithdrawalRequestsPanel from "./StockWithdrawalRequestsPanel.tsx";
 //test
 const SELLERS_PAGE_SIZE = 10;
 
@@ -48,6 +50,9 @@ const StockManagement = () => {
     const [qrModalAutoGenerate, setQrModalAutoGenerate] = useState(false);
     const [isInventoryQRModalVisible, setIsInventoryQRModalVisible] = useState(false);
     const [isStockQRInfoModalVisible, setIsStockQRInfoModalVisible] = useState(false);
+    const [isWithdrawalRequestModalVisible, setIsWithdrawalRequestModalVisible] = useState(false);
+    const [isWithdrawalRequestsListVisible, setIsWithdrawalRequestsListVisible] = useState(false);
+    const [pendingWithdrawalCount, setPendingWithdrawalCount] = useState(0);
 
     const [products, setProducts] = useState<any[]>([]);
     const [sellers, setSellers] = useState<any[]>([]);
@@ -503,6 +508,16 @@ const StockManagement = () => {
             )}
 
             {!isSeller && (
+                <StockWithdrawalRequestsPanel
+                    branchId={effectiveBranchId || undefined}
+                    open={isWithdrawalRequestsListVisible}
+                    onClose={() => setIsWithdrawalRequestsListVisible(false)}
+                    onApproved={() => fetchInventoryPage(true)}
+                    onCountChange={setPendingWithdrawalCount}
+                />
+            )}
+
+            {!isSeller && (
                 <div
                     className="bg-white rounded-xl px-4 py-4 shadow-md mb-4"
                     style={{ border: "1px solid #f1ece4" }}
@@ -536,19 +551,23 @@ const StockManagement = () => {
                             >
                                 {selectedSeller ? "Vendedor seleccionado" : "Selecciona vendedor para editar stock"}
                             </div>
-                            <div
+                            <Button
+                                size="small"
+                                disabled={pendingWithdrawalCount === 0}
+                                onClick={() => setIsWithdrawalRequestsListVisible(true)}
                                 style={{
-                                    padding: "4px 10px",
                                     borderRadius: 999,
-                                    background: qrToolsDisabled ? "#fafafa" : "#f6ffed",
-                                    color: qrToolsDisabled ? "#8c8c8c" : "#237804",
+                                    height: 28,
+                                    padding: "0 12px",
+                                    background: pendingWithdrawalCount > 0 ? "#fff7e6" : "#fafafa",
+                                    color: pendingWithdrawalCount > 0 ? "#ad4e00" : "#8c8c8c",
                                     fontSize: 12,
-                                    fontWeight: 600,
-                                    border: qrToolsDisabled ? "1px solid #e8e8e8" : "1px solid #b7eb8f"
+                                    fontWeight: 700,
+                                    borderColor: pendingWithdrawalCount > 0 ? "#ffbb96" : "#e8e8e8"
                                 }}
                             >
-                                {qrToolsDisabled ? "Selecciona contexto para usar QR" : "QR listo para esta sucursal"}
-                            </div>
+                                Solicitudes de salida: {pendingWithdrawalCount}
+                            </Button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                         <div>
@@ -711,19 +730,31 @@ const StockManagement = () => {
                 )*/}
             </Row>
             {isSeller ? (
-                <ProductTableSeller
-                    productsList={isLoadingInventory ? [] : finalProductList}
-                    loading={isLoadingInventory}
-                    onUpdateProducts={() => fetchInventoryPage(true)}
-                    sucursalId={sucursalId}
-                    setSucursalId={setSucursalId}
-                    branches={sellerSucursales}
-                    categories={categories}
-                    searchText={searchText}
-                    setSearchText={setSearchText}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                />
+                <>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                        <Button
+                            type="primary"
+                            icon={<ExportOutlined />}
+                            disabled={!effectiveBranchId}
+                            onClick={() => setIsWithdrawalRequestModalVisible(true)}
+                        >
+                            Solicitar salida de productos
+                        </Button>
+                    </div>
+                    <ProductTableSeller
+                        productsList={isLoadingInventory ? [] : finalProductList}
+                        loading={isLoadingInventory}
+                        onUpdateProducts={() => fetchInventoryPage(true)}
+                        sucursalId={sucursalId}
+                        setSucursalId={setSucursalId}
+                        branches={sellerSucursales}
+                        categories={categories}
+                        searchText={searchText}
+                        setSearchText={setSearchText}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                    />
+                </>
             ) : (
                 <ProductTable
                     productsList={finalProductList}
@@ -852,6 +883,14 @@ const StockManagement = () => {
                 selectedSellerId={selectedSeller ? String(selectedSeller) : undefined}
                 initialProductIds={qrModalProductIds}
                 autoGenerateOnOpen={qrModalAutoGenerate}
+            />
+            <SellerWithdrawalRequestModal
+                visible={isWithdrawalRequestModalVisible}
+                onClose={() => setIsWithdrawalRequestModalVisible(false)}
+                onCreated={() => fetchInventoryPage(true)}
+                products={finalProductList}
+                branches={sellerSucursales}
+                defaultBranchId={effectiveBranchId || undefined}
             />
         </div>
 
