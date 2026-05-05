@@ -8,6 +8,12 @@ const getVariantLabel = (variantes: Record<string, string> = {}) =>
         .filter(Boolean)
         .join(' / ');
 
+const getBranchId = (branch: any) => String(branch?.id_sucursal?._id || branch?.id_sucursal?.$oid || branch?.id_sucursal || '');
+
+const buildCombinationKey = (productId: string, combination: any, index: number) =>
+    combination?.variantKey ||
+    `${productId}-${getVariantLabel(combination?.variantes || {}) || index}`;
+
 const ProductPriceMatrixModal = ({
     visible,
     onClose,
@@ -33,19 +39,31 @@ const ProductPriceMatrixModal = ({
         }
 
         const sucursalId = localStorage.getItem('sucursalId') || '';
-        const currentBranch =
-            producto?.sucursales?.find(
-                (branch: any) =>
-                    String(branch.id_sucursal?.$oid || branch.id_sucursal) === String(sucursalId)
-            ) || producto?.sucursales?.find((branch: any) => (branch?.combinaciones || []).length > 0);
+        const productId = String(producto?._id?.$oid || producto?._id || '');
+        const branches = Array.isArray(producto?.sucursales) ? producto.sucursales : [];
+        const currentBranch = branches.find((branch: any) => getBranchId(branch) === String(sucursalId));
+        const orderedBranches = [
+            ...(currentBranch ? [currentBranch] : []),
+            ...branches.filter((branch: any) => branch !== currentBranch)
+        ];
+        const rowMap = new Map<string, any>();
 
-        const nextRows = (currentBranch?.combinaciones || []).map((combination: any, index: number) => ({
-            key: combination.variantKey || `${getVariantLabel(combination.variantes)}-${index}`,
-            variantKey: combination.variantKey,
-            variantes: combination.variantes || {},
-            label: getVariantLabel(combination.variantes || {}) || `Variante ${index + 1}`,
-            precio: Number(combination.precio || 0)
-        }));
+        orderedBranches.forEach((branch: any) => {
+            (branch?.combinaciones || []).forEach((combination: any, index: number) => {
+                const key = buildCombinationKey(productId, combination, index);
+                if (rowMap.has(key)) return;
+
+                rowMap.set(key, {
+                    key,
+                    variantKey: combination.variantKey,
+                    variantes: combination.variantes || {},
+                    label: getVariantLabel(combination.variantes || {}) || `Variante ${rowMap.size + 1}`,
+                    precio: Number(combination.precio || 0)
+                });
+            });
+        });
+
+        const nextRows = Array.from(rowMap.values());
 
         setRows(nextRows);
         setBulkPrice(null);

@@ -72,6 +72,16 @@ const parseSellerDate = (value: any) => {
   return dayjs(value);
 };
 
+const parsePaymentDate = (value: any) => {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return dayjs(value.slice(0, 10));
+  }
+  return parseSellerDate(value);
+};
+
+const formatPaymentDate = (value: any) =>
+  value ? parsePaymentDate(value).format("DD/MM/YYYY") : "";
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [form] = Form.useForm();
@@ -355,9 +365,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
-  const paymentDateLabel = paymentRequest.fecha_pago_asignada
-    ? dayjs(paymentRequest.fecha_pago_asignada).format("DD/MM/YYYY")
-    : "";
+  const paymentDateLabel = formatPaymentDate(paymentRequest.fecha_pago_asignada);
   const hasPendingPaymentRequest = Boolean(paymentRequest.fecha_pago_asignada);
   const selectedQrFile = qrFileList?.[0]?.originFileObj;
   const serviceEndDate = parseSellerDate(seller?.fecha_vigencia);
@@ -404,9 +412,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       setQrFileList([]);
       setPaymentRequestModalOpen(false);
 
-      const assignedDate = dayjs(
+      const assignedDate = formatPaymentDate(
         updatedSeller.fecha_pago_asignada || res.data?.fecha_pago_asignada
-      ).format("DD/MM/YYYY");
+      );
       message.success(`Solicitud registrada. Tu pago fue asignado para el ${assignedDate}.`);
     } catch (error) {
       console.error(error);

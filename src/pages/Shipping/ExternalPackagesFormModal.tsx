@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AutoComplete, Button, Form, Input, InputNumber, Modal, Select, message } from "antd";
+import { AutoComplete, Button, Form, Input, InputNumber, Modal, Select, Space, message } from "antd";
 import {
   ExternalContactSuggestion,
   getExternalContactSuggestionsAPI,
@@ -217,6 +217,62 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         destino_sucursal_id: watchedDestinationBranchId,
         precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, watchedDestinationBranchId),
       }))
+    );
+  };
+
+  const applyDescriptionToAll = () => {
+    const description = String(form.getFieldValue("bulk_descripcion_paquete") || "").trim();
+    if (!description) {
+      message.warning("Ingresa una descripcion para aplicarla");
+      return;
+    }
+
+    const currentRows = form.getFieldValue("paquetes") || [];
+    form.setFieldValue(
+      "paquetes",
+      buildPackages(packageCount, currentRows).map((row) => ({
+        ...row,
+        descripcion_paquete: description,
+      }))
+    );
+  };
+
+  const applyPackagePriceToAll = () => {
+    const price = roundCurrency(Number(form.getFieldValue("bulk_precio_paquete") || 0));
+    if (price <= 0) {
+      message.warning("Ingresa un precio de paquete mayor a 0");
+      return;
+    }
+
+    const currentRows = form.getFieldValue("paquetes") || [];
+    form.setFieldValue(
+      "paquetes",
+      buildPackages(packageCount, currentRows).map((row) => {
+        const mode = row.esta_pagado || "no";
+        if (mode === "si") {
+          return {
+            ...row,
+            precio_paquete: price,
+            monto_paga_vendedor: price,
+            monto_paga_comprador: 0,
+          };
+        }
+        if (mode === "mixto") {
+          const half = roundCurrency(price / 2);
+          return {
+            ...row,
+            precio_paquete: price,
+            monto_paga_vendedor: half,
+            monto_paga_comprador: roundCurrency(price - half),
+          };
+        }
+        return {
+          ...row,
+          precio_paquete: price,
+          monto_paga_vendedor: 0,
+          monto_paga_comprador: 0,
+        };
+      })
     );
   };
 
@@ -491,15 +547,16 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       message.error("No se pudo identificar la sucursal actual para registrar la entrega externa");
       return;
     }
-    if (!values.origen_sucursal_id) {
-      message.error("Selecciona la sucursal donde el vendedor dejara el producto");
+    const originBranchId = currentSucursal._id;
+    if (!originBranchId) {
+      message.error("No se pudo identificar la sucursal origen");
       return;
     }
 
     const paquetes = (values.paquetes || []).slice(0, packageCount).map((row: any, index: number) => {
       const price = roundCurrency(Number(row.precio_paquete || 0));
       const branchRoutePrice = roundCurrency(
-        getBranchRoutePrice(values.origen_sucursal_id, row.destino_sucursal_id)
+        getBranchRoutePrice(originBranchId, row.destino_sucursal_id)
       );
       const paidStatus = row.esta_pagado || "no";
       let sellerAmount = roundCurrency(Number(row.monto_paga_vendedor || 0));
@@ -570,8 +627,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       carnet_vendedor: values.carnet_vendedor,
       vendedor: values.vendedor,
       telefono_vendedor: values.telefono_vendedor,
-      id_sucursal: values.origen_sucursal_id,
-      origen_sucursal_id: values.origen_sucursal_id,
+      id_sucursal: originBranchId,
+      origen_sucursal_id: originBranchId,
       lugar_entrega:
         destinationOptions.find((option) => String(option.value) === String(values.destino_sucursal_id))?.label ||
         currentSucursal?.nombre ||
@@ -737,6 +794,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
               placeholder="Origen"
               showSearch
               optionFilterProp="label"
+              disabled
             />
           </Form.Item>
           <Form.Item
@@ -760,6 +818,21 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             Usar destino en todos
           </Button>
         </div>
+
+        <Space wrap size={[8, 8]} style={{ marginBottom: 12 }}>
+          <Form.Item name="bulk_descripcion_paquete" style={{ marginBottom: 0 }}>
+            <Input placeholder="Descripcion para todos" style={{ width: 240 }} />
+          </Form.Item>
+          <Button onClick={applyDescriptionToAll}>
+            Usar descripcion en todos
+          </Button>
+          <Form.Item name="bulk_precio_paquete" style={{ marginBottom: 0 }}>
+            <InputNumber prefix="Bs." min={0} placeholder="Precio paquete" style={{ width: 180 }} />
+          </Form.Item>
+          <Button onClick={applyPackagePriceToAll}>
+            Usar precio en todos
+          </Button>
+        </Space>
 
         <div style={{ overflowX: "auto", marginTop: 8 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>

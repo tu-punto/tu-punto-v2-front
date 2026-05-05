@@ -27,6 +27,16 @@ const parseSellerDate = (value: any) => {
   return dayjs(value);
 };
 
+const parsePaymentDate = (value: any) => {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return dayjs(value.slice(0, 10));
+  }
+  return parseSellerDate(value);
+};
+
+const formatPaymentDate = (value: any) =>
+  value ? parsePaymentDate(value).format("DD/MM/YYYY") : "";
+
 export default function SellerTable({
   refreshKey,
   setRefreshKey,
@@ -143,12 +153,12 @@ export default function SellerTable({
       ],
       onFilter: (value: any, row: SellerRow) => {
         if (value === "sin_solicitud") return !row.fecha_pago_asignada;
-        const date = dayjs(row.fecha_pago_asignada);
+        const date = parsePaymentDate(row.fecha_pago_asignada);
         return date.isValid() && String(date.date()) === String(value);
       },
       sorter: (a: any, b: any) => {
-        const dateA = a.fecha_pago_asignada ? dayjs(a.fecha_pago_asignada).unix() : 0;
-        const dateB = b.fecha_pago_asignada ? dayjs(b.fecha_pago_asignada).unix() : 0;
+        const dateA = a.fecha_pago_asignada ? parsePaymentDate(a.fecha_pago_asignada).unix() : 0;
+        const dateB = b.fecha_pago_asignada ? parsePaymentDate(b.fecha_pago_asignada).unix() : 0;
         return dateA - dateB;
       },
     },
@@ -280,9 +290,7 @@ export default function SellerTable({
               nombre: `${seller.nombre} ${seller.apellido || ""}`.trim(),
               fecha_vigencia: dayjs(seller.fecha_vigencia).format("DD/MM/YYYY"),
               fecha: dayjs(seller.fecha).format("DD/MM/YYYY"),
-              fecha_pago_asignada_label: seller.fecha_pago_asignada
-                ? dayjs(seller.fecha_pago_asignada).format("DD/MM/YYYY")
-                : "",
+              fecha_pago_asignada_label: formatPaymentDate(seller.fecha_pago_asignada),
               deuda: deuda,
               pagoTotal: `Bs. ${Number.isFinite(pagoPendiente) ? pagoPendiente.toFixed(2) : "0.00"}`,
               pagoTotalInt: Number.isFinite(pagoPendiente) ? pagoPendiente : 0,
