@@ -2,7 +2,7 @@ import { Button, Input, InputNumber, Modal, Space, Table, Typography, message } 
 import { useEffect, useMemo, useState } from 'react';
 import { updateProductPriceAPI } from '../../api/product';
 
-const PRICE_MATRIX_PAGE_SIZE = 50;
+const PRICE_MATRIX_PAGE_SIZE = 25;
 
 const getVariantLabel = (variantes: Record<string, string> = {}) =>
     Object.values(variantes || {})
@@ -12,9 +12,19 @@ const getVariantLabel = (variantes: Record<string, string> = {}) =>
 
 const getBranchId = (branch: any) => String(branch?.id_sucursal?._id || branch?.id_sucursal?.$oid || branch?.id_sucursal || '');
 
-const buildCombinationKey = (productId: string, combination: any, index: number) =>
-    combination?.variantKey ||
-    `${productId}-${getVariantLabel(combination?.variantes || {}) || index}`;
+const normalizeVariants = (variantes: Record<string, any> = {}) =>
+    Object.entries(variantes || {})
+        .filter(([, value]) => String(value || '').trim())
+        .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+        .reduce((acc, [key, value]) => ({ ...acc, [key]: String(value || '').trim() }), {});
+
+const buildCombinationKey = (productId: string, combination: any, index: number) => {
+    const variantKey = String(combination?.variantKey || '').trim();
+    const normalizedVariants = normalizeVariants(combination?.variantes || {});
+    const variantHash = Object.keys(normalizedVariants).length ? JSON.stringify(normalizedVariants) : '';
+
+    return `${productId}-${variantKey || 'sin-variant-key'}-${variantHash || index}`;
+};
 
 const ProductPriceMatrixModal = ({
     visible,
@@ -31,24 +41,43 @@ const ProductPriceMatrixModal = ({
     const [bulkPrice, setBulkPrice] = useState<number | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [saving, setSaving] = useState(false);
+    const [pageSize, setPageSize] = useState(PRICE_MATRIX_PAGE_SIZE);
 
     useEffect(() => {
         if (!visible) {
             setRows([]);
             setBulkPrice(null);
             setSearchTerm('');
+            setPageSize(PRICE_MATRIX_PAGE_SIZE);
             return;
         }
 
         const sucursalId = localStorage.getItem('sucursalId') || '';
         const productId = String(producto?._id?.$oid || producto?._id || '');
         const branches = Array.isArray(producto?.sucursales) ? producto.sucursales : [];
+        const tableVariants = Array.isArray(producto?.tableVariants) ? producto.tableVariants : [];
         const currentBranch = branches.find((branch: any) => getBranchId(branch) === String(sucursalId));
         const orderedBranches = [
             ...(currentBranch ? [currentBranch] : []),
             ...branches.filter((branch: any) => branch !== currentBranch)
         ];
         const rowMap = new Map<string, any>();
+
+        tableVariants.forEach((variantRow: any, index: number) => {
+            const variantes = variantRow?.variantes_obj || variantRow?.variantes || {};
+            const key = buildCombinationKey(productId, {
+                variantKey: variantRow?.variantKey,
+                variantes
+            }, index);
+
+            rowMap.set(key, {
+                key,
+                variantKey: variantRow?.variantKey,
+                variantes,
+                label: variantRow?.variant || getVariantLabel(variantes) || `Variante ${rowMap.size + 1}`,
+                precio: Number(variantRow?.precio || 0)
+            });
+        });
 
         orderedBranches.forEach((branch: any) => {
             (branch?.combinaciones || []).forEach((combination: any, index: number) => {
@@ -70,6 +99,7 @@ const ProductPriceMatrixModal = ({
         setRows(nextRows);
         setBulkPrice(null);
         setSearchTerm('');
+        setPageSize(PRICE_MATRIX_PAGE_SIZE);
     }, [visible, producto]);
 
     const hasRows = rows.length > 0;
@@ -215,9 +245,11 @@ const ProductPriceMatrixModal = ({
                     pagination={
                         shouldPaginate
                             ? {
+                                pageSize,
                                 defaultPageSize: PRICE_MATRIX_PAGE_SIZE,
                                 pageSizeOptions: ['25', '50', '100'],
                                 showSizeChanger: true,
+                                onChange: (_page, nextPageSize) => setPageSize(nextPageSize),
                                 showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} variantes`
                             }
                             : false

@@ -215,7 +215,10 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             return message.error("No se pudo obtener el producto completo");
         }
 
-        setSelectedProductForPriceMatrix(product);
+        setSelectedProductForPriceMatrix({
+            ...product,
+            tableVariants: Array.isArray(record?.children) ? record.children : []
+        });
         setPriceMatrixModalOpen(true);
     };
 
