@@ -20,12 +20,14 @@ import {
 } from "antd";
 import {
   CloseOutlined,
+  DownOutlined,
   FileImageOutlined,
   FilePdfOutlined,
   FileTextOutlined,
   LinkOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  UpOutlined,
   VideoCameraOutlined,
 } from "@ant-design/icons";
 import ServiciosResumenTable from "./components/ServicesSummaryTable";
@@ -147,6 +149,12 @@ const AudienceTags = ({ roles }: { roles?: string[] }) => (
   </Space>
 );
 
+const isTutorialAnnouncement = (announcement: Pick<Announcement, "version">) =>
+  String(announcement.version || "").startsWith("tutorial-");
+
+const filterByAnnouncementType = (items: Announcement[], type: "announcement" | "tutorial") =>
+  items.filter((item) => (type === "tutorial" ? isTutorialAnnouncement(item) : !isTutorialAnnouncement(item)));
+
 const ServiceAnnouncementCard = ({
   announcement,
   showAdminActions = false,
@@ -163,6 +171,9 @@ const ServiceAnnouncementCard = ({
   busyId?: string | null;
 }) => {
   const isBusy = busyId === announcement._id;
+  const isTutorial = isTutorialAnnouncement(announcement);
+  const [expanded, setExpanded] = useState(!isTutorial);
+  const tutorialText = announcement.summary || announcement.body;
 
   return (
     <Card
@@ -182,7 +193,7 @@ const ServiceAnnouncementCard = ({
             <div style={{ marginTop: 6 }}>
               <Space wrap>
                 <Tag color="blue">
-                  {String(announcement.version || "").startsWith("tutorial-") ? "Tutorial" : `Version ${announcement.version}`}
+                  {isTutorial ? "Tutorial" : `Version ${announcement.version}`}
                 </Tag>
                 <Tag color={announcement.status === "published" ? "green" : "default"}>
                   {announcement.status === "published" ? "Publicado" : "Borrador"}
@@ -204,33 +215,53 @@ const ServiceAnnouncementCard = ({
           </div>
         </div>
 
-        {announcement.summary ? (
-          <Paragraph style={{ marginBottom: 0 }}>{announcement.summary}</Paragraph>
-        ) : null}
+        {expanded ? (
+          <div className={isTutorial ? "service-tutorial-expanded-content" : undefined}>
+            {isTutorial ? (
+              tutorialText ? (
+                <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>{tutorialText}</Paragraph>
+              ) : null
+            ) : (
+              <>
+                {announcement.summary ? (
+                  <Paragraph style={{ marginBottom: 0 }}>{announcement.summary}</Paragraph>
+                ) : null}
 
-        <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>{announcement.body}</Paragraph>
+                <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>{announcement.body}</Paragraph>
 
-        {announcement.regulation ? (
-          <div>
-            <Text strong>Reglamento</Text>
-            <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>
-              {announcement.regulation}
-            </Paragraph>
+                {announcement.regulation ? (
+                  <div>
+                    <Text strong>Reglamento</Text>
+                    <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>
+                      {announcement.regulation}
+                    </Paragraph>
+                  </div>
+                ) : null}
+
+                {announcement.policyText ? (
+                  <div>
+                    <Text strong>Politicas</Text>
+                    <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>
+                      {announcement.policyText}
+                    </Paragraph>
+                  </div>
+                ) : null}
+              </>
+            )}
+
+            <AnnouncementAttachments attachments={announcement.attachments} />
           </div>
         ) : null}
-
-        {announcement.policyText ? (
-          <div>
-            <Text strong>Politicas</Text>
-            <Paragraph style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>
-              {announcement.policyText}
-            </Paragraph>
-          </div>
-        ) : null}
-
-        <AnnouncementAttachments attachments={announcement.attachments} />
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+          {isTutorial ? (
+            <Button
+              icon={expanded ? <UpOutlined /> : <DownOutlined />}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? "Ocultar" : "Ver"}
+            </Button>
+          ) : null}
           {showAdminActions && announcement.status !== "published" ? (
             <Button loading={isBusy} onClick={() => onPublish && void onPublish(announcement._id)}>
               Publicar
@@ -270,6 +301,8 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const [attachmentFiles, setAttachmentFiles] = useState<PendingAttachmentFile[]>([]);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
   const [announcementMode, setAnnouncementMode] = useState<"announcement" | "tutorial">("announcement");
+  const [adminListMode, setAdminListMode] = useState<"announcement" | "tutorial">("announcement");
+  const [myListMode, setMyListMode] = useState<"announcement" | "tutorial">("announcement");
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentFilesRef = useRef<PendingAttachmentFile[]>([]);
   const watchedLinkAttachments = Form.useWatch("linkAttachments", form) || [];
@@ -277,6 +310,14 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const pendingCount = useMemo(
     () => announcements.filter((item) => item.pendingRead || item.pendingAcceptance).length,
     [announcements]
+  );
+  const filteredAdminAnnouncements = useMemo(
+    () => filterByAnnouncementType(adminAnnouncements, adminListMode),
+    [adminAnnouncements, adminListMode]
+  );
+  const filteredMyAnnouncements = useMemo(
+    () => filterByAnnouncementType(announcements, myListMode),
+    [announcements, myListMode]
   );
   const pageTitle = isSeller ? "COMUNICADOS DEL SERVICIO" : "PANEL DE CONTROL DE SERVICIOS";
   const pageSubtitle = isSeller
@@ -446,7 +487,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
         body: isTutorial ? String(values.body || values.title || "") : values.body,
         regulation: isTutorial ? "" : values.regulation,
         policyText: isTutorial ? "" : values.policyText,
-        targetRoles: isTutorial ? ["seller"] : values.targetRoles,
+        targetRoles: values.targetRoles,
         requireAcceptance: isTutorial ? false : values.requireAcceptance,
         sendPush: isTutorial ? true : values.sendPush,
         linkAttachments: Array.isArray(values.linkAttachments)
@@ -808,25 +849,25 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               ) : null}
             </div>
 
-            {announcementMode === "announcement" ? (
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item name="targetRoles" label="Dirigido a" rules={[{ required: true, message: "Selecciona al menos un rol" }]}>
-                    <Select mode="multiple" options={roleOptions} />
-                  </Form.Item>
-                </Col>
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item name="targetRoles" label="Dirigido a" rules={[{ required: true, message: "Selecciona al menos un rol" }]}>
+                  <Select mode="multiple" options={roleOptions} />
+                </Form.Item>
+              </Col>
+              {announcementMode === "announcement" ? (
                 <Col xs={24} md={6}>
                   <Form.Item name="requireAcceptance" label="Requiere aceptacion" valuePropName="checked">
                     <Switch />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={6}>
-                  <Form.Item name="sendPush" label="Enviar push" valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-            ) : null}
+              ) : null}
+              <Col xs={24} md={announcementMode === "announcement" ? 6 : 12}>
+                <Form.Item name="sendPush" label="Enviar push" valuePropName="checked">
+                  <Switch />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
               <Button loading={submitting} onClick={() => void handleCreate(false)}>
@@ -855,15 +896,30 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       ) : null}
 
       {isAdmin ? (
-        <Card title="Comunicados creados" style={{ borderRadius: 14 }}>
+        <Card
+          title={
+            <div className="service-announcement-section-title">
+              <span>Creados</span>
+              <Segmented
+                value={adminListMode}
+                options={[
+                  { label: "Comunicados", value: "announcement" },
+                  { label: "Tutoriales", value: "tutorial" },
+                ]}
+                onChange={(value) => setAdminListMode(value as "announcement" | "tutorial")}
+              />
+            </div>
+          }
+          style={{ borderRadius: 14 }}
+        >
           {loadingAnnouncements ? (
             <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
               <Spin />
             </div>
-          ) : adminAnnouncements.length ? (
+          ) : filteredAdminAnnouncements.length ? (
             <List
               grid={{ gutter: 16, xs: 1, lg: 2 }}
-              dataSource={adminAnnouncements}
+              dataSource={filteredAdminAnnouncements}
               renderItem={(item) => (
                 <List.Item>
                   <ServiceAnnouncementCard
@@ -876,20 +932,35 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               )}
             />
           ) : (
-            <Empty description="Aun no hay comunicados creados" />
+            <Empty description={adminListMode === "tutorial" ? "Aun no hay tutoriales creados" : "Aun no hay comunicados creados"} />
           )}
         </Card>
       ) : null}
 
-      <Card title="Comunicados para ti" style={{ borderRadius: 14 }}>
+      <Card
+        title={
+          <div className="service-announcement-section-title">
+            <span>Para ti</span>
+            <Segmented
+              value={myListMode}
+              options={[
+                { label: "Comunicados", value: "announcement" },
+                { label: "Tutoriales", value: "tutorial" },
+              ]}
+              onChange={(value) => setMyListMode(value as "announcement" | "tutorial")}
+            />
+          </div>
+        }
+        style={{ borderRadius: 14 }}
+      >
         {loadingAnnouncements ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
             <Spin />
           </div>
-        ) : announcements.length ? (
+        ) : filteredMyAnnouncements.length ? (
           <List
             grid={{ gutter: 16, xs: 1, lg: 2 }}
-            dataSource={announcements}
+            dataSource={filteredMyAnnouncements}
             renderItem={(item) => (
               <List.Item>
                 <ServiceAnnouncementCard
@@ -902,7 +973,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
             )}
           />
         ) : (
-          <Empty description="No hay comunicados publicados para este rol" />
+          <Empty description={myListMode === "tutorial" ? "No hay tutoriales publicados para este rol" : "No hay comunicados publicados para este rol"} />
         )}
       </Card>
     </div>

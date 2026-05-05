@@ -87,14 +87,7 @@ const AnnouncementAttachments = ({ attachments = [] }: { attachments?: Announcem
           return (
             <div className="announcement-attachment-card" key={`${attachment.kind}-${attachment.url}-${index}`}>
               <div className={`announcement-attachment-thumb ${getAttachmentAccent(attachment)}`}>
-                {isVideoAttachment(attachment) ? (
-                  <video
-                    src={attachment.url}
-                    className="announcement-attachment-video"
-                    controls
-                    preload="metadata"
-                  />
-                ) : isImageAttachment(attachment) ? (
+                {isImageAttachment(attachment) ? (
                   <img
                     src={attachment.url}
                     alt={title}
@@ -141,7 +134,7 @@ const AnnouncementAttachments = ({ attachments = [] }: { attachments?: Announcem
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Abrir
+                    Ver
                   </Button>
                   {attachment.kind === "file" ? (
                     <Button

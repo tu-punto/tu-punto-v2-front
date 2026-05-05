@@ -8,6 +8,22 @@
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
+.service-announcement-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-tutorial-expanded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
 .service-announcement-editor-header {
   display: flex;
   align-items: flex-start;
