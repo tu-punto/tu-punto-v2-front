@@ -42,6 +42,8 @@ import {
   getSellerAPI,
   getSellerDebtsAPI,
   declineSellerServiceAPI,
+  adminDeclineSellerServiceAPI,
+  cancelSellerServiceDeclineAPI,
   requestSellerPaymentAPI,
   updateSellerAPI,
 } from "../../../api/seller";
@@ -447,6 +449,45 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
+  const handleAdminDeclineService = async () => {
+    if (!seller?.key) return;
+
+    setDeclineServiceLoading(true);
+    try {
+      const res = await adminDeclineSellerServiceAPI(String(seller.key));
+      if (!res?.success) throw new Error("No se pudo registrar la declinacion");
+      const updatedSeller = res.data?.seller || {};
+      setDeclineServiceDate(
+        updatedSeller.declinacion_servicio_fecha || new Date().toISOString()
+      );
+      message.success("Declinacion del servicio registrada");
+      onSuccess();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo declinar el servicio.");
+    } finally {
+      setDeclineServiceLoading(false);
+    }
+  };
+
+  const handleCancelDeclineService = async () => {
+    if (!seller?.key) return;
+
+    setDeclineServiceLoading(true);
+    try {
+      const res = await cancelSellerServiceDeclineAPI(String(seller.key));
+      if (!res?.success) throw new Error("No se pudo anular la declinacion");
+      setDeclineServiceDate(null);
+      message.success("Declinacion del servicio anulada");
+      onSuccess();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo anular la declinacion.");
+    } finally {
+      setDeclineServiceLoading(false);
+    }
+  };
+
   /* ─────────── submit final ─────────── */
   const handleFinish = async (formValues: any) => {
     setLoading(true);
@@ -571,6 +612,25 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           {!canDeclineService && !declineServiceDate ? (
             <Tag color="default">{serviceDeclineDisabledReason}</Tag>
           ) : null}
+        </div>
+      )}
+
+      {!isSeller && (
+        <div className="mb-5 flex justify-center gap-3">
+          {declineServiceDate ? (
+            <Button loading={declineServiceLoading} onClick={handleCancelDeclineService}>
+              Anular declinacion
+            </Button>
+          ) : (
+            <Button
+              danger
+              loading={declineServiceLoading}
+              disabled={!serviceEndDate.isValid() || Boolean(serviceDeclineDeadline && dayjs().isAfter(serviceDeclineDeadline))}
+              onClick={handleAdminDeclineService}
+            >
+              Declinar servicio
+            </Button>
+          )}
         </div>
       )}
 

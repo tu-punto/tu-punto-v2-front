@@ -1,4 +1,4 @@
-import { Button, Table, Tooltip, Select, Space, Input, message } from "antd";
+import { Button, Table, Tooltip, Select, Space, Input, message, Modal } from "antd";
 import { useEffect, useState } from "react";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -7,7 +7,11 @@ import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
 
-import { getSellersAPI } from "../../api/seller";
+import {
+  adminDeclineSellerServiceAPI,
+  cancelSellerServiceDeclineAPI,
+  getSellersAPI,
+} from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
@@ -59,8 +63,10 @@ export default function SellerTable({
   const getEstadoVendedor = (row: Pick<ISeller, "fecha_vigencia" | "declinacion_servicio_fecha">) => {
     const hoy = dayjs();
     const vigencia = parseSellerDate(row.fecha_vigencia);
-    if (row.declinacion_servicio_fecha && hoy.isBefore(vigencia.add(6, "day"), "day")) {
-      return "Declinando el servicio";
+    if (row.declinacion_servicio_fecha) {
+      const retiroHasta = vigencia.add(5, "day").endOf("day");
+      if (!hoy.isAfter(retiroHasta)) return "Declinando el servicio";
+      return "Ya no es cliente";
     }
     const diasVencido = hoy.diff(vigencia, "day");
 
@@ -102,6 +108,47 @@ export default function SellerTable({
       default:
         return {};
     }
+  };
+
+  const canDeclineSeller = (row: SellerRow) => {
+    if (row.declinacion_servicio_fecha) return false;
+    const vigencia = parseSellerDate(row.fecha_vigencia);
+    if (!vigencia.isValid()) return false;
+    return !dayjs().isAfter(vigencia.subtract(5, "day").endOf("day"));
+  };
+
+  const canRenewSeller = (row: SellerRow) =>
+    getEstadoVendedor(row) !== "Ya no es cliente";
+
+  const handleAdminDecline = (row: SellerRow) => {
+    Modal.confirm({
+      title: "Declinar servicio",
+      content: `Se registrara que ${row.nombre} declinara el servicio.`,
+      okText: "Declinar",
+      cancelText: "Cancelar",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const res = await adminDeclineSellerServiceAPI(row.key);
+        if (!res?.success) throw new Error("No se pudo declinar");
+        message.success("Declinacion registrada");
+        refresh();
+      },
+    });
+  };
+
+  const handleCancelDecline = (row: SellerRow) => {
+    Modal.confirm({
+      title: "Anular declinacion",
+      content: `Se anulara la declinacion de ${row.nombre}.`,
+      okText: "Anular",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        const res = await cancelSellerServiceDeclineAPI(row.key);
+        if (!res?.success) throw new Error("No se pudo anular");
+        message.success("Declinacion anulada");
+        refresh();
+      },
+    });
   };
 
   // ✅ Columnas con sorters
@@ -209,11 +256,51 @@ export default function SellerTable({
       render: (_: any, row: SellerRow) => (
         <div className="flex gap-2 justify-end">
           <PayDebtButton seller={row} onSuccess={refresh} />
-          <Tooltip title="Renovar vendedor">
+          {row.declinacion_servicio_fecha ? (
+            <Tooltip title="Anular declinacion">
+              <Button
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCancelDecline(row);
+                }}
+              >
+                Anular
+              </Button>
+            </Tooltip>
+          ) : (
+            <Tooltip
+              title={
+                canDeclineSeller(row)
+                  ? "Declinar servicio"
+                  : "La declinacion solo esta habilitada hasta 5 dias antes de la vigencia"
+              }
+            >
+              <Button
+                danger
+                size="small"
+                disabled={!canDeclineSeller(row)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAdminDecline(row);
+                }}
+              >
+                Declinar
+              </Button>
+            </Tooltip>
+          )}
+          <Tooltip
+            title={
+              canRenewSeller(row)
+                ? "Renovar vendedor"
+                : "No se puede renovar un vendedor que ya no es cliente"
+            }
+          >
             <Button
               type="primary"
               size="small"
               icon={<EditOutlined />}
+              disabled={!canRenewSeller(row)}
               onClick={(e) => {
                 e.stopPropagation();
                 setSelected(row);

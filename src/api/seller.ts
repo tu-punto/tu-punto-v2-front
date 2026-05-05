@@ -90,6 +90,24 @@ export const declineSellerServiceAPI = async (sellerId: string) => {
     }
 }
 
+export const adminDeclineSellerServiceAPI = async (sellerId: string) => {
+    try {
+        const res = await apiClient.post(`/seller/${sellerId}/admin-decline-service`)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const cancelSellerServiceDeclineAPI = async (sellerId: string) => {
+    try {
+        const res = await apiClient.post(`/seller/${sellerId}/cancel-decline-service`)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
 export const getSellerDebtsAPI  = async (sellerId: string) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}/debts`)
