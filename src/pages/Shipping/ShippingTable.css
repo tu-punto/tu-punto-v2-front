@@ -1,0 +1,171 @@
+.shipping-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  align-items: center;
+}
+
+.shipping-filter-grid .ant-select,
+.shipping-filter-grid .ant-input,
+.shipping-filter-grid .ant-picker {
+  width: 100%;
+}
+
+.shipping-filter-action {
+  width: 100%;
+}
+
+.shipping-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 84px;
+}
+
+.shipping-mobile-card {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.shipping-mobile-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.shipping-mobile-card-header strong {
+  min-width: 0;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.shipping-mobile-card-header span {
+  flex: 0 0 auto;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.shipping-mobile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  font-size: 13px;
+}
+
+.shipping-mobile-grid span {
+  color: #6b7280;
+}
+
+.shipping-mobile-grid strong {
+  color: #111827;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 639px) {
+  .shipping-page {
+    padding: 12px 10px 92px;
+    overflow-x: hidden;
+  }
+
+  .shipping-page-header {
+    align-items: stretch;
+  }
+
+  .shipping-page-title {
+    width: 100%;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .shipping-page-title h1 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .shipping-filter-panel {
+    padding: 12px;
+  }
+
+  .shipping-filter-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-areas:
+      "search search search search search search"
+      "vendor vendor vendor destination destination destination"
+      "start start start end end end"
+      "create create packages packages qr qr";
+    gap: 8px;
+  }
+
+  .shipping-filter-search {
+    grid-area: search;
+  }
+
+  .shipping-filter-vendor {
+    grid-area: vendor;
+  }
+
+  .shipping-filter-destination {
+    grid-area: destination;
+  }
+
+  .shipping-filter-start {
+    grid-area: start;
+  }
+
+  .shipping-filter-end {
+    grid-area: end;
+  }
+
+  .shipping-filter-create {
+    grid-area: create;
+  }
+
+  .shipping-filter-packages {
+    grid-area: packages;
+  }
+
+  .shipping-filter-qr {
+    grid-area: qr;
+  }
+
+  .shipping-filter-other {
+    grid-column: 1 / -1;
+  }
+
+  .shipping-filter-origin {
+    display: none;
+  }
+
+  .shipping-filter-action {
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .shipping-filter-packages {
+    font-size: 13px;
+  }
+
+  .shipping-mobile-pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 2px;
+  }
+
+  .shipping-desktop-table {
+    display: none;
+  }
+}

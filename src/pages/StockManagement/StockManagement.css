@@ -1,0 +1,74 @@
+.stock-management-page {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.stock-products-table {
+  max-width: 100%;
+}
+
+.stock-products-table .ant-table-wrapper,
+.stock-products-table .ant-spin-nested-loading,
+.stock-products-table .ant-spin-container {
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .stock-management-page {
+    padding-bottom: 92px;
+  }
+
+  .stock-management-header {
+    align-items: stretch;
+  }
+
+  .stock-management-title {
+    width: 100%;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .stock-management-title h1 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .stock-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .stock-filter-grid > div {
+    min-width: 0;
+  }
+
+  .stock-filter-grid .ant-btn,
+  .stock-filter-grid .ant-input-search,
+  .stock-filter-grid .ant-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .stock-filter-grid .ant-btn {
+    height: 40px !important;
+    padding-inline: 8px;
+    font-size: 13px;
+    white-space: normal;
+    line-height: 1.1;
+  }
+
+  .stock-filter-grid > div:first-child,
+  .stock-filter-grid > div:nth-last-child(-n + 2) {
+    grid-column: 1 / -1;
+  }
+
+  .stock-products-table .ant-table {
+    font-size: 13px;
+  }
+
+  .stock-products-table .ant-table-cell {
+    padding: 10px 12px !important;
+    white-space: normal;
+  }
+}

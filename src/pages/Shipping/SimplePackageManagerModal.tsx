@@ -731,6 +731,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         guideNumber: String(row?.numero_guia || ""),
         clientName: row?.comprador,
         clientPhone: row?.telefono_comprador,
+        clientCi: row?.carnet_comprador,
         origin: getBranchName(row?.origen_sucursal || row?.sucursal, "Sin origen"),
         destination: getBranchName(row?.destino_sucursal, row?.lugar_entrega || "Sin destino"),
         ticketWidthMm: options.ticketWidthMm,

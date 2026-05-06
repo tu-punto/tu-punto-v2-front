@@ -1,5 +1,5 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Input, message, Select, Table, Tooltip } from 'antd';
+import { Button, DatePicker, Input, message, Pagination, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
 import { getShippingsListAPI, getShippingByIdAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
@@ -17,6 +17,7 @@ const { RangePicker } = DatePicker;
 const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
+const MOBILE_CARD_PAGE_SIZE = 12;
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -137,6 +138,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
     const [loadingTable, setLoadingTable] = useState(false);
     const [statusNow, setStatusNow] = useState(() => moment().tz("America/La_Paz"));
+    const [mobilePage, setMobilePage] = useState(1);
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator;
@@ -183,6 +185,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 externalSale?.saldo_cobrar ??
                 (estaPagado === "si" ? 0 : estaPagado === "mixto" ? pagaComprador : precioPaquete)
             ),
+            numero_guia: externalSale?.numero_guia || "",
             observaciones: externalSale?.descripcion_paquete || "",
             venta: [],
             productos_temporales: [],
@@ -344,6 +347,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 pedido.cliente,
                 pedido.telefono_cliente,
                 pedido.carnet_cliente,
+                pedido.numero_guia,
             ].some((value: any) => String(value || "").toLowerCase().includes(searchValue));
 
             return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor && matchesCliente;
@@ -369,6 +373,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
         return () => window.clearInterval(intervalId);
     }, []);
+
+    useEffect(() => {
+        setMobilePage(1);
+    }, [selectedStatus, selectedLocation, selectedOrigin, dateRange, selectedVendedor, searchCliente]);
 
     const columns = [
         {/*{
@@ -399,6 +407,12 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     setSortOrder(prev => (prev === 'ascend' ? 'descend' : 'ascend'));
                 },
             }),
+        },
+        {
+            title: 'Guia',
+            dataIndex: 'numero_guia',
+            key: 'numero_guia',
+            render: (value: any) => value || '-',
         },
         {
             title: 'Lugar de Origen',
@@ -526,6 +540,33 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         },
     ];
     const visibleColumns = columns.filter((column: any) => column?.key !== 'lugar_origen');
+    const currentRows =
+        selectedStatus === 'entregado'
+            ? filteredEntregadoData
+            : selectedStatus === 'en_camino'
+                ? filteredInTransitData
+                : filteredEsperaData;
+    const mobileRows = (currentRows as any[]).slice(
+        (mobilePage - 1) * MOBILE_CARD_PAGE_SIZE,
+        mobilePage * MOBILE_CARD_PAGE_SIZE
+    );
+
+    const openShippingDetail = async (record: any) => {
+        if (record.is_external) {
+            const fullExternal = await getExternalSaleByIdAPI(record._id);
+            if (fullExternal?.success === false) {
+                message.error(fullExternal.message || "No se pudo cargar la entrega externa");
+                return;
+            }
+            setSelectedExternalShipping(fullExternal);
+            setIsExternalInfoVisible(true);
+            return;
+        }
+        const fullShipping = await getShippingByIdAPI(record._id);
+        console.log("Pedido completo con ventas:", fullShipping);
+        setSelectedShipping(fullShipping);
+        setIsModalVisible(true);
+    };
 
     const fetchSucursal = async () => {
         try {
@@ -591,11 +632,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     }
                 }
             `}</style>
-            <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3">
-                <div className="flex flex-wrap items-center justify-center gap-2">
+            <div className="shipping-filter-panel mb-4 bg-white rounded-xl border border-gray-200 p-3">
+                <div className="shipping-filter-grid">
                 {(isAdmin || isOperator) && (
                     <Select
-                        style={{ width: 200, margin: 0 }}
+                        className="shipping-filter-vendor"
                         placeholder="Vendedores"
                         value={selectedVendedor || undefined}
                         onChange={(value) => setSelectedVendedor(value || "")}
@@ -624,8 +665,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     </Select>
                 )}
                 <Input
-                    style={{ width: 200, margin: 0 }}
-                    placeholder="Buscar nombre, carnet o celular..."
+                    className="shipping-filter-search"
+                    placeholder="Buscar nombre, carnet, celular o guia..."
                     value={searchCliente}
                     onChange={(e) => setSearchCliente(e.target.value)}
                     allowClear
@@ -644,8 +685,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
                 */}
                 <Select
+                    className="shipping-filter-origin"
                     placeholder="Sucursal de Origen"
-                    style={{ width: 200, margin: 0 }}
                     value={selectedOrigin}
                     onChange={(value) => setSelectedOrigin(value || '')}
                     allowClear
@@ -658,7 +699,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     ))}
                 </Select>
                 <Select
-                    style={{ width: 200, margin: 0 }}
+                    className="shipping-filter-destination"
                     placeholder="Sucursal De Destino"
                     onChange={(value) => {
                         setSelectedLocation(value || '');
@@ -677,7 +718,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 </Select>
                 {selectedLocation === 'other' && (
                     <Input
-                        style={{ width: 200, marginBottom: 0 }}
+                        className="shipping-filter-other"
                         placeholder="Especificar otro lugar"
                         value={otherLocation}
                         onChange={(e) => setOtherLocation(e.target.value)}
@@ -686,6 +727,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 {isMobile ? (
                     <>
                         <DatePicker
+                            className="shipping-filter-start"
                             placeholder="Start date"
                             open={openPicker === 'start'}
                             value={dateRange[0] ? moment(dateRange[0]) : null}
@@ -697,6 +739,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             }}
                         />
                         <DatePicker
+                            className="shipping-filter-end"
                             placeholder="End date"
                             open={openPicker === 'end'}
                             value={dateRange[1] ? moment(dateRange[1]) : null}
@@ -728,16 +771,18 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 {canManageExternal && (
                     <Tooltip title="Registrar entrega externa">
                         <Button
+                            className="shipping-filter-action shipping-filter-create"
                             type="primary"
                             icon={<span className="inline-flex items-center gap-0.5"><InboxOutlined /><ArrowRightOutlined /></span>}
                             onClick={() => setIsExternalCreateVisible(true)}
-                            style={{ width: 46, height: 46, borderRadius: 10, fontSize: 18 }}
+                            style={{ height: 46, borderRadius: 10, fontSize: 18 }}
                         />
                     </Tooltip>
                 )}
                 {canManageExternal && (
                     <Tooltip title="Gestionar paquetes del servicio">
                         <Button
+                            className="shipping-filter-action shipping-filter-packages"
                             type="default"
                             icon={<InboxOutlined />}
                             onClick={() => setIsSimplePackageManagerVisible(true)}
@@ -750,10 +795,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 {onOpenQR && (
                     <Tooltip title="Escanear QR de pedidos">
                         <Button
+                            className="shipping-filter-action shipping-filter-qr"
                             type="default"
                             icon={<QrcodeOutlined />}
                             onClick={onOpenQR}
-                            style={{ width: 46, height: 46, borderRadius: 10, fontSize: 18 }}
+                            style={{ height: 46, borderRadius: 10, fontSize: 18 }}
                         />
                     </Tooltip>
                 )}
@@ -941,7 +987,57 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             </div>
 
             <div key={selectedStatus} style={{ animation: "shippingStatusPanelFade 220ms ease" }}>
+            {isMobile && (
+                <div className="shipping-mobile-list">
+                    {mobileRows.map((record: any) => {
+                        const statusMeta = getVisualStatusMeta(record, statusNow);
+                        return (
+                            <button
+                                type="button"
+                                className="shipping-mobile-card"
+                                key={record.key || record._id}
+                                onClick={() => openShippingDetail(record)}
+                            >
+                                <div className="shipping-mobile-card-header">
+                                    <strong>{record.cliente || "Sin cliente"}</strong>
+                                    <span
+                                        style={{
+                                            borderColor: statusMeta.tone.border,
+                                            background: statusMeta.tone.background,
+                                            color: statusMeta.tone.text,
+                                        }}
+                                    >
+                                        {statusMeta.label}
+                                    </span>
+                                </div>
+                                <div className="shipping-mobile-grid">
+                                    <span>Fecha</span>
+                                    <strong>{moment.parseZone(record.hora_entrega_acordada).format("DD/MM/YYYY")}</strong>
+                                    <span>Guia</span>
+                                    <strong>{record.numero_guia || "-"}</strong>
+                                    <span>Destino</span>
+                                    <strong>{record.lugar_entrega || "-"}</strong>
+                                    <span>Celular</span>
+                                    <strong>{record.telefono_cliente || "-"}</strong>
+                                    <span>Carnet</span>
+                                    <strong>{record.carnet_cliente || "-"}</strong>
+                                </div>
+                            </button>
+                        );
+                    })}
+                    <Pagination
+                        className="shipping-mobile-pagination"
+                        current={mobilePage}
+                        pageSize={MOBILE_CARD_PAGE_SIZE}
+                        total={(currentRows as any[]).length}
+                        showSizeChanger={false}
+                        onChange={setMobilePage}
+                        size="small"
+                    />
+                </div>
+            )}
             <Table
+                className="shipping-desktop-table"
                 loading={loadingTable}
                 columns={visibleColumns}
                 dataSource={

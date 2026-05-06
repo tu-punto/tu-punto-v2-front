@@ -444,6 +444,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         guideNumber: String(row?.numero_guia || ""),
         clientName: row?.comprador,
         clientPhone: row?.telefono_comprador,
+        clientCi: row?.carnet_comprador,
         origin: row?.origen_sucursal?.nombre || row?.sucursal?.nombre || currentSucursal?.nombre || "Externo",
         destination: row?.destino_sucursal?.nombre || row?.lugar_entrega || currentSucursal?.nombre || "Externo",
         ticketWidthMm: options.ticketWidthMm,

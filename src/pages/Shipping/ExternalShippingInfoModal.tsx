@@ -164,6 +164,7 @@ const ExternalShippingInfoModal = ({
         guideNumber: String(externalShipping.numero_guia || ""),
         clientName: externalShipping.comprador,
         clientPhone: externalShipping.telefono_comprador,
+        clientCi: externalShipping.carnet_comprador,
         origin: externalShipping?.sucursal?.nombre || "Externo",
         destination: externalShipping?.lugar_entrega || externalShipping?.sucursal?.nombre || "Externo",
         ticketWidthMm: 40,

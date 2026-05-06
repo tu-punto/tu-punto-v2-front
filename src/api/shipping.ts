@@ -24,6 +24,7 @@ const getShippingsListAPI = async (params?: {
   originId?: string;
   sellerId?: string;
   client?: string;
+  guide?: string;
 }) => {
   try {
     const res = await apiClient.get("/shipping/list", { params });

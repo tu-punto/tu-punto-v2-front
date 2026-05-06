@@ -80,6 +80,7 @@ export const buildDirectShippingLabelImageData = async (params: {
   guideNumber: string;
   clientName?: string;
   clientPhone?: string;
+  clientCi?: string;
   origin?: string;
   destination?: string;
   qrImagePath?: string;
@@ -91,48 +92,56 @@ export const buildDirectShippingLabelImageData = async (params: {
   const sizeScale = clamp(qrSizeMm / 16, 0.96, 1.28);
 
   const widthPx = mmToPx(ticketWidthMm);
-  const sideMarginPx = mmToPx(ticketWidthMm <= 40 ? 0.55 : 1);
-  const columnGapPx = mmToPx(1.4);
-  const leftWidthPx = Math.round((widthPx - sideMarginPx * 2 - columnGapPx) * 0.5);
+  const sideMarginPx = mmToPx(ticketWidthMm <= 40 ? 0.75 : 1);
+  const columnGapPx = mmToPx(1.2);
+  const leftWidthPx = Math.round((widthPx - sideMarginPx * 2 - columnGapPx) * 0.44);
   const rightWidthPx = Math.max(widthPx - sideMarginPx * 2 - columnGapPx - leftWidthPx, 42);
   const leftX = sideMarginPx;
   const rightX = sideMarginPx + leftWidthPx + columnGapPx;
-  const lineHeight = mmToPx(2.45 * sizeScale);
-  const titleFontPx = Math.round(16 * sizeScale);
-  const bodyFontPx = Math.round(12.8 * sizeScale);
-  const routeFontPx = Math.round(13.4 * sizeScale);
+  const codePrefixFontPx = Math.round(21 * sizeScale);
+  const codeNumberFontPx = Math.round(26 * sizeScale);
+  const codeSuffixFontPx = Math.round(18 * sizeScale);
+  const detailFontPx = Math.round(10.6 * sizeScale);
+  const detailLineHeight = mmToPx(3.35 * sizeScale);
+  const codeLineHeight = mmToPx(6.1 * sizeScale);
 
   const guideNumber = cleanLabelValue(params.guideNumber, "Sin guia");
+  const guideParts = guideNumber.match(/^([A-Z]+-?)(\d+)(?:-?(.+))?$/i);
+  const codeLines = guideParts
+    ? [
+        guideParts[1].toUpperCase().endsWith("-")
+          ? guideParts[1].toUpperCase()
+          : `${guideParts[1].toUpperCase()}-`,
+        `${guideParts[2]}-`,
+        guideParts[3] || "",
+      ].filter(Boolean)
+    : wrapByWidth(
+        Object.assign(document.createElement("canvas").getContext("2d")!, {
+          font: `bold ${codeNumberFontPx}px Arial`,
+        }),
+        guideNumber,
+        leftWidthPx
+      ).slice(0, 3);
   const clientPhone = cleanLabelValue(params.clientPhone);
   const clientName = cleanLabelValue(params.clientName);
-  const origin = `O: ${cleanLabelValue(params.origin, "Sin origen")}`;
-  const destination = `D: ${cleanLabelValue(params.destination, "Sin destino")}`;
+  const clientCi = cleanLabelValue(params.clientCi);
+  const details = [
+    clientName ? `N: ${clientName}` : "",
+    clientPhone ? `T: ${clientPhone}` : "",
+    clientCi ? `CI: ${clientCi}` : "",
+    `O: ${cleanLabelValue(params.origin, "Sin origen")}`,
+    `D: ${cleanLabelValue(params.destination, "Sin destino")}`,
+  ].filter(Boolean);
 
   const measureCanvas = document.createElement("canvas");
   const measureCtx = measureCanvas.getContext("2d");
   if (!measureCtx) throw new Error("No se pudo inicializar canvas");
 
-  measureCtx.font = `bold ${titleFontPx}px Arial`;
-  const guideLines = wrapByWidth(measureCtx, guideNumber, leftWidthPx).slice(0, 1);
-  measureCtx.font = `normal ${bodyFontPx}px Arial`;
-  const leftDetail = clientPhone || clientName;
-  const leftDetailLines = leftDetail ? wrapByWidth(measureCtx, leftDetail, leftWidthPx).slice(0, 1) : [];
-  measureCtx.font = `bold ${routeFontPx}px Arial`;
-  const originLines = wrapByWidth(measureCtx, origin, rightWidthPx).slice(0, 1);
-  const destinationLines = wrapByWidth(measureCtx, destination, rightWidthPx).slice(0, 1);
-
-  const leftLines = [
-    ...guideLines.map((text) => ({ text, title: true })),
-    ...leftDetailLines.map((text) => ({ text, title: false })),
-  ];
-  const rightLines = [
-    ...originLines.map((text) => ({ text, route: true })),
-    ...destinationLines.map((text) => ({ text, route: true })),
-  ];
-  const rowCount = Math.max(leftLines.length, rightLines.length, 2);
-  const textBlockHeight = rowCount * lineHeight;
-  const verticalPaddingPx = mmToPx(0.45 * sizeScale);
-  const heightPx = Math.max(mmToPx(8.8), textBlockHeight + verticalPaddingPx * 2);
+  measureCtx.font = `bold ${detailFontPx}px Arial`;
+  const detailLines = details.flatMap((line) => wrapByWidth(measureCtx, line, rightWidthPx)).slice(0, 5);
+  const verticalPaddingPx = mmToPx(0.8 * sizeScale);
+  const textBlockHeight = Math.max(codeLines.length * codeLineHeight, detailLines.length * detailLineHeight);
+  const heightPx = Math.max(mmToPx(20), textBlockHeight + verticalPaddingPx * 2);
 
   const canvas = document.createElement("canvas");
   canvas.width = widthPx;
@@ -144,15 +153,19 @@ export const buildDirectShippingLabelImageData = async (params: {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const startY = verticalPaddingPx + Math.round(lineHeight * 0.82);
+  const codeStartY = verticalPaddingPx + Math.round(codeLineHeight * 0.78);
+  const detailStartY = verticalPaddingPx + Math.round(detailLineHeight * 0.88);
   ctx.fillStyle = "#111111";
-  leftLines.forEach((line, index) => {
-    ctx.font = `${line.title ? "bold" : "normal"} ${line.title ? titleFontPx : bodyFontPx}px Arial`;
-    ctx.fillText(line.text, leftX, startY + index * lineHeight);
+  codeLines.forEach((line, index) => {
+    const fontSize = index === 0 ? codePrefixFontPx : index === 1 ? codeNumberFontPx : codeSuffixFontPx;
+    ctx.font = `normal ${fontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText(line, leftX + leftWidthPx / 2, codeStartY + index * codeLineHeight);
   });
-  rightLines.forEach((line, index) => {
-    ctx.font = `bold ${routeFontPx}px Arial`;
-    ctx.fillText(line.text, rightX, startY + index * lineHeight);
+  ctx.textAlign = "left";
+  detailLines.forEach((line, index) => {
+    ctx.font = `bold ${detailFontPx}px Arial`;
+    ctx.fillText(line, rightX, detailStartY + index * detailLineHeight);
   });
 
   return {

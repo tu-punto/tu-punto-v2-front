@@ -544,6 +544,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                             </h2>
 
                             <Table
+                                className="stock-products-table"
                                 columns={columns}
                                 dataSource={groupedProducts}
                                 rowClassName={(record) =>
@@ -568,6 +569,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                                     pageSizeOptions: ['5', '10', '20', '50'],
                                     showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`
                                 }}
+                                scroll={{ x: 820 }}
                                 rowKey="key"
                             />
                         </div>
