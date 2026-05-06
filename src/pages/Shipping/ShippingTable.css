@@ -13,6 +13,11 @@
 
 .shipping-filter-action {
   width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .shipping-mobile-list {
@@ -152,11 +157,14 @@
 
   .shipping-filter-action {
     min-width: 0;
-    padding-inline: 8px;
+    padding-inline: 6px;
+    gap: 4px;
+    font-size: 12px;
   }
 
+  .shipping-filter-create,
   .shipping-filter-packages {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .shipping-mobile-pagination {

@@ -775,8 +775,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             type="primary"
                             icon={<span className="inline-flex items-center gap-0.5"><InboxOutlined /><ArrowRightOutlined /></span>}
                             onClick={() => setIsExternalCreateVisible(true)}
-                            style={{ height: 46, borderRadius: 10, fontSize: 18 }}
-                        />
+                            style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
+                        >
+                            Externos
+                        </Button>
                     </Tooltip>
                 )}
                 {canManageExternal && (

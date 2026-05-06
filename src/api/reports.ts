@@ -37,7 +37,8 @@ type EntregasNuevoServicioParams = {
 };
 
 type ReporteEntregasSimplesExternasParams = {
-  mes: string;
+  mes?: string;
+  meses?: string[];
   sucursales?: string[];
 };
 
@@ -261,14 +262,30 @@ export async function downloadEntregasNuevoServicioXlsx(params: EntregasNuevoSer
 }
 
 export async function downloadReporteEntregasSimplesExternasXlsx(params: ReporteEntregasSimplesExternasParams) {
+  const meses = params.meses?.length ? params.meses : params.mes ? [params.mes] : [];
+  const nombreMeses = meses.length > 1 ? `${meses[0]}_a_${meses[meses.length - 1]}` : meses[0] || "sin_mes";
   await downloadXlsxFromGet(
     "/reports/reporte-entregas-simples-externas/xlsx",
     {
       mes: params.mes,
+      meses: meses.join(","),
       sucursales: params.sucursales?.join(","),
     },
-    `reporte_entregas_simples_externas_${params.mes}.xlsx`,
+    `reporte_entregas_simples_externas_${nombreMeses}.xlsx`,
   );
+}
+
+export async function getReporteEntregasSimplesExternasAPI(params: ReporteEntregasSimplesExternasParams) {
+  const meses = params.meses?.length ? params.meses : params.mes ? [params.mes] : [];
+  const { data } = await apiClient.get("/reports/reporte-entregas-simples-externas", {
+    params: {
+      mes: params.mes,
+      meses: meses.join(","),
+      sucursales: params.sucursales?.join(","),
+    },
+    withCredentials: true,
+  });
+  return data;
 }
 
 export async function downloadClientesStatusXlsx() {

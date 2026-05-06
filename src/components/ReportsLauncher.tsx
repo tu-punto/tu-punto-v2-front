@@ -40,6 +40,7 @@ import {
   downloadVentasVendedores4mXlsx,
   getEntregasNuevoServicioAPI,
   getOperacionMensualAPI,
+  getReporteEntregasSimplesExternasAPI,
   type TicketPromedioMode,
   getVentasVendedoresMesesAPI,
   getVentasQrAPI,
@@ -89,6 +90,7 @@ type ReportDefinition = {
     | "ventasVendedores"
     | "inventario"
     | "entregasNuevoServicio"
+    | "reporteEntregasSimplesExternas"
     | "none";
   requires: {
     meses?: boolean;
@@ -273,9 +275,9 @@ const REPORTS: ReportDefinition[] = [
   {
     id: "reporteEntregasSimplesExternas",
     title: "Reporte de entregas simples y externas",
-    description: "XLSX con resumen mensual total y por sucursal, detalle de simples y detalle de externas.",
+    description: "Vista previa y XLSX con resumen total, por sucursal, detalle de simples y externas.",
     category: "Reportes adicionales",
-    previewMode: "none",
+    previewMode: "reporteEntregasSimplesExternas",
     requires: { meses: true, sucursales: true },
     isNew: true,
   },
@@ -605,6 +607,16 @@ export default function ReportsLauncher() {
         return;
       }
 
+      if (selectedReport.previewMode === "reporteEntregasSimplesExternas") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getReporteEntregasSimplesExternasAPI({
+          meses,
+          sucursales: vals.sucursales,
+        });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
       if (selectedReport.previewMode === "inventario") {
         const data = await getInventarioActualAPI({
           idSucursal: vals.sucursalId as string,
@@ -676,7 +688,7 @@ export default function ReportsLauncher() {
           break;
         case "reporteEntregasSimplesExternas":
           await downloadReporteEntregasSimplesExternasXlsx({
-            mes: meses[0],
+            meses,
             sucursales: vals.sucursales,
           });
           break;
@@ -915,6 +927,34 @@ export default function ReportsLauncher() {
           { title: "Totales por vendedor", rows: data.totalesPorVendedor || [] },
           { title: "Totales por metodo de pago", rows: data.totalesPorMetodoPago || [] },
           { title: "Detalle", rows: data.rows || [] },
+        ],
+      };
+    }
+
+    if (preview.reportId === "reporteEntregasSimplesExternas") {
+      const total = data.total || {};
+      return {
+        cards: [
+          {
+            title: "Entregas totales",
+            value: `${total.total_entregas ?? 0}`,
+            subtitle: `Simples: ${total.simples_realizadas ?? 0} | Externas: ${total.externas_realizadas ?? 0}`,
+          },
+          {
+            title: "Cobrado total",
+            value: formatBs(total.cobrado_total_bs),
+            subtitle: `Simples: ${formatBs(total.cobrado_simples_bs)} | Externas: ${formatBs(total.cobrado_externas_bs)}`,
+          },
+          {
+            title: "Monto potencial",
+            value: formatBs(total.monto_potencial_total_bs),
+            subtitle: `Meses: ${(data.meses || []).join(", ")}`,
+          },
+        ],
+        tables: [
+          { title: "Resumen por sucursal", rows: data.resumenRows || [] },
+          { title: "Detalle simples", rows: data.simpleDetails || [] },
+          { title: "Detalle externas", rows: data.externalDetails || [] },
         ],
       };
     }
