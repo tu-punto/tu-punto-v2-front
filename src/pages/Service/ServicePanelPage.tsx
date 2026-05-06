@@ -576,12 +576,12 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   };
 
   return (
-    <div className="p-4" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md mb-2">
-        <img src={servicesIcon} alt="Servicios" className="w-16" />
-        <div>
-          <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">{pageTitle}</h1>
-          <div style={{ color: "#64748b", fontSize: 13 }}>
+    <div className="service-panel-page p-4">
+      <div className="service-panel-hero bg-white rounded-xl shadow-md">
+        <img src={servicesIcon} alt="Servicios" className="service-panel-hero-icon" />
+        <div className="service-panel-hero-copy">
+          <h1 className="service-panel-title font-bold text-gray-800">{pageTitle}</h1>
+          <div className="service-panel-subtitle">
             {pageSubtitle}
           </div>
         </div>
@@ -598,8 +598,9 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
 
       {isAdmin ? (
         <Card
+          className="service-announcement-card"
           title={
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div className="service-announcement-section-title">
               <span>{announcementMode === "tutorial" ? "Nuevo tutorial" : "Nuevo comunicado"}</span>
               <Segmented
                 value={announcementMode}
@@ -622,7 +623,6 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               />
             </div>
           }
-          style={{ borderRadius: 14 }}
         >
           <Form
             form={form}
@@ -882,7 +882,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       ) : null}
 
       {isAdmin ? (
-        <Card title="Resumen administrativo" style={{ borderRadius: 14 }}>
+        <Card className="service-announcement-card" title="Resumen administrativo">
           {loadingSummary ? (
             <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
               <Spin />
@@ -897,6 +897,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
 
       {isAdmin ? (
         <Card
+          className="service-announcement-card"
           title={
             <div className="service-announcement-section-title">
               <span>Creados</span>
@@ -910,7 +911,6 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               />
             </div>
           }
-          style={{ borderRadius: 14 }}
         >
           {loadingAnnouncements ? (
             <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
@@ -938,6 +938,7 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
       ) : null}
 
       <Card
+        className="service-announcement-card"
         title={
           <div className="service-announcement-section-title">
             <span>Para ti</span>
@@ -951,7 +952,6 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
             />
           </div>
         }
-        style={{ borderRadius: 14 }}
       >
         {loadingAnnouncements ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>

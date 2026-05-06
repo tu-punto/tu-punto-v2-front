@@ -1,0 +1,50 @@
+.users-page {
+  min-width: 0;
+}
+
+.users-page-header {
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.users-page-title-col {
+  min-width: 0;
+}
+
+.users-page-title-card {
+  padding: 12px 24px;
+}
+
+.users-page-title-card .ant-card-body {
+  padding: 0;
+}
+
+.users-page-title {
+  margin: 0 !important;
+  color: #1f2937 !important;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .users-page-header {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .users-page-title-card {
+    padding: 10px 14px;
+  }
+
+  .users-page-title {
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
+
+  .users-page .ant-btn {
+    width: 100%;
+  }
+
+  .users-page .ant-table-wrapper {
+    max-width: 100%;
+  }
+}

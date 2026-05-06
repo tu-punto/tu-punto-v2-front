@@ -30,3 +30,32 @@
     text-align: center;
     min-width: 0;
 }
+
+.bottom-menu-label {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.05;
+}
+
+@media (max-width: 380px) {
+    .bottom-menu .ant-menu-horizontal {
+        height: 76px !important;
+    }
+
+    .bottom-menu .ant-menu-item a,
+    .bottom-menu .ant-menu-item button {
+        height: 76px !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+
+    .bottom-menu .ant-menu-item img {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    .bottom-menu .ant-menu-item p {
+        font-size: 12px !important;
+    }
+}

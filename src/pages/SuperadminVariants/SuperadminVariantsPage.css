@@ -86,6 +86,11 @@
 .superadmin-variants-table-card {
   border: 1px solid #d8e5ef;
   box-shadow: 0 18px 40px rgba(17, 24, 39, 0.06);
+  min-width: 0;
+}
+
+.superadmin-variants-table-card .ant-card-body {
+  min-width: 0;
 }
 
 .superadmin-variants-page .ant-table-thead > tr > th {
@@ -192,5 +197,58 @@
 
   .superadmin-variants-filter-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .superadmin-variants-page {
+    padding: 8px !important;
+    min-width: 0;
+  }
+
+  .superadmin-variants-page .ant-card {
+    border-radius: 16px;
+  }
+
+  .superadmin-variants-page .ant-card-body {
+    padding: 14px 12px;
+  }
+
+  .superadmin-variants-header h2 {
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
+
+  .superadmin-variants-header .ant-btn {
+    width: 100%;
+  }
+
+  .superadmin-variants-summary-value {
+    font-size: 38px;
+  }
+
+  .superadmin-variants-summary-caption {
+    overflow-wrap: anywhere;
+  }
+
+  .superadmin-variants-table-card .ant-table-wrapper,
+  .superadmin-variants-table-card .ant-spin-nested-loading,
+  .superadmin-variants-table-card .ant-spin-container {
+    min-width: 0;
+  }
+
+  .superadmin-variants-table-card .ant-table-content {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .superadmin-variants-product-title,
+  .superadmin-variants-product-meta {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .superadmin-variants-page .ant-pagination {
+    justify-content: center;
   }
 }

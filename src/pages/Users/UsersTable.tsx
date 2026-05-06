@@ -28,15 +28,19 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
       title: "Email",
       dataIndex: "email",
       key: "email",
+      width: 260,
+      ellipsis: true,
     },
     {
       title: "Rol",
       dataIndex: "role",
       key: "role",
+      width: 120,
     },
     {
       title: "Sucursal",
       key: "sucursal",
+      width: 160,
       render: (_: any, record: any) => {
         if (record.role === "admin" || record.is_superadmin) return "Todas";
         if (record.role === "seller") return "-";
@@ -46,6 +50,7 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
     {
       title: "Acciones",
       key: "actions",
+      width: 120,
       render: (_, record) => (
         <Space>
           <Button
@@ -85,6 +90,7 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
       loading={loading}
       rowKey="_id"
       pagination={{ pageSize: 10 }}
+      scroll={{ x: "max-content" }}
     />
   );
 };

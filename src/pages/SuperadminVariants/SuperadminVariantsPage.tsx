@@ -28,6 +28,7 @@ import {
   renameSuperadminVariantAPI,
   updateSuperadminVariantStockAPI,
 } from "../../api/product";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 import "./SuperadminVariantsPage.css";
 
@@ -138,6 +139,7 @@ const SuperadminVariantsPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<VariantRow | null>(null);
   const [editForm] = Form.useForm();
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -372,7 +374,7 @@ const SuperadminVariantsPage = () => {
   const branchColumns: ColumnsType<VariantRow> = branches.map((branch) => ({
     title: branch.sucursalName,
     key: `branch-${branch.sucursalId}`,
-    width: 170,
+    width: isMobile ? 150 : 170,
     align: "center",
     render: (_value, row) => (
       <BranchStockCell
@@ -391,8 +393,8 @@ const SuperadminVariantsPage = () => {
         title: "Variante",
         dataIndex: "displayName",
         key: "displayName",
-        fixed: "left",
-        width: 320,
+        fixed: isMobile ? undefined : "left",
+        width: isMobile ? 240 : 320,
         render: (_value, row) => (
           <div className="superadmin-variants-product-cell">
             <div className={`superadmin-variants-stock-dot ${row.totalStock > 0 ? "is-positive" : "is-empty"}`} />
@@ -408,7 +410,7 @@ const SuperadminVariantsPage = () => {
       {
         title: "Atributos",
         key: "variantAttributes",
-        width: 260,
+        width: isMobile ? 220 : 260,
         render: (_value, row) => (
           <div className="superadmin-variants-attribute-list">
             {Object.entries(row.variantAttributes).map(([key, value]) => (
@@ -423,8 +425,8 @@ const SuperadminVariantsPage = () => {
       {
         title: "Acciones",
         key: "actions",
-        fixed: "right",
-        width: 140,
+        fixed: isMobile ? undefined : "right",
+        width: isMobile ? 130 : 140,
         align: "center",
         render: (_value, row) => (
           <Space direction="vertical" size={8}>
@@ -452,7 +454,12 @@ const SuperadminVariantsPage = () => {
         ),
       },
     ],
-    [branchColumns, busyKey]
+    [branchColumns, busyKey, isMobile]
+  );
+
+  const tableScrollX = useMemo(
+    () => (isMobile ? 240 : 320) + (isMobile ? 220 : 260) + branches.length * (isMobile ? 150 : 170) + (isMobile ? 130 : 140),
+    [branches.length, isMobile]
   );
 
   const activeBranchOptions = useMemo(() => {
@@ -565,7 +572,7 @@ const SuperadminVariantsPage = () => {
           loading={loading}
           columns={columns}
           dataSource={rows}
-          scroll={{ x: 1200 }}
+          scroll={{ x: Math.max(tableScrollX, isMobile ? 980 : 1200) }}
           locale={{
             emptyText: (
               <Empty

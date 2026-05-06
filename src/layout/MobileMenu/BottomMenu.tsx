@@ -10,6 +10,18 @@ import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
 import { canSellerAccessInventory, canSellerAccessShop } from "../../utils/sellerServiceAccess";
 
+const adminBottomPaths = ["/shipping", "/sales", "/stock"];
+const sellerBottomPaths = ["/shipping", "/simple-packages", "/shop"];
+
+const getMobileLabel = (path: string, fallback: string) => {
+    if (path === "/sales" || path === "/shop") return "Carrito";
+    if (path === "/simple-packages") return "Crear paquetes";
+    return fallback;
+};
+
+const isActivePath = (pathname: string, path: string) =>
+    pathname === path || pathname.startsWith(`${path}/`);
+
 const BottomMenu = () => {
     const { user } = useContext(UserContext)!;
     const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -27,9 +39,11 @@ const BottomMenu = () => {
               (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
               (!i.requiresSuperadmin || isSuperadminUser(user))
         );
+        const bottomPaths = role === "seller" ? sellerBottomPaths : adminBottomPaths;
         const bottom: any[] = [];
         const plus: any[] = [];
-        filtered.forEach(i => (["Pedidos","Stock","Vender"].includes(i.label) ? bottom : plus).push(i));
+        filtered.forEach(i => (bottomPaths.includes(i.path) ? bottom : plus).push(i));
+        bottom.sort((a, b) => bottomPaths.indexOf(a.path) - bottomPaths.indexOf(b.path));
         setMenuItems(bottom);
         setPlusMenuItems(plus);
     }, [user]);
@@ -46,7 +60,8 @@ const BottomMenu = () => {
                     <div className="absolute bottom-full left-0 right-0 z-50 bg-[#0a5aa3] rounded-t-xl shadow-2xl p-3 pb-4 border-t border-white/10">
                         <div className="grid grid-cols-2 gap-2">
                             {plusMenuItems.map(item => {
-                                const active = location.pathname.startsWith(item.path);
+                                const active = isActivePath(location.pathname, item.path);
+                                const label = getMobileLabel(item.path, item.label);
                                 return (
                                     <Link
                                         to={item.path}
@@ -55,7 +70,7 @@ const BottomMenu = () => {
                                 ${active ? "bg-white/20" : "bg-white/10"}
                                 hover:bg-white/15 active:bg-white/25 transition-colors`}
                                     >
-                                        {item.label}
+                                        {label}
                                     </Link>
                                 );
                             })}
@@ -71,7 +86,8 @@ const BottomMenu = () => {
                     selectable={false}
                 >
                     {menuItems.map(item => {
-                        const active = location.pathname.startsWith(item.path);
+                        const active = isActivePath(location.pathname, item.path);
+                        const label = getMobileLabel(item.path, item.label);
                         return (
                             <Menu.Item key={item.path} style={{ flex: 1, textAlign: "center", padding: 0 }}>
                                 <Link
@@ -81,8 +97,8 @@ const BottomMenu = () => {
                               ${active ? "bg-white/15" : "bg-transparent"}
                               hover:bg-white/10 active:bg-white/20`}
                                 >
-                                    <img src={item.icon} alt={item.label} className="w-7 h-7 mb-0.5" />
-                                    <p className="text-gray-100 text-sm leading-none">{item.label}</p>
+                                    <img src={item.icon} alt={label} className="w-7 h-7 mb-0.5" />
+                                    <p className="text-gray-100 text-sm leading-none bottom-menu-label">{label}</p>
                                 </Link>
                             </Menu.Item>
                         );

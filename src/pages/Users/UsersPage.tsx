@@ -6,6 +6,7 @@ import UserFormModal from "./UserFormModal";
 import { useUserStore } from "../../stores/userStore";
 import { UserContext } from "../../context/userContext";
 import { isSuperadminUser } from "../../utils/role";
+import "./UsersPage.css";
 
 const { Title } = Typography;
 
@@ -46,11 +47,11 @@ const UsersPage = () => {
   };
 
   return (
-    <>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col>
-          <Card style={{ padding: "12px 24px" }}>
-            <Title level={2} style={{ margin: 0, color: "#1f2937" }}>
+    <div className="users-page">
+      <Row className="users-page-header" justify="space-between" align="middle">
+        <Col className="users-page-title-col">
+          <Card className="users-page-title-card">
+            <Title level={2} className="users-page-title">
               Gestión de Usuarios
             </Title>
           </Card>
@@ -78,7 +79,7 @@ const UsersPage = () => {
         editingUser={editingUser}
         canAssignRoles={canAssignRoles}
       />
-    </>
+    </div>
   );
 };
 

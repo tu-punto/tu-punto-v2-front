@@ -26,6 +26,12 @@ const buildCombinationKey = (productId: string, combination: any, index: number)
     return `${productId}-${variantKey || 'sin-variant-key'}-${variantHash || index}`;
 };
 
+const buildVariantIdentity = (combination: any) => {
+    const normalizedVariants = normalizeVariants(combination?.variantes || combination?.variantes_obj || {});
+    const variantHash = Object.keys(normalizedVariants).length ? JSON.stringify(normalizedVariants) : '';
+    return variantHash || String(combination?.variant || combination?.label || combination?.variantKey || '').trim().toLowerCase();
+};
+
 const ProductPriceMatrixModal = ({
     visible,
     onClose,
@@ -61,7 +67,36 @@ const ProductPriceMatrixModal = ({
             ...(currentBranch ? [currentBranch] : []),
             ...branches.filter((branch: any) => branch !== currentBranch)
         ];
+        const duplicateIdentityByBranch = new Set<string>();
+
+        orderedBranches.forEach((branch: any) => {
+            const counts = new Map<string, number>();
+            (branch?.combinaciones || []).forEach((combination: any) => {
+                const identity = buildVariantIdentity(combination);
+                if (!identity) return;
+                counts.set(identity, (counts.get(identity) || 0) + 1);
+            });
+
+            counts.forEach((count, identity) => {
+                if (count > 1) duplicateIdentityByBranch.add(identity);
+            });
+        });
+
         const rowMap = new Map<string, any>();
+        const identityRowMap = new Map<string, string>();
+        const setVariantRow = (row: any, fallbackKey: string) => {
+            const identity = buildVariantIdentity(row);
+            const shouldPreserveDuplicates = identity && duplicateIdentityByBranch.has(identity);
+            const existingKey = !shouldPreserveDuplicates && identity ? identityRowMap.get(identity) : '';
+            const key = existingKey || fallbackKey;
+
+            if (!existingKey && identity && !shouldPreserveDuplicates) {
+                identityRowMap.set(identity, key);
+            }
+
+            if (rowMap.has(key)) return;
+            rowMap.set(key, row);
+        };
 
         tableVariants.forEach((variantRow: any, index: number) => {
             const variantes = variantRow?.variantes_obj || variantRow?.variantes || {};
@@ -70,27 +105,26 @@ const ProductPriceMatrixModal = ({
                 variantes
             }, index);
 
-            rowMap.set(key, {
+            setVariantRow({
                 key,
                 variantKey: variantRow?.variantKey,
                 variantes,
                 label: variantRow?.variant || getVariantLabel(variantes) || `Variante ${rowMap.size + 1}`,
                 precio: Number(variantRow?.precio || 0)
-            });
+            }, key);
         });
 
         orderedBranches.forEach((branch: any) => {
             (branch?.combinaciones || []).forEach((combination: any, index: number) => {
                 const key = buildCombinationKey(productId, combination, index);
-                if (rowMap.has(key)) return;
 
-                rowMap.set(key, {
+                setVariantRow({
                     key,
                     variantKey: combination.variantKey,
                     variantes: combination.variantes || {},
                     label: getVariantLabel(combination.variantes || {}) || `Variante ${rowMap.size + 1}`,
                     precio: Number(combination.precio || 0)
-                });
+                }, key);
             });
         });
 

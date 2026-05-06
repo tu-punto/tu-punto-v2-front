@@ -1,3 +1,47 @@
+.service-panel-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.service-panel-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.service-panel-hero-icon {
+  width: 64px;
+  flex: 0 0 auto;
+}
+
+.service-panel-hero-copy {
+  min-width: 0;
+  text-align: left;
+}
+
+.service-panel-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.service-panel-subtitle {
+  color: #64748b;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.service-announcement-card {
+  border-radius: 14px;
+  min-width: 0;
+}
+
 .service-announcement-editor-section {
   display: flex;
   flex-direction: column;
@@ -14,6 +58,12 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.service-announcement-section-title > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .service-tutorial-expanded-content {
@@ -184,7 +234,81 @@
 }
 
 @media (max-width: 768px) {
+  .service-panel-page {
+    padding: 8px !important;
+  }
+
+  .service-panel-hero {
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+
+  .service-panel-hero-icon {
+    width: 46px;
+  }
+
+  .service-panel-title {
+    font-size: 20px;
+  }
+
+  .service-announcement-card > .ant-card-head {
+    padding: 0 12px;
+  }
+
+  .service-announcement-card > .ant-card-head .ant-card-head-title {
+    padding: 12px 0;
+    white-space: normal;
+  }
+
+  .service-announcement-card > .ant-card-body {
+    padding: 14px 12px;
+    overflow-x: hidden;
+  }
+
+  .service-announcement-section-title {
+    align-items: flex-start;
+  }
+
+  .service-announcement-section-title .ant-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .service-announcement-section-title .ant-segmented-item-label {
+    padding-inline: 10px;
+    min-height: 30px;
+    line-height: 30px;
+  }
+
+  .service-announcement-editor-section {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .service-announcement-link-card,
+  .service-announcement-upload-zone-copy,
+  .service-announcement-file-card {
+    align-items: flex-start;
+  }
+
+  .service-announcement-link-card {
+    flex-wrap: wrap;
+  }
+
   .service-announcement-link-fields {
     grid-template-columns: 1fr;
+    flex-basis: 100%;
+  }
+
+  .service-announcement-files-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-announcement-upload-zone {
+    padding: 14px;
+  }
+
+  .service-announcement-upload-zone-copy {
+    flex-direction: column;
   }
 }
