@@ -1,4 +1,5 @@
 import { Button, Empty, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
+import { PrinterOutlined, WhatsAppOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useMemo, useState } from "react";
 import {
   createSimplePackageOrdersAPI,
@@ -8,6 +9,7 @@ import {
   getUploadedSimplePackageSellersAPI,
   printSimplePackageGuidesAPI,
   registerSimplePackagesAPI,
+  sendSimplePackageGuideWhatsappAPI,
   updateSimplePackageAPI,
 } from "../../api/simplePackage";
 import { getSellerAPI, getSellersBasicAPI } from "../../api/seller";
@@ -110,6 +112,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
   const [branchPriceModalVisible, setBranchPriceModalVisible] = useState(false);
   const [printingQr, setPrintingQr] = useState(false);
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
 
   const [creating, setCreating] = useState(false);
@@ -808,6 +811,44 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     }
   };
 
+  const handleSendGuideWhatsapp = async () => {
+    if (!selectedSellerId) {
+      message.warning("Selecciona un vendedor");
+      return;
+    }
+    const rowsWithGuide = pendingRows.filter((row) => row?.numero_guia);
+    if (!rowsWithGuide.length) {
+      message.warning("Primero imprime las etiquetas para generar los numeros de guia");
+      return;
+    }
+
+    setSendingWhatsapp(true);
+    try {
+      const response = await sendSimplePackageGuideWhatsappAPI({
+        packageIds: rowsWithGuide.map((row) => String(row._id)),
+      });
+
+      if (!response?.success) {
+        message.error(response.message || "No se pudieron enviar los WhatsApp");
+        return;
+      }
+
+      const sentCount = Number(response.sentCount || 0);
+      const failedCount = Number(response.failedCount || 0);
+      const skippedCount = Number(response.skippedCount || 0);
+      if (failedCount || skippedCount) {
+        message.warning(`WhatsApp enviados: ${sentCount}. Fallidos/omitidos: ${failedCount + skippedCount}`);
+        return;
+      }
+      message.success(`WhatsApp enviados: ${sentCount}`);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudieron enviar los WhatsApp");
+    } finally {
+      setSendingWhatsapp(false);
+    }
+  };
+
   const prepareRowsForCreateAndPrint = async (
     targetRows: any[],
     options = labelPrintOptions
@@ -1010,6 +1051,22 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                       disabled={!pendingRows.length || printingQr}
                     >
                       Crear paquetes
+                    </Button>
+                    <Button
+                      onClick={handlePrintPendingQrs}
+                      icon={<PrinterOutlined />}
+                      loading={printingQr}
+                      disabled={!rowsMissingPrintedQr.length || printingQr || sendingWhatsapp}
+                    >
+                      Imprimir etiquetas
+                    </Button>
+                    <Button
+                      onClick={handleSendGuideWhatsapp}
+                      icon={<WhatsAppOutlined />}
+                      loading={sendingWhatsapp}
+                      disabled={!pendingRows.some((row) => row?.numero_guia) || printingQr || sendingWhatsapp}
+                    >
+                      WhatsApp guias
                     </Button>
                   </>
                 ) : (

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { PrinterOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, message } from "antd";
-import { updateExternalSaleAPI } from "../../api/externalSale";
+import { PrinterOutlined, WhatsAppOutlined } from "@ant-design/icons";
+import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Space, message } from "antd";
+import { sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
 import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
 import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
 
@@ -42,6 +42,7 @@ const ExternalShippingInfoModal = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [printingQr, setPrintingQr] = useState(false);
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
   const packagePrice = useMemo(
     () => Number(externalShipping?.precio_paquete ?? externalShipping?.precio_total ?? 0),
@@ -121,6 +122,40 @@ const ExternalShippingInfoModal = ({
     const half = roundCurrency(buyerDebt / 2);
     form.setFieldValue("subtotal_qr", half);
     form.setFieldValue("subtotal_efectivo", roundCurrency(buyerDebt - half));
+  };
+
+  const handleSendGuideWhatsapp = async () => {
+    if (!externalShipping?._id) {
+      message.warning("No se pudo identificar el pedido");
+      return;
+    }
+    if (!externalShipping?.numero_guia) {
+      message.warning("El pedido debe tener numero de guia antes de enviar WhatsApp");
+      return;
+    }
+
+    setSendingWhatsapp(true);
+    try {
+      const response = await sendExternalGuideWhatsappAPI(String(externalShipping._id));
+      if (!response?.success) {
+        message.error(response.message || "No se pudo enviar WhatsApp");
+        return;
+      }
+
+      const sentCount = Number(response.sentCount || 0);
+      const failedCount = Number(response.failedCount || 0);
+      const skippedCount = Number(response.skippedCount || 0);
+      if (failedCount || skippedCount) {
+        message.warning(`WhatsApp enviados: ${sentCount}. Fallidos/omitidos: ${failedCount + skippedCount}`);
+        return;
+      }
+      message.success(`WhatsApp enviados: ${sentCount}`);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo enviar WhatsApp");
+    } finally {
+      setSendingWhatsapp(false);
+    }
   };
 
   const handleSubtotalQrChange = (value: number | null) => {
@@ -319,14 +354,24 @@ const ExternalShippingInfoModal = ({
       destroyOnClose
     >
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <Space wrap>
         <Button
           icon={<PrinterOutlined />}
           loading={printingQr}
-          disabled={!externalShipping?.numero_guia}
+          disabled={!externalShipping?.numero_guia || sendingWhatsapp}
           onClick={() => void handlePrintExternalQRDirect()}
         >
           Imprimir etiqueta
         </Button>
+        <Button
+          icon={<WhatsAppOutlined />}
+          loading={sendingWhatsapp}
+          disabled={!externalShipping?.numero_guia || printingQr}
+          onClick={() => void handleSendGuideWhatsapp()}
+        >
+          WhatsApp guia
+        </Button>
+        </Space>
       </div>
       <Form form={form} layout="vertical" onFinish={handleSave}>
         <Card title="Informacion del Vendedor" bordered={false}>
