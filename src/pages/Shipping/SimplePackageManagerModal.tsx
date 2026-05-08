@@ -94,6 +94,12 @@ const summaryCardStyle: React.CSSProperties = {
 const getBranchId = (value: any) => String(value?._id || value || "").trim();
 const isQrPrintedRow = (row: any) => Boolean(row?.qr_impreso || row?.numero_guia);
 const getBranchName = (value: any, fallback = "") => String(value?.nombre || fallback || "").trim();
+const formatSellerDisplayName = (seller: any) => {
+  const fullName = `${seller?.nombre || ""} ${seller?.apellido || ""}`.trim();
+  const brand = String(seller?.marca || "").trim();
+  if (brand && fullName) return `${brand} - ${fullName}`;
+  return fullName || brand || seller?.vendedor || "Vendedor";
+};
 
 const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackageManagerModalProps) => {
   const { user }: any = useContext(UserContext);
@@ -1090,7 +1096,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                         onChange={(value) => setCreateSellerId(String(value || ""))}
                         options={createSellerOptions.map((seller: any) => ({
                           value: String(seller._id),
-                          label: `${seller.nombre || ""} ${seller.apellido || ""}`.trim() || seller.marca || "Vendedor",
+                          label: formatSellerDisplayName(seller),
                         }))}
                         placeholder="Selecciona un vendedor"
                       />
