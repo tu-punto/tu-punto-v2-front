@@ -14,6 +14,7 @@ let qzSigningChecked = false;
 let qzSigningAvailable = false;
 
 const isQzReady = () => typeof window !== "undefined" && Boolean(window.qz);
+const waitMs = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 const serverBase = String(SERVER_URL || "").replace(/\/+$/, "");
 const qzCertificateUrl = `${serverBase}/qr/certificate`;
 const qzSignUrl = `${serverBase}/qr/sign`;
@@ -113,9 +114,13 @@ export const ensureQzLoaded = async (): Promise<any> => {
   return qzScriptPromise;
 };
 
-export const connectQz = async (): Promise<any> => {
+export const connectQz = async (options?: { forceReconnect?: boolean }): Promise<any> => {
   const qz = await ensureQzLoaded();
   await ensureQzSecurity(qz);
+  if (options?.forceReconnect && qz.websocket.isActive()) {
+    await qz.websocket.disconnect();
+    await waitMs(250);
+  }
   if (!qz.websocket.isActive()) {
     await qz.websocket.connect({
       retries: 2,
@@ -132,12 +137,42 @@ export const disconnectQz = async (): Promise<void> => {
   }
 };
 
-export const findQzPrinters = async (): Promise<string[]> => {
-  const qz = await connectQz();
+const normalizePrinterName = (value: unknown): string => String(value || "").trim();
+
+const addPrinterNames = (target: Set<string>, value: unknown) => {
+  if (Array.isArray(value)) {
+    value.forEach((item) => addPrinterNames(target, item));
+    return;
+  }
+
+  if (typeof value === "string") {
+    const name = normalizePrinterName(value);
+    if (name) target.add(name);
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    const row = value as Record<string, unknown>;
+    const name = normalizePrinterName(row.name || row.printerName || row.printer || row.id);
+    if (name) target.add(name);
+  }
+};
+
+export const findQzPrinters = async (options?: { refresh?: boolean }): Promise<string[]> => {
+  const qz = await connectQz({ forceReconnect: options?.refresh });
+  const names = new Set<string>();
+
   const printers = await qz.printers.find();
-  if (Array.isArray(printers)) return printers;
-  if (typeof printers === "string") return [printers];
-  return [];
+  addPrinterNames(names, printers);
+
+  try {
+    const details = await qz.printers.details();
+    addPrinterNames(names, details);
+  } catch (error) {
+    console.warn("[QZ] No se pudo obtener detalle de impresoras", error);
+  }
+
+  return Array.from(names).sort((a, b) => a.localeCompare(b));
 };
 
 export const createEscPosConfig = async (

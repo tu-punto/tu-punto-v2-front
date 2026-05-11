@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, InputNumber, Modal, Select, Switch, Typography, message } from "antd";
+import { Alert, Button, Input, InputNumber, Modal, Select, Switch, Typography, message } from "antd";
 import { CheckCircleFilled, EyeOutlined, InboxOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { batchGenerateVariantQRAPI, listVariantQRAPI, listVariantQRGroupAPI } from "../../api/qr";
 import { SERVER_URL } from "../../config/config";
@@ -460,6 +460,7 @@ const VariantQRBatchModal = ({
   const [selectedQzPrinter, setSelectedQzPrinter] = useState<string | undefined>(
     localStorage.getItem("qzPrinterName") || undefined
   );
+  const [manualQzPrinter, setManualQzPrinter] = useState("");
   const [directPreviewVisible, setDirectPreviewVisible] = useState(false);
   const [directPreviewItems, setDirectPreviewItems] = useState<DirectPreviewItem[]>([]);
   const [stockByItemKey, setStockByItemKey] = useState<Record<string, number>>({});
@@ -519,8 +520,12 @@ const VariantQRBatchModal = ({
   const effectiveProductIds = hasInitialProductIds ? initialProductIds : undefined;
   const hasScopedSelection = Boolean(sellerId) || Boolean(effectiveProductIds?.length);
   const qzPrinterOptions = useMemo(
-    () => qzPrinters.map((name) => ({ value: name, label: name })),
-    [qzPrinters]
+    () => {
+      const names = new Set(qzPrinters);
+      if (selectedQzPrinter) names.add(selectedQzPrinter);
+      return Array.from(names).map((name) => ({ value: name, label: name }));
+    },
+    [qzPrinters, selectedQzPrinter]
   );
   const itemPrintKey = (item: QRItem) => `${item.productId}::${item.variantKey}`;
   const getItemSystemStock = (item: QRItem) => {
@@ -834,8 +839,9 @@ const VariantQRBatchModal = ({
   const handleLoadQzPrinters = async () => {
     setQzBusy(true);
     try {
-      const printers = await findQzPrinters();
+      const printers = await findQzPrinters({ refresh: true });
       setQzPrinters(printers);
+      setQzConnected(true);
 
       if (!printers.length) {
         message.warning("No se encontraron impresoras en QZ Tray");
@@ -856,6 +862,20 @@ const VariantQRBatchModal = ({
     } finally {
       setQzBusy(false);
     }
+  };
+
+  const handleUseManualPrinter = () => {
+    const printerName = manualQzPrinter.trim();
+    if (!printerName) {
+      message.warning("Escribe el nombre exacto de la impresora");
+      return;
+    }
+
+    setQzPrinters((current) => (current.includes(printerName) ? current : [...current, printerName]));
+    setSelectedQzPrinter(printerName);
+    localStorage.setItem("qzPrinterName", printerName);
+    setManualQzPrinter("");
+    message.success("Impresora guardada para impresion directa");
   };
 
   const handlePrintDirect = async (items: QRItem[], isTest = false) => {
@@ -1341,6 +1361,17 @@ const VariantQRBatchModal = ({
                 showSearch
                 optionFilterProp="label"
               />
+              <div className="flex gap-2 mt-2">
+                <Input
+                  value={manualQzPrinter}
+                  onChange={(event) => setManualQzPrinter(event.target.value)}
+                  onPressEnter={handleUseManualPrinter}
+                  placeholder="Nombre exacto si no aparece en QZ"
+                />
+                <Button onClick={handleUseManualPrinter} style={{ borderRadius: 12 }}>
+                  Usar
+                </Button>
+              </div>
             </div>
           </div>
 
