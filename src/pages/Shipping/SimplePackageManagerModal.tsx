@@ -140,6 +140,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const totals = useMemo(() => calculateSimplePackageTotals(rows), [rows]);
   const createTotals = useMemo(() => calculateSimplePackageTotals(createRows), [createRows]);
   const selectedSeller = sellerRows.find((seller) => String(seller._id) === String(selectedSellerId));
+  const canSendGuideWhatsapp = isSuperadminUser(user);
 
   const generalPaymentMethod = useMemo(() => {
     if (!rows.length) return "";
@@ -818,6 +819,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   };
 
   const handleSendGuideWhatsapp = async () => {
+    if (!canSendGuideWhatsapp) {
+      message.warning("Solo superadmins pueden enviar guias por WhatsApp");
+      return;
+    }
     if (!selectedSellerId) {
       message.warning("Selecciona un vendedor");
       return;
@@ -1066,14 +1071,16 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                     >
                       Imprimir etiquetas
                     </Button>
-                    <Button
-                      onClick={handleSendGuideWhatsapp}
-                      icon={<WhatsAppOutlined />}
-                      loading={sendingWhatsapp}
-                      disabled={!pendingRows.some((row) => row?.numero_guia) || printingQr || sendingWhatsapp}
-                    >
-                      WhatsApp guias
-                    </Button>
+                    {canSendGuideWhatsapp && (
+                      <Button
+                        onClick={handleSendGuideWhatsapp}
+                        icon={<WhatsAppOutlined />}
+                        loading={sendingWhatsapp}
+                        disabled={!pendingRows.some((row) => row?.numero_guia) || printingQr || sendingWhatsapp}
+                      >
+                        WhatsApp guias
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <Button onClick={resetCreateState}>Cancelar creacion</Button>

@@ -11,6 +11,7 @@ interface ExternalShippingInfoModalProps {
   onSaved: () => void;
   externalShipping: any;
   isAdmin: boolean;
+  canSendGuideWhatsapp: boolean;
 }
 
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
@@ -38,6 +39,7 @@ const ExternalShippingInfoModal = ({
   onSaved,
   externalShipping,
   isAdmin,
+  canSendGuideWhatsapp,
 }: ExternalShippingInfoModalProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -125,6 +127,10 @@ const ExternalShippingInfoModal = ({
   };
 
   const handleSendGuideWhatsapp = async () => {
+    if (!canSendGuideWhatsapp) {
+      message.warning("Solo superadmins pueden enviar la guia por WhatsApp");
+      return;
+    }
     if (!externalShipping?._id) {
       message.warning("No se pudo identificar el pedido");
       return;
@@ -363,14 +369,16 @@ const ExternalShippingInfoModal = ({
         >
           Imprimir etiqueta
         </Button>
-        <Button
-          icon={<WhatsAppOutlined />}
-          loading={sendingWhatsapp}
-          disabled={!externalShipping?.numero_guia || printingQr}
-          onClick={() => void handleSendGuideWhatsapp()}
-        >
-          WhatsApp guia
-        </Button>
+        {canSendGuideWhatsapp && (
+          <Button
+            icon={<WhatsAppOutlined />}
+            loading={sendingWhatsapp}
+            disabled={!externalShipping?.numero_guia || printingQr}
+            onClick={() => void handleSendGuideWhatsapp()}
+          >
+            WhatsApp guia
+          </Button>
+        )}
         </Space>
       </div>
       <Form form={form} layout="vertical" onFinish={handleSave}>

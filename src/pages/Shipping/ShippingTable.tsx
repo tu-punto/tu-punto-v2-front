@@ -11,6 +11,7 @@ import SimplePackageManagerModal from './SimplePackageManagerModal';
 import { getSucursalsBasicAPI } from '../../api/sucursal';
 import { getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
+import { isSuperadminUser } from "../../utils/role";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
@@ -1118,6 +1119,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 visible={isExternalInfoVisible}
                 externalShipping={selectedExternalShipping}
                 isAdmin={canManageExternal}
+                canSendGuideWhatsapp={isSuperadminUser(user)}
                 onClose={() => {
                     setIsExternalInfoVisible(false);
                     setSelectedExternalShipping(null);
