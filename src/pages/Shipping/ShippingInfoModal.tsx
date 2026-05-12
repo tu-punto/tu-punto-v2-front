@@ -191,9 +191,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         () => Number(shipping?.deuda_comprador ?? 0),
         [shipping]
     );
+    const deliveryPermissionBranchId = paymentBranchId || deliveryOwnerBranchId;
     const canMarkAsDelivered = useMemo(() => {
-        return !deliveryOwnerBranchId || String(deliveryOwnerBranchId) === String(currentSucursalId);
-    }, [deliveryOwnerBranchId, currentSucursalId]);
+        return !deliveryPermissionBranchId || String(deliveryPermissionBranchId) === String(currentSucursalId);
+    }, [deliveryPermissionBranchId, currentSucursalId]);
 
 
     const saldoACobrar = useMemo(() => {
