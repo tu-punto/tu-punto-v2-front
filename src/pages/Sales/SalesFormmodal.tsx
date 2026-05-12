@@ -5,7 +5,7 @@ import { registerShippingAPI } from "../../api/shipping";
 const tipoPagoMap: Record<number, string> = {
   1: "Transferencia o QR",
   2: "Efectivo",
-  3: "Pagado al dueno",
+  3: "Pagado al dueño",
   4: "Efectivo + QR",
 };
 
