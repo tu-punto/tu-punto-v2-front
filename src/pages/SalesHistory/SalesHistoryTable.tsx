@@ -25,7 +25,8 @@ const SalesHistoryTable = () => {
 
         try {
             if (record.is_external) {
-                const res = await getExternalSaleByIdAPI(record._id);
+                const externalId = record.external_sale_id || String(record._id || "").replace(/-(seller|buyer)-payment$/, "");
+                const res = await getExternalSaleByIdAPI(externalId);
                 if (res && res._id) {
                     setSelectedExternalSale(res);
                     setIsExternalModalOpen(true);
