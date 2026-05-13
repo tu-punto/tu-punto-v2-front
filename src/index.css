@@ -100,3 +100,12 @@ button:focus-visible {
 .highlight-row {
   background-color: #f0f8ff; /* Light blue background for highlighted rows */
 }
+
+.external-seller-payment-segmented .ant-segmented-item-selected {
+  background: #ff7f2a;
+  color: #ffffff;
+}
+
+.external-seller-payment-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #ffffff;
+}

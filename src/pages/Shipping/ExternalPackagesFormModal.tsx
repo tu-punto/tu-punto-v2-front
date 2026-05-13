@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AutoComplete, Button, Form, Input, InputNumber, Modal, Select, Space, message } from "antd";
+import { AutoComplete, Button, Form, Input, InputNumber, Modal, Segmented, Select, Space, message } from "antd";
 import {
   ExternalContactSuggestion,
   getExternalContactSuggestionsAPI,
@@ -24,6 +24,8 @@ interface ExternalPackagesFormModalProps {
 
 const MIN_PACKAGES = 1;
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+const getTotalPaymentAmount = (packagePrice: number, branchRoutePrice: number) =>
+  roundCurrency(Number(packagePrice || 0) + Number(branchRoutePrice || 0));
 const waitMs = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 
 const ticketWidthOptions = [
@@ -196,11 +198,22 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   };
 
   const handlePackageDestinationChange = (rowIndex: number, destinationId: string) => {
+    const branchRoutePrice = getBranchRoutePrice(watchedOriginBranchId, destinationId);
+    const packagePrice = roundCurrency(Number(form.getFieldValue(["paquetes", rowIndex, "precio_paquete"]) || 0));
+    const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
+    const mode = form.getFieldValue(["paquetes", rowIndex, "esta_pagado"]) || "no";
+
     form.setFieldValue(["paquetes", rowIndex, "destino_sucursal_id"], destinationId);
-    form.setFieldValue(
-      ["paquetes", rowIndex, "precio_entre_sucursal"],
-      getBranchRoutePrice(watchedOriginBranchId, destinationId)
-    );
+    form.setFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"], branchRoutePrice);
+
+    if (mode === "si") {
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], totalAmount);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
+    } else if (mode === "mixto" && totalAmount > 0) {
+      const half = roundCurrency(totalAmount / 2);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], half);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(totalAmount - half));
+    }
   };
 
   const applyDestinationToAll = () => {
@@ -212,11 +225,25 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const currentRows = form.getFieldValue("paquetes") || [];
     form.setFieldValue(
       "paquetes",
-      buildPackages(packageCount, currentRows).map((row) => ({
-        ...row,
-        destino_sucursal_id: watchedDestinationBranchId,
-        precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, watchedDestinationBranchId),
-      }))
+      buildPackages(packageCount, currentRows).map((row) => {
+        const branchRoutePrice = getBranchRoutePrice(watchedOriginBranchId, watchedDestinationBranchId);
+        const totalAmount = getTotalPaymentAmount(Number(row.precio_paquete || 0), branchRoutePrice);
+        const mode = row.esta_pagado || "no";
+        const nextRow = {
+          ...row,
+          destino_sucursal_id: watchedDestinationBranchId,
+          precio_entre_sucursal: branchRoutePrice,
+        };
+
+        if (mode === "si") {
+          return { ...nextRow, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
+        }
+        if (mode === "mixto" && totalAmount > 0) {
+          const half = roundCurrency(totalAmount / 2);
+          return { ...nextRow, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
+        }
+        return nextRow;
+      })
     );
   };
 
@@ -249,21 +276,22 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       "paquetes",
       buildPackages(packageCount, currentRows).map((row) => {
         const mode = row.esta_pagado || "no";
+        const totalAmount = getTotalPaymentAmount(price, row.precio_entre_sucursal || 0);
         if (mode === "si") {
           return {
             ...row,
             precio_paquete: price,
-            monto_paga_vendedor: price,
+            monto_paga_vendedor: totalAmount,
             monto_paga_comprador: 0,
           };
         }
         if (mode === "mixto") {
-          const half = roundCurrency(price / 2);
+          const half = roundCurrency(totalAmount / 2);
           return {
             ...row,
             precio_paquete: price,
             monto_paga_vendedor: half,
-            monto_paga_comprador: roundCurrency(price - half),
+            monto_paga_comprador: roundCurrency(totalAmount - half),
           };
         }
         return {
@@ -278,6 +306,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
   const handlePaymentModeChange = (rowIndex: number, mode: "si" | "no" | "mixto") => {
     const price = Number(form.getFieldValue(["paquetes", rowIndex, "precio_paquete"]) || 0);
+    const branchRoutePrice = Number(form.getFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"]) || 0);
+    const totalAmount = getTotalPaymentAmount(price, branchRoutePrice);
     if (price <= 0) {
       message.warning("Primero ingresa el precio del paquete");
       form.setFieldValue(["paquetes", rowIndex, "esta_pagado"], "no");
@@ -287,7 +317,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
 
     if (mode === "si") {
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], price);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], totalAmount);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
       return;
     }
@@ -297,13 +327,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       return;
     }
 
-    const half = roundCurrency(price / 2);
+    const half = roundCurrency(totalAmount / 2);
     form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], half);
-    form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(price - half));
+    form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(totalAmount - half));
   };
 
   const handlePackagePriceChange = (rowIndex: number, value: number | null) => {
     const price = roundCurrency(Number(value || 0));
+    const branchRoutePrice = roundCurrency(Number(form.getFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"]) || 0));
+    const totalAmount = getTotalPaymentAmount(price, branchRoutePrice);
     const mode = form.getFieldValue(["paquetes", rowIndex, "esta_pagado"]) || "no";
     const currentSellerAmount = roundCurrency(
       Number(form.getFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"]) || 0)
@@ -320,7 +352,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
 
     if (mode === "si") {
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], price);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], totalAmount);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
       return;
     }
@@ -329,23 +361,25 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       const hasManualSplit = currentSellerAmount > 0 && currentBuyerAmount > 0;
 
       if (hasManualSplit) {
-        const nextSellerAmount = Math.min(currentSellerAmount, roundCurrency(Math.max(0, price - 0.01)));
+        const nextSellerAmount = Math.min(currentSellerAmount, roundCurrency(Math.max(0, totalAmount - 0.01)));
         form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], nextSellerAmount);
         form.setFieldValue(
           ["paquetes", rowIndex, "monto_paga_comprador"],
-          roundCurrency(price - nextSellerAmount)
+          roundCurrency(totalAmount - nextSellerAmount)
         );
         return;
       }
 
-      const half = roundCurrency(price / 2);
+      const half = roundCurrency(totalAmount / 2);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], half);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(price - half));
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(totalAmount - half));
     }
   };
 
   const handleMixedSellerChange = (rowIndex: number, value: number | null) => {
     const price = roundCurrency(Number(form.getFieldValue(["paquetes", rowIndex, "precio_paquete"]) || 0));
+    const branchRoutePrice = roundCurrency(Number(form.getFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"]) || 0));
+    const totalAmount = getTotalPaymentAmount(price, branchRoutePrice);
     if (price <= 0) {
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
@@ -354,10 +388,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
     let seller = roundCurrency(Number(value || 0));
     if (seller < 0) seller = 0;
-    if (seller > price) seller = price;
+    if (seller > totalAmount) seller = totalAmount;
 
     form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], seller);
-    form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(price - seller));
+    form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(totalAmount - seller));
   };
 
   const handlePackageCountChange = (value: number | null) => {
@@ -367,11 +401,23 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       numero_paquetes: nextCount,
       paquetes: buildPackages(nextCount, currentRows).map((row) => {
         const destinationId = row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "";
-        return {
+        const branchRoutePrice = getBranchRoutePrice(watchedOriginBranchId, destinationId);
+        const totalAmount = getTotalPaymentAmount(Number(row.precio_paquete || 0), branchRoutePrice);
+        const mode = row.esta_pagado || "no";
+        const nextRow = {
           ...row,
           destino_sucursal_id: destinationId,
-          precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, destinationId),
+          precio_entre_sucursal: branchRoutePrice,
         };
+
+        if (mode === "si") {
+          return { ...nextRow, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
+        }
+        if (mode === "mixto" && totalAmount > 0) {
+          const half = roundCurrency(totalAmount / 2);
+          return { ...nextRow, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
+        }
+        return nextRow;
       }),
     });
     setPackageCount(nextCount);
@@ -507,7 +553,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       origen_sucursal_id: currentSucursal?._id,
       destino_sucursal_id: currentSucursal?._id,
       numero_paquetes: MIN_PACKAGES,
-      metodo_pago: undefined,
+      metodo_pago: "efectivo",
       paquetes: buildPackages(MIN_PACKAGES).map((row) => ({
         ...row,
         destino_sucursal_id: currentSucursal?._id || "",
@@ -534,11 +580,23 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           ? row.destino_sucursal_id
           : nextGeneralDestination;
 
-        return {
+        const branchRoutePrice = getBranchRoutePrice(watchedOriginBranchId, destinationId);
+        const totalAmount = getTotalPaymentAmount(Number(row.precio_paquete || 0), branchRoutePrice);
+        const mode = row.esta_pagado || "no";
+        const nextRow = {
           ...row,
           destino_sucursal_id: destinationId,
-          precio_entre_sucursal: getBranchRoutePrice(watchedOriginBranchId, destinationId),
+          precio_entre_sucursal: branchRoutePrice,
         };
+
+        if (mode === "si") {
+          return { ...nextRow, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
+        }
+        if (mode === "mixto" && totalAmount > 0) {
+          const half = roundCurrency(totalAmount / 2);
+          return { ...nextRow, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
+        }
+        return nextRow;
       })
     );
   }, [destinationOptions, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
@@ -562,9 +620,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       const paidStatus = row.esta_pagado || "no";
       let sellerAmount = roundCurrency(Number(row.monto_paga_vendedor || 0));
       let buyerAmount = roundCurrency(Number(row.monto_paga_comprador || 0));
+      const totalAmount = getTotalPaymentAmount(price, branchRoutePrice);
 
       if (paidStatus === "si") {
-        sellerAmount = price;
+        sellerAmount = totalAmount;
         buyerAmount = 0;
       } else if (paidStatus === "no") {
         sellerAmount = 0;
@@ -592,6 +651,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       }
       if (p.esta_pagado === "mixto") {
         const price = Number(p.precio_paquete || 0);
+        const totalAmount = getTotalPaymentAmount(price, Number(p.precio_entre_sucursal || 0));
         const montoVendedor = Number(p.monto_paga_vendedor || 0);
         const montoComprador = Number(p.monto_paga_comprador || 0);
         const suma = roundCurrency(montoVendedor + montoComprador);
@@ -604,12 +664,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           message.error("En pago mixto ambos deben pagar un monto mayor a 0");
           return;
         }
-        if (montoVendedor >= price || montoComprador >= price) {
-          message.error("En pago mixto ninguna parte puede pagar todo el paquete");
+        if (montoVendedor >= totalAmount || montoComprador >= totalAmount) {
+          message.error("En pago mixto ninguna parte puede pagar todo el monto");
           return;
         }
-        if (Math.abs(suma - price) > 0.01) {
-          message.error("En pago mixto la suma debe ser igual al precio del paquete");
+        if (Math.abs(suma - totalAmount) > 0.01) {
+          message.error("En pago mixto la suma debe ser igual al precio del paquete mas el precio entre sucursal");
           return;
         }
       }
@@ -772,9 +832,9 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             label="Pago del vendedor"
             rules={hasSellerPayment ? [{ required: true, message: "Selecciona efectivo o QR" }] : []}
           >
-            <Select
-              allowClear
-              placeholder="Selecciona como se recibio el pago del vendedor"
+            <Segmented
+              block
+              className="external-seller-payment-segmented"
               options={[
                 { label: "Efectivo", value: "efectivo" },
                 { label: "QR", value: "qr" },
@@ -988,7 +1048,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                             >
                               <InputNumber
                                 min={0}
-                                max={Math.max(0, roundCurrency(Number(watchedPackages?.[rowIndex]?.precio_paquete || 0) - 0.01))}
+                                max={Math.max(
+                                  0,
+                                  roundCurrency(
+                                    getTotalPaymentAmount(
+                                      Number(watchedPackages?.[rowIndex]?.precio_paquete || 0),
+                                      Number(watchedPackages?.[rowIndex]?.precio_entre_sucursal || 0)
+                                    ) - 0.01
+                                  )
+                                )}
                                 precision={2}
                                 prefix="Bs."
                                 style={{ width: "100%" }}
