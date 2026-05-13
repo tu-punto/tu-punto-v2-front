@@ -96,9 +96,17 @@ const getShippingByIdAPI = async (id: string) => {
 
 const updateShippingAPI = async (updateShippingData: any, shippingId: string) => {
   try {
-    const res = await apiClient.put(`/shipping/${shippingId}`, updateShippingData);
+    const currentBranchId = localStorage.getItem("sucursalId") || undefined;
+    const res = await apiClient.put(`/shipping/${shippingId}`, {
+      ...updateShippingData,
+      currentBranchId,
+    });
     return { success: true, ...res.data };
   } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
     return { success: false };
   }
 };

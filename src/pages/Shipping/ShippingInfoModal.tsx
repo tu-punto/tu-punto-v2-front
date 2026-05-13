@@ -673,7 +673,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
             console.log("📤 Datos enviados al backend:", updateShippingInfo);
 
-            await updateShippingAPI(updateShippingInfo, shipping._id);
+            const updateResponse = await updateShippingAPI(updateShippingInfo, shipping._id);
+            if (!updateResponse?.success) {
+                message.error(updateResponse?.msg || updateResponse?.error?.message || "No se pudo actualizar el pedido");
+                return;
+            }
             message.success("Pedido actualizado con éxito");
             onSave();
             onClose();
