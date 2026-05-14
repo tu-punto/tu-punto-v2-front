@@ -13,7 +13,7 @@ import {
   Modal,
   Radio,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { IBoxClose } from "../../models/boxClose";
 import {
@@ -23,6 +23,7 @@ import {
 } from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
+import { UserContext } from "../../context/userContext";
 const { Title } = Typography;
 type Metodo = "efectivo" | "qr";
 type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_cliente";
@@ -81,6 +82,19 @@ const BoxCloseForm = ({
   const [operations, setOperations] = useState<OperacionAdicional[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [operationForm] = Form.useForm();
+  const { user } = useContext(UserContext) || {};
+  const currentUserId = user?._id || user?.id;
+  const currentUserAdmin = admins.find((admin) => String(admin._id) === String(currentUserId));
+  const currentUserOption = currentUserId
+    ? {
+        label: currentUserAdmin?.name || user?.nombre_vendedor || user?.name || user?.email || "Usuario actual",
+        value: currentUserId,
+      }
+    : undefined;
+  const responsibleOptions =
+    currentUserOption && !admins.some((admin) => String(admin._id) === String(currentUserOption.value))
+      ? [currentUserOption, ...admins.map((admin) => ({ label: admin.name, value: admin._id }))]
+      : admins.map((admin) => ({ label: admin.name, value: admin._id }));
 
   const getOperationTotals = (ops: OperacionAdicional[]) => {
     let deltaEf = 0;
@@ -164,6 +178,12 @@ const BoxCloseForm = ({
     };
     fetchAdmins();
   }, []);
+
+  useEffect(() => {
+    if (mode !== "create" || !currentUserOption || form.getFieldValue("responsable")) return;
+    form.setFieldValue("responsable", currentUserOption);
+  }, [mode, currentUserOption?.value, currentUserOption?.label, form]);
+
   const buildClosingAtISO = () => {
     const now = new Date();
     const selected = selectedDate?.toDate();
@@ -519,10 +539,7 @@ const BoxCloseForm = ({
                   onChange={(option) => {
                     form.setFieldValue("responsable", option); // <- ¡simplemente esto!
                   }}
-                  options={admins.map((admin) => ({
-                    label: admin.name,
-                    value: admin._id,
-                  }))}
+                  options={responsibleOptions}
                 />
               </Form.Item>
             </Col>
