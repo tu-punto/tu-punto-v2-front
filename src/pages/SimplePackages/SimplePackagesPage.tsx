@@ -1,7 +1,11 @@
 import { Button, Card, Input, InputNumber, Select, Space, Spin, Typography, message } from "antd";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { getSellerAPI } from "../../api/seller";
-import { getSimplePackageBranchPricesAPI, registerSimplePackagesAPI } from "../../api/simplePackage";
+import {
+  getSimplePackageBranchPricesAPI,
+  getSimplePackageEscalationStatusAPI,
+  registerSimplePackagesAPI,
+} from "../../api/simplePackage";
 import { UserContext } from "../../context/userContext";
 import {
   createDraftRow,
@@ -33,6 +37,8 @@ const SimplePackagesPage = () => {
   const [selectedDestinationId, setSelectedDestinationId] = useState("");
   const [sellerBranches, setSellerBranches] = useState<any[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
+  const [monthlyPackageCount, setMonthlyPackageCount] = useState(0);
+  const [missingForNextRange, setMissingForNextRange] = useState(0);
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
     precio_paquete: Number(user?.seller_precio_paquete || 0),
     amortizacion: Number(user?.seller_amortizacion || 0),
@@ -56,6 +62,17 @@ const SimplePackagesPage = () => {
         precio: Number(row?.precio || 0),
         destino: row?.destino_sucursal,
       });
+    });
+    return map;
+  }, [branchPrices]);
+
+  const routeIdMap = useMemo(() => {
+    const map = new Map<string, string>();
+    branchPrices.forEach((row: any) => {
+      const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
+      const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
+      if (!originId || !destinationId) return;
+      map.set(`${originId}::${destinationId}`, String(row?._id || ""));
     });
     return map;
   }, [branchPrices]);
@@ -95,6 +112,18 @@ const SimplePackagesPage = () => {
     if (String(originId) === String(destinationId)) return 0;
     return Number(routePriceMap.get(`${originId}::${destinationId}`)?.precio || 0);
   };
+
+  const getRouteId = (originId: string, destinationId?: string) => {
+    if (!originId || !destinationId) return "";
+    return String(routeIdMap.get(`${originId}::${destinationId}`) || "");
+  };
+
+  const nextMonthlyNumber = monthlyPackageCount + 1;
+  const progressTarget = missingForNextRange > 0 ? nextMonthlyNumber + missingForNextRange : nextMonthlyNumber;
+  const progressPercent =
+    missingForNextRange > 0
+      ? Math.max(8, Math.min(100, Math.round((nextMonthlyNumber / progressTarget) * 100)))
+      : 100;
 
   useEffect(() => {
     const fetchSellerConfig = async () => {
@@ -176,6 +205,27 @@ const SimplePackagesPage = () => {
       })
     );
   }, [destinationOptions, selectedOriginId, sellerConfig, routePriceMap]);
+
+  useEffect(() => {
+    if (!user?.id_vendedor) return;
+
+    const fetchEscalationStatus = async () => {
+      try {
+        const response = await getSimplePackageEscalationStatusAPI({
+          sellerId: user.id_vendedor,
+          routeId: getRouteId(selectedOriginId, selectedDestinationId),
+        });
+        if (response?.success && response?.data) {
+          setMonthlyPackageCount(Number(response.data.monthCount || 0));
+          setMissingForNextRange(Number(response.data.missingForNextRange || 0));
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void fetchEscalationStatus();
+  }, [selectedOriginId, selectedDestinationId, routeIdMap, user?.id_vendedor]);
 
   const updateRow = (index: number, patch: Partial<SimplePackageDraftRow>) => {
     setRows((prev) =>
@@ -305,10 +355,59 @@ const SimplePackagesPage = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-3 mb-4">
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/box-icon.png" alt="Paquetes" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">Paquetes del servicio</h1>
+        </div>
+        <div
+          style={{
+            minWidth: 280,
+            maxWidth: 520,
+            border: "1px solid #fed7aa",
+            borderRadius: 10,
+            padding: "10px 14px",
+            background: "linear-gradient(135deg, #fff7ed 0%, #ffffff 58%, #eff6ff 100%)",
+            boxShadow: "0 10px 28px rgba(249, 115, 22, 0.12)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <div>
+              <Typography.Text strong style={{ color: "#9a3412" }}>
+                Racha mensual: {monthlyPackageCount} paquete(s)
+              </Typography.Text>
+              <div style={{ color: "#1f2937", fontWeight: 700, marginTop: 2 }}>
+                {missingForNextRange > 0
+                  ? `Faltan ${missingForNextRange} para desbloquear el siguiente rango`
+                  : "Ya estas en el mejor rango del mes"}
+              </div>
+            </div>
+            <div
+              style={{
+                minWidth: 56,
+                height: 56,
+                borderRadius: 10,
+                display: "grid",
+                placeItems: "center",
+                background: "#ffedd5",
+                color: "#9a3412",
+                fontWeight: 800,
+                fontSize: 18,
+              }}
+            >
+              #{nextMonthlyNumber}
+            </div>
+          </div>
+          <div style={{ height: 7, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", marginTop: 8 }}>
+            <div
+              style={{
+                height: "100%",
+                width: `${progressPercent}%`,
+                borderRadius: 999,
+                background: "linear-gradient(90deg, #f97316 0%, #2563eb 100%)",
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -372,6 +471,7 @@ const SimplePackagesPage = () => {
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ ...tableCellStyle, width: 72 }}>#</th>
                     <th style={tableCellStyle}>Nombre del comprador</th>
                     <th style={tableCellStyle}>Descripcion del paquete</th>
                     <th style={tableCellStyle}>Celular</th>
@@ -385,6 +485,9 @@ const SimplePackagesPage = () => {
                 <tbody>
                   {rows.map((row, index) => (
                     <tr key={row.key}>
+                      <td style={tableCellStyle}>
+                        <Typography.Text strong>{monthlyPackageCount + index + 1}</Typography.Text>
+                      </td>
                       <td style={tableCellStyle}>
                         <Input
                           value={row.comprador}
@@ -470,7 +573,7 @@ const SimplePackagesPage = () => {
               {rows.map((row, index) => (
                 <div key={row.key} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
                   <div className="mb-3 flex items-center justify-between">
-                    <Typography.Text strong>Paquete {index + 1}</Typography.Text>
+                    <Typography.Text strong>Paquete #{monthlyPackageCount + index + 1}</Typography.Text>
                     <Typography.Text type="secondary">
                       Total: Bs. {Number(row.precio_total || 0).toFixed(2)}
                     </Typography.Text>

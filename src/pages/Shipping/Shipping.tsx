@@ -1,14 +1,19 @@
 import { useState, useContext } from "react";
 import { UserContext } from "../../context/userContext.tsx";
+import { Button, Tooltip } from "antd";
+import { SettingOutlined } from "@ant-design/icons";
 
 import ShippingTable from "./ShippingTable";
 import ShippingQRScannerModal from "./ShippingQRScannerModal.tsx";
+import PackageEscalationControlModal from "./PackageEscalationControlModal";
 import "./ShippingTable.css";
+import { isSuperadminUser } from "../../utils/role";
 
 
 const Shipping = () => {
 	const refreshKey = 0;
 	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+	const [isEscalationControlVisible, setIsEscalationControlVisible] = useState(false);
 
 	const { user }: any = useContext(UserContext);
 	const canScanOrders =
@@ -26,6 +31,18 @@ const Shipping = () => {
 						Pedidos
 					</h1>
 				</div>
+				{isSuperadminUser(user) && (
+					<Tooltip title="Control de Escalonamiento">
+						<Button
+							type="default"
+							icon={<SettingOutlined />}
+							onClick={() => setIsEscalationControlVisible(true)}
+							style={{ height: 42, borderRadius: 10, fontWeight: 700 }}
+						>
+							Escalonamiento
+						</Button>
+					</Tooltip>
+				)}
 			</div>
 
 			<ShippingTable
@@ -35,6 +52,10 @@ const Shipping = () => {
 			<ShippingQRScannerModal
 				open={isQRModalOpen}
 				onClose={() => setIsQRModalOpen(false)}
+			/>
+			<PackageEscalationControlModal
+				visible={isEscalationControlVisible}
+				onClose={() => setIsEscalationControlVisible(false)}
 			/>
 		</div >
 	);

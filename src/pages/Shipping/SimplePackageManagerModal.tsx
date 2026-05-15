@@ -4,13 +4,16 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import {
   createSimplePackageOrdersAPI,
   deleteSimplePackageAPI,
+  getPackageEscalationConfigAPI,
   getSimplePackageBranchPricesAPI,
+  getSimplePackageEscalationStatusAPI,
   getSimplePackagesListAPI,
   getUploadedSimplePackageSellersAPI,
   printSimplePackageGuidesAPI,
   registerSimplePackagesAPI,
   sendSimplePackageGuideWhatsappAPI,
   updateSimplePackageAPI,
+  PackageEscalationRange,
 } from "../../api/simplePackage";
 import { getSellerAPI, getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
@@ -21,7 +24,6 @@ import {
   resizeDraftRows,
   SimplePackageDraftRow,
 } from "../SimplePackages/simplePackageHelpers";
-import SimplePackageBranchPriceModal from "./SimplePackageBranchPriceModal";
 import { isSuperadminUser } from "../../utils/role";
 import {
   buildDirectShippingLabelImageData,
@@ -38,6 +40,23 @@ interface SimplePackageManagerModalProps {
 }
 
 const MIN_PACKAGES = 1;
+const DEFAULT_SIMPLE_RANGES: PackageEscalationRange[] = [
+  { from: 1, to: 30, small_price: 4, large_price: 8 },
+  { from: 31, to: 60, small_price: 3, large_price: 6 },
+  { from: 61, to: null, small_price: 2.5, large_price: 5 },
+];
+const getSimpleEscalatedPriceFromRanges = (
+  ranges: PackageEscalationRange[],
+  position: number,
+  packageSize = "estandar"
+) => {
+  const safePosition = Math.max(1, Number(position || 1));
+  const range =
+    ranges.find((row) => safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)) ||
+    ranges[ranges.length - 1] ||
+    DEFAULT_SIMPLE_RANGES[0];
+  return Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+};
 const waitMs = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 
 const ticketWidthOptions = [
@@ -116,7 +135,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const [sellerConfig, setSellerConfig] = useState({ precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 });
   const [selectedSellerBranches, setSelectedSellerBranches] = useState<any[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
-  const [branchPriceModalVisible, setBranchPriceModalVisible] = useState(false);
   const [printingQr, setPrintingQr] = useState(false);
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
@@ -126,14 +144,22 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const [createSellerOptions, setCreateSellerOptions] = useState<any[]>([]);
   const [createSellerId, setCreateSellerId] = useState("");
   const [loadingCreateSellerConfig, setLoadingCreateSellerConfig] = useState(false);
-  const [createSellerConfig, setCreateSellerConfig] = useState({ precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 });
+  const [createSellerConfig, setCreateSellerConfig] = useState({
+    precio_paquete: 0,
+    precio_paquete_grande: 0,
+    amortizacion: 0,
+    saldo_por_paquete: 0,
+  });
+  const [createEscalationRanges, setCreateEscalationRanges] = useState<PackageEscalationRange[]>(DEFAULT_SIMPLE_RANGES);
+  const [createMonthlyCount, setCreateMonthlyCount] = useState(0);
+  const [missingForNextRange, setMissingForNextRange] = useState(0);
   const [createSellerBranches, setCreateSellerBranches] = useState<any[]>([]);
   const [createPackageCount, setCreatePackageCount] = useState(MIN_PACKAGES);
   const [createGeneralDescription, setCreateGeneralDescription] = useState("");
   const [createOriginId, setCreateOriginId] = useState(currentSucursalId);
   const [createDestinationId, setCreateDestinationId] = useState(currentSucursalId);
   const [createRows, setCreateRows] = useState<SimplePackageDraftRow[]>([
-    createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 }),
+    createDraftRow(0, { precio_paquete: 0, precio_paquete_grande: 0, amortizacion: 0, saldo_por_paquete: 0 }),
   ]);
   const [savingCreate, setSavingCreate] = useState(false);
 
@@ -141,6 +167,41 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const createTotals = useMemo(() => calculateSimplePackageTotals(createRows), [createRows]);
   const selectedSeller = sellerRows.find((seller) => String(seller._id) === String(selectedSellerId));
   const canSendGuideWhatsapp = isSuperadminUser(user);
+
+  const getSimpleEscalatedPrice = (position: number, packageSize = "estandar") => {
+    const safePosition = Math.max(1, Number(position || 1));
+    const range =
+      createEscalationRanges.find(
+        (row) => safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)
+      ) ||
+      createEscalationRanges[createEscalationRanges.length - 1] ||
+      DEFAULT_SIMPLE_RANGES[0];
+    return Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+  };
+
+  const getCreateRowConfig = (index: number, row?: Partial<SimplePackageDraftRow>) => ({
+    ...createSellerConfig,
+    precio_paquete: getSimpleEscalatedPrice(createMonthlyCount + index + 1, "estandar"),
+    precio_paquete_grande: getSimpleEscalatedPrice(createMonthlyCount + index + 1, "grande"),
+    amortizacion: Math.min(
+      Number(createSellerConfig.amortizacion || 0),
+      getSimpleEscalatedPrice(createMonthlyCount + index + 1, row?.package_size || "estandar")
+    ),
+  });
+
+  const rebuildCreateRows = (
+    count: number,
+    currentRows: SimplePackageDraftRow[] = createRows,
+    patch?: (row: SimplePackageDraftRow, index: number) => Partial<SimplePackageDraftRow>
+  ) =>
+    Array.from({ length: count }, (_, index) => {
+      const row = currentRows[index] || createDraftRow(index, getCreateRowConfig(index));
+      const nextRow = {
+        ...row,
+        ...(patch ? patch(row, index) : {}),
+      };
+      return createDraftRow(index, getCreateRowConfig(index, nextRow), nextRow);
+    });
 
   const generalPaymentMethod = useMemo(() => {
     if (!rows.length) return "";
@@ -174,7 +235,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   }, [rows]);
 
   const routeOptionsByOrigin = useMemo(() => {
-    const map = new Map<string, { value: string; label: string; precio: number }[]>();
+    const map = new Map<string, { value: string; label: string; precio: number; routeId: string }[]>();
     branchPrices.forEach((row: any) => {
       const originId = getBranchId(row?.origen_sucursal);
       const destinationId = getBranchId(row?.destino_sucursal);
@@ -184,6 +245,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         value: destinationId,
         label: String(row?.destino_sucursal?.nombre || "Sucursal"),
         precio: Number(row?.precio || 0),
+        routeId: String(row?._id || ""),
       });
       map.set(originId, current);
     });
@@ -218,6 +280,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             (item) => String(item.value) === String(destinationId || "")
           )?.precio || 0
         );
+  const getRouteId = (originId: string, destinationId?: string) =>
+    String(
+      (routeOptionsByOrigin.get(String(originId)) || []).find(
+        (item) => String(item.value) === String(destinationId || "")
+      )?.routeId || ""
+    );
 
   const getDestinationOptions = (originId: string, allowedBranchIds: Set<string>, originName?: string) => {
     if (!originId) return [];
@@ -246,7 +314,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     setCreateGeneralDescription("");
     setCreateOriginId(currentSucursalId);
     setCreateDestinationId(currentSucursalId);
-    setCreateRows([createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 })]);
+    setCreateMonthlyCount(0);
+    setMissingForNextRange(0);
+    setCreateRows([createDraftRow(0, { precio_paquete: 0, precio_paquete_grande: 0, amortizacion: 0, saldo_por_paquete: 0 })]);
   };
 
   const fetchBranchPrices = async () => {
@@ -337,13 +407,20 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const fetchCreateSellerConfig = async (sellerId: string) => {
     if (!sellerId) {
       setCreateSellerBranches([]);
-      setCreateSellerConfig({ precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 });
+      setCreateSellerConfig({ precio_paquete: 0, precio_paquete_grande: 0, amortizacion: 0, saldo_por_paquete: 0 });
       return;
     }
 
     setLoadingCreateSellerConfig(true);
     try {
-      const sellerResponse = await getSellerAPI(sellerId);
+      const [sellerResponse, escalationResponse, statusResponse] = await Promise.all([
+        getSellerAPI(sellerId),
+        getPackageEscalationConfigAPI({ routeId: getRouteId(currentSucursalId || createOriginId, createDestinationId) }),
+        getSimplePackageEscalationStatusAPI({
+          routeId: getRouteId(currentSucursalId || createOriginId, createDestinationId),
+          sellerId,
+        }),
+      ]);
       const nextBranches = Array.isArray(sellerResponse?.pago_sucursales)
         ? sellerResponse.pago_sucursales.filter(
             (branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0
@@ -356,19 +433,38 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         ? currentSucursalId
         : String(nextBranches[0]?.id_sucursal?._id || nextBranches[0]?.id_sucursal || "");
 
+      const nextRanges =
+        Array.isArray(statusResponse?.data?.ranges) && statusResponse.data.ranges.length
+          ? statusResponse.data.ranges
+          : Array.isArray(escalationResponse?.data?.simple_package) && escalationResponse.data.simple_package.length
+            ? escalationResponse.data.simple_package
+            : DEFAULT_SIMPLE_RANGES;
+      const nextMonthlyCount = Number(statusResponse?.data?.monthCount || 0);
+      setCreateEscalationRanges(nextRanges);
+      setCreateMonthlyCount(nextMonthlyCount);
+      setMissingForNextRange(Number(statusResponse?.data?.missingForNextRange || 0));
       setCreateSellerBranches(nextBranches);
       setCreateSellerConfig({
-        precio_paquete: Number(sellerResponse?.precio_paquete || 0),
+        precio_paquete: Number(nextRanges[0]?.small_price || 0),
+        precio_paquete_grande: Number(nextRanges[0]?.large_price || 0),
         amortizacion: Number(sellerResponse?.amortizacion || 0),
         saldo_por_paquete: 0,
       });
       setCreateOriginId(nextOriginId);
       setCreateDestinationId(nextOriginId);
       setCreateRows((prev) =>
-        resizeDraftRows(createPackageCount, prev, {
-          precio_paquete: Number(sellerResponse?.precio_paquete || 0),
-          amortizacion: Number(sellerResponse?.amortizacion || 0),
-          saldo_por_paquete: 0,
+        Array.from({ length: createPackageCount }, (_, index) => {
+          const previousRow = prev[index];
+          const position = nextMonthlyCount + index + 1;
+          const smallPrice = getSimpleEscalatedPriceFromRanges(nextRanges, position, "estandar");
+          const largePrice = getSimpleEscalatedPriceFromRanges(nextRanges, position, "grande");
+          const nextConfig = {
+            precio_paquete: smallPrice,
+            precio_paquete_grande: largePrice,
+            amortizacion: Math.min(Number(sellerResponse?.amortizacion || 0), smallPrice),
+            saldo_por_paquete: 0,
+          };
+          return createDraftRow(index, nextConfig, previousRow);
         })
       );
     } catch (error) {
@@ -417,7 +513,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             ? row.destino_sucursal_id
             : "";
 
-        return createDraftRow(index, createSellerConfig, {
+        return createDraftRow(index, getCreateRowConfig(index, row), {
           ...row,
           destino_sucursal_id: nextDestinationId,
           precio_entre_sucursal: getRoutePrice(createOriginId, nextDestinationId),
@@ -566,7 +662,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
             : getRoutePrice(createOriginId, nextDestinationId);
 
-        return createDraftRow(index, createSellerConfig, {
+        return createDraftRow(index, getCreateRowConfig(index, { ...row, ...patch }), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
@@ -579,7 +675,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const handleCreatePackageCountChange = (value: number | null) => {
     const nextCount = Math.max(MIN_PACKAGES, Number(value || MIN_PACKAGES));
     setCreatePackageCount(nextCount);
-    setCreateRows((prev) => resizeDraftRows(nextCount, prev, createSellerConfig));
+    setCreateRows((prev) => rebuildCreateRows(nextCount, prev));
   };
 
   const handleApplyCreateDescription = () => {
@@ -591,7 +687,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
     setCreateRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, createSellerConfig, {
+        createDraftRow(index, getCreateRowConfig(index, row), {
           ...row,
           descripcion_paquete: description,
         })
@@ -608,7 +704,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
     setCreateRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, createSellerConfig, {
+        createDraftRow(index, getCreateRowConfig(index, row), {
           ...row,
           destino_sucursal_id: createDestinationId,
           precio_entre_sucursal: getRoutePrice(createOriginId, createDestinationId),
@@ -1055,8 +1151,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
               <Space wrap>
                 {!creating ? (
                   <>
+                    <Button type="primary" onClick={() => setCreating(true)}>
+                      Nuevo registro
+                    </Button>
                     <Button
-                      type="primary"
                       onClick={handleCreateCurrentRows}
                       loading={printingQr}
                       disabled={!pendingRows.length || printingQr}
@@ -1084,9 +1182,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                   </>
                 ) : (
                   <Button onClick={resetCreateState}>Cancelar creacion</Button>
-                )}
-                {isSuperadminUser(user) && (
-                  <Button onClick={() => setBranchPriceModalVisible(true)}>Editar precios entre sucursales</Button>
                 )}
               </Space>
             </div>
@@ -1146,10 +1241,22 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                     <Button onClick={handleApplyCreateDescription}>Usar en todos</Button>
                   </div>
 
+                  <div style={{ border: "1px solid #dbeafe", background: "#eff6ff", borderRadius: 8, padding: 12 }}>
+                    <Typography.Text strong>
+                      Paquetes acumulados este mes: {createMonthlyCount}
+                    </Typography.Text>
+                    <div style={{ color: "#1d4ed8", marginTop: 4 }}>
+                      {missingForNextRange > 0
+                        ? `Faltan ${missingForNextRange} paquete(s) para el siguiente rango.`
+                        : "Este vendedor ya esta en el ultimo rango del mes."}
+                    </div>
+                  </div>
+
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                       <thead>
                         <tr style={{ background: "#f8fafc" }}>
+                          <th style={tableCellStyle}># mes</th>
                           <th style={tableCellStyle}>Nombre del comprador</th>
                           <th style={tableCellStyle}>Descripcion del paquete</th>
                           <th style={tableCellStyle}>Celular</th>
@@ -1166,6 +1273,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                       <tbody>
                         {createRows.map((row, index) => (
                           <tr key={row.key}>
+                            <td style={tableCellStyle}>
+                              <Typography.Text strong>{createMonthlyCount + index + 1}</Typography.Text>
+                            </td>
                             <td style={tableCellStyle}>
                               <Input
                                 value={row.comprador}
@@ -1620,14 +1730,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
           </div>
         </div>
       </Modal>
-      <SimplePackageBranchPriceModal
-        visible={branchPriceModalVisible}
-        onClose={() => {
-          setBranchPriceModalVisible(false);
-          void fetchBranchPrices();
-          if (selectedSellerId && !creating) void fetchPackages(selectedSellerId);
-        }}
-      />
     </>
   );
 };

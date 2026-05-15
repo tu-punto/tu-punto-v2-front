@@ -9,6 +9,6 @@ export const normalizeRole = (role?: string): "admin" | "operator" | "seller" | 
   return "";
 };
 
-export const isSuperadminUser = (user?: { is_superadmin?: boolean | null } | null): boolean =>
-  user?.is_superadmin === true;
+export const isSuperadminUser = (user?: { is_superadmin?: boolean | null; role?: string | null } | null): boolean =>
+  user?.is_superadmin === true || String(user?.role || "").trim().toLowerCase() === "superadmin";
 

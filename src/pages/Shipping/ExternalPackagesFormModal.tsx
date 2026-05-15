@@ -5,7 +5,7 @@ import {
   getExternalContactSuggestionsAPI,
   registerExternalPackagesAPI,
 } from "../../api/externalSale";
-import { getSimplePackageBranchPricesAPI } from "../../api/simplePackage";
+import { getPackageEscalationConfigAPI, getSimplePackageBranchPricesAPI, PackageEscalationRange } from "../../api/simplePackage";
 import { getSucursalsBasicAPI } from "../../api/sucursal";
 import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
 import {
@@ -23,6 +23,11 @@ interface ExternalPackagesFormModalProps {
 }
 
 const MIN_PACKAGES = 1;
+const DEFAULT_EXTERNAL_RANGES: PackageEscalationRange[] = [
+  { from: 1, to: 5, small_price: 5, large_price: 10 },
+  { from: 6, to: 15, small_price: 4, large_price: 8 },
+  { from: 16, to: null, small_price: 3, large_price: 6 },
+];
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
 const getTotalPaymentAmount = (packagePrice: number, branchRoutePrice: number) =>
   roundCurrency(Number(packagePrice || 0) + Number(branchRoutePrice || 0));
@@ -73,6 +78,7 @@ const buildPackages = (count: number, existing: any[] = []) =>
     comprador: existing[index]?.comprador || "",
     descripcion_paquete: existing[index]?.descripcion_paquete || "",
     telefono_comprador: existing[index]?.telefono_comprador || "",
+    package_size: existing[index]?.package_size || "estandar",
     precio_paquete: existing[index]?.precio_paquete ?? undefined,
     esta_pagado: existing[index]?.esta_pagado ?? "no",
     monto_paga_vendedor: existing[index]?.monto_paga_vendedor ?? 0,
@@ -109,6 +115,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const [suggestionOptions, setSuggestionOptions] = useState<Record<string, SuggestionOption[]>>({});
   const [branchOptions, setBranchOptions] = useState<{ value: string; label: string }[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
+  const [escalationRanges, setEscalationRanges] = useState<PackageEscalationRange[]>(DEFAULT_EXTERNAL_RANGES);
+  const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
   const suggestionRequestIds = useRef<Record<string, number>>({});
 
@@ -124,6 +132,39 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const watchedOriginBranchId = Form.useWatch("origen_sucursal_id", form);
   const watchedDestinationBranchId = Form.useWatch("destino_sucursal_id", form);
 
+  const getEscalatedPackagePrice = (count = packageCount, packageSize = "estandar", routeId = "") => {
+    const config = escalationConfigs.find(
+      (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "external"
+    );
+    const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : escalationRanges;
+    const safeCount = Math.max(MIN_PACKAGES, Number(count || MIN_PACKAGES));
+    const range =
+      ranges.find((row: PackageEscalationRange) => safeCount >= row.from && (row.to === null || row.to === undefined || safeCount <= row.to)) ||
+      ranges[ranges.length - 1] ||
+      DEFAULT_EXTERNAL_RANGES[0];
+    return roundCurrency(packageSize === "grande" ? Number(range.large_price || 0) : Number(range.small_price || 0));
+  };
+
+  const applyEscalatedPricesToRows = (count = packageCount) => {
+    const currentRows = form.getFieldValue("paquetes") || [];
+    form.setFieldValue(
+      "paquetes",
+      buildPackages(count, currentRows).map((row) => {
+        const routeId = getRouteId(watchedOriginBranchId, row.destino_sucursal_id);
+        const packagePrice = getEscalatedPackagePrice(count, row.package_size, routeId);
+        const totalAmount = getTotalPaymentAmount(packagePrice, row.precio_entre_sucursal || 0);
+        if (row.esta_pagado === "si") {
+          return { ...row, precio_paquete: packagePrice, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
+        }
+        if (row.esta_pagado === "mixto") {
+          const half = roundCurrency(totalAmount / 2);
+          return { ...row, precio_paquete: packagePrice, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
+        }
+        return { ...row, precio_paquete: packagePrice, monto_paga_vendedor: 0, monto_paga_comprador: 0 };
+      })
+    );
+  };
+
   const routePriceMap = useMemo(() => {
     const map = new Map<string, number>();
     branchPrices.forEach((row: any) => {
@@ -131,6 +172,17 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
       if (!originId || !destinationId) return;
       map.set(`${originId}::${destinationId}`, Number(row?.precio || 0));
+    });
+    return map;
+  }, [branchPrices]);
+
+  const routeIdMap = useMemo(() => {
+    const map = new Map<string, string>();
+    branchPrices.forEach((row: any) => {
+      const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
+      const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
+      if (!originId || !destinationId) return;
+      map.set(`${originId}::${destinationId}`, String(row?._id || ""));
     });
     return map;
   }, [branchPrices]);
@@ -157,6 +209,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     String(originId || "") === String(destinationId || "")
       ? 0
       : Number(routePriceMap.get(`${originId || ""}::${destinationId || ""}`) || 0);
+  const getRouteId = (originId?: string, destinationId?: string) =>
+    String(routeIdMap.get(`${originId || ""}::${destinationId || ""}`) || "");
 
   const searchContactSuggestions = async (key: string, field: SuggestionField, value: string) => {
     const query = String(value || "").trim();
@@ -402,12 +456,14 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       paquetes: buildPackages(nextCount, currentRows).map((row) => {
         const destinationId = row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "";
         const branchRoutePrice = getBranchRoutePrice(watchedOriginBranchId, destinationId);
-        const totalAmount = getTotalPaymentAmount(Number(row.precio_paquete || 0), branchRoutePrice);
+        const packagePrice = getEscalatedPackagePrice(nextCount, row.package_size, getRouteId(watchedOriginBranchId, destinationId));
+        const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
         const mode = row.esta_pagado || "no";
         const nextRow = {
           ...row,
           destino_sucursal_id: destinationId,
           precio_entre_sucursal: branchRoutePrice,
+          precio_paquete: packagePrice,
         };
 
         if (mode === "si") {
@@ -525,9 +581,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const loadBranches = async () => {
       setLoadingBranches(true);
       try {
-        const [sucursalesResponse, pricesResponse] = await Promise.all([
+        const [sucursalesResponse, pricesResponse, escalationResponse] = await Promise.all([
           getSucursalsBasicAPI(),
           getSimplePackageBranchPricesAPI(),
+          getPackageEscalationConfigAPI(),
         ]);
 
         const sucursales = Array.isArray(sucursalesResponse) ? sucursalesResponse : [];
@@ -540,6 +597,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             .filter((option) => option.value)
         );
         setBranchPrices(Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : []);
+        setEscalationConfigs(Array.isArray(escalationResponse?.data) ? escalationResponse.data : []);
       } catch (error) {
         console.error(error);
         message.error("No se pudieron cargar las sucursales");
@@ -558,6 +616,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         ...row,
         destino_sucursal_id: currentSucursal?._id || "",
         precio_entre_sucursal: 0,
+        precio_paquete: getEscalatedPackagePrice(MIN_PACKAGES, row.package_size),
       })),
     });
   }, [currentSucursal?._id, form, visible]);
@@ -581,12 +640,14 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           : nextGeneralDestination;
 
         const branchRoutePrice = getBranchRoutePrice(watchedOriginBranchId, destinationId);
-        const totalAmount = getTotalPaymentAmount(Number(row.precio_paquete || 0), branchRoutePrice);
+        const packagePrice = getEscalatedPackagePrice(packageCount, row.package_size, getRouteId(watchedOriginBranchId, destinationId));
+        const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
         const mode = row.esta_pagado || "no";
         const nextRow = {
           ...row,
           destino_sucursal_id: destinationId,
           precio_entre_sucursal: branchRoutePrice,
+          precio_paquete: packagePrice,
         };
 
         if (mode === "si") {
@@ -599,7 +660,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         return nextRow;
       })
     );
-  }, [destinationOptions, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
+  }, [destinationOptions, escalationRanges, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
 
   const onFinish = async (values: any) => {
     if (!currentSucursal?._id || !currentSucursal?.nombre) {
@@ -636,6 +697,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         descripcion_paquete: row.descripcion_paquete,
         telefono_comprador: row.telefono_comprador || "",
         destino_sucursal_id: row.destino_sucursal_id || "",
+        package_size: row.package_size === "grande" ? "grande" : "estandar",
         precio_entre_sucursal: branchRoutePrice,
         precio_paquete: price,
         esta_pagado: paidStatus,
@@ -904,6 +966,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Celular</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Sucursal destino</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Precio entre sucursal</th>
+                <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Tamano</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Precio paquete</th>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Estado pago</th>
               </tr>
@@ -1007,6 +1070,22 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                         </Form.Item>
                       </td>
                       <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
+                        <Form.Item name={["paquetes", rowIndex, "package_size"]} initialValue="estandar" style={{ marginBottom: 0 }}>
+                          <Select
+                            options={[
+                              { label: "Estandar", value: "estandar" },
+                              { label: "Grande", value: "grande" },
+                            ]}
+                            onChange={(value) => {
+                              const destinationId = form.getFieldValue(["paquetes", rowIndex, "destino_sucursal_id"]);
+                              const packagePrice = getEscalatedPackagePrice(packageCount, value, getRouteId(watchedOriginBranchId, destinationId));
+                              form.setFieldValue(["paquetes", rowIndex, "precio_paquete"], packagePrice);
+                              handlePackagePriceChange(rowIndex, packagePrice);
+                            }}
+                          />
+                        </Form.Item>
+                      </td>
+                      <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
                         <Form.Item
                           name={["paquetes", rowIndex, "precio_paquete"]}
                           rules={[{ required: true, message: "Requerido" }]}
@@ -1016,6 +1095,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                             prefix="Bs."
                             min={0}
                             style={{ width: "100%" }}
+                            readOnly
                             onChange={(value) => handlePackagePriceChange(rowIndex, value)}
                           />
                         </Form.Item>
@@ -1039,7 +1119,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                     </tr>
                     {isMixedRow && (
                       <tr>
-                        <td colSpan={7} style={{ border: "1px solid #d9d9d9", padding: 8, background: "#fafafa" }}>
+                        <td colSpan={8} style={{ border: "1px solid #d9d9d9", padding: 8, background: "#fafafa" }}>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <Form.Item
                               label="Paga vendedor"

@@ -24,11 +24,11 @@ export const buildPackagePricing = (
   amortizacion: number,
   saldoPorPaquete: number,
   packageSize: "estandar" | "grande",
-  branchRoutePrice = 0
+  branchRoutePrice = 0,
+  largeUnitPrice?: number
 ) => {
-  const multiplier = packageSize === "grande" ? 2 : 1;
   const precioPaqueteUnitario = roundCurrency(unitPrice);
-  const precioPaquete = roundCurrency(precioPaqueteUnitario * multiplier);
+  const precioPaquete = roundCurrency(packageSize === "grande" ? Number(largeUnitPrice ?? unitPrice * 2) : unitPrice);
   const deudaVendedor = roundCurrency(amortizacion);
   const precioEntreSucursal = roundCurrency(branchRoutePrice);
   const deudaComprador = roundCurrency(Math.max(0, precioPaquete + precioEntreSucursal - deudaVendedor));
@@ -46,7 +46,7 @@ export const buildPackagePricing = (
 
 export const createDraftRow = (
   index: number,
-  config: { precio_paquete: number; amortizacion: number; saldo_por_paquete: number },
+  config: { precio_paquete: number; precio_paquete_grande?: number; amortizacion: number; saldo_por_paquete: number },
   existing?: Partial<SimplePackageDraftRow>
 ): SimplePackageDraftRow => {
   const packageSize = existing?.package_size === "grande" ? "grande" : "estandar";
@@ -72,7 +72,8 @@ export const createDraftRow = (
       amortizacion,
       saldoPorPaquete,
       packageSize,
-      routePrice
+      routePrice,
+      config.precio_paquete_grande
     ),
   };
 };
@@ -80,7 +81,7 @@ export const createDraftRow = (
 export const resizeDraftRows = (
   count: number,
   rows: SimplePackageDraftRow[],
-  config: { precio_paquete: number; amortizacion: number; saldo_por_paquete: number }
+  config: { precio_paquete: number; precio_paquete_grande?: number; amortizacion: number; saldo_por_paquete: number }
 ) => {
   return Array.from({ length: count }, (_, index) => createDraftRow(index, config, rows[index]));
 };
@@ -112,7 +113,7 @@ export const calculateSimplePackageTotals = (rows: SimplePackageDraftRow[]) =>
 export const applyPackagePatch = (
   row: any,
   patch: Record<string, unknown>,
-  config?: { precio_paquete?: number; amortizacion?: number; saldo_por_paquete?: number }
+  config?: { precio_paquete?: number; precio_paquete_grande?: number; amortizacion?: number; saldo_por_paquete?: number }
 ) => {
   const nextSize =
     patch.package_size === "grande"
@@ -133,7 +134,8 @@ export const applyPackagePatch = (
     amortizacion,
     saldoPorPaquete,
     nextSize,
-    branchRoutePrice
+    branchRoutePrice,
+    config?.precio_paquete_grande
   );
   const paid = patch.esta_pagado === "si" || patch.esta_pagado === "no" ? patch.esta_pagado : row.esta_pagado;
   const metodoPago =
