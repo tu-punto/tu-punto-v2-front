@@ -52,6 +52,7 @@ const StockManagement = () => {
     const [isInventoryQRModalVisible, setIsInventoryQRModalVisible] = useState(false);
     const [isStockQRInfoModalVisible, setIsStockQRInfoModalVisible] = useState(false);
     const [isWithdrawalRequestModalVisible, setIsWithdrawalRequestModalVisible] = useState(false);
+    const [withdrawalProducts, setWithdrawalProducts] = useState<any[]>([]);
     const [isWithdrawalRequestsListVisible, setIsWithdrawalRequestsListVisible] = useState(false);
     const [pendingWithdrawalCount, setPendingWithdrawalCount] = useState(0);
 
@@ -467,6 +468,22 @@ const StockManagement = () => {
         setIsConfirmModalVisible(true);
     };
 
+    const openWithdrawalRequestModal = async () => {
+        if (!sellerSucursales.length) {
+            message.warning("No tienes sucursales disponibles para solicitar salida.");
+            return;
+        }
+
+        try {
+            const rows = await getSellerInventoryAllAPI({});
+            setWithdrawalProducts(Array.isArray(rows) ? rows : []);
+            setIsWithdrawalRequestModalVisible(true);
+        } catch (error) {
+            console.error("Error al cargar inventario para solicitud de salida:", error);
+            message.error("No se pudo cargar el inventario para la solicitud.");
+        }
+    };
+
 
 
 
@@ -736,8 +753,8 @@ const StockManagement = () => {
                         <Button
                             type="primary"
                             icon={<ExportOutlined />}
-                            disabled={!effectiveBranchId}
-                            onClick={() => setIsWithdrawalRequestModalVisible(true)}
+                            disabled={!sellerSucursales.length}
+                            onClick={() => void openWithdrawalRequestModal()}
                         >
                             Solicitar salida de productos
                         </Button>
@@ -889,9 +906,8 @@ const StockManagement = () => {
                 visible={isWithdrawalRequestModalVisible}
                 onClose={() => setIsWithdrawalRequestModalVisible(false)}
                 onCreated={() => fetchInventoryPage(true)}
-                products={finalProductList}
+                products={withdrawalProducts}
                 branches={sellerSucursales}
-                defaultBranchId={effectiveBranchId || undefined}
             />
         </div>
 

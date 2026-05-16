@@ -327,7 +327,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const getEffectiveDeliverySpaces = (_originId: string, _destinationId?: string, spaces = 1) =>
     Math.max(1, Number(spaces || 1));
 
-  const getDeliveryRoutePrice = (originId: string, destinationId?: string, spaces = 1, position = 1) => {
+  const getDeliveryRoutePrice = (originId: string, destinationId?: string, spaces = 1, _position = 1) => {
     if (String(originId || "") === String(destinationId || "")) return 0;
     const routeId = getRouteId(originId, destinationId);
     const config = escalationConfigs.find(
@@ -335,7 +335,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     );
     if (!config) return Number(getRoutePrice(originId, destinationId) || 0) * Math.max(1, Number(spaces || 1));
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
-    const safePosition = Math.max(1, Number(position || 1));
+    const safePosition = Math.max(1, Number(spaces || 1));
     const range =
       ranges.find((row: PackageEscalationRange) => safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)) ||
       ranges[ranges.length - 1] ||

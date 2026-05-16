@@ -189,7 +189,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const getEffectiveDeliverySpaces = (_originId: string, _destinationId?: string, spaces = 1) =>
     Math.max(1, Number(spaces || 1));
 
-  const getDeliveryRoutePrice = (originId?: string, destinationId?: string, spaces = 1, count = packageCount) => {
+  const getDeliveryRoutePrice = (originId?: string, destinationId?: string, spaces = 1, _count = packageCount) => {
     if (String(originId || "") === String(destinationId || "")) return 0;
     const routeId = getRouteId(originId, destinationId);
     const config = escalationConfigs.find(
@@ -197,7 +197,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     );
     if (!config) return roundCurrency(getBranchRoutePrice(originId, destinationId) * Math.max(1, Number(spaces || 1)));
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
-    const safeCount = Math.max(MIN_PACKAGES, Number(count || MIN_PACKAGES));
+    const safeCount = Math.max(MIN_PACKAGES, Number(spaces || MIN_PACKAGES));
     const range =
       ranges.find((row: PackageEscalationRange) => safeCount >= row.from && (row.to === null || row.to === undefined || safeCount <= row.to)) ||
       ranges[ranges.length - 1] ||

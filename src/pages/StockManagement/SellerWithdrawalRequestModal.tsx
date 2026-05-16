@@ -13,7 +13,6 @@ type Props = {
     onCreated: () => void;
     products: any[];
     branches: BranchOption[];
-    defaultBranchId?: string;
 };
 
 const buildVariantLabel = (row: any) => {
@@ -30,8 +29,7 @@ const SellerWithdrawalRequestModal = ({
     onClose,
     onCreated,
     products,
-    branches,
-    defaultBranchId
+    branches
 }: Props) => {
     const [branchId, setBranchId] = useState<string>("");
     const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
@@ -41,11 +39,11 @@ const SellerWithdrawalRequestModal = ({
 
     useEffect(() => {
         if (!visible) return;
-        setBranchId(String(defaultBranchId || branches[0]?._id || ""));
+        setBranchId("");
         setSelectedRowKeys([]);
         setQuantities({});
         setComment("");
-    }, [visible, defaultBranchId, branches]);
+    }, [visible]);
 
     const rows = useMemo(() => {
         return (Array.isArray(products) ? products : [])
@@ -201,7 +199,7 @@ const SellerWithdrawalRequestModal = ({
                         selectedRowKeys,
                         onChange: (keys) => setSelectedRowKeys(keys)
                     }}
-                    locale={{ emptyText: "No hay productos con stock en esta sucursal." }}
+                    locale={{ emptyText: branchId ? "No hay productos con stock en esta sucursal." : "Selecciona una sucursal para ver productos." }}
                 />
 
                 <Input.TextArea

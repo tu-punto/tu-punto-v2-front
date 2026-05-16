@@ -499,7 +499,7 @@ const SimplePackagesPage = () => {
             >
               <div style={{ textAlign: "center", lineHeight: 1.1 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Siguiente paquete:</div>
-                <div>#{nextMonthlyNumber}</div>
+                <div>{nextMonthlyNumber}</div>
               </div>
             </div>
           </div>
