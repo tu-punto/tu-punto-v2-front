@@ -1272,15 +1272,18 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
               <Space wrap>
                 {!creating ? (
                   <>
-                    <Button type="primary" onClick={() => setCreating(true)}>
-                      Nuevo registro
-                    </Button>
                     <Button
+                      type="primary"
                       onClick={handleCreateCurrentRows}
                       loading={printingQr}
                       disabled={!pendingRows.length || printingQr}
+                      style={{
+                        background: "#f97316",
+                        borderColor: "#f97316",
+                        color: "#ffffff",
+                      }}
                     >
-                      Crear paquetes
+                      Crear pedidos
                     </Button>
                     <Button
                       onClick={handlePrintPendingQrs}

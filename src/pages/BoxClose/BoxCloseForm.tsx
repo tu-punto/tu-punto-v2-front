@@ -533,9 +533,9 @@ const BoxCloseForm = ({
                 rules={[{ required: true, message: "Campo requerido" }]}
               >
                 <Select
-                  placeholder="Selecciona un responsable"
+                  placeholder="Responsable"
                   labelInValue
-                  disabled={mode === "edit"}
+                  disabled
                   onChange={(option) => {
                     form.setFieldValue("responsable", option); // <- ¡simplemente esto!
                   }}

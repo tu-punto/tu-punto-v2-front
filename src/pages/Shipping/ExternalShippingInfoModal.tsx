@@ -83,6 +83,7 @@ const ExternalShippingInfoModal = ({
     [externalShipping, totalAmountToCharge]
   );
   const serviceLabel = isSimplePackage ? "Simple" : "Externo";
+  const canEditDelivery = isAdmin && externalShipping?.estado_pedido !== "Entregado" && externalShipping?.delivered !== true;
 
   const estadoPedido = Form.useWatch("estado_pedido", form);
   const tipoPagoEntrega = Form.useWatch("tipo_de_pago", form);
@@ -318,6 +319,9 @@ const ExternalShippingInfoModal = ({
 
       const normalizedType = normalizeDeliveryPaymentCode(values.tipo_de_pago);
       const payload = {
+        comprador: String(values.comprador || "").trim(),
+        telefono_comprador: String(values.telefono_comprador || "").trim(),
+        descripcion_paquete: String(values.descripcion_paquete || "").trim(),
         estado_pedido: values.estado_pedido,
         delivered: values.estado_pedido === "Entregado",
         tipo_de_pago:
@@ -413,12 +417,12 @@ const ExternalShippingInfoModal = ({
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label="Nombre Cliente" name="comprador">
-                <Input readOnly />
+                <Input readOnly={!canEditDelivery} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Celular" name="telefono_comprador">
-                <Input readOnly />
+                <Input readOnly={!canEditDelivery} />
               </Form.Item>
             </Col>
           </Row>
@@ -428,7 +432,7 @@ const ExternalShippingInfoModal = ({
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item label="Descripcion del paquete" name="descripcion_paquete">
-                <Input.TextArea rows={3} readOnly />
+                <Input.TextArea rows={3} readOnly={!canEditDelivery} />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -497,7 +501,7 @@ const ExternalShippingInfoModal = ({
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item name="estado_pedido" label="Estado del pedido" rules={[{ required: true }]}>
-                <Radio.Group disabled={!isAdmin}>
+                <Radio.Group disabled={!canEditDelivery}>
                   <Radio.Button value="En Espera">En espera</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>
                 </Radio.Group>
@@ -511,7 +515,7 @@ const ExternalShippingInfoModal = ({
                 <Col span={24}>
                   <Form.Item name="tipo_de_pago" label="Tipo de pago del comprador" rules={[{ required: true }]}>
                     <Radio.Group
-                      disabled={!isAdmin}
+                      disabled={!canEditDelivery}
                       onChange={(event) => handleBuyerPaymentTypeChange(event.target.value)}
                     >
                       <Radio.Button value="1">Transferencia o QR</Radio.Button>
@@ -562,7 +566,7 @@ const ExternalShippingInfoModal = ({
                         max={Math.max(0, roundCurrency(buyerDebt - 0.01))}
                         precision={2}
                         style={{ width: "100%" }}
-                        disabled={!isAdmin}
+                        disabled={!canEditDelivery}
                         onChange={handleSubtotalQrChange}
                       />
                     </Form.Item>
@@ -595,7 +599,7 @@ const ExternalShippingInfoModal = ({
           <Button onClick={onClose} style={{ marginRight: 8 }}>
             Cerrar
           </Button>
-          {isAdmin && (
+          {canEditDelivery && (
             <Button type="primary" htmlType="submit" loading={loading}>
               Guardar cambios
             </Button>

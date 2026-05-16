@@ -1,10 +1,13 @@
-import { Button, Card, Input, InputNumber, Select, Space, Spin, Typography, message } from "antd";
+import { Button, Card, Input, InputNumber, Modal, Select, Space, Spin, Table, Typography, message } from "antd";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { getSellerAPI } from "../../api/seller";
 import {
   getSimplePackageBranchPricesAPI,
   getSimplePackageEscalationStatusAPI,
+  getSimplePackagesListAPI,
   registerSimplePackagesAPI,
+  updateSimplePackageAPI,
+  deleteSimplePackageAPI,
 } from "../../api/simplePackage";
 import { UserContext } from "../../context/userContext";
 import {
@@ -39,6 +42,10 @@ const SimplePackagesPage = () => {
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
   const [monthlyPackageCount, setMonthlyPackageCount] = useState(0);
   const [missingForNextRange, setMissingForNextRange] = useState(0);
+  const [pendingModalVisible, setPendingModalVisible] = useState(false);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingSavingId, setPendingSavingId] = useState("");
+  const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
     precio_paquete: Number(user?.seller_precio_paquete || 0),
     amortizacion: Number(user?.seller_amortizacion || 0),
@@ -116,6 +123,92 @@ const SimplePackagesPage = () => {
   const getRouteId = (originId: string, destinationId?: string) => {
     if (!originId || !destinationId) return "";
     return String(routeIdMap.get(`${originId}::${destinationId}`) || "");
+  };
+
+  const getBranchId = (value: any) => String(value?._id || value?.id_sucursal || value || "");
+  const simpleBranchOptions = useMemo(
+    () =>
+      sellerBranches
+        .map((branch: any) => ({
+          value: getBranchId(branch?.id_sucursal),
+          label: String(branch?.sucursalName || branch?.id_sucursal?.nombre || "Sucursal"),
+        }))
+        .filter((option) => option.value),
+    [sellerBranches]
+  );
+
+  const fetchPendingPackages = async () => {
+    if (!user?.id_vendedor) return;
+    setPendingLoading(true);
+    try {
+      const response = await getSimplePackagesListAPI({ sellerId: user.id_vendedor });
+      if (response?.success === false) {
+        message.error(response.message || "No se pudieron cargar los paquetes pendientes");
+        return;
+      }
+      setPendingRows(Array.isArray(response?.rows) ? response.rows : []);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudieron cargar los paquetes pendientes");
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
+  const patchPendingRow = (id: string, patch: Record<string, any>) => {
+    setPendingRows((current) =>
+      current.map((row) => (String(row?._id) === String(id) ? { ...row, ...patch } : row))
+    );
+  };
+
+  const savePendingRow = async (row: any) => {
+    const rowId = String(row?._id || "");
+    if (!rowId) return;
+
+    setPendingSavingId(rowId);
+    try {
+      const response = await updateSimplePackageAPI(rowId, {
+        comprador: String(row.comprador || "").trim(),
+        telefono_comprador: String(row.telefono_comprador || "").trim(),
+        descripcion_paquete: String(row.descripcion_paquete || "").trim(),
+        origen_sucursal_id: getBranchId(row.origen_sucursal || row.sucursal),
+        destino_sucursal_id: getBranchId(row.destino_sucursal),
+        amortizacion_vendedor: Number(row.amortizacion_vendedor || 0),
+        saldo_por_paquete: Number(row.saldo_por_paquete || 0),
+      });
+
+      if (!response.success) {
+        message.error(response.message || "No se pudo guardar el paquete");
+        return;
+      }
+
+      message.success("Paquete actualizado");
+      await fetchPendingPackages();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo guardar el paquete");
+    } finally {
+      setPendingSavingId("");
+    }
+  };
+
+  const deletePendingRow = (row: any) => {
+    Modal.confirm({
+      title: "Eliminar paquete pendiente",
+      content: "Solo se puede eliminar si todavia no fue convertido en pedido.",
+      okText: "Eliminar",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        const response = await deleteSimplePackageAPI(String(row?._id || ""));
+        if (!response.success) {
+          message.error(response.message || "No se pudo eliminar el paquete");
+          return;
+        }
+        message.success("Paquete eliminado");
+        await fetchPendingPackages();
+      },
+    });
   };
 
   const nextMonthlyNumber = monthlyPackageCount + 1;
@@ -341,6 +434,7 @@ const SimplePackagesPage = () => {
       }
 
       message.success(`Se registraron ${response.createdCount || payloadRows.length} paquetes`);
+      await fetchPendingPackages();
       setPackageCount(MIN_PACKAGES);
       setGeneralDescription("");
       setSelectedDestinationId(String(selectedOriginId || ""));
@@ -360,6 +454,14 @@ const SimplePackagesPage = () => {
           <img src="/box-icon.png" alt="Paquetes" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">Paquetes del servicio</h1>
         </div>
+        <Button
+          onClick={() => {
+            setPendingModalVisible(true);
+            void fetchPendingPackages();
+          }}
+        >
+          Ver pendientes
+        </Button>
         <div
           style={{
             minWidth: 280,
@@ -413,6 +515,129 @@ const SimplePackagesPage = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        title="Paquetes simples en espera"
+        open={pendingModalVisible}
+        onCancel={() => setPendingModalVisible(false)}
+        footer={null}
+        width={1180}
+      >
+        <Table
+          loading={pendingLoading}
+          dataSource={pendingRows}
+          rowKey={(row: any) => String(row?._id)}
+          pagination={{ pageSize: 8 }}
+          scroll={{ x: "max-content" }}
+          columns={[
+            {
+              title: "Comprador",
+              dataIndex: "comprador",
+              width: 180,
+              render: (_: any, row: any) => (
+                <Input
+                  value={row.comprador}
+                  onChange={(event) => patchPendingRow(String(row._id), { comprador: event.target.value })}
+                />
+              ),
+            },
+            {
+              title: "Celular",
+              dataIndex: "telefono_comprador",
+              width: 140,
+              render: (_: any, row: any) => (
+                <Input
+                  value={row.telefono_comprador}
+                  onChange={(event) =>
+                    patchPendingRow(String(row._id), {
+                      telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
+                    })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Descripcion",
+              dataIndex: "descripcion_paquete",
+              width: 260,
+              render: (_: any, row: any) => (
+                <Input.TextArea
+                  value={row.descripcion_paquete}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  onChange={(event) =>
+                    patchPendingRow(String(row._id), { descripcion_paquete: event.target.value })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Destino",
+              dataIndex: "destino_sucursal",
+              width: 220,
+              render: (_: any, row: any) => (
+                <Select
+                  style={{ width: "100%" }}
+                  value={getBranchId(row.destino_sucursal) || undefined}
+                  options={simpleBranchOptions}
+                  onChange={(value) => patchPendingRow(String(row._id), { destino_sucursal: value })}
+                />
+              ),
+            },
+            {
+              title: "Cubre vendedor",
+              dataIndex: "amortizacion_vendedor",
+              width: 150,
+              render: (_: any, row: any) => (
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  addonBefore="Bs."
+                  value={Number(row.amortizacion_vendedor || 0)}
+                  onChange={(value) =>
+                    patchPendingRow(String(row._id), { amortizacion_vendedor: Number(value || 0) })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Saldo paquete",
+              dataIndex: "saldo_por_paquete",
+              width: 150,
+              render: (_: any, row: any) => (
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  addonBefore="Bs."
+                  value={Number(row.saldo_por_paquete || 0)}
+                  onChange={(value) =>
+                    patchPendingRow(String(row._id), { saldo_por_paquete: Number(value || 0) })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Acciones",
+              key: "actions",
+              fixed: "right",
+              width: 180,
+              render: (_: any, row: any) => (
+                <Space>
+                  <Button
+                    type="primary"
+                    loading={pendingSavingId === String(row._id)}
+                    onClick={() => void savePendingRow(row)}
+                  >
+                    Guardar
+                  </Button>
+                  <Button danger onClick={() => deletePendingRow(row)}>
+                    Borrar
+                  </Button>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Modal>
 
       <Spin spinning={loadingConfig}>
         <Space direction="vertical" size={16} style={{ display: "flex" }}>
