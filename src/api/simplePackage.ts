@@ -121,7 +121,7 @@ export const getPackageEscalationConfigAPI = async (params?: { routeId?: string 
 };
 
 export const upsertPackageEscalationConfigAPI = async (payload: {
-  routeId: string;
+  routeId?: string;
   serviceOrigin: "external" | "simple_package" | "delivery";
   ranges: PackageEscalationRange[];
   deliverySpaces?: PackageDeliverySpace[];

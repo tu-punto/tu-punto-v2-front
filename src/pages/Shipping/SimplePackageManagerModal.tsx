@@ -298,22 +298,34 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       )?.routeId || ""
     );
 
-  const getDeliverySpacesForSize = (packageSize = "estandar", routeId = "") => {
+  const getSmallSpaceLimit = (routeId = "") => {
+    const globalConfig = escalationConfigs.find(
+      (row: any) => !String(row?.route?._id || row?.route || "") && row?.service_origin === "delivery"
+    );
     const config = escalationConfigs.find(
       (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "delivery"
     );
     const spacesRows =
-      Array.isArray(config?.delivery_spaces) && config.delivery_spaces.length
+      Array.isArray(globalConfig?.delivery_spaces) && globalConfig.delivery_spaces.length
+        ? globalConfig.delivery_spaces
+        : Array.isArray(config?.delivery_spaces) && config.delivery_spaces.length
         ? config.delivery_spaces
         : DEFAULT_DELIVERY_SPACES;
     return Math.max(
       1,
       Number(
-        spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === String(packageSize).toLowerCase())
-          ?.spaces || 1
+        spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === "small_limit")?.spaces ??
+          spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === "estandar")?.spaces ??
+          1
       )
     );
   };
+
+  const getPackageSizeBySpaces = (spaces = 1, routeId = "") =>
+    Math.max(1, Number(spaces || 1)) > getSmallSpaceLimit(routeId) ? "grande" : "estandar";
+
+  const getEffectiveDeliverySpaces = (_originId: string, _destinationId?: string, spaces = 1) =>
+    Math.max(1, Number(spaces || 1));
 
   const getDeliveryRoutePrice = (originId: string, destinationId?: string, spaces = 1, position = 1) => {
     if (String(originId || "") === String(destinationId || "")) return 0;
@@ -329,6 +341,33 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       ranges[ranges.length - 1] ||
       DEFAULT_DELIVERY_RANGES[0];
     return Number(range.small_price || 0) * Math.max(1, Number(spaces || 1));
+  };
+
+  const buildDeliveryDerivedPatch = (
+    row: any,
+    patch: Record<string, unknown>,
+    originId: string,
+    destinationId: string,
+    position = 1
+  ) => {
+    const spaces = getEffectiveDeliverySpaces(
+      originId,
+      destinationId,
+      Number(patch.delivery_spaces !== undefined ? patch.delivery_spaces || 1 : row.delivery_spaces || 1)
+    );
+    const routeId = getRouteId(originId, destinationId);
+    const packageSize = getPackageSizeBySpaces(spaces, routeId);
+    const routePrice =
+      patch.precio_entre_sucursal !== undefined
+        ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
+        : getDeliveryRoutePrice(originId, destinationId, spaces, position);
+
+    return {
+      ...patch,
+      package_size: packageSize,
+      delivery_spaces: spaces,
+      precio_entre_sucursal: routePrice,
+    };
   };
 
   const getDestinationOptions = (originId: string, allowedBranchIds: Set<string>, originName?: string) => {
@@ -562,10 +601,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             : "";
 
         const routeId = getRouteId(createOriginId, nextDestinationId);
-        const spaces = row.delivery_spaces || getDeliverySpacesForSize(row.package_size, routeId);
-        return createDraftRow(index, getCreateRowConfig(index, row), {
+        const spaces = getEffectiveDeliverySpaces(createOriginId, nextDestinationId, row.delivery_spaces);
+        const packageSize = getPackageSizeBySpaces(spaces, routeId);
+        return createDraftRow(index, getCreateRowConfig(index, { ...row, package_size: packageSize }), {
           ...row,
           destino_sucursal_id: nextDestinationId,
+          package_size: packageSize,
           delivery_spaces: spaces,
           precio_entre_sucursal: getDeliveryRoutePrice(createOriginId, nextDestinationId, spaces, createMonthlyCount + index + 1),
         });
@@ -587,26 +628,28 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       const nextDestinationId = String(
         patch.destino_sucursal ?? patch.destino_sucursal_id ?? getBranchId(row?.destino_sucursal)
       );
-      const nextSize = String(patch.package_size || row.package_size || "estandar");
-      const routeId = getRouteId(originId, nextDestinationId);
-      const nextSpaces =
-        patch.delivery_spaces !== undefined
-          ? Math.max(1, Number(patch.delivery_spaces || 1))
-          : patch.package_size !== undefined
-            ? getDeliverySpacesForSize(nextSize, routeId)
-            : Math.max(1, Number(row.delivery_spaces || getDeliverySpacesForSize(nextSize, routeId)));
-      const nextRoutePrice =
-        patch.precio_entre_sucursal !== undefined
-          ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
-          : getDeliveryRoutePrice(originId, nextDestinationId, nextSpaces, Number(row.numero_paquete || 1));
+      const derivedPatch = buildDeliveryDerivedPatch(
+        row,
+        patch,
+        originId,
+        nextDestinationId,
+        Number(row.numero_paquete || 1)
+      );
 
-      return applyPackagePatch(row, { ...patch, delivery_spaces: nextSpaces, precio_entre_sucursal: nextRoutePrice }, sellerConfig);
+      return applyPackagePatch(row, derivedPatch, sellerConfig);
     });
     setRows(optimisticRows);
     setSavingRowIds((prev) => [...prev, rowId]);
 
     try {
-      const response = await updateSimplePackageAPI(rowId, patch);
+      const targetOriginId = getBranchId(targetRow?.origen_sucursal || targetRow?.sucursal);
+      const targetDestinationId = String(
+        patch.destino_sucursal ?? patch.destino_sucursal_id ?? getBranchId(targetRow?.destino_sucursal)
+      );
+      const response = await updateSimplePackageAPI(
+        rowId,
+        buildDeliveryDerivedPatch(targetRow, patch, targetOriginId, targetDestinationId, Number(targetRow?.numero_paquete || 1))
+      );
       if (!response.success) {
         setRows(previousRows);
         message.error(response.message || "No se pudo actualizar el paquete");
@@ -717,22 +760,22 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         if (rowIndex !== index) return row;
         const nextDestinationId = String(patch.destino_sucursal_id ?? (row.destino_sucursal_id || ""));
         const routeId = getRouteId(createOriginId, nextDestinationId);
-        const nextSize = String(patch.package_size || row.package_size || "estandar");
-        const nextSpaces =
-          patch.delivery_spaces !== undefined
-            ? Math.max(1, Number(patch.delivery_spaces || 1))
-            : patch.package_size !== undefined
-              ? getDeliverySpacesForSize(nextSize, routeId)
-              : Math.max(1, Number(row.delivery_spaces || getDeliverySpacesForSize(nextSize, routeId)));
+        const nextSpaces = getEffectiveDeliverySpaces(
+          createOriginId,
+          nextDestinationId,
+          Number(patch.delivery_spaces !== undefined ? patch.delivery_spaces || 1 : row.delivery_spaces || 1)
+        );
+        const nextSize = getPackageSizeBySpaces(nextSpaces, routeId);
         const nextRoutePrice =
           patch.precio_entre_sucursal !== undefined
             ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
             : getDeliveryRoutePrice(createOriginId, nextDestinationId, nextSpaces, createMonthlyCount + index + 1);
 
-        return createDraftRow(index, getCreateRowConfig(index, { ...row, ...patch }), {
+        return createDraftRow(index, getCreateRowConfig(index, { ...row, ...patch, package_size: nextSize }), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
+          package_size: nextSize,
           delivery_spaces: nextSpaces,
           precio_entre_sucursal: nextRoutePrice,
         });
@@ -771,19 +814,18 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     }
 
     setCreateRows((prev) =>
-      prev.map((row, index) =>
-        createDraftRow(index, getCreateRowConfig(index, row), {
+      prev.map((row, index) => {
+        const routeId = getRouteId(createOriginId, createDestinationId);
+        const spaces = getEffectiveDeliverySpaces(createOriginId, createDestinationId, row.delivery_spaces);
+        const packageSize = getPackageSizeBySpaces(spaces, routeId);
+        return createDraftRow(index, getCreateRowConfig(index, { ...row, package_size: packageSize }), {
           ...row,
           destino_sucursal_id: createDestinationId,
-          delivery_spaces: row.delivery_spaces || getDeliverySpacesForSize(row.package_size, getRouteId(createOriginId, createDestinationId)),
-          precio_entre_sucursal: getDeliveryRoutePrice(
-            createOriginId,
-            createDestinationId,
-            row.delivery_spaces || getDeliverySpacesForSize(row.package_size, getRouteId(createOriginId, createDestinationId)),
-            createMonthlyCount + index + 1
-          ),
-        })
-      )
+          package_size: packageSize,
+          delivery_spaces: spaces,
+          precio_entre_sucursal: getDeliveryRoutePrice(createOriginId, createDestinationId, spaces, createMonthlyCount + index + 1),
+        });
+      })
     );
     message.success("Sucursal destino aplicada a todos los paquetes");
   };
@@ -798,16 +840,20 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       return;
     }
 
-    const payloadRows = createRows.map((row) => ({
-      comprador: String(row.comprador || "").trim(),
-      telefono_comprador: String(row.telefono_comprador || "").trim(),
-      descripcion_paquete: String(row.descripcion_paquete || "").trim(),
-      destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
-      package_size: row.package_size,
-      delivery_spaces: Number(row.delivery_spaces || 1),
-      saldo_por_paquete: Number(row.saldo_por_paquete || 0),
-      precio_entre_sucursal: Number(row.precio_entre_sucursal || 0),
-    }));
+    const payloadRows = createRows.map((row) => {
+      const destinationId = String(row.destino_sucursal_id || "").trim();
+      const spaces = getEffectiveDeliverySpaces(createOriginId, destinationId, row.delivery_spaces);
+      return {
+        comprador: String(row.comprador || "").trim(),
+        telefono_comprador: String(row.telefono_comprador || "").trim(),
+        descripcion_paquete: String(row.descripcion_paquete || "").trim(),
+        destino_sucursal_id: destinationId,
+        package_size: getPackageSizeBySpaces(spaces, getRouteId(createOriginId, destinationId)),
+        delivery_spaces: spaces,
+        saldo_por_paquete: Number(row.saldo_por_paquete || 0),
+        precio_entre_sucursal: Number(row.precio_entre_sucursal || 0),
+      };
+    });
 
     for (let index = 0; index < payloadRows.length; index += 1) {
       const row = payloadRows[index];
@@ -1392,11 +1438,11 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                               <Select
                                 value={row.package_size || "estandar"}
                                 style={{ width: "100%" }}
+                                disabled
                                 options={[
                                   { label: "Estandar", value: "estandar" },
                                   { label: "Grande", value: "grande" },
                                 ]}
-                                onChange={(value) => updateCreateRow(index, { package_size: value })}
                               />
                             </td>
                             <td style={tableCellStyle}>
@@ -1404,7 +1450,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                 min={1}
                                 style={{ width: "100%" }}
                                 value={Number(row.delivery_spaces || 1)}
-                                disabled={!createOriginId || String(createOriginId) === String(row.destino_sucursal_id || "")}
+                                disabled={!createOriginId}
                                 onChange={(value) =>
                                   updateCreateRow(index, { delivery_spaces: Math.max(1, Number(value || 1)) })
                                 }
@@ -1623,33 +1669,44 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Select
                                     value={row.package_size || "estandar"}
                                     style={{ width: "100%" }}
-                                    disabled={isSaving || isPrinted}
+                                    disabled
                                     options={[
                                       { label: "Estandar", value: "estandar" },
                                       { label: "Grande", value: "grande" },
                                     ]}
-                                    onChange={(value) => commitRowPatch(rowId, { package_size: value })}
                                   />
                                 </td>
                                 <td style={tableCellStyle}>
                                   <InputNumber
                                     min={1}
                                     style={{ width: "100%" }}
-                                    disabled={isSaving || isPrinted || String(originId) === String(getBranchId(row?.destino_sucursal))}
+                                    disabled={isSaving || isPrinted}
                                     value={Number(row.delivery_spaces || 1)}
-                                    onChange={(value) =>
+                                    onChange={(value) => {
+                                      const destinationId = getBranchId(row?.destino_sucursal);
+                                      const spaces = getEffectiveDeliverySpaces(originId, destinationId, Number(value || 1));
+                                      const routeId = getRouteId(originId, destinationId);
                                       setRows((current) =>
                                         current.map((currentRow) =>
                                           String(currentRow._id) === rowId
                                             ? applyPackagePatch(
                                                 currentRow,
-                                                { delivery_spaces: Math.max(1, Number(value || 1)) },
+                                                {
+                                                  package_size: getPackageSizeBySpaces(spaces, routeId),
+                                                  delivery_spaces: spaces,
+                                                  precio_entre_sucursal: getDeliveryRoutePrice(
+                                                    originId,
+                                                    destinationId,
+                                                    spaces,
+                                                    Number(row.numero_paquete || 1)
+                                                  ),
+                                                },
                                                 sellerConfig
                                               )
                                             : currentRow
                                         )
-                                      )
-                                    }
+                                      );
+                                    }}
                                     onBlur={() => {
                                       const currentRow = rows.find((item) => String(item._id) === rowId);
                                       void commitRowPatch(rowId, {
@@ -1769,12 +1826,11 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   className="mt-1"
                                   value={row.package_size || "estandar"}
                                   style={{ width: "100%" }}
-                                  disabled={isSaving || isPrinted}
+                                  disabled
                                   options={[
                                     { label: "Estandar", value: "estandar" },
                                     { label: "Grande", value: "grande" },
                                   ]}
-                                  onChange={(value) => commitRowPatch(rowId, { package_size: value })}
                                 />
                               </div>
                               <div>
@@ -1783,21 +1839,33 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   className="mt-1"
                                   min={1}
                                   style={{ width: "100%" }}
-                                  disabled={isSaving || isPrinted || String(originId) === String(getBranchId(row?.destino_sucursal))}
+                                  disabled={isSaving || isPrinted}
                                   value={Number(row.delivery_spaces || 1)}
-                                  onChange={(value) =>
+                                  onChange={(value) => {
+                                    const destinationId = getBranchId(row?.destino_sucursal);
+                                    const spaces = getEffectiveDeliverySpaces(originId, destinationId, Number(value || 1));
+                                    const routeId = getRouteId(originId, destinationId);
                                     setRows((current) =>
                                       current.map((currentRow) =>
                                         String(currentRow._id) === rowId
                                           ? applyPackagePatch(
                                               currentRow,
-                                              { delivery_spaces: Math.max(1, Number(value || 1)) },
+                                              {
+                                                package_size: getPackageSizeBySpaces(spaces, routeId),
+                                                delivery_spaces: spaces,
+                                                precio_entre_sucursal: getDeliveryRoutePrice(
+                                                  originId,
+                                                  destinationId,
+                                                  spaces,
+                                                  Number(row.numero_paquete || 1)
+                                                ),
+                                              },
                                               sellerConfig
                                             )
                                           : currentRow
                                       )
-                                    )
-                                  }
+                                    );
+                                  }}
                                   onBlur={() => {
                                     const currentRow = rows.find((item) => String(item._id) === rowId);
                                     void commitRowPatch(rowId, {

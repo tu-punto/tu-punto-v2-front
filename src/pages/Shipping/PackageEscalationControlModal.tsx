@@ -1,5 +1,5 @@
-import { Button, Checkbox, Empty, Input, InputNumber, Modal, Select, Space, Spin, Tabs, Typography, message } from "antd";
-import { DeleteOutlined, InboxOutlined, PlusOutlined, TruckOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Empty, InputNumber, Modal, Select, Space, Spin, Tabs, Typography, message } from "antd";
+import { InboxOutlined, TruckOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import {
   getSimplePackageBranchPricesAPI,
@@ -34,8 +34,7 @@ const DEFAULT_DELIVERY_RANGES: PackageEscalationRange[] = [
 ];
 
 const DEFAULT_DELIVERY_SPACES: PackageDeliverySpace[] = [
-  { size: "estandar", spaces: 1 },
-  { size: "grande", spaces: 2 },
+  { size: "small_limit", spaces: 1 },
 ];
 
 const tableCellStyle: React.CSSProperties = {
@@ -121,10 +120,21 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
       setDeliveryRanges(normalizeRanges(response.data?.delivery, DEFAULT_DELIVERY_RANGES));
       setDeliverySpaces(
         Array.isArray(response.data?.delivery_spaces) && response.data.delivery_spaces.length
-          ? response.data.delivery_spaces.map((row: any) => ({
-              size: String(row?.size || "").trim(),
-              spaces: Math.max(1, Number(row?.spaces || 1)),
-            }))
+          ? [
+              {
+                size: "small_limit",
+                spaces: Math.max(
+                  1,
+                  Number(
+                    response.data.delivery_spaces.find((row: any) => String(row?.size || "").toLowerCase() === "small_limit")
+                      ?.spaces ??
+                      response.data.delivery_spaces.find((row: any) => String(row?.size || "").toLowerCase() === "estandar")
+                        ?.spaces ??
+                      1
+                  )
+                ),
+              },
+            ]
           : DEFAULT_DELIVERY_SPACES
       );
     } catch (error) {
@@ -227,6 +237,29 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
     } catch (error) {
       console.error(error);
       message.error("Error guardando el escalonamiento");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveDeliverySpaces = async () => {
+    setSaving(true);
+    try {
+      const response = await upsertPackageEscalationConfigAPI({
+        serviceOrigin: "delivery",
+        ranges: deliveryRanges,
+        deliverySpaces,
+      });
+      if (!response?.success) {
+        message.error(response?.message || "No se pudo guardar el limite de espacios");
+        return;
+      }
+      message.success("Limite de espacios guardado");
+      setSpacesModalVisible(false);
+      if (selectedRouteId) await loadConfig(selectedRouteId);
+    } catch (error) {
+      console.error(error);
+      message.error("Error guardando el limite de espacios");
     } finally {
       setSaving(false);
     }
@@ -476,70 +509,29 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
         )}
       </Modal>
       <Modal
-        title="Espacios por tamano"
+        title="Limite de espacios"
         open={spacesModalVisible}
         onCancel={() => setSpacesModalVisible(false)}
-        onOk={() => setSpacesModalVisible(false)}
+        onOk={saveDeliverySpaces}
         okText="Listo"
         cancelText="Cancelar"
+        okButtonProps={{ loading: saving }}
       >
         <Space direction="vertical" size={12} style={{ width: "100%" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-            <thead>
-              <tr>
-                <th style={tableCellStyle}>Tamano</th>
-                <th style={tableCellStyle}>Espacios</th>
-                <th style={{ ...tableCellStyle, width: 64 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {deliverySpaces.map((row, index) => (
-                <tr key={`${row.size}-${index}`}>
-                  <td style={tableCellStyle}>
-                    <Input
-                      value={row.size}
-                      placeholder="Ej: refrigerador"
-                      onChange={(event) =>
-                        setDeliverySpaces((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, size: event.target.value } : item
-                          )
-                        )
-                      }
-                    />
-                  </td>
-                  <td style={tableCellStyle}>
-                    <InputNumber
-                      min={1}
-                      value={row.spaces}
-                      style={{ width: "100%" }}
-                      onChange={(value) =>
-                        setDeliverySpaces((current) =>
-                          current.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, spaces: Math.max(1, Number(value || 1)) } : item
-                          )
-                        )
-                      }
-                    />
-                  </td>
-                  <td style={tableCellStyle}>
-                    <Button
-                      danger
-                      icon={<DeleteOutlined />}
-                      disabled={deliverySpaces.length <= 1}
-                      onClick={() => setDeliverySpaces((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Button
-            icon={<PlusOutlined />}
-            onClick={() => setDeliverySpaces((current) => [...current, { size: "", spaces: 1 }])}
-          >
-            Agregar fila
-          </Button>
+          <Typography.Text>
+            Los paquetes con esta cantidad de espacios o menos se consideran pequenos. Si pasan este limite, se cobran como grandes.
+          </Typography.Text>
+          <div>
+            <Typography.Text strong>Espacios maximos para pequeno</Typography.Text>
+            <InputNumber
+              min={1}
+              value={deliverySpaces[0]?.spaces || 1}
+              style={{ width: "100%", marginTop: 8 }}
+              onChange={(value) =>
+                setDeliverySpaces([{ size: "small_limit", spaces: Math.max(1, Number(value || 1)) }])
+              }
+            />
+          </div>
         </Space>
       </Modal>
       <SimplePackageBranchPriceModal
