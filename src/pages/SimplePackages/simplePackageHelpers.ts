@@ -4,6 +4,7 @@ export type SimplePackageDraftRow = {
   telefono_comprador: string;
   descripcion_paquete: string;
   package_size: "estandar" | "grande";
+  delivery_spaces?: number;
   destino_sucursal_id?: string;
   precio_paquete_unitario: number;
   precio_paquete: number;
@@ -25,7 +26,8 @@ export const buildPackagePricing = (
   saldoPorPaquete: number,
   packageSize: "estandar" | "grande",
   branchRoutePrice = 0,
-  largeUnitPrice?: number
+  largeUnitPrice?: number,
+  deliverySpaces = 1
 ) => {
   const precioPaqueteUnitario = roundCurrency(unitPrice);
   const precioPaquete = roundCurrency(packageSize === "grande" ? Number(largeUnitPrice ?? unitPrice * 2) : unitPrice);
@@ -39,6 +41,7 @@ export const buildPackagePricing = (
     amortizacion_vendedor: deudaVendedor,
     saldo_por_paquete: roundCurrency(saldoPorPaquete),
     deuda_comprador: deudaComprador,
+    delivery_spaces: Math.max(1, Number(deliverySpaces || 1)),
     precio_entre_sucursal: precioEntreSucursal,
     precio_total: roundCurrency(precioPaquete + precioEntreSucursal),
   };
@@ -51,6 +54,7 @@ export const createDraftRow = (
 ): SimplePackageDraftRow => {
   const packageSize = existing?.package_size === "grande" ? "grande" : "estandar";
   const routePrice = Number(existing?.precio_entre_sucursal || 0);
+  const deliverySpaces = Math.max(1, Number(existing?.delivery_spaces || 1));
   const saldoPorPaquete = Number(existing?.saldo_por_paquete ?? config.saldo_por_paquete ?? 0);
   const amortizacion = Number(existing?.amortizacion_vendedor ?? config.amortizacion ?? 0);
   const initialPaymentMethod =
@@ -63,6 +67,7 @@ export const createDraftRow = (
     telefono_comprador: existing?.telefono_comprador || "",
     descripcion_paquete: existing?.descripcion_paquete || "",
     package_size: packageSize,
+    delivery_spaces: deliverySpaces,
     destino_sucursal_id: existing?.destino_sucursal_id || "",
     esta_pagado: existing?.esta_pagado || "no",
     metodo_pago: initialPaymentMethod,
@@ -73,7 +78,8 @@ export const createDraftRow = (
       saldoPorPaquete,
       packageSize,
       routePrice,
-      config.precio_paquete_grande
+      config.precio_paquete_grande,
+      deliverySpaces
     ),
   };
 };
@@ -129,13 +135,15 @@ export const applyPackagePatch = (
     patch.saldo_por_paquete ?? config?.saldo_por_paquete ?? (row?.saldo_por_paquete || 0)
   );
   const branchRoutePrice = Number(patch.precio_entre_sucursal ?? (row?.precio_entre_sucursal || 0));
+  const deliverySpaces = Math.max(1, Number(patch.delivery_spaces ?? row?.delivery_spaces ?? 1));
   const pricing = buildPackagePricing(
     unitPrice,
     amortizacion,
     saldoPorPaquete,
     nextSize,
     branchRoutePrice,
-    config?.precio_paquete_grande
+    config?.precio_paquete_grande,
+    deliverySpaces
   );
   const paid = patch.esta_pagado === "si" || patch.esta_pagado === "no" ? patch.esta_pagado : row.esta_pagado;
   const metodoPago =

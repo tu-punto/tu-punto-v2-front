@@ -378,7 +378,7 @@ const SimplePackagesPage = () => {
               </Typography.Text>
               <div style={{ color: "#1f2937", fontWeight: 700, marginTop: 2 }}>
                 {missingForNextRange > 0
-                  ? `Faltan ${missingForNextRange} para desbloquear el siguiente rango`
+                  ? `Te faltan ${missingForNextRange} paquetes para desbloquear el siguiente rango`
                   : "Ya estas en el mejor rango del mes"}
               </div>
             </div>
@@ -395,7 +395,10 @@ const SimplePackagesPage = () => {
                 fontSize: 18,
               }}
             >
-              #{nextMonthlyNumber}
+              <div style={{ textAlign: "center", lineHeight: 1.1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Siguiente paquete:</div>
+                <div>#{nextMonthlyNumber}</div>
+              </div>
             </div>
           </div>
           <div style={{ height: 7, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", marginTop: 8 }}>

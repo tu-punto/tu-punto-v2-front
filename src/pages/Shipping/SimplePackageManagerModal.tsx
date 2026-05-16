@@ -1,5 +1,5 @@
 import { Button, Empty, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
-import { PrinterOutlined, WhatsAppOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PrinterOutlined, WhatsAppOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useMemo, useState } from "react";
 import {
   createSimplePackageOrdersAPI,
@@ -13,6 +13,7 @@ import {
   registerSimplePackagesAPI,
   sendSimplePackageGuideWhatsappAPI,
   updateSimplePackageAPI,
+  PackageDeliverySpace,
   PackageEscalationRange,
 } from "../../api/simplePackage";
 import { getSellerAPI, getSellersBasicAPI } from "../../api/seller";
@@ -44,6 +45,15 @@ const DEFAULT_SIMPLE_RANGES: PackageEscalationRange[] = [
   { from: 1, to: 30, small_price: 4, large_price: 8 },
   { from: 31, to: 60, small_price: 3, large_price: 6 },
   { from: 61, to: null, small_price: 2.5, large_price: 5 },
+];
+const DEFAULT_DELIVERY_RANGES: PackageEscalationRange[] = [
+  { from: 1, to: 5, small_price: 5, large_price: 5 },
+  { from: 6, to: 15, small_price: 4, large_price: 4 },
+  { from: 16, to: null, small_price: 3, large_price: 3 },
+];
+const DEFAULT_DELIVERY_SPACES: PackageDeliverySpace[] = [
+  { size: "estandar", spaces: 1 },
+  { size: "grande", spaces: 2 },
 ];
 const getSimpleEscalatedPriceFromRanges = (
   ranges: PackageEscalationRange[],
@@ -135,6 +145,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const [sellerConfig, setSellerConfig] = useState({ precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 });
   const [selectedSellerBranches, setSelectedSellerBranches] = useState<any[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
+  const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
   const [printingQr, setPrintingQr] = useState(false);
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
@@ -287,6 +298,39 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       )?.routeId || ""
     );
 
+  const getDeliverySpacesForSize = (packageSize = "estandar", routeId = "") => {
+    const config = escalationConfigs.find(
+      (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "delivery"
+    );
+    const spacesRows =
+      Array.isArray(config?.delivery_spaces) && config.delivery_spaces.length
+        ? config.delivery_spaces
+        : DEFAULT_DELIVERY_SPACES;
+    return Math.max(
+      1,
+      Number(
+        spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === String(packageSize).toLowerCase())
+          ?.spaces || 1
+      )
+    );
+  };
+
+  const getDeliveryRoutePrice = (originId: string, destinationId?: string, spaces = 1, position = 1) => {
+    if (String(originId || "") === String(destinationId || "")) return 0;
+    const routeId = getRouteId(originId, destinationId);
+    const config = escalationConfigs.find(
+      (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "delivery"
+    );
+    if (!config) return Number(getRoutePrice(originId, destinationId) || 0) * Math.max(1, Number(spaces || 1));
+    const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
+    const safePosition = Math.max(1, Number(position || 1));
+    const range =
+      ranges.find((row: PackageEscalationRange) => safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)) ||
+      ranges[ranges.length - 1] ||
+      DEFAULT_DELIVERY_RANGES[0];
+    return Number(range.small_price || 0) * Math.max(1, Number(spaces || 1));
+  };
+
   const getDestinationOptions = (originId: string, allowedBranchIds: Set<string>, originName?: string) => {
     if (!originId) return [];
     const routeOptions = (routeOptionsByOrigin.get(String(originId)) || []).filter((item) =>
@@ -320,8 +364,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   };
 
   const fetchBranchPrices = async () => {
-    const pricesResponse = await getSimplePackageBranchPricesAPI();
+    const [pricesResponse, escalationResponse] = await Promise.all([
+      getSimplePackageBranchPricesAPI(),
+      getPackageEscalationConfigAPI(),
+    ]);
     setBranchPrices(Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : []);
+    setEscalationConfigs(Array.isArray(escalationResponse?.data) ? escalationResponse.data : []);
   };
 
   const fetchSellers = async () => {
@@ -513,10 +561,13 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             ? row.destino_sucursal_id
             : "";
 
+        const routeId = getRouteId(createOriginId, nextDestinationId);
+        const spaces = row.delivery_spaces || getDeliverySpacesForSize(row.package_size, routeId);
         return createDraftRow(index, getCreateRowConfig(index, row), {
           ...row,
           destino_sucursal_id: nextDestinationId,
-          precio_entre_sucursal: getRoutePrice(createOriginId, nextDestinationId),
+          delivery_spaces: spaces,
+          precio_entre_sucursal: getDeliveryRoutePrice(createOriginId, nextDestinationId, spaces, createMonthlyCount + index + 1),
         });
       })
     );
@@ -536,12 +587,20 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       const nextDestinationId = String(
         patch.destino_sucursal ?? patch.destino_sucursal_id ?? getBranchId(row?.destino_sucursal)
       );
+      const nextSize = String(patch.package_size || row.package_size || "estandar");
+      const routeId = getRouteId(originId, nextDestinationId);
+      const nextSpaces =
+        patch.delivery_spaces !== undefined
+          ? Math.max(1, Number(patch.delivery_spaces || 1))
+          : patch.package_size !== undefined
+            ? getDeliverySpacesForSize(nextSize, routeId)
+            : Math.max(1, Number(row.delivery_spaces || getDeliverySpacesForSize(nextSize, routeId)));
       const nextRoutePrice =
         patch.precio_entre_sucursal !== undefined
           ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
-          : getRoutePrice(originId, nextDestinationId);
+          : getDeliveryRoutePrice(originId, nextDestinationId, nextSpaces, Number(row.numero_paquete || 1));
 
-      return applyPackagePatch(row, { ...patch, precio_entre_sucursal: nextRoutePrice }, sellerConfig);
+      return applyPackagePatch(row, { ...patch, delivery_spaces: nextSpaces, precio_entre_sucursal: nextRoutePrice }, sellerConfig);
     });
     setRows(optimisticRows);
     setSavingRowIds((prev) => [...prev, rowId]);
@@ -657,15 +716,24 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const nextDestinationId = String(patch.destino_sucursal_id ?? (row.destino_sucursal_id || ""));
+        const routeId = getRouteId(createOriginId, nextDestinationId);
+        const nextSize = String(patch.package_size || row.package_size || "estandar");
+        const nextSpaces =
+          patch.delivery_spaces !== undefined
+            ? Math.max(1, Number(patch.delivery_spaces || 1))
+            : patch.package_size !== undefined
+              ? getDeliverySpacesForSize(nextSize, routeId)
+              : Math.max(1, Number(row.delivery_spaces || getDeliverySpacesForSize(nextSize, routeId)));
         const nextRoutePrice =
           patch.precio_entre_sucursal !== undefined
             ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
-            : getRoutePrice(createOriginId, nextDestinationId);
+            : getDeliveryRoutePrice(createOriginId, nextDestinationId, nextSpaces, createMonthlyCount + index + 1);
 
         return createDraftRow(index, getCreateRowConfig(index, { ...row, ...patch }), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
+          delivery_spaces: nextSpaces,
           precio_entre_sucursal: nextRoutePrice,
         });
       })
@@ -707,7 +775,13 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         createDraftRow(index, getCreateRowConfig(index, row), {
           ...row,
           destino_sucursal_id: createDestinationId,
-          precio_entre_sucursal: getRoutePrice(createOriginId, createDestinationId),
+          delivery_spaces: row.delivery_spaces || getDeliverySpacesForSize(row.package_size, getRouteId(createOriginId, createDestinationId)),
+          precio_entre_sucursal: getDeliveryRoutePrice(
+            createOriginId,
+            createDestinationId,
+            row.delivery_spaces || getDeliverySpacesForSize(row.package_size, getRouteId(createOriginId, createDestinationId)),
+            createMonthlyCount + index + 1
+          ),
         })
       )
     );
@@ -730,6 +804,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       descripcion_paquete: String(row.descripcion_paquete || "").trim(),
       destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
       package_size: row.package_size,
+      delivery_spaces: Number(row.delivery_spaces || 1),
       saldo_por_paquete: Number(row.saldo_por_paquete || 0),
       precio_entre_sucursal: Number(row.precio_entre_sucursal || 0),
     }));
@@ -1262,6 +1337,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                           <th style={tableCellStyle}>Celular</th>
                           <th style={tableCellStyle}>Sucursal destino</th>
                           <th style={tableCellStyle}>Tamaño</th>
+                          <th style={tableCellStyle}>Espacios delivery</th>
                           <th style={tableCellStyle}>Saldo del paquete</th>
                           <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
                           <th style={tableCellStyle}>Precio paquete</th>
@@ -1321,6 +1397,17 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   { label: "Grande", value: "grande" },
                                 ]}
                                 onChange={(value) => updateCreateRow(index, { package_size: value })}
+                              />
+                            </td>
+                            <td style={tableCellStyle}>
+                              <InputNumber
+                                min={1}
+                                style={{ width: "100%" }}
+                                value={Number(row.delivery_spaces || 1)}
+                                disabled={!createOriginId || String(createOriginId) === String(row.destino_sucursal_id || "")}
+                                onChange={(value) =>
+                                  updateCreateRow(index, { delivery_spaces: Math.max(1, Number(value || 1)) })
+                                }
                               />
                             </td>
                             <td style={tableCellStyle}>
@@ -1482,6 +1569,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                             <th style={tableCellStyle}>Celular</th>
                             <th style={tableCellStyle}>Sucursal destino</th>
                             <th style={tableCellStyle}>Tamaño</th>
+                            <th style={tableCellStyle}>Espacios delivery</th>
                             <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
                             <th style={tableCellStyle}>Precio paquete</th>
                             <th style={tableCellStyle}>Precio total del servicio por paquete (sujeto a variacion segun el tamaño del paquete)</th>
@@ -1545,6 +1633,33 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                 </td>
                                 <td style={tableCellStyle}>
                                   <InputNumber
+                                    min={1}
+                                    style={{ width: "100%" }}
+                                    disabled={isSaving || isPrinted || String(originId) === String(getBranchId(row?.destino_sucursal))}
+                                    value={Number(row.delivery_spaces || 1)}
+                                    onChange={(value) =>
+                                      setRows((current) =>
+                                        current.map((currentRow) =>
+                                          String(currentRow._id) === rowId
+                                            ? applyPackagePatch(
+                                                currentRow,
+                                                { delivery_spaces: Math.max(1, Number(value || 1)) },
+                                                sellerConfig
+                                              )
+                                            : currentRow
+                                        )
+                                      )
+                                    }
+                                    onBlur={() => {
+                                      const currentRow = rows.find((item) => String(item._id) === rowId);
+                                      void commitRowPatch(rowId, {
+                                        delivery_spaces: Math.max(1, Number(currentRow?.delivery_spaces || 1)),
+                                      });
+                                    }}
+                                  />
+                                </td>
+                                <td style={tableCellStyle}>
+                                  <InputNumber
                                     min={0}
                                     style={{ width: "100%" }}
                                     addonBefore="Bs."
@@ -1592,9 +1707,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                       Etiqueta impresa<br />{row.numero_guia || ""}
                                     </Typography.Text>
                                   ) : (
-                                    <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
-                                      Borrar
-                                    </Button>
+                                    <Button danger icon={<DeleteOutlined />} disabled={isSaving} onClick={() => handleDelete(rowId)} />
                                   )}
                                 </td>
                               </tr>
@@ -1664,6 +1777,35 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   onChange={(value) => commitRowPatch(rowId, { package_size: value })}
                                 />
                               </div>
+                              <div>
+                                <Typography.Text strong>Espacios delivery</Typography.Text>
+                                <InputNumber
+                                  className="mt-1"
+                                  min={1}
+                                  style={{ width: "100%" }}
+                                  disabled={isSaving || isPrinted || String(originId) === String(getBranchId(row?.destino_sucursal))}
+                                  value={Number(row.delivery_spaces || 1)}
+                                  onChange={(value) =>
+                                    setRows((current) =>
+                                      current.map((currentRow) =>
+                                        String(currentRow._id) === rowId
+                                          ? applyPackagePatch(
+                                              currentRow,
+                                              { delivery_spaces: Math.max(1, Number(value || 1)) },
+                                              sellerConfig
+                                            )
+                                          : currentRow
+                                      )
+                                    )
+                                  }
+                                  onBlur={() => {
+                                    const currentRow = rows.find((item) => String(item._id) === rowId);
+                                    void commitRowPatch(rowId, {
+                                      delivery_spaces: Math.max(1, Number(currentRow?.delivery_spaces || 1)),
+                                    });
+                                  }}
+                                />
+                              </div>
                               <div className="grid grid-cols-1 gap-3">
                                 <div>
                                   <Typography.Text strong>Precio del envio</Typography.Text>
@@ -1713,9 +1855,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                 </div>
                               </div>
                               {!isPrinted && (
-                                <Button danger block disabled={isSaving} onClick={() => handleDelete(rowId)}>
-                                  Borrar
-                                </Button>
+                                <Button danger block icon={<DeleteOutlined />} disabled={isSaving} onClick={() => handleDelete(rowId)} />
                               )}
                             </div>
                           </div>
