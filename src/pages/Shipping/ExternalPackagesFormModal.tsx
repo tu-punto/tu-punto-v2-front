@@ -189,7 +189,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const getEffectiveDeliverySpaces = (_originId: string, _destinationId?: string, spaces = 1) =>
     Math.max(1, Number(spaces || 1));
 
-  const getDeliveryRoutePrice = (originId?: string, destinationId?: string, spaces = 1, _count = packageCount) => {
+  const getDeliveryRoutePrice = (originId?: string, destinationId?: string, spaces = 1, escalationSpaces = spaces) => {
     if (String(originId || "") === String(destinationId || "")) return 0;
     const routeId = getRouteId(originId, destinationId);
     const config = escalationConfigs.find(
@@ -197,7 +197,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     );
     if (!config) return roundCurrency(getBranchRoutePrice(originId, destinationId) * Math.max(1, Number(spaces || 1)));
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
-    const safeCount = Math.max(MIN_PACKAGES, Number(spaces || MIN_PACKAGES));
+    const safeCount = Math.max(MIN_PACKAGES, Number(escalationSpaces || spaces || MIN_PACKAGES));
     const range =
       ranges.find((row: PackageEscalationRange) => safeCount >= row.from && (row.to === null || row.to === undefined || safeCount <= row.to)) ||
       ranges[ranges.length - 1] ||
@@ -205,27 +205,60 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     return roundCurrency(Number(range.small_price || 0) * Math.max(1, Number(spaces || 1)));
   };
 
+  const getTotalDeliverySpacesForRoute = (rows: any[], originId?: string, destinationId?: string) =>
+    (rows || [])
+      .filter((row) => String(row.destino_sucursal_id || "") === String(destinationId || ""))
+      .reduce(
+        (sum, row) => sum + getEffectiveDeliverySpaces(originId || "", destinationId, row.delivery_spaces),
+        0
+      );
+
+  const applyPaymentAmounts = (row: any, packagePrice: number, branchRoutePrice: number) => {
+    const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
+    const mode = row.esta_pagado || "no";
+    if (mode === "si") {
+      return { ...row, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
+    }
+    if (mode === "mixto" && totalAmount > 0) {
+      const half = roundCurrency(totalAmount / 2);
+      return { ...row, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
+    }
+    return { ...row, monto_paga_vendedor: 0, monto_paga_comprador: 0 };
+  };
+
+  const recalculateRowsByDeliverySpaces = (sourceRows: any[], count = packageCount) => {
+    const normalizedRows = buildPackages(count, sourceRows).map((row) => ({
+      ...row,
+      destino_sucursal_id: row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "",
+    }));
+
+    return normalizedRows.map((row) => {
+      const destinationId = row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "";
+      const routeId = getRouteId(watchedOriginBranchId, destinationId);
+      const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, row.delivery_spaces);
+      const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
+      const escalationSpaces = getTotalDeliverySpacesForRoute(normalizedRows, watchedOriginBranchId, destinationId);
+      const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, destinationId, deliverySpaces, escalationSpaces);
+      const packagePrice = getEscalatedPackagePrice(count, packageSize, routeId);
+
+      return applyPaymentAmounts(
+        {
+          ...row,
+          destino_sucursal_id: destinationId,
+          package_size: packageSize,
+          delivery_spaces: deliverySpaces,
+          precio_entre_sucursal: branchRoutePrice,
+          precio_paquete: packagePrice,
+        },
+        packagePrice,
+        branchRoutePrice
+      );
+    });
+  };
+
   const applyEscalatedPricesToRows = (count = packageCount) => {
     const currentRows = form.getFieldValue("paquetes") || [];
-    form.setFieldValue(
-      "paquetes",
-      buildPackages(count, currentRows).map((row) => {
-        const routeId = getRouteId(watchedOriginBranchId, row.destino_sucursal_id);
-        const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, row.destino_sucursal_id, row.delivery_spaces);
-        const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-        const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, row.destino_sucursal_id, deliverySpaces, count);
-        const packagePrice = getEscalatedPackagePrice(count, packageSize, routeId);
-        const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
-        if (row.esta_pagado === "si") {
-          return { ...row, package_size: packageSize, delivery_spaces: deliverySpaces, precio_entre_sucursal: branchRoutePrice, precio_paquete: packagePrice, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
-        }
-        if (row.esta_pagado === "mixto") {
-          const half = roundCurrency(totalAmount / 2);
-          return { ...row, package_size: packageSize, delivery_spaces: deliverySpaces, precio_entre_sucursal: branchRoutePrice, precio_paquete: packagePrice, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
-        }
-        return { ...row, package_size: packageSize, delivery_spaces: deliverySpaces, precio_entre_sucursal: branchRoutePrice, precio_paquete: packagePrice, monto_paga_vendedor: 0, monto_paga_comprador: 0 };
-      })
-    );
+    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, count));
   };
 
   const routePriceMap = useMemo(() => {
@@ -315,29 +348,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   };
 
   const handlePackageDestinationChange = (rowIndex: number, destinationId: string) => {
-    const row = form.getFieldValue(["paquetes", rowIndex]) || {};
-    const routeId = getRouteId(watchedOriginBranchId, destinationId);
-    const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, row.delivery_spaces);
-    const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-    const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, destinationId, deliverySpaces);
-    const packagePrice = getEscalatedPackagePrice(packageCount, packageSize, routeId);
-    const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
-    const mode = form.getFieldValue(["paquetes", rowIndex, "esta_pagado"]) || "no";
-
-    form.setFieldValue(["paquetes", rowIndex, "destino_sucursal_id"], destinationId);
-    form.setFieldValue(["paquetes", rowIndex, "package_size"], packageSize);
-    form.setFieldValue(["paquetes", rowIndex, "precio_paquete"], packagePrice);
-    form.setFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"], branchRoutePrice);
-    form.setFieldValue(["paquetes", rowIndex, "delivery_spaces"], deliverySpaces);
-
-    if (mode === "si") {
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], totalAmount);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
-    } else if (mode === "mixto" && totalAmount > 0) {
-      const half = roundCurrency(totalAmount / 2);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], half);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], roundCurrency(totalAmount - half));
-    }
+    const currentRows = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((currentRow, index) =>
+      index === rowIndex ? { ...currentRow, destino_sucursal_id: destinationId } : currentRow
+    );
+    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, packageCount));
   };
 
   const applyDestinationToAll = () => {
@@ -346,36 +360,11 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       return;
     }
 
-    const currentRows = form.getFieldValue("paquetes") || [];
-    form.setFieldValue(
-      "paquetes",
-      buildPackages(packageCount, currentRows).map((row) => {
-        const routeId = getRouteId(watchedOriginBranchId, watchedDestinationBranchId);
-        const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, watchedDestinationBranchId, row.delivery_spaces);
-        const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-        const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, watchedDestinationBranchId, deliverySpaces);
-        const packagePrice = getEscalatedPackagePrice(packageCount, packageSize, routeId);
-        const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
-        const mode = row.esta_pagado || "no";
-        const nextRow = {
-          ...row,
-          destino_sucursal_id: watchedDestinationBranchId,
-          package_size: packageSize,
-          delivery_spaces: deliverySpaces,
-          precio_paquete: packagePrice,
-          precio_entre_sucursal: branchRoutePrice,
-        };
-
-        if (mode === "si") {
-          return { ...nextRow, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
-        }
-        if (mode === "mixto" && totalAmount > 0) {
-          const half = roundCurrency(totalAmount / 2);
-          return { ...nextRow, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
-        }
-        return nextRow;
-      })
-    );
+    const currentRows = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((row) => ({
+      ...row,
+      destino_sucursal_id: watchedDestinationBranchId,
+    }));
+    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, packageCount));
   };
 
   const applyDescriptionToAll = () => {
@@ -530,33 +519,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const currentRows = form.getFieldValue("paquetes") || [];
     form.setFieldsValue({
       numero_paquetes: nextCount,
-      paquetes: buildPackages(nextCount, currentRows).map((row) => {
-        const destinationId = row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "";
-        const routeId = getRouteId(watchedOriginBranchId, destinationId);
-        const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, row.delivery_spaces);
-        const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-        const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, destinationId, deliverySpaces, nextCount);
-        const packagePrice = getEscalatedPackagePrice(nextCount, packageSize, routeId);
-        const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
-        const mode = row.esta_pagado || "no";
-        const nextRow = {
-          ...row,
-          destino_sucursal_id: destinationId,
-          package_size: packageSize,
-          delivery_spaces: deliverySpaces,
-          precio_entre_sucursal: branchRoutePrice,
-          precio_paquete: packagePrice,
-        };
-
-        if (mode === "si") {
-          return { ...nextRow, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
-        }
-        if (mode === "mixto" && totalAmount > 0) {
-          const half = roundCurrency(totalAmount / 2);
-          return { ...nextRow, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
-        }
-        return nextRow;
-      }),
+      paquetes: recalculateRowsByDeliverySpaces(currentRows, nextCount),
     });
     setPackageCount(nextCount);
   };
@@ -714,40 +677,13 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       : watchedOriginBranchId;
     form.setFieldValue("destino_sucursal_id", nextGeneralDestination);
 
-    const currentRows = form.getFieldValue("paquetes") || [];
-    form.setFieldValue(
-      "paquetes",
-      buildPackages(packageCount, currentRows).map((row) => {
-        const destinationId = destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
-          ? row.destino_sucursal_id
-          : nextGeneralDestination;
-
-        const routeId = getRouteId(watchedOriginBranchId, destinationId);
-        const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, row.delivery_spaces);
-        const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-        const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, destinationId, deliverySpaces);
-        const packagePrice = getEscalatedPackagePrice(packageCount, packageSize, routeId);
-        const totalAmount = getTotalPaymentAmount(packagePrice, branchRoutePrice);
-        const mode = row.esta_pagado || "no";
-        const nextRow = {
-          ...row,
-          destino_sucursal_id: destinationId,
-          package_size: packageSize,
-          delivery_spaces: deliverySpaces,
-          precio_entre_sucursal: branchRoutePrice,
-          precio_paquete: packagePrice,
-        };
-
-        if (mode === "si") {
-          return { ...nextRow, monto_paga_vendedor: totalAmount, monto_paga_comprador: 0 };
-        }
-        if (mode === "mixto" && totalAmount > 0) {
-          const half = roundCurrency(totalAmount / 2);
-          return { ...nextRow, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
-        }
-        return nextRow;
-      })
-    );
+    const currentRows = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((row) => ({
+      ...row,
+      destino_sucursal_id: destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
+        ? row.destino_sucursal_id
+        : nextGeneralDestination,
+    }));
+    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, packageCount));
   }, [destinationOptions, escalationRanges, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
 
   const onFinish = async (values: any) => {
@@ -761,13 +697,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       return;
     }
 
-    const paquetes = (values.paquetes || []).slice(0, packageCount).map((row: any, index: number) => {
+    const formRows = buildPackages(packageCount, values.paquetes || []);
+    const paquetes = formRows.slice(0, packageCount).map((row: any, index: number) => {
       const routeId = getRouteId(originBranchId, row.destino_sucursal_id);
       const deliverySpaces = getEffectiveDeliverySpaces(originBranchId, row.destino_sucursal_id, row.delivery_spaces);
       const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
       const price = getEscalatedPackagePrice(packageCount, packageSize, routeId);
+      const escalationSpaces = getTotalDeliverySpacesForRoute(formRows, originBranchId, row.destino_sucursal_id);
       const branchRoutePrice = roundCurrency(
-        getDeliveryRoutePrice(originBranchId, row.destino_sucursal_id, deliverySpaces, packageCount)
+        getDeliveryRoutePrice(originBranchId, row.destino_sucursal_id, deliverySpaces, escalationSpaces)
       );
       const paidStatus = row.esta_pagado || "no";
       let sellerAmount = roundCurrency(Number(row.monto_paga_vendedor || 0));
@@ -973,7 +911,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Form.Item>
           <Form.Item
             name="numero_paquetes"
-            label="Numero de paquetes"
+            label="Número de paquetes"
             rules={[{ required: true, message: "Debe indicar la cantidad de paquetes" }]}
           >
             <InputNumber min={MIN_PACKAGES} style={{ width: "100%" }} onChange={handlePackageCountChange} />
@@ -1182,14 +1120,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                             onChange={(value) => {
                               const destinationId = form.getFieldValue(["paquetes", rowIndex, "destino_sucursal_id"]);
                               const spaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, Number(value || 1));
-                              const routeId = getRouteId(watchedOriginBranchId, destinationId);
-                              const packageSize = getPackageSizeBySpaces(spaces, routeId);
-                              const deliveryPrice = getDeliveryRoutePrice(watchedOriginBranchId, destinationId, spaces);
-                              const packagePrice = getEscalatedPackagePrice(packageCount, packageSize, routeId);
-                              form.setFieldValue(["paquetes", rowIndex, "package_size"], packageSize);
-                              form.setFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"], deliveryPrice);
-                              form.setFieldValue(["paquetes", rowIndex, "precio_paquete"], packagePrice);
-                              handlePackagePriceChange(rowIndex, packagePrice);
+                              const rowsWithNextSpaces = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((row, index) =>
+                                index === rowIndex ? { ...row, delivery_spaces: spaces } : row
+                              );
+                              form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(rowsWithNextSpaces, packageCount));
                             }}
                           />
                         </Form.Item>

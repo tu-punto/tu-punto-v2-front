@@ -283,7 +283,7 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
               <th style={tableCellStyle}>Precio por espacio</th>
             ) : (
               <>
-                <th style={tableCellStyle}>Pequenas</th>
+                <th style={tableCellStyle}>Pequeñas</th>
                 <th style={tableCellStyle}>Grandes</th>
               </>
             )}
@@ -519,10 +519,10 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
       >
         <Space direction="vertical" size={12} style={{ width: "100%" }}>
           <Typography.Text>
-            Los paquetes con esta cantidad de espacios o menos se consideran pequenos. Si pasan este limite, se cobran como grandes.
+            Los paquetes con esta cantidad de espacios o menos se consideran pequeños. Si pasan este limite, se cobran como grandes.
           </Typography.Text>
           <div>
-            <Typography.Text strong>Espacios maximos para pequeno</Typography.Text>
+            <Typography.Text strong>Espacios máximos para pequeño</Typography.Text>
             <InputNumber
               min={1}
               value={deliverySpaces[0]?.spaces || 1}
