@@ -459,8 +459,21 @@ const SimplePackagesPage = () => {
             setPendingModalVisible(true);
             void fetchPendingPackages();
           }}
+          size="large"
+          style={{
+            minHeight: 46,
+            paddingInline: 24,
+            borderRadius: 10,
+            borderColor: "#d97706",
+            background: "linear-gradient(180deg, #f59e0b 0%, #d97706 100%)",
+            color: "#ffffff",
+            fontWeight: 800,
+            letterSpacing: 0,
+            boxShadow: "0 5px 0 #92400e, 0 12px 24px rgba(217, 119, 6, 0.22)",
+            transform: "translateY(-2px)",
+          }}
         >
-          Ver pendientes
+          PEDIDOS PENDIENTES
         </Button>
         <div
           style={{
@@ -644,7 +657,7 @@ const SimplePackagesPage = () => {
           <Card>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[220px_240px_1fr_auto] gap-3 items-end">
               <div>
-                <Typography.Text strong>Numero de paquetes</Typography.Text>
+                <Typography.Text strong>Número de paquetes</Typography.Text>
                 <InputNumber
                   min={MIN_PACKAGES}
                   style={{ width: "100%", marginTop: 8 }}

@@ -23,13 +23,14 @@ import InventoryQRModal from "./InventoryQRModal.tsx";
 import StockQRInfoModal from "./StockQRInfoModal.tsx";
 import SellerWithdrawalRequestModal from "./SellerWithdrawalRequestModal.tsx";
 import StockWithdrawalRequestsPanel from "./StockWithdrawalRequestsPanel.tsx";
+import { normalizeRole } from "../../utils/role";
 import "./StockManagement.css";
 //test
 const SELLERS_PAGE_SIZE = 10;
 
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
-    const isSeller = user?.role === 'seller';
+    const isSeller = normalizeRole(user?.role) === 'seller';
     const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
     const [resetSignal, setResetSignal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -458,7 +459,8 @@ const StockManagement = () => {
             "Sucursal actual"
         )
         : "Sucursal actual";
-    const qrToolsDisabled = !effectiveSellerId || !effectiveBranchId;
+    const inventoryQrDisabled = !effectiveSellerId || !effectiveBranchId;
+    const infoQrDisabled = !effectiveBranchId;
 
     const openConfirmWithDraft = (draft: any[]) => {
         const mergedDraft = mergeStockDrafts(stockListForConfirmModal, draft);
@@ -657,9 +659,9 @@ const StockManagement = () => {
                                 icon={<QrcodeOutlined />}
                                 block
                                 style={actionButtonStyle}
-                                disabled={qrToolsDisabled}
+                                disabled={inventoryQrDisabled}
                                 onClick={() => setIsInventoryQRModalVisible(true)}
-                                title={qrToolsDisabled ? "Debe seleccionar un vendedor primero" : undefined}
+                                title={inventoryQrDisabled ? "Debe seleccionar un vendedor primero" : undefined}
                             >
                                 Inventario QR
                             </Button>
@@ -669,9 +671,9 @@ const StockManagement = () => {
                                 icon={<InfoCircleOutlined />}
                                 block
                                 style={actionButtonStyle}
-                                disabled={qrToolsDisabled}
+                                disabled={infoQrDisabled}
                                 onClick={() => setIsStockQRInfoModalVisible(true)}
-                                title={qrToolsDisabled ? "Debe seleccionar un vendedor primero" : undefined}
+                                title={infoQrDisabled ? "Debe seleccionar una sucursal primero" : undefined}
                             >
                                 Informacion QR
                             </Button>
@@ -862,8 +864,7 @@ const StockManagement = () => {
             <InventoryQRModal
                 open={isInventoryQRModalVisible}
                 onClose={() => setIsInventoryQRModalVisible(false)}
-                sellerId={effectiveSellerId || undefined}
-                sellerLabel={effectiveSellerLabel}
+                sellerLabel={selectedSeller ? effectiveSellerLabel : "Cualquier vendedor"}
                 sucursalId={effectiveBranchId || undefined}
                 sucursalLabel={effectiveBranchLabel}
                 onUseDifferences={(draft) => {
@@ -874,8 +875,7 @@ const StockManagement = () => {
             <StockQRInfoModal
                 open={isStockQRInfoModalVisible}
                 onClose={() => setIsStockQRInfoModalVisible(false)}
-                sellerId={effectiveSellerId || undefined}
-                sellerLabel={effectiveSellerLabel}
+                sellerLabel={selectedSeller ? effectiveSellerLabel : "Cualquier vendedor"}
                 sucursalId={effectiveBranchId || undefined}
                 sucursalLabel={effectiveBranchLabel}
             />

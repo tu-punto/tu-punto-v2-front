@@ -81,7 +81,11 @@ export const updateSimplePackageAPI = async (id: string, payload: any) => {
   }
 };
 
-export const createSimplePackageOrdersAPI = async (payload: { packageIds: string[]; paymentMethod?: "efectivo" | "qr" | "" }) => {
+export const createSimplePackageOrdersAPI = async (payload: {
+  packageIds: string[];
+  paymentMethod?: "efectivo" | "qr" | "";
+  skipGuideNotification?: boolean;
+}) => {
   try {
     const res = await apiClient.post("/simple-packages/create-orders", payload);
     return { success: true, ...res.data };

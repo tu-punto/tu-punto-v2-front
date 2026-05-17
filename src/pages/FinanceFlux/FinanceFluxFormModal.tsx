@@ -36,6 +36,10 @@ function FinanceFluxFormModal({
   const [newSeller, setNewSeller] = useState("");
   const [newFluxCategory, setNewFluxCategory] = useState("");
   const [form] = Form.useForm();
+  const isServiceMatrixFlux =
+    editingFlux &&
+    Array.isArray(editingFlux.detalle_servicios) &&
+    editingFlux.detalle_servicios.length > 0;
 
   const fluxCategories = useFinanceFluxCategoryStore(
     (state) => state.fluxCategories
@@ -309,7 +313,12 @@ function FinanceFluxFormModal({
               rules={[{ required: true, message: "Este campo es obligatorio" }]}
               initialValue={0.0}
             >
-              <InputNumber prefix={"Bs. "} style={{ width: "100%" }} min={0} />
+              <InputNumber
+                prefix={"Bs. "}
+                style={{ width: "100%" }}
+                min={0}
+                disabled={isServiceMatrixFlux}
+              />
             </Form.Item>
           </Col>
         </Row>

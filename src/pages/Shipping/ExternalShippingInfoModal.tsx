@@ -15,6 +15,14 @@ interface ExternalShippingInfoModalProps {
 }
 
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()) => {
+  if (!startAt) return 0;
+  const start = new Date(startAt as any);
+  if (Number.isNaN(start.getTime())) return 0;
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const pickedUpDay = new Date(pickedUpAt.getFullYear(), pickedUpAt.getMonth(), pickedUpAt.getDate()).getTime();
+  return Math.max(0, Math.floor((pickedUpDay - startDay) / 86400000) - 7);
+};
 
 const DELIVERY_PAYMENT_LABEL_BY_CODE: Record<string, string> = {
   "1": "Transferencia o QR",
@@ -70,7 +78,10 @@ const ExternalShippingInfoModal = ({
     }
     return roundCurrency(externalShipping?.precio_total ?? packagePrice);
   }, [packagePrice, packageSaldo, shippingPrice, amortizacion, externalShipping, isSimplePackage]);
-  const buyerDebt = useMemo(
+  const estadoPedido = Form.useWatch("estado_pedido", form);
+  const tipoPagoEntrega = Form.useWatch("tipo_de_pago", form);
+  const subtotalEfectivo = Number(Form.useWatch("subtotal_efectivo", form) || 0);
+  const baseBuyerDebt = useMemo(
     () =>
       roundCurrency(
         Number(
@@ -82,12 +93,21 @@ const ExternalShippingInfoModal = ({
       ),
     [externalShipping, totalAmountToCharge]
   );
+  const latePickupFee = useMemo(
+    () => {
+      if (externalShipping?.estado_pedido === "Entregado") {
+        return roundCurrency(Number(externalShipping?.late_pickup_fee || 0));
+      }
+      return calculateLatePickupFee(externalShipping?.storage_fee_start_at || externalShipping?.fecha_pedido);
+    },
+    [externalShipping]
+  );
+  const buyerDebt = useMemo(
+    () => roundCurrency(baseBuyerDebt + (externalShipping?.estado_pedido === "Entregado" ? 0 : latePickupFee)),
+    [baseBuyerDebt, latePickupFee, externalShipping]
+  );
   const serviceLabel = isSimplePackage ? "Simple" : "Externo";
   const canEditDelivery = isAdmin && externalShipping?.estado_pedido !== "Entregado" && externalShipping?.delivered !== true;
-
-  const estadoPedido = Form.useWatch("estado_pedido", form);
-  const tipoPagoEntrega = Form.useWatch("tipo_de_pago", form);
-  const subtotalEfectivo = Number(Form.useWatch("subtotal_efectivo", form) || 0);
   const shouldAskBuyerPayment = estadoPedido === "Entregado" && buyerDebt > 0;
 
   const externalPaidStatus = String(externalShipping?.esta_pagado || "no").trim().toLowerCase();
@@ -494,6 +514,13 @@ const ExternalShippingInfoModal = ({
                 <Input value={`Bs. ${buyerDebt.toFixed(2)}`} readOnly />
               </Form.Item>
             </Col>
+            {latePickupFee > 0 && (
+              <Col span={12}>
+                <Form.Item label="Multa por recojo tardio">
+                  <Input value={`Bs. ${latePickupFee.toFixed(2)}`} readOnly style={{ backgroundColor: "#fff7e6", fontWeight: 700 }} />
+                </Form.Item>
+              </Col>
+            )}
           </Row>
         </Card>
 

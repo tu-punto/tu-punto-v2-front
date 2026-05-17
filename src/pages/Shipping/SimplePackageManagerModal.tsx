@@ -1,5 +1,5 @@
 import { Button, Empty, Input, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
-import { DeleteOutlined, PrinterOutlined, WhatsAppOutlined } from "@ant-design/icons";
+import { DeleteOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useMemo, useState } from "react";
 import {
   createSimplePackageOrdersAPI,
@@ -11,7 +11,6 @@ import {
   getUploadedSimplePackageSellersAPI,
   printSimplePackageGuidesAPI,
   registerSimplePackagesAPI,
-  sendSimplePackageGuideWhatsappAPI,
   updateSimplePackageAPI,
   PackageDeliverySpace,
   PackageEscalationRange,
@@ -147,7 +146,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
   const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
   const [printingQr, setPrintingQr] = useState(false);
-  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
 
   const [creating, setCreating] = useState(false);
@@ -177,7 +175,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const totals = useMemo(() => calculateSimplePackageTotals(rows), [rows]);
   const createTotals = useMemo(() => calculateSimplePackageTotals(createRows), [createRows]);
   const selectedSeller = sellerRows.find((seller) => String(seller._id) === String(selectedSellerId));
-  const canSendGuideWhatsapp = isSuperadminUser(user);
+  const canCreateWithoutPrinting = isSuperadminUser(user);
 
   const getSimpleEscalatedPrice = (position: number, packageSize = "estandar") => {
     const safePosition = Math.max(1, Number(position || 1));
@@ -226,10 +224,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   }, [rows]);
 
   const pendingRows = useMemo(() => rows.filter((row) => !row?.is_external), [rows]);
-  const rowsMissingPrintedQr = useMemo(
-    () => pendingRows.filter((row) => !row?.qr_impreso || !row?.numero_guia),
-    [pendingRows]
-  );
   const unlockedRows = useMemo(() => rows.filter((row) => !isQrPrintedRow(row)), [rows]);
 
   const originSummary = useMemo(() => {
@@ -1045,95 +1039,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     return true;
   };
 
-  const handlePrintPendingQrs = async () => {
-    if (!selectedSellerId) {
-      message.warning("Selecciona un vendedor");
-      return;
-    }
-    if (!pendingRows.length) {
-      message.warning("Este vendedor no tiene paquetes pendientes");
-      return;
-    }
-    if (!rowsMissingPrintedQr.length) {
-      message.info("Todos los paquetes pendientes ya tienen etiqueta impresa");
-      return;
-    }
-
-    setPrintingQr(true);
-    try {
-      const response = await printSimplePackageGuidesAPI({
-        packageIds: rowsMissingPrintedQr.map((row) => String(row._id)),
-      });
-
-      if (!response?.success) {
-        message.error(response.message || "No se pudieron preparar las etiquetas");
-        return;
-      }
-
-      const printedRows = Array.isArray(response.rows) ? response.rows : [];
-      if (!printedRows.length) {
-        message.info("No hay etiquetas nuevas para imprimir");
-        await fetchPackages(selectedSellerId);
-        return;
-      }
-
-      const printed = await printSimplePackageRows(printedRows);
-      if (!printed) return;
-
-      const printedById = new Map(printedRows.map((row: any) => [String(row._id), row]));
-      setRows((current) => current.map((row) => printedById.get(String(row._id)) || row));
-      message.success(`Se imprimieron ${printedRows.length} etiqueta(s)`);
-      await fetchPackages(selectedSellerId);
-    } catch (error) {
-      console.error(error);
-      message.error("No se pudieron imprimir las etiquetas. Revisa QZ Tray o la impresora.");
-    } finally {
-      setPrintingQr(false);
-    }
-  };
-
-  const handleSendGuideWhatsapp = async () => {
-    if (!canSendGuideWhatsapp) {
-      message.warning("Solo superadmins pueden enviar guias por WhatsApp");
-      return;
-    }
-    if (!selectedSellerId) {
-      message.warning("Selecciona un vendedor");
-      return;
-    }
-    const rowsWithGuide = pendingRows.filter((row) => row?.numero_guia);
-    if (!rowsWithGuide.length) {
-      message.warning("Primero imprime las etiquetas para generar los numeros de guia");
-      return;
-    }
-
-    setSendingWhatsapp(true);
-    try {
-      const response = await sendSimplePackageGuideWhatsappAPI({
-        packageIds: rowsWithGuide.map((row) => String(row._id)),
-      });
-
-      if (!response?.success) {
-        message.error(response.message || "No se pudieron enviar los WhatsApp");
-        return;
-      }
-
-      const sentCount = Number(response.sentCount || 0);
-      const failedCount = Number(response.failedCount || 0);
-      const skippedCount = Number(response.skippedCount || 0);
-      if (failedCount || skippedCount) {
-        message.warning(`WhatsApp enviados: ${sentCount}. Fallidos/omitidos: ${failedCount + skippedCount}`);
-        return;
-      }
-      message.success(`WhatsApp enviados: ${sentCount}`);
-    } catch (error) {
-      console.error(error);
-      message.error("No se pudieron enviar los WhatsApp");
-    } finally {
-      setSendingWhatsapp(false);
-    }
-  };
-
   const prepareRowsForCreateAndPrint = async (
     targetRows: any[],
     options = labelPrintOptions
@@ -1170,7 +1075,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     return rowsReady;
   };
 
-  const handleCreateCurrentRows = () => {
+  const handleCreateCurrentRows = (options?: { skipPrintAndWhatsapp?: boolean }) => {
     if (!selectedSellerId) {
       message.warning("Selecciona un vendedor");
       return;
@@ -1188,6 +1093,44 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     const paymentMethod = generalPaymentMethod === "mixed" || generalPaymentMethod === "efectivo" ? "efectivo" : generalPaymentMethod === "qr" ? "qr" : "";
 
     const draftPrintOptions = { ...labelPrintOptions };
+    const skipPrintAndWhatsapp = options?.skipPrintAndWhatsapp === true;
+    if (skipPrintAndWhatsapp) {
+      Modal.confirm({
+        title: "Crear pedidos sin imprimir",
+        content: (
+          <div>
+            Se crearan {pendingRows.length} pedidos simples sin imprimir etiquetas ni enviar WhatsApp, con metodo de pago:{" "}
+            {paymentMethod === "efectivo" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "No pagado"}. Continuar?
+          </div>
+        ),
+        okText: "Crear sin imprimir",
+        cancelText: "Cancelar",
+        onOk: async () => {
+          setPrintingQr(true);
+          try {
+            const response = await createSimplePackageOrdersAPI({
+              packageIds: pendingRows.map((row) => String(row._id)),
+              paymentMethod,
+              skipGuideNotification: true,
+            });
+            if (!response?.success) {
+              message.error(response.message || "No se pudieron crear los pedidos simples");
+              return;
+            }
+
+            message.success(`Se crearon ${pendingRows.length} pedidos simples sin imprimir`);
+            await Promise.all([fetchPackages(selectedSellerId), fetchSellers()]);
+            onChanged?.();
+          } catch (error) {
+            console.error(error);
+            message.error(error instanceof Error ? error.message : "Error creando los pedidos simples");
+          } finally {
+            setPrintingQr(false);
+          }
+        },
+      });
+      return;
+    }
     Modal.confirm({
       title: "Crear pedidos simples",
       content: `Se crearán ${pendingRows.length} pedidos simples con método de pago: ${
@@ -1331,7 +1274,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                   <>
                     <Button
                       type="primary"
-                      onClick={handleCreateCurrentRows}
+                      onClick={() => handleCreateCurrentRows()}
                       loading={printingQr}
                       disabled={!pendingRows.length || printingQr}
                       style={{
@@ -1342,22 +1285,13 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                     >
                       Crear pedidos
                     </Button>
-                    <Button
-                      onClick={handlePrintPendingQrs}
-                      icon={<PrinterOutlined />}
-                      loading={printingQr}
-                      disabled={!rowsMissingPrintedQr.length || printingQr || sendingWhatsapp}
-                    >
-                      Imprimir etiquetas
-                    </Button>
-                    {canSendGuideWhatsapp && (
+                    {canCreateWithoutPrinting && (
                       <Button
-                        onClick={handleSendGuideWhatsapp}
-                        icon={<WhatsAppOutlined />}
-                        loading={sendingWhatsapp}
-                        disabled={!pendingRows.some((row) => row?.numero_guia) || printingQr || sendingWhatsapp}
+                        onClick={() => handleCreateCurrentRows({ skipPrintAndWhatsapp: true })}
+                        loading={printingQr}
+                        disabled={!pendingRows.length || printingQr}
                       >
-                        WhatsApp guias
+                        Crear sin imprimir
                       </Button>
                     )}
                   </>

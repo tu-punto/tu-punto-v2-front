@@ -27,6 +27,15 @@ import {
 } from "./shippingQrLabel";
 import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
 
+const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()) => {
+    if (!startAt) return 0;
+    const start = new Date(startAt as any);
+    if (Number.isNaN(start.getTime())) return 0;
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+    const pickedUpDay = new Date(pickedUpAt.getFullYear(), pickedUpAt.getMonth(), pickedUpAt.getDate()).getTime();
+    return Math.max(0, Math.floor((pickedUpDay - startDay) / 86400000) - 7);
+};
+
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
 
@@ -187,10 +196,18 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         () => Number((simplePackagePrice + simplePackageShippingPrice).toFixed(2)),
         [simplePackagePrice, simplePackageShippingPrice]
     );
-    const simplePackageBuyerDebt = useMemo(
-        () => Number(shipping?.deuda_comprador ?? 0),
-        [shipping]
-    );
+    const simplePackageLatePickupFee = useMemo(() => {
+        if (!isSimplePackageOrder) return 0;
+        if (shipping?.estado_pedido === "Entregado") {
+            return Number(shipping?.late_pickup_fee || 0);
+        }
+        return calculateLatePickupFee(shipping?.storage_fee_start_at || shipping?.fecha_pedido);
+    }, [isSimplePackageOrder, shipping]);
+    const simplePackageBuyerDebt = useMemo(() => {
+        const baseDebt = Number(shipping?.deuda_comprador ?? 0);
+        const lateFee = shipping?.estado_pedido === "Entregado" ? 0 : simplePackageLatePickupFee;
+        return Number((baseDebt + lateFee).toFixed(2));
+    }, [shipping, simplePackageLatePickupFee]);
     const deliveryPermissionBranchId = paymentBranchId || deliveryOwnerBranchId;
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryPermissionBranchId || String(deliveryPermissionBranchId) === String(currentSucursalId);
@@ -1272,6 +1289,18 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
                             {["1", "2"].includes(tipoPago || "") && (
                                 <Row gutter={16}>
+                                    {simplePackageLatePickupFee > 0 && (
+                                        <Col span={24}>
+                                            <Form.Item label="Multa por recojo tardio">
+                                                <InputNumber
+                                                    prefix="Bs."
+                                                    value={simplePackageLatePickupFee}
+                                                    readOnly
+                                                    style={{ width: '100%', backgroundColor: '#fff7e6', fontWeight: 'bold' }}
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    )}
                                     <Col span={24}>
                                         <Form.Item label={tipoPago === "1" ? "Subtotal QR" : "Subtotal Efectivo"}>
                                             <InputNumber
@@ -1287,6 +1316,18 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
                             {tipoPago === "4" && (
                                 <Row gutter={16}>
+                                    {simplePackageLatePickupFee > 0 && (
+                                        <Col span={24}>
+                                            <Form.Item label="Multa por recojo tardio">
+                                                <InputNumber
+                                                    prefix="Bs."
+                                                    value={simplePackageLatePickupFee}
+                                                    readOnly
+                                                    style={{ width: '100%', backgroundColor: '#fff7e6', fontWeight: 'bold' }}
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    )}
                                     <Col span={12}>
                                         <Form.Item label="Subtotal QR" name="subtotal_qr">
                                             <InputNumber
