@@ -1385,7 +1385,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                       />
                     </div>
                     <div>
-                      <Typography.Text strong>Numero de paquetes</Typography.Text>
+                      <Typography.Text strong>Número de paquetes</Typography.Text>
                       <InputNumber
                         min={MIN_PACKAGES}
                         style={{ width: "100%", marginTop: 8 }}
