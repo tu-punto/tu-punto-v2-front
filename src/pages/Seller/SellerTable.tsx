@@ -43,6 +43,8 @@ type SellerListResponse = {
   totalPendingPayment: number;
 };
 
+type AssignedPaymentSort = "ascend" | "descend" | null;
+
 const parseSellerDate = (value: unknown) => {
   if (typeof value === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
     const [day, month, year] = value.split("/").map(Number);
@@ -73,6 +75,8 @@ export default function SellerTable({
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
+  const [fechaPagoFilter, setFechaPagoFilter] = useState<"todos" | "sin_solicitud" | "8" | "18" | "28">("todos");
+  const [assignedPaymentSort, setAssignedPaymentSort] = useState<AssignedPaymentSort>(null);
   const [sellers, setSellers] = useState<SellerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPendingPayment, setTotalPendingPayment] = useState(0);
@@ -291,22 +295,8 @@ export default function SellerTable({
         dataIndex: "fecha_pago_asignada_label",
         key: "fecha_pago_asignada",
         render: (value: string) => value || "-",
-        filters: [
-          { text: "Sin solicitud", value: "sin_solicitud" },
-          { text: "Dia 8", value: "8" },
-          { text: "Dia 18", value: "18" },
-          { text: "Dia 28", value: "28" },
-        ],
-        onFilter: (value: React.Key | boolean, row: SellerRow) => {
-          if (value === "sin_solicitud") return !row.fecha_pago_asignada;
-          const date = parsePaymentDate(row.fecha_pago_asignada);
-          return date.isValid() && String(date.date()) === String(value);
-        },
-        sorter: (a: SellerRow, b: SellerRow) => {
-          const dateA = a.fecha_pago_asignada ? parsePaymentDate(a.fecha_pago_asignada).unix() : 0;
-          const dateB = b.fecha_pago_asignada ? parsePaymentDate(b.fecha_pago_asignada).unix() : 0;
-          return dateA - dateB;
-        },
+        sorter: true,
+        sortOrder: assignedPaymentSort,
       },
       {
         title: "Pago Mensual",
@@ -352,7 +342,7 @@ export default function SellerTable({
         fixed: "right" as const,
       },
     ],
-    [sellers]
+    [sellers, assignedPaymentSort]
   );
 
   useEffect(() => {
@@ -365,7 +355,7 @@ export default function SellerTable({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, estadoFilter, pagoFilter, isFactura]);
+  }, [debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, assignedPaymentSort, isFactura]);
 
   useEffect(() => {
     (async () => {
@@ -391,6 +381,9 @@ export default function SellerTable({
           q: debouncedSearch || undefined,
           status: statusParam,
           pendingPayment: pendingPaymentParam,
+          assignedPaymentDay: fechaPagoFilter === "todos" ? undefined : fechaPagoFilter,
+          sortBy: assignedPaymentSort ? "fecha_pago_asignada" : undefined,
+          sortOrder: assignedPaymentSort === "descend" ? "desc" : "asc",
           page,
           pageSize,
         });
@@ -445,7 +438,7 @@ export default function SellerTable({
         setLoading(false);
       }
     })();
-  }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, isFactura, page, pageSize]);
+  }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, assignedPaymentSort, isFactura, page, pageSize]);
 
   return (
     <>
@@ -476,6 +469,18 @@ export default function SellerTable({
             { value: "todos", label: "Todos" },
             { value: "con deuda", label: "Pago Pendiente" },
             { value: "sin deuda", label: "Sin Pago Pendiente" },
+          ]}
+        />
+        <Select
+          value={fechaPagoFilter}
+          onChange={setFechaPagoFilter}
+          style={{ minWidth: 190 }}
+          options={[
+            { value: "todos", label: "Fecha pago: todos" },
+            { value: "sin_solicitud", label: "Sin solicitud" },
+            { value: "8", label: "Dia 8" },
+            { value: "18", label: "Dia 18" },
+            { value: "28", label: "Dia 28" },
           ]}
         />
       </Space>
@@ -555,7 +560,15 @@ export default function SellerTable({
             showTotal: (totalRows, range) =>
               `${range[0]}-${range[1]} de ${totalRows} registros`,
           }}
-          onChange={(pagination) => {
+          onChange={(pagination, _filters, sorter) => {
+            const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+            const nextAssignedPaymentSort =
+              activeSorter?.columnKey === "fecha_pago_asignada" &&
+              (activeSorter.order === "ascend" || activeSorter.order === "descend")
+                ? activeSorter.order
+                : null;
+
+            setAssignedPaymentSort(nextAssignedPaymentSort);
             setPage(pagination.current || 1);
             setPageSize(pagination.pageSize || 10);
           }}
