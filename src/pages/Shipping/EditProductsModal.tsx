@@ -5,6 +5,7 @@ import ProductSellerViewModal from "../Seller/ProductSellerViewModal.tsx";
 import { deleteProductsByShippingAPI, updateProductsByShippingAPI } from "../../api/sales";
 import { registerSalesToShippingAPI } from "../../api/shipping";
 import { registerProductAPI } from "../../api/product.ts";
+import { applySellerCommissionCap } from "../../utils/commissionCap";
 
 interface EditProductsModalProps {
   visible: boolean;
@@ -69,7 +70,10 @@ const EditProductsModal = ({
           const comision = Number(vendedor?.comision_porcentual || 0);
           const cantidad = Number(updated.cantidad || 0);
           const precio = Number(updated.precio_unitario || 0);
-          updated.utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+          updated.utilidad = applySellerCommissionCap(
+            vendedorId,
+            parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+          );
         }
 
         return updated;
@@ -124,7 +128,10 @@ const EditProductsModal = ({
 
     const vendedor = sellers.find((v: any) => v._id === selected.id_vendedor);
     const comision = vendedor?.comision_porcentual || 0;
-    const utilidadCalculada = parseFloat(((selected.precio * comision) / 100).toFixed(2));
+    const utilidadCalculada = applySellerCommissionCap(
+      selected.id_vendedor,
+      parseFloat(((selected.precio * comision) / 100).toFixed(2))
+    );
 
     setLocalProducts((prev: any[]) => [
       ...prev,
@@ -343,7 +350,10 @@ const EditProductsModal = ({
             const comision = vendedor?.comision_porcentual || 0;
             const precio = tempProduct.precio_unitario || tempProduct.precio || 0;
             const cantidad = tempProduct.cantidad || 1;
-            const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            const utilidad = applySellerCommissionCap(
+              tempProduct.id_vendedor,
+              parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+            );
 
             setLocalProducts((prev) => [
               ...prev,

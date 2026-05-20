@@ -1,6 +1,7 @@
 import { Modal, Form, Input, Button, Radio, message, InputNumber, Row, Col } from "antd";
 import { useEffect, useState } from "react";
 import { registerShippingAPI } from "../../api/shipping";
+import { applySellerCommissionCap } from "../../utils/commissionCap";
 
 const tipoPagoMap: Record<number, string> = {
   1: "Transferencia o QR",
@@ -109,9 +110,9 @@ function SalesFormModal({
       const vendedor = p.id_vendedor || p.vendedor;
       const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
       const utilidad = parseFloat(p.utilidad);
-      const utilidadCalculada = parseFloat(
+      const utilidadCalculada = applySellerCommissionCap(vendedor, parseFloat(
         ((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2)
-      );
+      ));
 
       return {
         id_producto: p.key.split("-")[0],
@@ -122,7 +123,10 @@ function SalesFormModal({
         sucursal: branchIdFromProps,
         cantidad: p.cantidad,
         precio_unitario: p.precio_unitario,
-        utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
+        utilidad: applySellerCommissionCap(
+          vendedor,
+          isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad
+        ),
         deposito_realizado: false,
         variantes: p.variantes,
         variantKey: p.variantKey,

@@ -1,5 +1,6 @@
 import { Button, InputNumber, Table } from "antd";
 import { useEffect, useState } from "react";
+import { applySellerCommissionCap } from "../../utils/commissionCap";
 
 const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin,readonly = false, }: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
@@ -10,12 +11,17 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             const comision = Number(vendedor?.comision_porcentual || 0);
             const cantidad = Number(product.cantidad || 0);
             const precio = Number(product.precio_unitario || 0);
-            const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            const utilidadCalculada = applySellerCommissionCap(
+                product.id_vendedor,
+                parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+            );
 
             return {
                 ...product,
-                utilidad:
-                    product.utilidad != null ? product.utilidad : utilidadCalculada,
+                utilidad: applySellerCommissionCap(
+                    product.id_vendedor,
+                    product.utilidad != null ? Number(product.utilidad) : utilidadCalculada
+                ),
 
             };
         });
@@ -88,9 +94,19 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                     ) : (
                         <InputNumber
                             min={0}
-                            max={record.precio_unitario * record.cantidad}
+                            max={applySellerCommissionCap(
+                                record.id_vendedor || record.vendedor?._id || record.vendedor,
+                                Number(record.precio_unitario || 0) * Number(record.cantidad || 0)
+                            )}
                             value={record.utilidad}
-                            onChange={value => handleValueChange(record.key, 'utilidad', value)}
+                            onChange={value => handleValueChange(
+                                record.key,
+                                'utilidad',
+                                applySellerCommissionCap(
+                                    record.id_vendedor || record.vendedor?._id || record.vendedor,
+                                    Number(value || 0)
+                                )
+                            )}
                         />
                     )
             }
