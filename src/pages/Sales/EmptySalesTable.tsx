@@ -1,5 +1,6 @@
 import { Button, InputNumber, Table } from "antd";
 import { useEffect, useState } from "react";
+import { applySellerCommissionCap } from "../../utils/commissionCap";
 
 const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin,readonly = false, }: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
@@ -10,7 +11,10 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             const comision = Number(vendedor?.comision_porcentual || 0);
             const cantidad = Number(product.cantidad || 0);
             const precio = Number(product.precio_unitario || 0);
-            const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            const utilidadCalculada = applySellerCommissionCap(
+                product.id_vendedor,
+                parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+            );
 
             return {
                 ...product,

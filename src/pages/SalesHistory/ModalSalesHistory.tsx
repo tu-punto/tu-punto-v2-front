@@ -7,6 +7,7 @@ import { deleteShippingAPI, updateShippingAPI } from '../../api/shipping';
 import { deleteProductsByShippingAPI, updateProductsByShippingAPI } from '../../api/sales';
 import { getSellersAPI } from '../../api/seller.ts';
 import dayjs from "dayjs";
+import { applySellerCommissionCap } from '../../utils/commissionCap';
 
 const resolveBranchId = (value: any): string => {
   if (!value) return "";
@@ -196,7 +197,10 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
             const comision = Number(vendedor.comision_porcentual || 0);
             const cantidad = Number(updated.cantidad || 0);
             const precio = Number(updated.precio_unitario || 0);
-            const utilidadCalculada = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+            const utilidadCalculada = applySellerCommissionCap(
+              vendedorId,
+              parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+            );
             updated.utilidad = utilidadCalculada;
 
             console.log("Recalculando utilidad:", {

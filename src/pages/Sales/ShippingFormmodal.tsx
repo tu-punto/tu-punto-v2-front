@@ -11,6 +11,7 @@ import moment from "moment-timezone";
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import dayjs from 'dayjs';
+import { applySellerCommissionCap } from '../../utils/commissionCap';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -230,7 +231,10 @@ function ShippingFormModal({
                 const vendedor = p.id_vendedor || p.vendedor;
                 const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
                 const utilidad = parseFloat(p.utilidad);
-                const utilidadCalculada = parseFloat(((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2));
+                const utilidadCalculada = applySellerCommissionCap(
+                    vendedor,
+                    parseFloat(((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2))
+                );
 
                 return {
                     id_producto: p.key.split("-")[0],
@@ -241,7 +245,10 @@ function ShippingFormModal({
                     sucursal: suc || localStorage.getItem("sucursalId"),
                     cantidad: p.cantidad,
                     precio_unitario: p.precio_unitario,
-                    utilidad: isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad,
+                    utilidad: applySellerCommissionCap(
+                        vendedor,
+                        isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad
+                    ),
                     deposito_realizado: false,
                     variantes: p.variantes,
                     variantKey: p.variantKey,

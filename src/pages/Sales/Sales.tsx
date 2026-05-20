@@ -12,6 +12,7 @@ import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
 import QRScanner from "./QRScanner.tsx";
+import { applySellerCommissionCap } from "../../utils/commissionCap";
 
 export const Sales = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -392,7 +393,10 @@ export const Sales = () => {
       const precio = product.precio;
       const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
       const comision = Number(vendedor?.comision_porcentual || 0);
-      const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+      const utilidad = applySellerCommissionCap(
+        product.id_vendedor,
+        parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+      );
 
       return [
         ...prevProducts,
@@ -439,7 +443,10 @@ export const Sales = () => {
           const comision = Number(vendedor?.comision_porcentual || 0);
           const cantidad = Number(updated.cantidad || 0);
           const precio = Number(updated.precio_unitario || 0);
-          updated.utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+          updated.utilidad = applySellerCommissionCap(
+            p.id_vendedor,
+            parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+          );
         }
 
         return updated;
@@ -483,12 +490,18 @@ export const Sales = () => {
         }
         existing.cantidad = nextCantidad;
         existing.precio_unitario = precio;
-        existing.utilidad = parseFloat(((precio * nextCantidad * comision) / 100).toFixed(2));
+        existing.utilidad = applySellerCommissionCap(
+          existing.id_vendedor,
+          parseFloat(((precio * nextCantidad * comision) / 100).toFixed(2))
+        );
         updated[duplicateIndex] = existing;
         return updated;
       }
 
-      const utilidad = parseFloat(((precio * cantidadSolicitada * comision) / 100).toFixed(2));
+      const utilidad = applySellerCommissionCap(
+        newProduct.id_vendedor,
+        parseFloat(((precio * cantidadSolicitada * comision) / 100).toFixed(2))
+      );
       return [
         ...prevProducts,
         {
@@ -670,7 +683,10 @@ export const Sales = () => {
                   const stock = Number(item.stock || 0);
 
                   const cantidad = 1;
-                  const utilidad = parseFloat(((precio * cantidad * comision) / 100).toFixed(2));
+                  const utilidad = applySellerCommissionCap(
+                    item.id_vendedor,
+                    parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+                  );
 
                   handleAddProduct({
                     ...item,
