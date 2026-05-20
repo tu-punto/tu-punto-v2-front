@@ -436,7 +436,12 @@ export const Sales = () => {
     setSelectedProducts((prev: any[]) => {
       return prev.map((p) => {
         if (p.key !== key) return p;
-        const updated = { ...p, [field]: value };
+        const updated = {
+          ...p,
+          [field]: field === 'utilidad'
+            ? applySellerCommissionCap(p.id_vendedor, Number(value || 0))
+            : value
+        };
 
         if (field === 'cantidad' || field === 'precio_unitario') {
           const vendedor = sellers.find((v: any) => v._id === p.id_vendedor);

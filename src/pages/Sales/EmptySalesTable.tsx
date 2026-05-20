@@ -18,8 +18,10 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
 
             return {
                 ...product,
-                utilidad:
-                    product.utilidad != null ? product.utilidad : utilidadCalculada,
+                utilidad: applySellerCommissionCap(
+                    product.id_vendedor,
+                    product.utilidad != null ? Number(product.utilidad) : utilidadCalculada
+                ),
 
             };
         });
@@ -92,9 +94,19 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                     ) : (
                         <InputNumber
                             min={0}
-                            max={record.precio_unitario * record.cantidad}
+                            max={applySellerCommissionCap(
+                                record.id_vendedor || record.vendedor?._id || record.vendedor,
+                                Number(record.precio_unitario || 0) * Number(record.cantidad || 0)
+                            )}
                             value={record.utilidad}
-                            onChange={value => handleValueChange(record.key, 'utilidad', value)}
+                            onChange={value => handleValueChange(
+                                record.key,
+                                'utilidad',
+                                applySellerCommissionCap(
+                                    record.id_vendedor || record.vendedor?._id || record.vendedor,
+                                    Number(value || 0)
+                                )
+                            )}
                         />
                     )
             }
