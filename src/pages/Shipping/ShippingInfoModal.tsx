@@ -37,6 +37,11 @@ const calculateEstimatedBranchPickupDate = (value?: unknown) => {
     return createdAt.add(daysToAdd, "days");
 };
 
+const resolveBranchPickupFeeStart = (order: any) => {
+    const scheduleBaseAt = order?.public_tracking_schedule_base_at || order?.fecha_pedido;
+    return calculateEstimatedBranchPickupDate(scheduleBaseAt) || scheduleBaseAt || order?.fecha_pedido;
+};
+
 const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()) => {
     if (!startAt) return 0;
     const start = moment.tz(startAt as any, TZ);
@@ -213,7 +218,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const destinationBranchId = deliveryOwnerBranchId || paymentBranchId;
         const feeStartAt =
             origenBranchId && destinationBranchId && String(origenBranchId) !== String(destinationBranchId)
-                ? calculateEstimatedBranchPickupDate(shipping?.fecha_pedido) || shipping?.fecha_pedido
+                ? shipping?.public_tracking_frozen === true
+                    ? null
+                    : resolveBranchPickupFeeStart(shipping)
                 : shipping?.fecha_pedido;
         return calculateLatePickupFee(feeStartAt);
     }, [isSimplePackageOrder, shipping, origenBranchId, deliveryOwnerBranchId, paymentBranchId]);

@@ -26,6 +26,10 @@ const calculateEstimatedBranchPickupDate = (value?: unknown) => {
   const daysToAdd = day === 2 ? 2 : day === 3 ? 1 : day === 4 ? 5 : day === 5 ? 4 : day === 6 ? 3 : day === 7 ? 2 : 1;
   return createdAt.add(daysToAdd, "days");
 };
+const resolveBranchPickupFeeStart = (row: any) => {
+  const scheduleBaseAt = row?.public_tracking_schedule_base_at || row?.fecha_pedido;
+  return calculateEstimatedBranchPickupDate(scheduleBaseAt) || scheduleBaseAt || row?.fecha_pedido;
+};
 const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()) => {
   if (!startAt) return 0;
   const start = moment.tz(startAt as any, TZ);
@@ -130,7 +134,9 @@ const ExternalShippingInfoModal = ({
       const destinationId = getBranchId(chargeSource?.destino_sucursal) || getBranchId(chargeSource?.sucursal);
       const feeStartAt =
         originId && destinationId && originId !== destinationId
-          ? calculateEstimatedBranchPickupDate(chargeSource?.fecha_pedido) || chargeSource?.fecha_pedido
+          ? chargeSource?.public_tracking_frozen === true
+            ? null
+            : resolveBranchPickupFeeStart(chargeSource)
           : chargeSource?.fecha_pedido;
       return calculateLatePickupFee(feeStartAt);
     },
@@ -142,8 +148,8 @@ const ExternalShippingInfoModal = ({
   );
   const serviceLabel = isSimplePackage ? "Simple" : "Externo";
   const canEditDelivery = isAdmin && externalShipping?.estado_pedido !== "Entregado" && externalShipping?.delivered !== true;
-  const canEditCreatedToday = canEditDelivery && !isSimplePackage && isSameBusinessDay(externalShipping?.fecha_pedido);
-  const canEditBuyerName = canEditCreatedToday;
+  const canEditCreatedToday = canEditDelivery && isSameBusinessDay(externalShipping?.fecha_pedido);
+  const canEditBuyerName = canEditCreatedToday && !isSimplePackage;
   const canEditChargeSummary = canEditCreatedToday;
   const shouldAskBuyerPayment = estadoPedido === "Entregado" && buyerDebt > 0;
 
@@ -218,8 +224,12 @@ const ExternalShippingInfoModal = ({
     form.setFieldValue("esta_pagado", value);
     if (value === "si") {
       form.setFieldValue("monto_paga_vendedor", roundCurrency(totalServicePrice));
+      if (!form.getFieldValue("metodo_pago")) form.setFieldValue("metodo_pago", "efectivo");
     } else if (value === "no") {
       form.setFieldValue("monto_paga_vendedor", 0);
+      form.setFieldValue("metodo_pago", "");
+    } else if (!form.getFieldValue("metodo_pago")) {
+      form.setFieldValue("metodo_pago", "efectivo");
     }
   };
 
@@ -235,9 +245,15 @@ const ExternalShippingInfoModal = ({
           : roundCurrency(Number(form.getFieldValue("monto_paga_vendedor") || 0));
     const buyerAmountToSave =
       paidStatus === "mixto" ? roundCurrency(totalServicePrice - sellerAmountToSave) : 0;
+    const sellerMethodToSave =
+      sellerAmountToSave > 0 ? String(form.getFieldValue("metodo_pago") || "").trim().toLowerCase() : "";
 
     if (paidStatus === "mixto" && (sellerAmountToSave <= 0 || buyerAmountToSave <= 0)) {
       message.error("En pago mixto el monto vendedor debe ser mayor a 0 y menor al total");
+      return;
+    }
+    if (sellerAmountToSave > 0 && sellerMethodToSave !== "efectivo" && sellerMethodToSave !== "qr") {
+      message.error("Debe indicar si el pago del vendedor fue efectivo o QR");
       return;
     }
 
@@ -247,7 +263,7 @@ const ExternalShippingInfoModal = ({
         esta_pagado: paidStatus,
         monto_paga_vendedor: sellerAmountToSave,
         monto_paga_comprador: buyerAmountToSave,
-        metodo_pago: externalShipping?.metodo_pago || "efectivo",
+        metodo_pago: sellerMethodToSave,
       });
 
       if (!response.success) {
@@ -261,7 +277,7 @@ const ExternalShippingInfoModal = ({
         monto_paga_comprador: buyerAmountToSave,
         deuda_comprador: buyerAmountToSave,
         saldo_cobrar: buyerAmountToSave,
-        metodo_pago: externalShipping?.metodo_pago || "efectivo",
+        metodo_pago: sellerMethodToSave,
       });
       message.success("Resumen del cobro actualizado");
       setChargeEditing(false);
@@ -425,6 +441,7 @@ const ExternalShippingInfoModal = ({
       descripcion_paquete: externalShipping.descripcion_paquete || "",
       precio_paquete: packagePrice,
       esta_pagado: externalShipping.esta_pagado || "no",
+      metodo_pago: externalShipping.metodo_pago || "",
       monto_paga_vendedor: roundCurrency(Number(externalShipping.monto_paga_vendedor || 0)),
       estado_pedido: externalShipping.estado_pedido || "En Espera",
       tipo_de_pago: nextDeliveryType,
@@ -631,6 +648,7 @@ const ExternalShippingInfoModal = ({
                     if (chargeEditing) {
                       form.setFieldsValue({
                         esta_pagado: externalShipping?.esta_pagado || "no",
+                        metodo_pago: externalShipping?.metodo_pago || "",
                         monto_paga_vendedor: roundCurrency(Number(externalShipping?.monto_paga_vendedor || 0)),
                       });
                     }
@@ -671,7 +689,20 @@ const ExternalShippingInfoModal = ({
             </Col>
             <Col span={8}>
               <Form.Item label="Pago del vendedor registrado">
-                <Input value={sellerPaymentLabel} readOnly />
+                {chargeEditing ? (
+                  <Form.Item name="metodo_pago" noStyle>
+                    <Select
+                      disabled={displayedSellerAmount <= 0}
+                      options={[
+                        { value: "efectivo", label: "Efectivo" },
+                        { value: "qr", label: "QR" },
+                      ]}
+                      placeholder="Selecciona tipo de pago"
+                    />
+                  </Form.Item>
+                ) : (
+                  <Input value={sellerPaymentLabel} readOnly />
+                )}
               </Form.Item>
             </Col>
             <Col span={8}>

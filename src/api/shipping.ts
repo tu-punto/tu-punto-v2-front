@@ -141,6 +141,33 @@ const deleteShippingAPI = async (id: string) => {
     return { success: false };
   }
 };
+
+const getTrackingFreezeConfigAPI = async () => {
+  try {
+    const res = await apiClient.get("/tracking-freeze");
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
+const updateTrackingFreezeConfigAPI = async (enabled: boolean) => {
+  try {
+    const res = await apiClient.patch("/tracking-freeze", { enabled });
+    return { success: true, ...res.data };
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
 const getSalesHistoryAPI = async (
   date?: string,
   sucursalId?: string,
@@ -175,5 +202,7 @@ export {
   getShippingsBySellerIdAPI,
   addTemporaryProductsToShippingAPI,
   deleteShippingAPI,
-  getSalesHistoryAPI
+  getSalesHistoryAPI,
+  getTrackingFreezeConfigAPI,
+  updateTrackingFreezeConfigAPI
 };
