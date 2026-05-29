@@ -1,7 +1,7 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Input, message, Pagination, Select, Table, Tooltip } from 'antd';
+import { Button, DatePicker, Input, message, Modal, Pagination, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsListAPI, getShippingByIdAPI } from '../../api/shipping';
+import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
@@ -58,6 +58,20 @@ const isDeliveryOrder = (pedido: any) => {
 
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     const estadoReal = String(pedido?.estado_pedido || "").trim();
+
+    if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
+        return {
+            label: "Vendedor retiro el paquete",
+            tone: {
+                text: "#ad4e00",
+                border: "#ffd591",
+                background: "#fff7e6",
+                dot: "#fa8c16",
+            },
+            tooltip: undefined,
+            isVisualOnly: false,
+        };
+    }
 
     if (estadoReal === "Entregado") {
         return {
@@ -140,6 +154,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [loadingTable, setLoadingTable] = useState(false);
     const [statusNow, setStatusNow] = useState(() => moment().tz("America/La_Paz"));
     const [mobilePage, setMobilePage] = useState(1);
+    const [selectedRowKeys, setSelectedRowKeys] = useState<any[]>([]);
+    const [selectedRows, setSelectedRows] = useState<any[]>([]);
+    const [markingSellerWithdrawal, setMarkingSellerWithdrawal] = useState(false);
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator;
@@ -194,8 +211,61 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const filteredInTransitData = filteredEsperaData.filter((pedido: any) => getVisualStatusMeta(pedido, statusNow).isVisualOnly);
+    const isSellerWithdrawalCandidate = (pedido: any) =>
+        canManageExternal &&
+        String(pedido?.estado_pedido || "") === "En Espera" &&
+        (pedido?.is_external || pedido?.simple_package_order || pedido?.simple_package_source_id);
+    const selectedSellerWithdrawalRows = selectedRows.filter(isSellerWithdrawalCandidate);
+    const selectedSellerWithdrawalCount = selectedSellerWithdrawalRows.length;
+
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
+    };
+
+    const handleMarkSellerWithdrawal = () => {
+        if (!selectedSellerWithdrawalCount) {
+            message.warning("Selecciona entregas simples o externas en espera");
+            return;
+        }
+
+        Modal.confirm({
+            title: "Marcar retiro por vendedor",
+            content: `Se marcaran ${selectedSellerWithdrawalCount} entrega(s) como retiradas por el vendedor. Se cobraran igual que una entrega normal.`,
+            okText: "Marcar retiro",
+            cancelText: "Cancelar",
+            onOk: async () => {
+                setMarkingSellerWithdrawal(true);
+                try {
+                    const shippingIds = selectedSellerWithdrawalRows
+                        .filter((row: any) => !row.is_external)
+                        .map((row: any) => String(row._id));
+                    const externalSaleIds = selectedSellerWithdrawalRows
+                        .filter((row: any) => row.is_external)
+                        .map((row: any) => String(row._id));
+                    const response = await markSellerWithdrawalAPI({
+                        shippingIds,
+                        externalSaleIds,
+                        withdrawnAt: moment().tz("America/La_Paz").toISOString(),
+                    });
+
+                    if (!response?.success && !response?.updatedCount) {
+                        message.error(response?.message || "No se pudo marcar el retiro");
+                        return;
+                    }
+
+                    if (response.failedCount > 0) {
+                        message.warning(`Se marcaron ${response.updatedCount || 0}; ${response.failedCount} fallaron`);
+                    } else {
+                        message.success(`Se marcaron ${response.updatedCount || selectedSellerWithdrawalCount} entrega(s)`);
+                    }
+                    setSelectedRowKeys([]);
+                    setSelectedRows([]);
+                    fetchShippings();
+                } finally {
+                    setMarkingSellerWithdrawal(false);
+                }
+            },
+        });
     };
 
     const fetchShippings = async () => {
@@ -377,6 +447,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
     useEffect(() => {
         setMobilePage(1);
+        setSelectedRowKeys([]);
+        setSelectedRows([]);
     }, [selectedStatus, selectedLocation, selectedOrigin, dateRange, selectedVendedor, searchCliente]);
 
     const columns = [
@@ -795,6 +867,20 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         </Button>
                     </Tooltip>
                 )}
+                {canManageExternal && selectedStatus !== "entregado" && (
+                    <Tooltip title="Marcar entregas simples o externas como retiradas por el vendedor">
+                        <Button
+                            className="shipping-filter-action"
+                            type="default"
+                            onClick={handleMarkSellerWithdrawal}
+                            loading={markingSellerWithdrawal}
+                            disabled={!selectedSellerWithdrawalCount}
+                            style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
+                        >
+                            Retiro vendedor{selectedSellerWithdrawalCount ? ` (${selectedSellerWithdrawalCount})` : ""}
+                        </Button>
+                    </Tooltip>
+                )}
                 {onOpenQR && (
                     <Tooltip title="Escanear QR de pedidos">
                         <Button
@@ -1055,6 +1141,20 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     showSizeChanger: true,
                     pageSizeOptions: ["15", "30", "50", "100"]
                 }}
+                rowSelection={
+                    canManageExternal && selectedStatus !== "entregado"
+                        ? {
+                            selectedRowKeys,
+                            onChange: (keys, rows) => {
+                                setSelectedRowKeys(keys);
+                                setSelectedRows(rows.filter(isSellerWithdrawalCandidate));
+                            },
+                            getCheckboxProps: (record: any) => ({
+                                disabled: !isSellerWithdrawalCandidate(record),
+                            }),
+                        }
+                        : undefined
+                }
                 scroll={{ x: "max-content" }}
                 onRow={(record) => ({
                     onClick: async () => {

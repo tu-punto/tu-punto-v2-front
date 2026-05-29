@@ -44,6 +44,7 @@ import {
   type TicketPromedioMode,
   getVentasVendedoresMesesAPI,
   getVentasQrAPI,
+  getRiesgoClientesVentasAPI,
 } from "../api/reports";
 import { getAllSucursalsAPI } from "../api/sucursal";
 import { getSellersBasicAPI } from "../api/seller";
@@ -69,6 +70,7 @@ type ReportId =
   | "ingresos3m"
   | "clientesActivos3m"
   | "ventasVendedores4m"
+  | "riesgoClientesVentas"
   | "entregasNuevoServicio"
   | "reporteEntregasSimplesExternas"
   | "ventasQr"
@@ -87,7 +89,8 @@ type ReportDefinition = {
     | "comisiones"
     | "ingresos"
     | "clientesActivosServicio"
-    | "ventasVendedores"
+  | "ventasVendedores"
+    | "riesgoClientesVentas"
     | "inventario"
     | "entregasNuevoServicio"
     | "reporteEntregasSimplesExternas"
@@ -271,6 +274,15 @@ const REPORTS: ReportDefinition[] = [
     category: "Reportes adicionales",
     previewMode: "ventasVendedores",
     requires: { meses: true },
+  },
+  {
+    id: "riesgoClientesVentas",
+    title: "Alertas de clientes por ventas",
+    description: "Compara el mes actual contra mes anterior y promedios de 3 y 6 meses.",
+    category: "Reportes adicionales",
+    previewMode: "riesgoClientesVentas",
+    requires: { meses: true },
+    isNew: true,
   },
   {
     id: "reporteEntregasSimplesExternas",
@@ -597,6 +609,13 @@ export default function ReportsLauncher() {
         return;
       }
 
+      if (selectedReport.previewMode === "riesgoClientesVentas") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getRiesgoClientesVentasAPI({ meses });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
       if (selectedReport.previewMode === "entregasNuevoServicio") {
         const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
         const data = await getEntregasNuevoServicioAPI({
@@ -682,6 +701,9 @@ export default function ReportsLauncher() {
           break;
         case "ventasVendedores4m":
           await downloadVentasVendedores4mXlsx({ meses, mesFin });
+          break;
+        case "riesgoClientesVentas":
+          message.info("Este reporte solo tiene vista previa por ahora.");
           break;
         case "entregasNuevoServicio":
           await downloadEntregasNuevoServicioXlsx({ meses, sellerId: vals.sellerId });
@@ -900,6 +922,24 @@ export default function ReportsLauncher() {
           { title: "Resumen por vendedor", rows: data.resumen || [] },
           { title: "Detalle", rows: data.detalle || [] },
         ],
+      };
+    }
+
+    if (preview.reportId === "riesgoClientesVentas") {
+      return {
+        cards: [
+          {
+            title: "Clientes evaluados",
+            value: `${data?.resumen?.clientes ?? 0}`,
+            subtitle: `Mes actual: ${data?.mes || ""}`,
+          },
+          {
+            title: "Alertas",
+            value: `${data?.resumen?.alertas ?? 0}`,
+            subtitle: `Analisis: ${(data?.mesesAnalisis || []).join(", ")}`,
+          },
+        ],
+        tables: [{ title: "Comparacion historica", rows: data.rows || [] }],
       };
     }
 

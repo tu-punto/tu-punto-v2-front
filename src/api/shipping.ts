@@ -110,6 +110,27 @@ const updateShippingAPI = async (updateShippingData: any, shippingId: string) =>
     return { success: false };
   }
 };
+
+const markSellerWithdrawalAPI = async (payload: {
+  shippingIds?: string[];
+  externalSaleIds?: string[];
+  withdrawnAt?: string;
+}) => {
+  try {
+    const currentBranchId = localStorage.getItem("sucursalId") || undefined;
+    const res = await apiClient.post("/shipping/seller-withdrawal", {
+      ...payload,
+      currentBranchId,
+    });
+    return { success: true, ...res.data };
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
 const addTemporaryProductsToShippingAPI = async (shippingId: string, productosTemporales: any[]) => {
   try {
     const res = await apiClient.put(`/shipping/${shippingId}/temporales`, {
@@ -197,6 +218,7 @@ export {
   registerShippingAPI,
   registerSalesToShippingAPI,
   updateShippingAPI,
+  markSellerWithdrawalAPI,
   getShipingByIdsAPI,
   getShippingByIdAPI,
   getShippingsBySellerIdAPI,

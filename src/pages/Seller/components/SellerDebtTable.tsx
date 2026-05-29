@@ -1,6 +1,6 @@
 import { Table, Input, Button, Switch } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { updateFinanceFluxAPI } from '../../../api/financeFlux';
 import ServiceDetailDrawer from '../../FinanceFlux/ServiceDetailDrawer';
 
@@ -32,11 +32,11 @@ export default function SellerDebtTable({
   };
 
   const handleSave = async () => {
-    const res = await updateFinanceFluxAPI(editingKey!, {
-      ...editingRow
-    })
+    await updateFinanceFluxAPI(editingKey!, {
+      ...editingRow,
+    });
     setEditingKey(null);
-    setRefreshKey((prevKey) => prevKey + 1); 
+    setRefreshKey((prevKey: number) => prevKey + 1);
   };
 
   const handleCancel = () => {
@@ -57,7 +57,7 @@ export default function SellerDebtTable({
         const editable = isEditing(record);
         return editable ? (
           <Input
-            type='date'
+            type="date"
             defaultValue={dayjs(val).format('YYYY-MM-DD')}
             onChange={(e) => handleChange('fecha', e.target.value)}
           />
@@ -112,7 +112,13 @@ export default function SellerDebtTable({
       },
     },
     {
-      title: '¿Es deuda?',
+      title: 'Tipo',
+      dataIndex: 'clase_cobro',
+      key: 'clase_cobro',
+      render: (val: string) => val === 'RECUPERACION' ? 'Recuperacion' : 'Servicio',
+    },
+    {
+      title: 'Es deuda',
       dataIndex: 'esDeuda',
       key: 'esDeuda',
       render: (val: any, record: any) => {
@@ -121,13 +127,11 @@ export default function SellerDebtTable({
           <Switch
             checked={editingRow.esDeuda !== undefined ? editingRow.esDeuda : val}
             onChange={(checked) => handleChange('esDeuda', checked)}
-            checkedChildren="Sí"
+            checkedChildren="Si"
             unCheckedChildren="No"
           />
         ) : (
-            <span>
-            {val ? 'Sí' : 'No'}
-            </span>
+          <span>{val ? 'Si' : 'No'}</span>
         );
       },
     },
@@ -157,18 +161,18 @@ export default function SellerDebtTable({
     <div style={{ marginTop: 24 }}>
       <h4 className="text-lg font-bold mb-2">Registro de Deudas</h4>
       <Table
-          dataSource={data}
-          columns={columns}
-          rowKey="_id"
-          pagination={{
-            showSizeChanger: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} de ${total} registros`,
-            pageSize: 5,
-            pageSizeOptions: ["10", "20", "50", "100"],
-          }}
-          size="small"
-        />
+        dataSource={data}
+        columns={columns}
+        rowKey="_id"
+        pagination={{
+          showSizeChanger: true,
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} de ${total} registros`,
+          pageSize: 5,
+          pageSizeOptions: ["10", "20", "50", "100"],
+        }}
+        size="small"
+      />
       <ServiceDetailDrawer
         open={!!detailFlux}
         onClose={() => setDetailFlux(null)}

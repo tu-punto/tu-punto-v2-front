@@ -211,6 +211,11 @@ export async function getVentasVendedoresMesesAPI(params: { mes?: string; meses?
   return data;
 }
 
+export async function getRiesgoClientesVentasAPI(params: { mes?: string; meses?: string[]; mesFin?: string }) {
+  const { data } = await apiClient.post("/reports/riesgo-clientes-ventas", params, { withCredentials: true });
+  return data;
+}
+
 export async function getVentasQrAPI(params: { mes?: string; meses?: string[]; sucursales?: string[] }) {
   const { data } = await apiClient.post("/reports/ventas-qr", params, {
     withCredentials: true,

@@ -122,6 +122,18 @@ export const getSellerDebtsAPI  = async (sellerId: string) => {
     }
 }
 
+export const createSellerRecoveryChargeAPI = async (
+    sellerId: string,
+    payload: { monto: number; concepto: string; fecha?: string }
+) => {
+    try {
+        const res = await apiClient.post(`/seller/${sellerId}/recovery-charge`, payload)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
 export const getPaymentProofsBySellerIdAPI = async (sellerId: any) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}/payment-proofs`)

@@ -46,6 +46,7 @@ import {
   cancelSellerServiceDeclineAPI,
   requestSellerPaymentAPI,
   updateSellerAPI,
+  createSellerRecoveryChargeAPI,
 } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
@@ -114,11 +115,14 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
   const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
   const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
+  const [recoveryChargeModalOpen, setRecoveryChargeModalOpen] = useState(false);
+  const [recoveryChargeLoading, setRecoveryChargeLoading] = useState(false);
   const [declineServiceLoading, setDeclineServiceLoading] = useState(false);
   const [declineServiceDate, setDeclineServiceDate] = useState(
     seller?.declinacion_servicio_fecha || null
   );
   const [qrFileList, setQrFileList] = useState<any[]>([]);
+  const [recoveryChargeForm] = Form.useForm();
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
@@ -488,6 +492,32 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
+  const handleCreateRecoveryCharge = async () => {
+    if (!seller?.key) return;
+
+    const values = await recoveryChargeForm.validateFields();
+    setRecoveryChargeLoading(true);
+    try {
+      const res = await createSellerRecoveryChargeAPI(String(seller.key), {
+        monto: Number(values.monto || 0),
+        concepto: values.concepto,
+        fecha: values.fecha?.toISOString(),
+      });
+      if (!res?.success) throw new Error("No se pudo registrar el cobro");
+
+      message.success("Cobro de recuperacion registrado");
+      recoveryChargeForm.resetFields();
+      setRecoveryChargeModalOpen(false);
+      setRefreshKey((prev) => prev + 1);
+      onSuccess();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo registrar el cobro de recuperacion.");
+    } finally {
+      setRecoveryChargeLoading(false);
+    }
+  };
+
   /* ─────────── submit final ─────────── */
   const handleFinish = async (formValues: any) => {
     setLoading(true);
@@ -617,6 +647,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
       {!isSeller && (
         <div className="mb-5 flex justify-center gap-3">
+          <Button onClick={() => setRecoveryChargeModalOpen(true)}>
+            Cobro recuperacion
+          </Button>
           {declineServiceDate ? (
             <Button loading={declineServiceLoading} onClick={handleCancelDeclineService}>
               Anular declinacion
@@ -633,6 +666,39 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           )}
         </div>
       )}
+
+      <Modal
+        title="Cobro de recuperacion"
+        open={recoveryChargeModalOpen}
+        onCancel={() => {
+          setRecoveryChargeModalOpen(false);
+          recoveryChargeForm.resetFields();
+        }}
+        onOk={handleCreateRecoveryCharge}
+        okText="Registrar cobro"
+        cancelText="Cancelar"
+        confirmLoading={recoveryChargeLoading}
+      >
+        <Form form={recoveryChargeForm} layout="vertical" initialValues={{ fecha: dayjs() }}>
+          <Form.Item
+            name="monto"
+            label="Monto"
+            rules={[{ required: true, message: "Ingresa el monto" }]}
+          >
+            <InputNumber min={0.01} precision={2} addonBefore="Bs." style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item
+            name="concepto"
+            label="Concepto"
+            rules={[{ required: true, message: "Ingresa el concepto" }]}
+          >
+            <Input placeholder="Ej. Recuperacion por error de envio" />
+          </Form.Item>
+          <Form.Item name="fecha" label="Fecha" rules={[{ required: true }]}>
+            <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Solicitar cobro"
