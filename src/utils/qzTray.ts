@@ -7,6 +7,7 @@ declare global {
 }
 
 const QZ_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js";
+const QZ_MANUAL_PRINTER_KEY = "qzPrinterNameManual";
 
 let qzScriptPromise: Promise<any> | null = null;
 let qzSecurityConfigured = false;
@@ -173,6 +174,44 @@ export const findQzPrinters = async (options?: { refresh?: boolean }): Promise<s
   }
 
   return Array.from(names).sort((a, b) => a.localeCompare(b));
+};
+
+export const resolvePreferredQzPrinter = async (): Promise<string> => {
+  const printers = await findQzPrinters({ refresh: true });
+  const storedPrinter = normalizePrinterName(localStorage.getItem("qzPrinterName"));
+  const hasManualPrinter = localStorage.getItem(QZ_MANUAL_PRINTER_KEY) === "true";
+
+  if (storedPrinter && (printers.includes(storedPrinter) || !printers.length || hasManualPrinter)) {
+    return storedPrinter;
+  }
+
+  const preferredPrinter = printers.find((name) => /epson|tm[\s-]?l90|m313a/i.test(name));
+  if (preferredPrinter) {
+    localStorage.setItem("qzPrinterName", preferredPrinter);
+    localStorage.removeItem(QZ_MANUAL_PRINTER_KEY);
+    return preferredPrinter;
+  }
+
+  const manualPrinter = normalizePrinterName(
+    window.prompt(
+      printers.length
+        ? `No se encontro automaticamente una Epson TM-L90. Escribe el nombre exacto de la impresora o deja vacio para usar "${printers[0]}".`
+        : "QZ Tray no devolvio impresoras. Escribe el nombre exacto que aparece en Windows para intentar imprimir directamente.",
+      storedPrinter
+    )
+  );
+  const selectedPrinter = manualPrinter || printers[0] || "";
+
+  if (selectedPrinter) {
+    localStorage.setItem("qzPrinterName", selectedPrinter);
+    if (manualPrinter) {
+      localStorage.setItem(QZ_MANUAL_PRINTER_KEY, "true");
+    } else {
+      localStorage.removeItem(QZ_MANUAL_PRINTER_KEY);
+    }
+  }
+
+  return selectedPrinter;
 };
 
 export const createEscPosConfig = async (

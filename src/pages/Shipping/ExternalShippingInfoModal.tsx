@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { PrinterOutlined, WhatsAppOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Space, message } from "antd";
+import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, message } from "antd";
 import { sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
-import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
-import { buildDirectShippingLabelImageData, toBase64Png } from "./shippingQrLabel";
+import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import {
+  buildDirectShippingLabelImageData,
+  DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS,
+  ShippingLabelPrintOptions,
+  toBase64Png,
+} from "./shippingQrLabel";
 
 interface ExternalShippingInfoModalProps {
   visible: boolean;
@@ -15,6 +20,45 @@ interface ExternalShippingInfoModalProps {
 }
 
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+
+const ticketWidthOptions = [
+  { value: 40, label: "40 mm (papel pequeno)" },
+  { value: 58, label: "58 mm" },
+  { value: 80, label: "80 mm" },
+];
+
+const qrSizeOptions = [
+  { value: 14, label: "14 mm" },
+  { value: 16, label: "16 mm" },
+  { value: 18, label: "18 mm" },
+  { value: 20, label: "20 mm" },
+  { value: 22, label: "22 mm" },
+];
+
+const printDelayOptions = [
+  { value: 0, label: "Sin pausa" },
+  { value: 250, label: "250 ms" },
+  { value: 500, label: "500 ms" },
+  { value: 800, label: "800 ms" },
+];
+
+const getStoredLabelPrintOptions = (): ShippingLabelPrintOptions => ({
+  ticketWidthMm:
+    Number(localStorage.getItem("shippingLabelTicketWidthMm")) ||
+    DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.ticketWidthMm,
+  qrSizeMm:
+    Number(localStorage.getItem("shippingLabelQrSizeMm")) ||
+    DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.qrSizeMm,
+  printDelayMs:
+    Number(localStorage.getItem("shippingLabelPrintDelayMs")) ||
+    DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS.printDelayMs,
+});
+
+const persistLabelPrintOptions = (options: ShippingLabelPrintOptions) => {
+  localStorage.setItem("shippingLabelTicketWidthMm", String(options.ticketWidthMm));
+  localStorage.setItem("shippingLabelQrSizeMm", String(options.qrSizeMm));
+  localStorage.setItem("shippingLabelPrintDelayMs", String(options.printDelayMs));
+};
 
 const DELIVERY_PAYMENT_LABEL_BY_CODE: Record<string, string> = {
   "1": "Transferencia o QR",
@@ -175,19 +219,7 @@ const ExternalShippingInfoModal = ({
     form.setFieldValue("subtotal_efectivo", roundCurrency(Math.max(0, buyerDebt - nextQr)));
   };
 
-  const resolveDirectPrintPrinter = async () => {
-    const printers = await findQzPrinters();
-    if (!printers.length) return "";
-
-    const storedPrinter = localStorage.getItem("qzPrinterName") || "";
-    if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
-
-    const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
-    localStorage.setItem("qzPrinterName", selectedPrinter);
-    return selectedPrinter;
-  };
-
-  const handlePrintExternalQRDirect = async () => {
+  const handlePrintExternalQRDirect = async (options: ShippingLabelPrintOptions) => {
     if (!externalShipping?.numero_guia) {
       message.warning("Esta entrega no tiene numero de guia para imprimir");
       return;
@@ -195,7 +227,7 @@ const ExternalShippingInfoModal = ({
 
     setPrintingQr(true);
     try {
-      const printerName = await resolveDirectPrintPrinter();
+      const printerName = await resolvePreferredQzPrinter();
       if (!printerName) {
         message.warning("No se encontraron impresoras en QZ Tray");
         return;
@@ -208,7 +240,8 @@ const ExternalShippingInfoModal = ({
         clientCi: externalShipping.carnet_comprador,
         origin: externalShipping?.sucursal?.nombre || "Externo",
         destination: externalShipping?.lugar_entrega || externalShipping?.sucursal?.nombre || "Externo",
-        ticketWidthMm: 40,
+        ticketWidthMm: options.ticketWidthMm,
+        qrSizeMm: options.qrSizeMm,
       });
 
       const pixelConfig = await createPixelConfig(printerName, {
@@ -233,6 +266,57 @@ const ExternalShippingInfoModal = ({
     } finally {
       setPrintingQr(false);
     }
+  };
+
+  const handleOpenPrintOptions = () => {
+    const draftOptions = getStoredLabelPrintOptions();
+
+    Modal.confirm({
+      title: `Imprimir etiqueta ${serviceLabel.toLowerCase()}`,
+      content: (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Ancho ticket</div>
+            <Select
+              defaultValue={draftOptions.ticketWidthMm}
+              style={{ width: "100%" }}
+              options={ticketWidthOptions}
+              onChange={(value) => {
+                draftOptions.ticketWidthMm = value;
+              }}
+            />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Tamano QR</div>
+            <Select
+              defaultValue={draftOptions.qrSizeMm}
+              style={{ width: "100%" }}
+              options={qrSizeOptions}
+              onChange={(value) => {
+                draftOptions.qrSizeMm = value;
+              }}
+            />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Pausa</div>
+            <Select
+              defaultValue={draftOptions.printDelayMs}
+              style={{ width: "100%" }}
+              options={printDelayOptions}
+              onChange={(value) => {
+                draftOptions.printDelayMs = value;
+              }}
+            />
+          </div>
+        </div>
+      ),
+      okText: "Imprimir",
+      cancelText: "Cancelar",
+      onOk: async () => {
+        persistLabelPrintOptions(draftOptions);
+        await handlePrintExternalQRDirect(draftOptions);
+      },
+    });
   };
 
   useEffect(() => {
@@ -365,7 +449,7 @@ const ExternalShippingInfoModal = ({
           icon={<PrinterOutlined />}
           loading={printingQr}
           disabled={!externalShipping?.numero_guia || sendingWhatsapp}
-          onClick={() => void handlePrintExternalQRDirect()}
+          onClick={handleOpenPrintOptions}
         >
           Imprimir etiqueta
         </Button>

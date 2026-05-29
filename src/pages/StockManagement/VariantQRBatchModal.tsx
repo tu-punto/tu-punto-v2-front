@@ -874,6 +874,7 @@ const VariantQRBatchModal = ({
     setQzPrinters((current) => (current.includes(printerName) ? current : [...current, printerName]));
     setSelectedQzPrinter(printerName);
     localStorage.setItem("qzPrinterName", printerName);
+    localStorage.setItem("qzPrinterNameManual", "true");
     setManualQzPrinter("");
     message.success("Impresora guardada para impresion directa");
   };
