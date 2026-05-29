@@ -30,6 +30,7 @@ import {
   toBase64Png,
 } from "./shippingQrLabel";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import QzPrinterSelector from "./QzPrinterSelector";
 
 interface SimplePackageManagerModalProps {
   visible: boolean;
@@ -680,6 +681,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   };
 
   const buildPrintOptionsContent = (draftOptions: ShippingLabelPrintOptions) => (
+    <div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
       <div>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Ancho ticket</div>
@@ -714,6 +716,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
           }}
         />
       </div>
+    </div>
+    <QzPrinterSelector />
     </div>
   );
 
@@ -904,6 +908,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     const draftPrintOptions = { ...labelPrintOptions };
     Modal.confirm({
       title: "Crear pedidos simples",
+      width: 900,
       content: `Se crearán ${pendingRows.length} pedidos simples con método de pago: ${
         paymentMethod === "efectivo" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "No pagado"
       }. ¿Continuar?`,

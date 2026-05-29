@@ -8,6 +8,7 @@ import {
 import { getSimplePackageBranchPricesAPI } from "../../api/simplePackage";
 import { getSucursalsBasicAPI } from "../../api/sucursal";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import QzPrinterSelector from "./QzPrinterSelector";
 import {
   buildDirectShippingLabelImageData,
   DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS,
@@ -429,6 +430,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   };
 
   const buildPrintOptionsContent = (draftOptions: ShippingLabelPrintOptions) => (
+    <div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
       <div>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Ancho ticket</div>
@@ -463,6 +465,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           }}
         />
       </div>
+    </div>
+    <QzPrinterSelector />
     </div>
   );
 
@@ -690,6 +694,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const draftPrintOptions = { ...labelPrintOptions };
     Modal.confirm({
       title: "Registrar e imprimir entregas externas",
+      width: 900,
       content: (
         <div>
           <div>

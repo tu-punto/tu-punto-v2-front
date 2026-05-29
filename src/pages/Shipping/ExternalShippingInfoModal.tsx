@@ -9,6 +9,7 @@ import {
   ShippingLabelPrintOptions,
   toBase64Png,
 } from "./shippingQrLabel";
+import QzPrinterSelector from "./QzPrinterSelector";
 
 interface ExternalShippingInfoModalProps {
   visible: boolean;
@@ -273,6 +274,7 @@ const ExternalShippingInfoModal = ({
 
     Modal.confirm({
       title: `Imprimir etiqueta ${serviceLabel.toLowerCase()}`,
+      width: 900,
       content: (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
           <div>
@@ -307,6 +309,9 @@ const ExternalShippingInfoModal = ({
                 draftOptions.printDelayMs = value;
               }}
             />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <QzPrinterSelector />
           </div>
         </div>
       ),
