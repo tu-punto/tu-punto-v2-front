@@ -15,7 +15,6 @@ let qzSigningChecked = false;
 let qzSigningAvailable = false;
 
 const isQzReady = () => typeof window !== "undefined" && Boolean(window.qz);
-const waitMs = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 const serverBase = String(SERVER_URL || "").replace(/\/+$/, "");
 const qzCertificateUrl = `${serverBase}/qr/certificate`;
 const qzSignUrl = `${serverBase}/qr/sign`;
@@ -115,13 +114,9 @@ export const ensureQzLoaded = async (): Promise<any> => {
   return qzScriptPromise;
 };
 
-export const connectQz = async (options?: { forceReconnect?: boolean }): Promise<any> => {
+export const connectQz = async (): Promise<any> => {
   const qz = await ensureQzLoaded();
   await ensureQzSecurity(qz);
-  if (options?.forceReconnect && qz.websocket.isActive()) {
-    await qz.websocket.disconnect();
-    await waitMs(250);
-  }
   if (!qz.websocket.isActive()) {
     await qz.websocket.connect({
       retries: 2,
@@ -159,8 +154,8 @@ const addPrinterNames = (target: Set<string>, value: unknown) => {
   }
 };
 
-export const findQzPrinters = async (options?: { refresh?: boolean }): Promise<string[]> => {
-  const qz = await connectQz({ forceReconnect: options?.refresh });
+export const findQzPrinters = async (_options?: { refresh?: boolean }): Promise<string[]> => {
+  const qz = await connectQz();
   const names = new Set<string>();
 
   const printers = await qz.printers.find();

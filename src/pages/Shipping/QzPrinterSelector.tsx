@@ -38,7 +38,7 @@ const QzPrinterSelector = () => {
   const handleConnectQz = async () => {
     setQzBusy(true);
     try {
-      await connectQz({ forceReconnect: qzConnected });
+      await connectQz();
       setQzConnected(true);
       message.success("QZ Tray conectado");
     } catch (error) {
@@ -99,7 +99,7 @@ const QzPrinterSelector = () => {
         <Typography.Text strong>Conexion</Typography.Text>
         <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
           <Button onClick={() => void handleConnectQz()} loading={qzBusy}>
-            {qzConnected ? "Reconectar QZ" : "Conectar QZ"}
+            {qzConnected ? "Verificar QZ" : "Conectar QZ"}
           </Button>
           {qzConnected ? (
             <span style={{ color: "#389e0d", fontWeight: 600, fontSize: 13 }}>
