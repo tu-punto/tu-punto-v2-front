@@ -145,7 +145,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
           saldo_por_paquete: 0,
         };
         const nextBranches = Array.isArray(seller?.pago_sucursales)
-          ? seller.pago_sucursales.filter((branch: any) => Number(branch?.entrega_simple || 0) > 0)
+          ? seller.pago_sucursales.filter((branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0)
           : [];
         const defaultOrigin = String(nextBranches[0]?.id_sucursal?._id || nextBranches[0]?.id_sucursal || "");
 

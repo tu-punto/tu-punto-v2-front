@@ -77,6 +77,7 @@ const StockManagement = () => {
         return (seller?.pago_sucursales || []).some((pago: any) => {
             const idSucursal = pago?.id_sucursal?._id || pago?.id_sucursal;
             if (String(idSucursal) !== String(branchId)) return false;
+            if (pago?.activo === false) return false;
             const rawExit = pago?.fecha_salida || seller?.fecha_vigencia;
             if (!rawExit) return true;
             const exit = new Date(rawExit);
@@ -179,7 +180,7 @@ const StockManagement = () => {
             if (isSeller) {
                 const sellerBasic = await getSellersBasicAPI();
                 const seller = Array.isArray(sellerBasic) && sellerBasic.length > 0 ? sellerBasic[0] : null;
-                const sucursales = (seller?.pago_sucursales || []).map((p: any) => ({
+                const sucursales = (seller?.pago_sucursales || []).filter((p: any) => p?.activo !== false).map((p: any) => ({
                     _id: String(p.id_sucursal?._id || p.id_sucursal),
                     nombre: p.sucursalName || "Sucursal"
                 }));

@@ -198,31 +198,33 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
 
     setSaving(true);
     try {
-      const responses = await Promise.all(
-        safeRouteIds.flatMap((routeId) =>
-          activeTab === "delivery"
-            ? [
-                upsertPackageEscalationConfigAPI({
-                  routeId,
-                  serviceOrigin: "delivery",
-                  ranges: deliveryRanges,
-                  deliverySpaces,
-                }),
-              ]
-            : [
+      const requests =
+        activeTab === "delivery"
+          ? safeRouteIds.map((routeId) =>
+              upsertPackageEscalationConfigAPI({
+                routeId,
+                serviceOrigin: "delivery",
+                ranges: deliveryRanges,
+                deliverySpaces,
+              })
+            )
+          : [
+              ...safeRouteIds.map((routeId) =>
                 upsertPackageEscalationConfigAPI({
                   routeId,
                   serviceOrigin: "external",
                   ranges: externalRanges,
-                }),
+                })
+              ),
+              ...safeRouteIds.map((routeId) =>
                 upsertPackageEscalationConfigAPI({
                   routeId,
                   serviceOrigin: "simple_package",
                   ranges: simpleRanges,
-                }),
-              ]
-        )
-      );
+                })
+              ),
+            ];
+      const responses = await Promise.all(requests);
 
       const failed = responses.find((response: any) => !response?.success);
       if (failed) {
@@ -409,14 +411,14 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
 
   const renderPackagesTab = () => (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      {renderHeader("Control de Escalonamiento: Precio Paquetes", "Define precios por cantidad para entregas externas y paquetes simples.")}
+      {renderHeader("Control de Escalonamiento: Precio Paquetes", "Las externas se configuran por ruta. En simples, los rangos son generales y los precios pueden variar por ruta.")}
       {renderRouteSelector()}
       {!selectedRouteId ? (
         <Empty description="Selecciona una ruta para editar sus rangos" />
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
           {renderRangesTable("Externas", "external", externalRanges)}
-          {renderRangesTable("Simples", "simple_package", simpleRanges)}
+          {renderRangesTable("Simples (rangos generales, precios por ruta)", "simple_package", simpleRanges)}
         </div>
       )}
       {renderFooter()}

@@ -76,7 +76,7 @@ export const Sales = () => {
         const vendedor = await getSellerAPI(user.id_vendedor);
 
         if (vendedor?.pago_sucursales?.length > 0) {
-          const sucursales = vendedor.pago_sucursales.map((s: any) => ({
+          const sucursales = vendedor.pago_sucursales.filter((s: any) => s?.activo !== false).map((s: any) => ({
             value: s.id_sucursal?.$oid || s.id_sucursal,
             label: s.sucursalName,
           }));

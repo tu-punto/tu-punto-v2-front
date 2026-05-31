@@ -28,10 +28,12 @@ import {
   downloadComisiones3MesesXlsx,
   downloadInventarioActualXlsx,
   downloadIngresos3MesesXlsx,
+  downloadIngresosMensualesSucursalServicioXlsx,
   getClientesActivosMesesAPI,
   getComisionesMesesAPI,
   getInventarioActualAPI,
   getIngresosMesesAPI,
+  getIngresosMensualesSucursalServicioAPI,
   downloadOperacionMensualXlsx,
   downloadReporteEntregasSimplesExternasXlsx,
   downloadStockProductosXlsx,
@@ -68,6 +70,7 @@ type ReportId =
   | "inventarioActual"
   | "comisiones3m"
   | "ingresos3m"
+  | "ingresosSucursalServicio"
   | "clientesActivos3m"
   | "ventasVendedores4m"
   | "riesgoClientesVentas"
@@ -88,6 +91,7 @@ type ReportDefinition = {
     | "ventasQr"
     | "comisiones"
     | "ingresos"
+    | "ingresosSucursalServicio"
     | "clientesActivosServicio"
   | "ventasVendedores"
     | "riesgoClientesVentas"
@@ -258,6 +262,15 @@ const REPORTS: ReportDefinition[] = [
     category: "Reportes adicionales",
     previewMode: "ingresos",
     requires: { meses: true, incluirDeuda: true },
+  },
+  {
+    id: "ingresosSucursalServicio",
+    title: "Ingresos mensuales por sucursal y servicio",
+    description: "Pagos mensuales por sucursal y servicio fijo. Excluye entregas externas y simples.",
+    category: "Reportes adicionales",
+    previewMode: "ingresosSucursalServicio",
+    requires: { meses: true, sucursales: true },
+    isNew: true,
   },
   {
     id: "clientesActivos3m",
@@ -595,6 +608,13 @@ export default function ReportsLauncher() {
         return;
       }
 
+      if (selectedReport.previewMode === "ingresosSucursalServicio") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getIngresosMensualesSucursalServicioAPI({ meses, sucursales: vals.sucursales });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
       if (selectedReport.previewMode === "clientesActivosServicio") {
         const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
         const data = await getClientesActivosMesesAPI({ meses });
@@ -695,6 +715,9 @@ export default function ReportsLauncher() {
           break;
         case "ingresos3m":
           await downloadIngresos3MesesXlsx({ meses, mesFin, incluirDeuda: !!vals.incluirDeuda });
+          break;
+        case "ingresosSucursalServicio":
+          await downloadIngresosMensualesSucursalServicioXlsx({ meses, sucursales: vals.sucursales });
           break;
         case "clientesActivos3m":
           await downloadClientesActivos3MesesXlsx({ meses, mesFin });
@@ -866,6 +889,22 @@ export default function ReportsLauncher() {
         tables: [
           { title: "Totales por mes", rows: data.totalesPorMes || [] },
           { title: "Detalle", rows: data.detalle || [] },
+        ],
+      };
+    }
+
+    if (preview.reportId === "ingresosSucursalServicio") {
+      return {
+        cards: [
+          {
+            title: "Ingresos mensuales",
+            value: formatBs(data?.totalGeneral?.monto_bs),
+            subtitle: `Sucursales: ${data?.totalGeneral?.sucursales ?? 0}`,
+          },
+        ],
+        tables: [
+          { title: "Resumen por sucursal", rows: data.resumenPorSucursal || [] },
+          { title: "Detalle por servicio", rows: data.rows || [] },
         ],
       };
     }

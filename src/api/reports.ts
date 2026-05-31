@@ -201,6 +201,27 @@ export async function getIngresosMesesAPI(params: { mes?: string; meses?: string
   return data;
 }
 
+export async function getIngresosMensualesSucursalServicioAPI(params: { mes?: string; meses?: string[]; sucursales?: string[] }) {
+  const { data } = await apiClient.post("/reports/ingresos-mensuales-sucursal-servicio", params, { withCredentials: true });
+  return data;
+}
+
+export async function downloadIngresosMensualesSucursalServicioXlsx(params: { mes?: string; meses?: string[]; sucursales?: string[] }) {
+  const nombreMeses =
+    params.meses && params.meses.length > 1
+      ? `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`
+      : params.meses?.[0] || params.mes || "sin_mes";
+  await downloadXlsxFromGet(
+    "/reports/ingresos-mensuales-sucursal-servicio/xlsx",
+    {
+      mes: params.mes,
+      meses: params.meses?.join(","),
+      sucursales: params.sucursales?.join(","),
+    },
+    `ingresos_mensuales_sucursal_servicio_${nombreMeses}.xlsx`,
+  );
+}
+
 export async function getClientesActivosMesesAPI(params: { mes?: string; meses?: string[]; mesFin?: string }) {
   const { data } = await apiClient.post("/reports/clientes-activos", params, { withCredentials: true });
   return data;
