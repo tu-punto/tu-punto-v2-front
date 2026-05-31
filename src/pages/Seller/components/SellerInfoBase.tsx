@@ -20,6 +20,7 @@ import {
   PhoneOutlined,
   MailOutlined,
   PercentageOutlined,
+  DeleteOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
@@ -153,8 +154,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       fecha_vigencia: sellerData?.fecha_vigencia ? dayjs(sellerData.fecha_vigencia, "D-M-YYYY") : null,
       mail: sellerData?.mail || "",
       comision_porcentual: sellerData?.comision_porcentual || 0,
-      amortizacion: sellerData?.amortizacion || 0,
-      precio_paquete: sellerData?.precio_paquete || 0,
+      amortizacion: sellerData?.amortizacion ?? null,
+      precio_paquete: sellerData?.precio_paquete ?? null,
       sucursales: branches,
     };
   };
@@ -781,8 +782,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
           mail: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
-          amortizacion: seller.amortizacion || 0,
-          precio_paquete: seller.precio_paquete || 0,
+          amortizacion: seller.amortizacion ?? null,
+          precio_paquete: seller.precio_paquete ?? null,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -855,7 +856,10 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                       if (!serviceFlags.hasSimplePackageServiceEnabled) {
                         return Promise.resolve();
                       }
-                      const precioPaquete = Number(getFieldValue("precio_paquete") || 0);
+                      const precioPaquete = getFieldValue("precio_paquete");
+                      if (value === null || value === undefined || precioPaquete === null || precioPaquete === undefined) {
+                        return Promise.resolve();
+                      }
                       if (Number(value || 0) <= precioPaquete) {
                         return Promise.resolve();
                       }
@@ -870,8 +874,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                   min={0}
                   disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
                   style={{ width: "100%" }}
-                  placeholder="0"
+                  placeholder="Vacío"
                   addonBefore="Bs."
+                  addonAfter={
+                  <Button
+                    type="text"
+                    aria-label="Borrar amortización"
+                    title="Borrar amortización"
+                    icon={<DeleteOutlined />}
+                    disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                    onClick={() => form.setFieldValue("amortizacion", null)}
+                  />
+                  }
                 />
               </Form.Item>
             </Col>
@@ -881,8 +895,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                   min={0}
                   disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
                   style={{ width: "100%" }}
-                  placeholder="0"
+                  placeholder="Vacío"
                   addonBefore="Bs."
+                  addonAfter={
+                  <Button
+                    type="text"
+                    aria-label="Borrar precio por paquete"
+                    title="Borrar precio por paquete"
+                    icon={<DeleteOutlined />}
+                    disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                    onClick={() => form.setFieldValue("precio_paquete", null)}
+                  />
+                  }
                 />
               </Form.Item>
             </Col>

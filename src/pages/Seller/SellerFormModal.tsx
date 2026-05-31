@@ -18,6 +18,7 @@ import {
   MailOutlined,
   HomeOutlined,
   PlusOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -252,7 +253,10 @@ export default function SellerFormModal({
                     if (!serviceFlags.hasSimplePackageService) {
                       return Promise.resolve();
                     }
-                    const precioPaquete = Number(getFieldValue("precio_paquete") || 0);
+                    const precioPaquete = getFieldValue("precio_paquete");
+                    if (value === null || value === undefined || precioPaquete === null || precioPaquete === undefined) {
+                      return Promise.resolve();
+                    }
                     if (Number(value || 0) <= precioPaquete) {
                       return Promise.resolve();
                     }
@@ -266,8 +270,19 @@ export default function SellerFormModal({
               <InputNumber
                 min={0}
                 addonBefore="Bs."
+                placeholder="Vacío"
                 className="w-full"
                 disabled={!serviceFlags.hasSimplePackageService}
+                addonAfter={
+                <Button
+                  type="text"
+                  aria-label="Borrar amortización"
+                  title="Borrar amortización"
+                  icon={<DeleteOutlined />}
+                  disabled={!serviceFlags.hasSimplePackageService}
+                  onClick={() => form.setFieldValue("amortizacion", null)}
+                />
+                }
               />
             </Form.Item>
           </Col>
@@ -276,8 +291,19 @@ export default function SellerFormModal({
               <InputNumber
                 min={0}
                 addonBefore="Bs."
+                placeholder="Vacío"
                 className="w-full"
                 disabled={!serviceFlags.hasSimplePackageService}
+                addonAfter={
+                <Button
+                  type="text"
+                  aria-label="Borrar precio por paquete"
+                  title="Borrar precio por paquete"
+                  icon={<DeleteOutlined />}
+                  disabled={!serviceFlags.hasSimplePackageService}
+                  onClick={() => form.setFieldValue("precio_paquete", null)}
+                />
+                }
               />
             </Form.Item>
           </Col>

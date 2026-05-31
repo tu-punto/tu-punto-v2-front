@@ -42,6 +42,8 @@ const SimplePackagesPage = () => {
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
   const [monthlyPackageCount, setMonthlyPackageCount] = useState(0);
   const [missingForNextRange, setMissingForNextRange] = useState(0);
+  const [useEscalation, setUseEscalation] = useState(false);
+  const [escalationRanges, setEscalationRanges] = useState<any[]>([]);
   const [pendingModalVisible, setPendingModalVisible] = useState(false);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingSavingId, setPendingSavingId] = useState("");
@@ -58,6 +60,35 @@ const SimplePackagesPage = () => {
       saldo_por_paquete: 0,
     }),
   ]);
+
+  const buildDraftConfig = (
+    index: number,
+    row?: Partial<SimplePackageDraftRow>,
+    ranges = escalationRanges,
+    monthCount = monthlyPackageCount,
+    shouldUseEscalation = useEscalation
+  ) => {
+    if (!shouldUseEscalation) return sellerConfig;
+    const position = monthCount + index + 1;
+    const range =
+      ranges.find(
+        (item: any) => position >= Number(item?.from || 1) && (item?.to == null || position <= Number(item.to))
+      ) || ranges[ranges.length - 1];
+    const packageSize = row?.package_size === "grande" ? "grande" : "estandar";
+    const price = Number(packageSize === "grande" ? range?.large_price || 0 : range?.small_price || 0);
+    return {
+      ...sellerConfig,
+      precio_paquete: Number(range?.small_price || 0),
+      precio_paquete_grande: Number(range?.large_price || range?.small_price || 0),
+      amortizacion: Math.min(Number(sellerConfig.amortizacion || 0), price),
+    };
+  };
+
+  const rebuildRows = (count: number, currentRows: SimplePackageDraftRow[] = rows) =>
+    Array.from({ length: count }, (_, index) => {
+      const row = currentRows[index];
+      return createDraftRow(index, buildDraftConfig(index, row), row);
+    });
 
   const routePriceMap = useMemo(() => {
     const map = new Map<string, { precio: number; destino: any }>();
@@ -236,6 +267,7 @@ const SimplePackagesPage = () => {
           amortizacion: Number(seller?.amortizacion ?? user?.seller_amortizacion ?? 0),
           saldo_por_paquete: 0,
         };
+        setUseEscalation(seller?.precio_paquete === null || seller?.precio_paquete === undefined);
         const nextBranches = Array.isArray(seller?.pago_sucursales)
           ? seller.pago_sucursales.filter(
               (branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0
@@ -290,7 +322,7 @@ const SimplePackagesPage = () => {
             ? row.destino_sucursal_id
             : "";
 
-        return createDraftRow(index, sellerConfig, {
+        return createDraftRow(index, buildDraftConfig(index, row), {
           ...row,
           destino_sucursal_id: nextDestinationId,
           precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, nextDestinationId),
@@ -309,8 +341,18 @@ const SimplePackagesPage = () => {
           routeId: getRouteId(selectedOriginId, selectedDestinationId),
         });
         if (response?.success && response?.data) {
-          setMonthlyPackageCount(Number(response.data.monthCount || 0));
+          const nextMonthCount = Number(response.data.monthCount || 0);
+          const nextRanges = Array.isArray(response.data.ranges) ? response.data.ranges : [];
+          setMonthlyPackageCount(nextMonthCount);
           setMissingForNextRange(Number(response.data.missingForNextRange || 0));
+          setEscalationRanges(nextRanges);
+          if (useEscalation) {
+            setRows((current) =>
+              current.map((row, index) =>
+                createDraftRow(index, buildDraftConfig(index, row, nextRanges, nextMonthCount, true), row)
+              )
+            );
+          }
         }
       } catch (error) {
         console.error(error);
@@ -318,14 +360,14 @@ const SimplePackagesPage = () => {
     };
 
     void fetchEscalationStatus();
-  }, [selectedOriginId, selectedDestinationId, routeIdMap, user?.id_vendedor]);
+  }, [selectedOriginId, selectedDestinationId, routeIdMap, user?.id_vendedor, useEscalation]);
 
   const updateRow = (index: number, patch: Partial<SimplePackageDraftRow>) => {
     setRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const nextDestinationId = String(patch.destino_sucursal_id ?? (row.destino_sucursal_id || ""));
-        return createDraftRow(index, sellerConfig, {
+        return createDraftRow(index, buildDraftConfig(index, row), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
@@ -338,7 +380,7 @@ const SimplePackagesPage = () => {
   const handlePackageCountChange = (value: number | null) => {
     const nextCount = Math.max(MIN_PACKAGES, Number(value || MIN_PACKAGES));
     setPackageCount(nextCount);
-    setRows((prev) => resizeDraftRows(nextCount, prev, sellerConfig));
+    setRows((prev) => rebuildRows(nextCount, prev));
   };
 
   const handleApplyDescription = () => {
@@ -350,7 +392,7 @@ const SimplePackagesPage = () => {
 
     setRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, sellerConfig, {
+        createDraftRow(index, buildDraftConfig(index, row), {
           ...row,
           descripcion_paquete: description,
         })
@@ -367,7 +409,7 @@ const SimplePackagesPage = () => {
 
     setRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, sellerConfig, {
+        createDraftRow(index, buildDraftConfig(index, row), {
           ...row,
           destino_sucursal_id: selectedDestinationId,
           precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, selectedDestinationId),
@@ -438,7 +480,7 @@ const SimplePackagesPage = () => {
       setPackageCount(MIN_PACKAGES);
       setGeneralDescription("");
       setSelectedDestinationId(String(selectedOriginId || ""));
-      setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
+      setRows(rebuildRows(MIN_PACKAGES, []));
     } catch (error) {
       console.error(error);
       message.error("Error registrando paquetes");
@@ -921,7 +963,7 @@ const SimplePackagesPage = () => {
                 setPackageCount(MIN_PACKAGES);
                 setGeneralDescription("");
                 setSelectedDestinationId(String(selectedOriginId || ""));
-                setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
+                setRows(rebuildRows(MIN_PACKAGES, []));
               }}
             >
               Limpiar

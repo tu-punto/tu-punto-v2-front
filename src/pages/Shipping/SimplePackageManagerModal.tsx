@@ -160,6 +160,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     saldo_por_paquete: 0,
   });
   const [createEscalationRanges, setCreateEscalationRanges] = useState<PackageEscalationRange[]>(DEFAULT_SIMPLE_RANGES);
+  const [createUseEscalation, setCreateUseEscalation] = useState(false);
   const [createMonthlyCount, setCreateMonthlyCount] = useState(0);
   const [missingForNextRange, setMissingForNextRange] = useState(0);
   const [createSellerBranches, setCreateSellerBranches] = useState<any[]>([]);
@@ -178,6 +179,13 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const canCreateWithoutPrinting = isSuperadminUser(user);
 
   const getSimpleEscalatedPrice = (position: number, packageSize = "estandar") => {
+    if (!createUseEscalation) {
+      return Number(
+        packageSize === "grande"
+          ? createSellerConfig.precio_paquete_grande || createSellerConfig.precio_paquete || 0
+          : createSellerConfig.precio_paquete || 0
+      );
+    }
     const safePosition = Math.max(1, Number(position || 1));
     const range =
       createEscalationRanges.find(
@@ -540,6 +548,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     if (!sellerId) {
       setCreateSellerBranches([]);
       setCreateSellerConfig({ precio_paquete: 0, precio_paquete_grande: 0, amortizacion: 0, saldo_por_paquete: 0 });
+      setCreateUseEscalation(false);
       return;
     }
 
@@ -572,13 +581,16 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             ? escalationResponse.data.simple_package
             : DEFAULT_SIMPLE_RANGES;
       const nextMonthlyCount = Number(statusResponse?.data?.monthCount || 0);
+      const shouldUseEscalation = sellerResponse?.precio_paquete === null || sellerResponse?.precio_paquete === undefined;
+      const fixedPackagePrice = Number(sellerResponse?.precio_paquete ?? 0);
       setCreateEscalationRanges(nextRanges);
+      setCreateUseEscalation(shouldUseEscalation);
       setCreateMonthlyCount(nextMonthlyCount);
       setMissingForNextRange(Number(statusResponse?.data?.missingForNextRange || 0));
       setCreateSellerBranches(nextBranches);
       setCreateSellerConfig({
-        precio_paquete: Number(nextRanges[0]?.small_price || 0),
-        precio_paquete_grande: Number(nextRanges[0]?.large_price || 0),
+        precio_paquete: shouldUseEscalation ? Number(nextRanges[0]?.small_price || 0) : fixedPackagePrice,
+        precio_paquete_grande: shouldUseEscalation ? Number(nextRanges[0]?.large_price || 0) : fixedPackagePrice,
         amortizacion: Number(sellerResponse?.amortizacion || 0),
         saldo_por_paquete: 0,
       });
@@ -588,8 +600,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         Array.from({ length: createPackageCount }, (_, index) => {
           const previousRow = prev[index];
           const position = nextMonthlyCount + index + 1;
-          const smallPrice = getSimpleEscalatedPriceFromRanges(nextRanges, position, "estandar");
-          const largePrice = getSimpleEscalatedPriceFromRanges(nextRanges, position, "grande");
+          const smallPrice = shouldUseEscalation
+            ? getSimpleEscalatedPriceFromRanges(nextRanges, position, "estandar")
+            : fixedPackagePrice;
+          const largePrice = shouldUseEscalation
+            ? getSimpleEscalatedPriceFromRanges(nextRanges, position, "grande")
+            : fixedPackagePrice;
           const nextConfig = {
             precio_paquete: smallPrice,
             precio_paquete_grande: largePrice,
