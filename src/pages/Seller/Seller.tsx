@@ -33,7 +33,7 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     Modal.confirm({
       title: "Renovación automática",
       content:
-        "Se renovarán por 1 mes los clientes vencidos que no declinaron el servicio.",
+        "Se renovarán por 1 mes los clientes que vencen mañana o que ya vencieron y no declinaron el servicio.",
       okText: "Renovar",
       cancelText: "Cancelar",
       onOk: async () => {
