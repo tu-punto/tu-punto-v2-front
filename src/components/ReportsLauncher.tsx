@@ -295,7 +295,6 @@ const REPORTS: ReportDefinition[] = [
     category: "Reportes adicionales",
     previewMode: "riesgoClientesVentas",
     requires: { meses: true },
-    isNew: true,
   },
   {
     id: "reporteEntregasSimplesExternas",
@@ -304,7 +303,6 @@ const REPORTS: ReportDefinition[] = [
     category: "Reportes adicionales",
     previewMode: "reporteEntregasSimplesExternas",
     requires: { meses: true, sucursales: true },
-    isNew: true,
   },
   {
     id: "ventasQr",

@@ -87,7 +87,7 @@ const formatPaymentDate = (value: any) =>
   value ? parsePaymentDate(value).format("DD/MM/YYYY") : "";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
+const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any) => {
   const [form] = Form.useForm();
 
   /* ───── estado global para submit ───── */
@@ -328,7 +328,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta actualizada correctamente");
       await fetchSales(); // Refresca ventas
-      onSuccess();
+      onRefresh?.();
     } else {
       message.error("Error al actualizar la venta");
     }
@@ -340,7 +340,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
-      onSuccess();
+      onRefresh?.();
     } else {
       message.error("Error al eliminar la venta");
     }

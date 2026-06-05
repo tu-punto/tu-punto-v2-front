@@ -8,10 +8,11 @@ import {
   Pagination,
   Select,
   Space,
+  Spin,
   Table,
   Tooltip,
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
@@ -89,6 +90,7 @@ export default function SellerTable({
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const sellersRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
 
@@ -358,6 +360,9 @@ export default function SellerTable({
   }, [debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, assignedPaymentSort, isFactura]);
 
   useEffect(() => {
+    const requestSeq = sellersRequestSeq.current + 1;
+    sellersRequestSeq.current = requestSeq;
+
     (async () => {
       setLoading(true);
       try {
@@ -388,6 +393,7 @@ export default function SellerTable({
           pageSize,
         });
         const response = res as SellerListResponse | ISeller[] | undefined;
+        if (requestSeq !== sellersRequestSeq.current) return;
         const rawSellers = Array.isArray(response) ? response : response?.data || [];
 
         const rows: SellerRow[] = rawSellers.map((seller) => {
@@ -433,9 +439,13 @@ export default function SellerTable({
             : Number(response?.totalPendingPayment || 0)
         );
       } catch {
-        message.error("Error al cargar vendedores");
+        if (requestSeq === sellersRequestSeq.current) {
+          message.error("Error al cargar vendedores");
+        }
       } finally {
-        setLoading(false);
+        if (requestSeq === sellersRequestSeq.current) {
+          setLoading(false);
+        }
       }
     })();
   }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, assignedPaymentSort, isFactura, page, pageSize]);
@@ -486,7 +496,8 @@ export default function SellerTable({
       </Space>
 
       <div className="seller-total-title">
-        Pago pendiente Bs. {totalPendingPayment.toFixed(2)}
+        Pago pendiente{" "}
+        {loading ? <Spin size="small" /> : `Bs. ${totalPendingPayment.toFixed(2)}`}
       </div>
 
       {isMobile ? (
@@ -597,6 +608,7 @@ export default function SellerTable({
             visible={infoModal && !debtModal}
             seller={selected}
             onCancel={closeAll}
+            onRefresh={refresh}
             onSuccess={() => {
               closeAll();
               refresh();

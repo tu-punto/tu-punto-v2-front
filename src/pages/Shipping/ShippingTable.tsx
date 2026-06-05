@@ -215,8 +215,20 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         canManageExternal &&
         String(pedido?.estado_pedido || "") === "En Espera" &&
         (pedido?.is_external || pedido?.simple_package_order || pedido?.simple_package_source_id);
-    const selectedSellerWithdrawalRows = selectedRows.filter(isSellerWithdrawalCandidate);
-    const selectedSellerWithdrawalCount = selectedSellerWithdrawalRows.length;
+    const getCurrentSellerWithdrawalRows = () => {
+        const activeRows =
+            selectedStatus === 'entregado'
+                ? filteredEntregadoData
+                : selectedStatus === 'en_camino'
+                    ? filteredInTransitData
+                    : filteredEsperaData;
+        const selectedKeys = new Set(selectedRowKeys.map(String));
+        return (activeRows as any[]).filter((row: any) => {
+            const rowKey = String(row?.key ?? row?._id ?? "");
+            return selectedKeys.has(rowKey) && isSellerWithdrawalCandidate(row);
+        });
+    };
+    const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -236,11 +248,18 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             onOk: async () => {
                 setMarkingSellerWithdrawal(true);
                 try {
-                    const shippingIds = selectedSellerWithdrawalRows
-                        .filter((row: any) => !row.is_external)
-                        .map((row: any) => String(row._id));
-                    const externalSaleIds = selectedSellerWithdrawalRows
+                    const rowsToMark = getCurrentSellerWithdrawalRows();
+                    if (!rowsToMark.length) {
+                        setSelectedRowKeys([]);
+                        setSelectedRows([]);
+                        message.warning("La seleccion ya no tiene entregas en espera para marcar");
+                        return;
+                    }
+                    const externalSaleIds = rowsToMark
                         .filter((row: any) => row.is_external)
+                        .map((row: any) => String(row._id));
+                    const shippingIds = rowsToMark
+                        .filter((row: any) => !row.is_external)
                         .map((row: any) => String(row._id));
                     const response = await markSellerWithdrawalAPI({
                         shippingIds,
@@ -256,7 +275,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     if (response.failedCount > 0) {
                         message.warning(`Se marcaron ${response.updatedCount || 0}; ${response.failedCount} fallaron`);
                     } else {
-                        message.success(`Se marcaron ${response.updatedCount || selectedSellerWithdrawalCount} entrega(s)`);
+                        message.success(`Se marcaron ${response.updatedCount || rowsToMark.length} entrega(s)`);
                     }
                     setSelectedRowKeys([]);
                     setSelectedRows([]);

@@ -2,7 +2,7 @@ import { Modal } from "antd";
 import SellerInfoPage from "./components/SellerInfoBase";
 
 
-const SellerInfoModalTry = ({ visible, onSuccess, onCancel, seller }: any) => {
+const SellerInfoModalTry = ({ visible, onSuccess, onCancel, onRefresh, seller }: any) => {
     return (
         <Modal
             visible={visible}
@@ -15,6 +15,7 @@ const SellerInfoModalTry = ({ visible, onSuccess, onCancel, seller }: any) => {
                 onSuccess={() => {
                     onSuccess();   // 🚀 refresca tabla porque SellerTable envía refresh()
                 }}
+                onRefresh={onRefresh}
                 onCancel={onCancel}
                 seller={seller}
             />
