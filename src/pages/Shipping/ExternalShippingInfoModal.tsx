@@ -130,6 +130,9 @@ const ExternalShippingInfoModal = ({
       if (chargeSource?.estado_pedido === "Entregado") {
         return roundCurrency(Number(chargeSource?.late_pickup_fee || 0));
       }
+      if (chargeSource?.public_tracking_frozen === true) {
+        return roundCurrency(Number(chargeSource?.late_pickup_fee || 0));
+      }
       const originId = getBranchId(chargeSource?.origen_sucursal) || getBranchId(chargeSource?.sucursal);
       const destinationId = getBranchId(chargeSource?.destino_sucursal) || getBranchId(chargeSource?.sucursal);
       const feeStartAt =

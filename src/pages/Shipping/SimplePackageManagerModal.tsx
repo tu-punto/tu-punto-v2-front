@@ -21,7 +21,6 @@ import {
   applyPackagePatch,
   calculateSimplePackageTotals,
   createDraftRow,
-  resizeDraftRows,
   SimplePackageDraftRow,
 } from "../SimplePackages/simplePackageHelpers";
 import { isSuperadminUser } from "../../utils/role";
@@ -335,7 +334,17 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     if (String(originId || "") === String(destinationId || "")) return 0;
     const routeId = getRouteId(originId, destinationId);
     const config = escalationConfigs.find(
-      (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "delivery"
+      (row: any) =>
+        row?.service_origin === "delivery" &&
+        (
+          String(row?.route?._id || row?.route || "") === String(routeId) ||
+          (
+            String(getBranchId(row?.route?.origen_sucursal)) === String(originId || "") &&
+            String(getBranchId(row?.route?.destino_sucursal)) === String(destinationId || "")
+          )
+        )
+    ) || escalationConfigs.find(
+      (row: any) => row?.service_origin === "delivery" && !row?.route
     );
     if (!config) return Number(getRoutePrice(originId, destinationId) || 0) * Math.max(1, Number(spaces || 1));
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
@@ -384,43 +393,60 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     });
   };
 
-  const buildDeliveryDerivedPatch = (
-    row: any,
-    patch: Record<string, unknown>,
-    originId: string,
-    destinationId: string,
-    position = 1
-  ) => {
-    const spaces = getEffectiveDeliverySpaces(
-      originId,
-      destinationId,
-      Number(patch.delivery_spaces !== undefined ? patch.delivery_spaces || 1 : row.delivery_spaces || 1)
-    );
-    const nextRowsForRoute = rows.map((currentRow) =>
-      String(currentRow?._id) === String(row?._id)
-        ? {
-            ...currentRow,
-            ...patch,
-            destino_sucursal: nextDestinationId,
-            destino_sucursal_id: nextDestinationId,
-            delivery_spaces: spaces,
-          }
-        : currentRow
-    );
-    const escalationSpaces = getTotalDeliverySpacesForRows(nextRowsForRoute, originId, destinationId);
-    const routeId = getRouteId(originId, destinationId);
-    const packageSize = getPackageSizeBySpaces(spaces, routeId);
-    const routePrice =
-      patch.precio_entre_sucursal !== undefined
-        ? Math.max(0, Number(patch.precio_entre_sucursal || 0))
-        : getDeliveryRoutePrice(originId, destinationId, spaces, escalationSpaces);
+  const recalculateExistingRowsByDeliverySpaces = (sourceRows: any[]) =>
+    sourceRows.map((row) => {
+      const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
+      const destinationId = getBranchId(row?.destino_sucursal) || String(row?.destino_sucursal_id || "");
+      const spaces = getEffectiveDeliverySpaces(originId, destinationId, row?.delivery_spaces);
+      const routeId = getRouteId(originId, destinationId);
+      const packageSize = getPackageSizeBySpaces(spaces, routeId);
+      const routePrice = getDeliveryRoutePrice(
+        originId,
+        destinationId,
+        spaces,
+        getTotalDeliverySpacesForRows(sourceRows, originId, destinationId)
+      );
 
-    return {
-      ...patch,
-      package_size: packageSize,
-      delivery_spaces: spaces,
-      precio_entre_sucursal: routePrice,
-    };
+      return applyPackagePatch(
+        row,
+        {
+          package_size: packageSize,
+          delivery_spaces: spaces,
+          precio_entre_sucursal: routePrice,
+        },
+        sellerConfig
+      );
+    });
+
+  const persistRecalculatedDeliveryRows = async (sourceRows: any[]) => {
+    const recalculatedRows = recalculateExistingRowsByDeliverySpaces(sourceRows);
+    const changedRows = recalculatedRows.filter((row, index) => {
+      const previous = sourceRows[index];
+      return (
+        String(row?.package_size || "") !== String(previous?.package_size || "") ||
+        Number(row?.delivery_spaces || 1) !== Number(previous?.delivery_spaces || 1) ||
+        Number(row?.precio_entre_sucursal || 0) !== Number(previous?.precio_entre_sucursal || 0)
+      );
+    });
+
+    if (!changedRows.length) return recalculatedRows;
+
+    const responses = await Promise.all(
+      changedRows.map((row) =>
+        updateSimplePackageAPI(String(row._id), {
+          package_size: row.package_size,
+          delivery_spaces: row.delivery_spaces,
+          precio_entre_sucursal: row.precio_entre_sucursal,
+        })
+      )
+    );
+    const failed = responses.find((response: any) => !response?.success);
+    if (failed) throw new Error(failed.message || "No se pudieron recalcular los precios delivery");
+
+    const responseById = new Map(
+      changedRows.map((row, index) => [String(row._id), responses[index]?.data || row])
+    );
+    return recalculatedRows.map((row) => responseById.get(String(row._id)) || row);
   };
 
   const getDestinationOptions = (originId: string, allowedBranchIds: Set<string>, originName?: string) => {
@@ -674,47 +700,83 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     }
 
     const previousRows = rows;
-    const optimisticRows = rows.map((row) => {
-      if (String(row._id) !== String(rowId)) return row;
-      const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
-      const nextDestinationId = String(
-        patch.destino_sucursal ?? patch.destino_sucursal_id ?? getBranchId(row?.destino_sucursal)
-      );
-      const derivedPatch = buildDeliveryDerivedPatch(
-        row,
-        patch,
-        originId,
-        nextDestinationId,
-        Number(row.numero_paquete || 1)
-      );
-
-      return applyPackagePatch(row, derivedPatch, sellerConfig);
-    });
+    const affectsDeliveryPricing = patch.delivery_spaces !== undefined ||
+      patch.destino_sucursal !== undefined ||
+      patch.destino_sucursal_id !== undefined;
+    const targetOriginId = getBranchId(targetRow?.origen_sucursal || targetRow?.sucursal);
+    const targetDestinationId = String(
+      patch.destino_sucursal ?? patch.destino_sucursal_id ?? getBranchId(targetRow?.destino_sucursal)
+    );
+    const targetSpaces = getEffectiveDeliverySpaces(
+      targetOriginId,
+      targetDestinationId,
+      Number(patch.delivery_spaces !== undefined ? patch.delivery_spaces || 1 : targetRow?.delivery_spaces || 1)
+    );
+    const patchedRows = rows.map((row) =>
+      String(row._id) === String(rowId)
+        ? applyPackagePatch(
+            row,
+            {
+              ...patch,
+              ...(affectsDeliveryPricing
+                ? {
+                    destino_sucursal: targetDestinationId,
+                    destino_sucursal_id: targetDestinationId,
+                    delivery_spaces: targetSpaces,
+                  }
+                : {}),
+            },
+            sellerConfig
+          )
+        : row
+    );
+    const optimisticRows = affectsDeliveryPricing
+      ? recalculateExistingRowsByDeliverySpaces(patchedRows)
+      : patchedRows;
     setRows(optimisticRows);
-    setSavingRowIds((prev) => [...prev, rowId]);
+    const rowsToSave = affectsDeliveryPricing
+      ? optimisticRows.filter((row, index) =>
+          String(row._id) === String(rowId) ||
+          String(row?.package_size || "") !== String(previousRows[index]?.package_size || "") ||
+          Number(row?.delivery_spaces || 1) !== Number(previousRows[index]?.delivery_spaces || 1) ||
+          Number(row?.precio_entre_sucursal || 0) !== Number(previousRows[index]?.precio_entre_sucursal || 0)
+        )
+      : optimisticRows.filter((row) => String(row._id) === String(rowId));
+    const savingIds = rowsToSave.map((row) => String(row._id));
+    setSavingRowIds((prev) => Array.from(new Set([...prev, ...savingIds])));
 
     try {
-      const targetOriginId = getBranchId(targetRow?.origen_sucursal || targetRow?.sucursal);
-      const targetDestinationId = String(
-        patch.destino_sucursal ?? patch.destino_sucursal_id ?? getBranchId(targetRow?.destino_sucursal)
+      const responses = await Promise.all(
+        rowsToSave.map((row) =>
+          updateSimplePackageAPI(String(row._id), {
+            ...(String(row._id) === String(rowId) ? patch : {}),
+            ...(affectsDeliveryPricing
+              ? {
+                  package_size: row.package_size,
+                  delivery_spaces: row.delivery_spaces,
+                  precio_entre_sucursal: row.precio_entre_sucursal,
+                }
+              : {}),
+          })
+        )
       );
-      const response = await updateSimplePackageAPI(
-        rowId,
-        buildDeliveryDerivedPatch(targetRow, patch, targetOriginId, targetDestinationId, Number(targetRow?.numero_paquete || 1))
-      );
-      if (!response.success) {
+      const failed = responses.find((response: any) => !response?.success);
+      if (failed) {
         setRows(previousRows);
-        message.error(response.message || "No se pudo actualizar el paquete");
+        message.error(failed.message || "No se pudo actualizar el paquete");
         return;
       }
 
-      setRows((current) => current.map((row) => (String(row._id) === String(rowId) ? response.data : row)));
+      const responseById = new Map(
+        rowsToSave.map((row, index) => [String(row._id), responses[index]?.data || row])
+      );
+      setRows(optimisticRows.map((row) => responseById.get(String(row._id)) || row));
     } catch (error) {
       console.error(error);
       setRows(previousRows);
       message.error("Error actualizando el paquete");
     } finally {
-      setSavingRowIds((prev) => prev.filter((id) => id !== rowId));
+      setSavingRowIds((prev) => prev.filter((id) => !savingIds.includes(id)));
     }
   };
 
@@ -732,7 +794,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       cancelText: "Cancelar",
       onOk: async () => {
         const previousRows = rows;
-        setRows((current) => current.filter((row) => String(row._id) !== String(rowId)));
+        const remainingRows = rows.filter((row) => String(row._id) !== String(rowId));
+        let deleted = false;
+        setRows(recalculateExistingRowsByDeliverySpaces(remainingRows));
         try {
           const response = await deleteSimplePackageAPI(rowId);
           if (!response.success) {
@@ -740,12 +804,20 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             message.error(response.message || "No se pudo eliminar el paquete");
             return;
           }
+          deleted = true;
+          const recalculatedRows = await persistRecalculatedDeliveryRows(remainingRows);
+          setRows(recalculatedRows);
           message.success("Paquete eliminado");
           void fetchSellers();
         } catch (error) {
           console.error(error);
-          setRows(previousRows);
-          message.error("Error eliminando el paquete");
+          if (deleted) {
+            void fetchPackages(selectedSellerId);
+            message.error("El paquete se elimino, pero no se pudieron recalcular todos los precios");
+          } else {
+            setRows(previousRows);
+            message.error("Error eliminando el paquete");
+          }
         }
       },
     });

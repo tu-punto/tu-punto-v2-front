@@ -44,7 +44,16 @@ type SellerListResponse = {
   totalPendingPayment: number;
 };
 
-type AssignedPaymentSort = "ascend" | "descend" | null;
+type SellerSortBy =
+  | "nombre"
+  | "estado"
+  | "pago_pendiente"
+  | "fecha_vigencia"
+  | "fecha_pago_asignada"
+  | "pago_mensual"
+  | "comision_porcentual"
+  | "emite_factura";
+type SellerSortState = { sortBy?: SellerSortBy; order?: "ascend" | "descend" };
 
 const parseSellerDate = (value: unknown) => {
   if (typeof value === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
@@ -77,7 +86,7 @@ export default function SellerTable({
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
   const [fechaPagoFilter, setFechaPagoFilter] = useState<"todos" | "sin_solicitud" | "8" | "18" | "28">("todos");
-  const [assignedPaymentSort, setAssignedPaymentSort] = useState<AssignedPaymentSort>(null);
+  const [tableSort, setTableSort] = useState<SellerSortState>({});
   const [sellers, setSellers] = useState<SellerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPendingPayment, setTotalPendingPayment] = useState(0);
@@ -266,7 +275,8 @@ export default function SellerTable({
         dataIndex: "nombre",
         key: "nombre",
         fixed: "left" as const,
-        sorter: (a: SellerRow, b: SellerRow) => a.nombre.localeCompare(b.nombre),
+        sorter: true,
+        sortOrder: tableSort.sortBy === "nombre" ? tableSort.order : null,
       },
       {
         title: "Estado",
@@ -275,22 +285,22 @@ export default function SellerTable({
           const estado = getEstadoVendedor(row);
           return <span style={getEstadoColor(estado)}>{estado}</span>;
         },
-        sorter: (a: SellerRow, b: SellerRow) =>
-          getEstadoVendedor(a).localeCompare(getEstadoVendedor(b)),
+        sorter: true,
+        sortOrder: tableSort.sortBy === "estado" ? tableSort.order : null,
       },
       {
         title: "Pago pendiente",
         dataIndex: "pagoTotal",
-        key: "pagoTotal",
-        sorter: (a: SellerRow, b: SellerRow) => a.pagoTotalInt - b.pagoTotalInt,
+        key: "pago_pendiente",
+        sorter: true,
+        sortOrder: tableSort.sortBy === "pago_pendiente" ? tableSort.order : null,
       },
       {
         title: "Fecha Vigencia",
         dataIndex: "fecha_vigencia",
         key: "fecha_vigencia",
-        sorter: (a: SellerRow, b: SellerRow) =>
-          dayjs(a.fecha_vigencia, "DD/MM/YYYY").unix() -
-          dayjs(b.fecha_vigencia, "DD/MM/YYYY").unix(),
+        sorter: true,
+        sortOrder: tableSort.sortBy === "fecha_vigencia" ? tableSort.order : null,
       },
       {
         title: "Fecha pago asignada",
@@ -298,7 +308,7 @@ export default function SellerTable({
         key: "fecha_pago_asignada",
         render: (value: string) => value || "-",
         sorter: true,
-        sortOrder: assignedPaymentSort,
+        sortOrder: tableSort.sortBy === "fecha_pago_asignada" ? tableSort.order : null,
       },
       {
         title: "Pago Mensual",
@@ -315,26 +325,23 @@ export default function SellerTable({
             {row.pago_mensual}
           </Button>
         ),
-        sorter: (a: SellerRow, b: SellerRow) => {
-          const getNumericValue = (str: string) =>
-            parseFloat(str.replace(/[Bs.\s]/g, "")) || 0;
-          return getNumericValue(a.pago_mensual) - getNumericValue(b.pago_mensual);
-        },
+        sorter: true,
+        sortOrder: tableSort.sortBy === "pago_mensual" ? tableSort.order : null,
       },
       {
         title: "Comision %",
         dataIndex: "comision_porcentual",
         key: "comision_porcentual",
-        sorter: (a: SellerRow, b: SellerRow) =>
-          (a.comision_porcentual || 0) - (b.comision_porcentual || 0),
+        sorter: true,
+        sortOrder: tableSort.sortBy === "comision_porcentual" ? tableSort.order : null,
       },
       {
         title: "Emite factura?",
         dataIndex: "emite_factura",
         key: "emite_factura",
         render: (tieneFactura: boolean) => (tieneFactura ? "Si" : "No"),
-        sorter: (a: SellerRow, b: SellerRow) =>
-          Number(!!a.emite_factura) - Number(!!b.emite_factura),
+        sorter: true,
+        sortOrder: tableSort.sortBy === "emite_factura" ? tableSort.order : null,
       },
       {
         title: "Acciones",
@@ -344,7 +351,7 @@ export default function SellerTable({
         fixed: "right" as const,
       },
     ],
-    [sellers, assignedPaymentSort]
+    [sellers, tableSort]
   );
 
   useEffect(() => {
@@ -357,7 +364,7 @@ export default function SellerTable({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, assignedPaymentSort, isFactura]);
+  }, [debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, tableSort, isFactura]);
 
   useEffect(() => {
     const requestSeq = sellersRequestSeq.current + 1;
@@ -387,8 +394,8 @@ export default function SellerTable({
           status: statusParam,
           pendingPayment: pendingPaymentParam,
           assignedPaymentDay: fechaPagoFilter === "todos" ? undefined : fechaPagoFilter,
-          sortBy: assignedPaymentSort ? "fecha_pago_asignada" : undefined,
-          sortOrder: assignedPaymentSort === "descend" ? "desc" : "asc",
+          sortBy: tableSort.sortBy,
+          sortOrder: tableSort.order === "descend" ? "desc" : "asc",
           page,
           pageSize,
         });
@@ -448,7 +455,7 @@ export default function SellerTable({
         }
       }
     })();
-  }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, assignedPaymentSort, isFactura, page, pageSize]);
+  }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, tableSort, isFactura, page, pageSize]);
 
   return (
     <>
@@ -573,13 +580,12 @@ export default function SellerTable({
           }}
           onChange={(pagination, _filters, sorter) => {
             const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter;
-            const nextAssignedPaymentSort =
-              activeSorter?.columnKey === "fecha_pago_asignada" &&
-              (activeSorter.order === "ascend" || activeSorter.order === "descend")
+            const nextOrder =
+              activeSorter?.order === "ascend" || activeSorter?.order === "descend"
                 ? activeSorter.order
-                : null;
-
-            setAssignedPaymentSort(nextAssignedPaymentSort);
+                : undefined;
+            const nextSortBy = String(activeSorter?.columnKey || "") as SellerSortBy;
+            setTableSort(nextOrder ? { sortBy: nextSortBy, order: nextOrder } : {});
             setPage(pagination.current || 1);
             setPageSize(pagination.pageSize || 10);
           }}

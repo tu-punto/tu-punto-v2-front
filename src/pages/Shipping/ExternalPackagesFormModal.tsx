@@ -28,6 +28,7 @@ interface ExternalPackagesFormModalProps {
 }
 
 const MIN_PACKAGES = 1;
+const getBranchId = (value: any) => String(value?._id || value || "").trim();
 const DEFAULT_EXTERNAL_RANGES: PackageEscalationRange[] = [
   { from: 1, to: 5, small_price: 5, large_price: 10 },
   { from: 6, to: 15, small_price: 4, large_price: 8 },
@@ -130,7 +131,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const [suggestionOptions, setSuggestionOptions] = useState<Record<string, SuggestionOption[]>>({});
   const [branchOptions, setBranchOptions] = useState<{ value: string; label: string }[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
-  const [escalationRanges, setEscalationRanges] = useState<PackageEscalationRange[]>(DEFAULT_EXTERNAL_RANGES);
+  const [escalationRanges] = useState<PackageEscalationRange[]>(DEFAULT_EXTERNAL_RANGES);
   const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
   const suggestionRequestIds = useRef<Record<string, number>>({});
@@ -195,7 +196,17 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     if (String(originId || "") === String(destinationId || "")) return 0;
     const routeId = getRouteId(originId, destinationId);
     const config = escalationConfigs.find(
-      (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "delivery"
+      (row: any) =>
+        row?.service_origin === "delivery" &&
+        (
+          String(row?.route?._id || row?.route || "") === String(routeId) ||
+          (
+            String(getBranchId(row?.route?.origen_sucursal)) === String(originId || "") &&
+            String(getBranchId(row?.route?.destino_sucursal)) === String(destinationId || "")
+          )
+        )
+    ) || escalationConfigs.find(
+      (row: any) => row?.service_origin === "delivery" && !row?.route
     );
     if (!config) return roundCurrency(getBranchRoutePrice(originId, destinationId) * Math.max(1, Number(spaces || 1)));
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
@@ -229,18 +240,24 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   };
 
   const recalculateRowsByDeliverySpaces = (sourceRows: any[], count = packageCount) => {
+    const originId = String(
+      form.getFieldValue("origen_sucursal_id") || watchedOriginBranchId || currentSucursal?._id || ""
+    );
+    const generalDestinationId = String(
+      form.getFieldValue("destino_sucursal_id") || watchedDestinationBranchId || originId
+    );
     const normalizedRows = buildPackages(count, sourceRows).map((row) => ({
       ...row,
-      destino_sucursal_id: row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "",
+      destino_sucursal_id: row.destino_sucursal_id || generalDestinationId,
     }));
 
     return normalizedRows.map((row) => {
-      const destinationId = row.destino_sucursal_id || watchedDestinationBranchId || watchedOriginBranchId || "";
-      const routeId = getRouteId(watchedOriginBranchId, destinationId);
-      const deliverySpaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, row.delivery_spaces);
+      const destinationId = row.destino_sucursal_id || generalDestinationId;
+      const routeId = getRouteId(originId, destinationId);
+      const deliverySpaces = getEffectiveDeliverySpaces(originId, destinationId, row.delivery_spaces);
       const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-      const escalationSpaces = getTotalDeliverySpacesForRoute(normalizedRows, watchedOriginBranchId, destinationId);
-      const branchRoutePrice = getDeliveryRoutePrice(watchedOriginBranchId, destinationId, deliverySpaces, escalationSpaces);
+      const escalationSpaces = getTotalDeliverySpacesForRoute(normalizedRows, originId, destinationId);
+      const branchRoutePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, escalationSpaces);
       const packagePrice = getEscalatedPackagePrice(count, packageSize, routeId);
 
       return applyPaymentAmounts(
@@ -258,9 +275,19 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     });
   };
 
-  const applyEscalatedPricesToRows = (count = packageCount) => {
-    const currentRows = form.getFieldValue("paquetes") || [];
-    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, count));
+  const setCalculatedPackageRows = (rows: any[]) => {
+    form.setFieldsValue({ paquetes: rows });
+    form.setFields(
+      rows.flatMap((row, index) => [
+        { name: ["paquetes", index, "destino_sucursal_id"], value: row.destino_sucursal_id },
+        { name: ["paquetes", index, "precio_entre_sucursal"], value: row.precio_entre_sucursal },
+        { name: ["paquetes", index, "package_size"], value: row.package_size },
+        { name: ["paquetes", index, "delivery_spaces"], value: row.delivery_spaces },
+        { name: ["paquetes", index, "precio_paquete"], value: row.precio_paquete },
+        { name: ["paquetes", index, "monto_paga_vendedor"], value: row.monto_paga_vendedor },
+        { name: ["paquetes", index, "monto_paga_comprador"], value: row.monto_paga_comprador },
+      ])
+    );
   };
 
   const routePriceMap = useMemo(() => {
@@ -353,20 +380,21 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const currentRows = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((currentRow, index) =>
       index === rowIndex ? { ...currentRow, destino_sucursal_id: destinationId } : currentRow
     );
-    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, packageCount));
+    setCalculatedPackageRows(recalculateRowsByDeliverySpaces(currentRows, packageCount));
   };
 
   const applyDestinationToAll = () => {
-    if (!watchedDestinationBranchId) {
+    const destinationId = String(form.getFieldValue("destino_sucursal_id") || "").trim();
+    if (!destinationId) {
       message.warning("Selecciona una sucursal destino para aplicarla");
       return;
     }
 
     const currentRows = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((row) => ({
       ...row,
-      destino_sucursal_id: watchedDestinationBranchId,
+      destino_sucursal_id: destinationId,
     }));
-    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, packageCount));
+    setCalculatedPackageRows(recalculateRowsByDeliverySpaces(currentRows, packageCount));
   };
 
   const applyDescriptionToAll = () => {
@@ -685,8 +713,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         ? row.destino_sucursal_id
         : nextGeneralDestination,
     }));
-    form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(currentRows, packageCount));
-  }, [destinationOptions, escalationRanges, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
+    setCalculatedPackageRows(recalculateRowsByDeliverySpaces(currentRows, packageCount));
+  }, [destinationOptions, escalationConfigs, escalationRanges, form, packageCount, visible, watchedDestinationBranchId, watchedOriginBranchId, routePriceMap]);
 
   const onFinish = async (values: any) => {
     if (!currentSucursal?._id || !currentSucursal?.nombre) {
@@ -1072,6 +1100,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                             <Input
                               placeholder="Celular"
                               onKeyDown={(e) => {
+                                if (e.ctrlKey || e.metaKey) return;
                                 if (
                                   !/[0-9]/.test(e.key) &&
                                   !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)
@@ -1120,12 +1149,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                             style={{ width: "100%" }}
                             disabled={!watchedOriginBranchId}
                             onChange={(value) => {
+                              const originId = String(
+                                form.getFieldValue("origen_sucursal_id") || watchedOriginBranchId || currentSucursal?._id || ""
+                              );
                               const destinationId = form.getFieldValue(["paquetes", rowIndex, "destino_sucursal_id"]);
-                              const spaces = getEffectiveDeliverySpaces(watchedOriginBranchId, destinationId, Number(value || 1));
+                              const spaces = getEffectiveDeliverySpaces(originId, destinationId, Number(value || 1));
                               const rowsWithNextSpaces = buildPackages(packageCount, form.getFieldValue("paquetes") || []).map((row, index) =>
                                 index === rowIndex ? { ...row, delivery_spaces: spaces } : row
                               );
-                              form.setFieldValue("paquetes", recalculateRowsByDeliverySpaces(rowsWithNextSpaces, packageCount));
+                              setCalculatedPackageRows(recalculateRowsByDeliverySpaces(rowsWithNextSpaces, packageCount));
                             }}
                           />
                         </Form.Item>

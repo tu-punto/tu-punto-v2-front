@@ -266,7 +266,7 @@ const REPORTS: ReportDefinition[] = [
   {
     id: "ingresosSucursalServicio",
     title: "Ingresos mensuales por sucursal y servicio",
-    description: "Pagos mensuales por sucursal y servicio fijo. Excluye entregas externas y simples.",
+    description: "Ingresos registrados en Gastos e Ingresos, agrupados por sucursal y servicio/categoria.",
     category: "Reportes adicionales",
     previewMode: "ingresosSucursalServicio",
     requires: { meses: true, sucursales: true },

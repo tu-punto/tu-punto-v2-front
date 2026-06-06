@@ -215,6 +215,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         if (shipping?.estado_pedido === "Entregado") {
             return Number(shipping?.late_pickup_fee || 0);
         }
+        if (shipping?.public_tracking_frozen === true) {
+            return Number(shipping?.late_pickup_fee || 0);
+        }
         const destinationBranchId = deliveryOwnerBranchId || paymentBranchId;
         const feeStartAt =
             origenBranchId && destinationBranchId && String(origenBranchId) !== String(destinationBranchId)
