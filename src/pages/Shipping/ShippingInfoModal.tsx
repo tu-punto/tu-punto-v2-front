@@ -904,6 +904,17 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     <Input value={`Bs. ${simplePackageSaldo.toFixed(2)}`} readOnly />
                                 </Form.Item>
                             </Col>
+                            {simplePackageLatePickupFee > 0 && (
+                                <Col span={24}>
+                                    <Form.Item label="Multa por recojo tardio">
+                                        <Input
+                                            value={`Bs. ${simplePackageLatePickupFee.toFixed(2)}`}
+                                            readOnly
+                                            style={{ backgroundColor: '#fff7e6', fontWeight: 'bold' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            )}
                             <Col span={24}>
                                 <Form.Item label="Deuda del comprador">
                                     <Input value={`Bs. ${simplePackageBuyerDebt.toFixed(2)}`} readOnly />
@@ -1313,18 +1324,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
                             {["1", "2"].includes(tipoPago || "") && (
                                 <Row gutter={16}>
-                                    {simplePackageLatePickupFee > 0 && (
-                                        <Col span={24}>
-                                            <Form.Item label="Multa por recojo tardio">
-                                                <InputNumber
-                                                    prefix="Bs."
-                                                    value={simplePackageLatePickupFee}
-                                                    readOnly
-                                                    style={{ width: '100%', backgroundColor: '#fff7e6', fontWeight: 'bold' }}
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                    )}
                                     <Col span={24}>
                                         <Form.Item label={tipoPago === "1" ? "Subtotal QR" : "Subtotal Efectivo"}>
                                             <InputNumber
@@ -1340,18 +1339,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
                             {tipoPago === "4" && (
                                 <Row gutter={16}>
-                                    {simplePackageLatePickupFee > 0 && (
-                                        <Col span={24}>
-                                            <Form.Item label="Multa por recojo tardio">
-                                                <InputNumber
-                                                    prefix="Bs."
-                                                    value={simplePackageLatePickupFee}
-                                                    readOnly
-                                                    style={{ width: '100%', backgroundColor: '#fff7e6', fontWeight: 'bold' }}
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                    )}
                                     <Col span={12}>
                                         <Form.Item label="Subtotal QR" name="subtotal_qr">
                                             <InputNumber
