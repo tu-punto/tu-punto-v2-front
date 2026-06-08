@@ -31,9 +31,10 @@ export const buildPackagePricing = (
 ) => {
   const precioPaqueteUnitario = roundCurrency(unitPrice);
   const precioPaquete = roundCurrency(packageSize === "grande" ? Number(largeUnitPrice ?? unitPrice * 2) : unitPrice);
-  const deudaVendedor = roundCurrency(amortizacion);
   const precioEntreSucursal = roundCurrency(branchRoutePrice);
-  const deudaComprador = roundCurrency(Math.max(0, precioPaquete + precioEntreSucursal - deudaVendedor));
+  const precioTotal = roundCurrency(precioPaquete + precioEntreSucursal);
+  const deudaVendedor = roundCurrency(Math.min(Math.max(0, amortizacion), precioTotal));
+  const deudaComprador = roundCurrency(Math.max(0, precioTotal - deudaVendedor));
 
   return {
     precio_paquete_unitario: precioPaqueteUnitario,
@@ -43,7 +44,7 @@ export const buildPackagePricing = (
     deuda_comprador: deudaComprador,
     delivery_spaces: Math.max(1, Number(deliverySpaces || 1)),
     precio_entre_sucursal: precioEntreSucursal,
-    precio_total: roundCurrency(precioPaquete + precioEntreSucursal),
+    precio_total: precioTotal,
   };
 };
 
@@ -127,7 +128,21 @@ export const applyPackagePatch = (
       : patch.package_size === "estandar"
         ? "estandar"
         : row.package_size;
-  const unitPrice = Number(config?.precio_paquete ?? (row?.precio_paquete_unitario || 0));
+  const currentPackagePrice = Number(row?.precio_paquete || 0);
+  const currentUnitPrice = Number(row?.precio_paquete_unitario || 0);
+  const hasConfigSmallPrice = config?.precio_paquete !== undefined && config?.precio_paquete !== null && Number(config.precio_paquete) > 0;
+  const hasConfigLargePrice =
+    config?.precio_paquete_grande !== undefined &&
+    config?.precio_paquete_grande !== null &&
+    Number(config.precio_paquete_grande) > 0;
+  const unitPrice = hasConfigSmallPrice
+    ? Number(config?.precio_paquete || 0)
+    : currentUnitPrice || (nextSize === "estandar" ? currentPackagePrice : 0);
+  const largeUnitPrice = hasConfigLargePrice
+    ? Number(config?.precio_paquete_grande || 0)
+    : nextSize === "grande" && currentPackagePrice > unitPrice
+      ? currentPackagePrice
+      : undefined;
   const amortizacion = Number(
     patch.amortizacion_vendedor ?? config?.amortizacion ?? (row?.amortizacion_vendedor || 0)
   );
@@ -142,7 +157,7 @@ export const applyPackagePatch = (
     saldoPorPaquete,
     nextSize,
     branchRoutePrice,
-    config?.precio_paquete_grande,
+    largeUnitPrice,
     deliverySpaces
   );
   const paid = patch.esta_pagado === "si" || patch.esta_pagado === "no" ? patch.esta_pagado : row.esta_pagado;

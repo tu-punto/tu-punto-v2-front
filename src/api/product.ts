@@ -1,6 +1,5 @@
 import { AxiosError } from "axios"
 import { apiClient, apiClientNoJSON } from "./apiClient"
-import { parseError } from "./util"
 
 const handleError = (error) => {
     const err = error as AxiosError
@@ -125,6 +124,35 @@ export const getSellerInventoryAllAPI = async (params?: {
     } catch (error) {
         console.error("Error al obtener inventario completo de vendedor:", error);
         return [];
+    }
+};
+
+export const downloadInventoryQRReportAPI = async (payload: {
+    sucursalId: string;
+    sucursalLabel?: string;
+    rows: any[];
+}) => {
+    try {
+        const res = await apiClient.post("/product/inventory-qr-report", payload, {
+            responseType: "blob"
+        });
+        const blob = new Blob([res.data], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const disposition = String(res.headers?.["content-disposition"] || "");
+        const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+        link.href = url;
+        link.download = filenameMatch?.[1] || `inventario_qr_${Date.now()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return { success: true };
+    } catch (error) {
+        console.error("Error al descargar reporte de inventario QR:", error);
+        return handleError(error);
     }
 };
 

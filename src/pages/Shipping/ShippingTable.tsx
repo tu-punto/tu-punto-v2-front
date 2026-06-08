@@ -22,12 +22,6 @@ const MOBILE_CARD_PAGE_SIZE = 12;
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
-const resolveBranchId = (value: any) => {
-    if (!value) return "";
-    if (typeof value === "string") return value;
-    return String(value?._id || value?.id_sucursal || value?.$oid || "");
-};
-
 const getOriginBranchName = (pedido: any) => {
     const lugar = pedido?.lugar_origen;
     if (typeof lugar === "object" && lugar !== null) {
@@ -139,7 +133,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [isExternalCreateVisible, setIsExternalCreateVisible] = useState(false);
     const [isSimplePackageManagerVisible, setIsSimplePackageManagerVisible] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState('');
-    const [selectedOrigin, setSelectedOrigin] = useState('');
     const [otherLocation, setOtherLocation] = useState('');
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
@@ -155,7 +148,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [statusNow, setStatusNow] = useState(() => moment().tz("America/La_Paz"));
     const [mobilePage, setMobilePage] = useState(1);
     const [selectedRowKeys, setSelectedRowKeys] = useState<any[]>([]);
-    const [selectedRows, setSelectedRows] = useState<any[]>([]);
     const [markingSellerWithdrawal, setMarkingSellerWithdrawal] = useState(false);
 
     const [isMobile, setIsMobile] = useState(false);
@@ -176,7 +168,12 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
         const estadoPedido = externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : "En Espera");
         const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
-        const sucursalOrigen = typeof externalSale?.sucursal === "object" ? externalSale.sucursal : null;
+        const sucursalOrigen =
+            typeof externalSale?.origen_sucursal === "object"
+                ? externalSale.origen_sucursal
+                : typeof externalSale?.sucursal === "object"
+                    ? externalSale.sucursal
+                    : null;
         const destinationLabel =
             externalSale?.lugar_entrega ||
             externalSale?.destino_sucursal?.nombre ||
@@ -194,7 +191,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             hora_entrega_real: externalSale?.hora_entrega_real || fechaBase,
             lugar_origen: sucursalOrigen,
             lugar_entrega: destinationLabel,
-            id_sucursal: sucursalOrigen?._id || externalSale?.sucursal || externalSale?.id_sucursal,
+            id_sucursal: sucursalOrigen?._id || externalSale?.origen_sucursal || externalSale?.sucursal || externalSale?.id_sucursal,
             sucursal: sucursalOrigen,
             estado_pedido: estadoPedido,
             esta_pagado: estaPagado,
@@ -251,7 +248,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     const rowsToMark = getCurrentSellerWithdrawalRows();
                     if (!rowsToMark.length) {
                         setSelectedRowKeys([]);
-                        setSelectedRows([]);
                         message.warning("La seleccion ya no tiene entregas en espera para marcar");
                         return;
                     }
@@ -278,7 +274,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         message.success(`Se marcaron ${response.updatedCount || rowsToMark.length} entrega(s)`);
                     }
                     setSelectedRowKeys([]);
-                    setSelectedRows([]);
                     fetchShippings();
                 } finally {
                     setMarkingSellerWithdrawal(false);
@@ -293,7 +288,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
             const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
             const status = selectedStatus === "entregado" ? "Entregado" : "En Espera";
-            const selectedOriginId = sucursal.find((s: any) => s.nombre === selectedOrigin)?._id;
+            const originBranchId = currentSucursalId || undefined;
             const sellerIdToQuery =
                 selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
                     ? selectedVendedor
@@ -306,7 +301,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     status,
                     from,
                     to,
-                    originId: selectedOriginId,
+                    originId: originBranchId,
                     sellerId: sellerIdToQuery,
                     client: searchCliente.trim() || undefined
                 }),
@@ -317,7 +312,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         status,
                         from,
                         to,
-                        sucursalId: selectedOriginId
+                        sucursalId: originBranchId,
+                        client: searchCliente.trim() || undefined
                     })
                     : Promise.resolve({ rows: [] }),
             ]);
@@ -387,16 +383,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
 
     const filterByLocationAndDate = (data: any) => {
-        const nombreSucursalToIdMap = new Map(
-            sucursal.map((suc) => [suc.nombre, suc._id?.toString()])
-        );
         return data.filter((pedido: any) => {
             const isOtherLocation = selectedLocation === 'other';
             const isExternal = !!pedido.is_external;
             const lugarEntregaLower = String(pedido.lugar_entrega || "").toLowerCase();
-            const origenId = resolveBranchId(pedido.lugar_origen);
-            const selectedOriginId = nombreSucursalToIdMap.get(selectedOrigin);
-            const matchesOrigin = !selectedOrigin || origenId === selectedOriginId;
 
             const matchesLocation = isExternal
                 ? (isOtherLocation
@@ -440,7 +430,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 pedido.numero_guia,
             ].some((value: any) => String(value || "").toLowerCase().includes(searchValue));
 
-            return matchesOrigin && matchesLocation && matchesDateRange && matchesVendedor && matchesCliente;
+            return matchesLocation && matchesDateRange && matchesVendedor && matchesCliente;
         });
     };
     useEffect(() => {
@@ -467,8 +457,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     useEffect(() => {
         setMobilePage(1);
         setSelectedRowKeys([]);
-        setSelectedRows([]);
-    }, [selectedStatus, selectedLocation, selectedOrigin, dateRange, selectedVendedor, searchCliente]);
+    }, [selectedStatus, selectedLocation, dateRange, selectedVendedor, searchCliente]);
 
     const columns = [
         {/*{
@@ -664,8 +653,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         try {
             const response = await getSucursalsBasicAPI();
             setSucursal(Array.isArray(response) ? response : []);
-
-            setSelectedOrigin('');
         } catch (error) {
             message.error('Error al obtener las sucursales');
         }
@@ -682,7 +669,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         canManageExternal,
         selectedStatus,
         dateRange,
-        selectedOrigin,
         selectedVendedor,
         searchCliente,
         user?.id_vendedor,
@@ -697,7 +683,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     useEffect(() => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [esperaData, entregadoData, selectedLocation, selectedOrigin, dateRange, selectedVendedor, searchCliente]);
+    }, [esperaData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -776,20 +762,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 </Select>
 
                 */}
-                <Select
-                    className="shipping-filter-origin"
-                    placeholder="Sucursal de Origen"
-                    value={selectedOrigin}
-                    onChange={(value) => setSelectedOrigin(value || '')}
-                    allowClear
-                    disabled={isAdmin || isOperator} // ← Bloquea si es admin
-                >
-                    {sucursal.map((suc: any) => (
-                        <Option key={suc._id || suc.id_sucursal} value={suc.nombre}>
-                            {suc.nombre}
-                        </Option>
-                    ))}
-                </Select>
                 <Select
                     className="shipping-filter-destination"
                     placeholder="Sucursal De Destino"
@@ -1164,9 +1136,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     canManageExternal && selectedStatus !== "entregado"
                         ? {
                             selectedRowKeys,
-                            onChange: (keys, rows) => {
+                            onChange: (keys) => {
                                 setSelectedRowKeys(keys);
-                                setSelectedRows(rows.filter(isSellerWithdrawalCandidate));
                             },
                             getCheckboxProps: (record: any) => ({
                                 disabled: !isSellerWithdrawalCandidate(record),

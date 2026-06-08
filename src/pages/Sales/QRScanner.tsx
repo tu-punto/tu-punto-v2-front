@@ -21,6 +21,7 @@ interface QRScannerProps {
   groupSuccessLabel?: string;
   appearance?: "default" | "simple";
   simpleVideoMinHeight?: number;
+  sucursalId?: string;
 }
 
 interface ScannedVariantItem {
@@ -196,7 +197,8 @@ function QRScanner({
   successLabel = "Producto agregado al carrito",
   groupSuccessLabel = "Variante del grupo agregada",
   appearance = "default",
-  simpleVideoMinHeight = 280
+  simpleVideoMinHeight = 280,
+  sucursalId
 }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -722,8 +724,8 @@ function QRScanner({
     resetInactivityCountdown();
 
     try {
-      const sucursalId = localStorage.getItem("sucursalId") || undefined;
-      const resolved = await resolveScannedPayload(payload, sucursalId);
+      const scanSucursalId = sucursalId || localStorage.getItem("sucursalId") || undefined;
+      const resolved = await resolveScannedPayload(payload, scanSucursalId);
 
       if (!resolved) {
         showFlash("error", "QR no valido");

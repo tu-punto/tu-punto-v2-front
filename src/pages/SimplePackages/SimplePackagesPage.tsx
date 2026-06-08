@@ -50,13 +50,13 @@ const SimplePackagesPage = () => {
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
     precio_paquete: Number(user?.seller_precio_paquete || 0),
-    amortizacion: Number(user?.seller_amortizacion || 0),
+    amortizacion: 0,
     saldo_por_paquete: 0,
   });
   const [rows, setRows] = useState<SimplePackageDraftRow[]>([
     createDraftRow(0, {
       precio_paquete: Number(user?.seller_precio_paquete || 0),
-      amortizacion: Number(user?.seller_amortizacion || 0),
+      amortizacion: 0,
       saldo_por_paquete: 0,
     }),
   ]);
@@ -264,7 +264,7 @@ const SimplePackagesPage = () => {
 
         const nextConfig = {
           precio_paquete: Number(seller?.precio_paquete ?? user?.seller_precio_paquete ?? 0),
-          amortizacion: Number(seller?.amortizacion ?? user?.seller_amortizacion ?? 0),
+          amortizacion: 0,
           saldo_por_paquete: 0,
         };
         setUseEscalation(seller?.precio_paquete === null || seller?.precio_paquete === undefined);
@@ -302,7 +302,6 @@ const SimplePackagesPage = () => {
     void fetchSellerConfig();
   }, [
     user?.id_vendedor,
-    user?.seller_amortizacion,
     user?.seller_precio_paquete,
   ]);
 
@@ -453,10 +452,10 @@ const SimplePackagesPage = () => {
         message.error(`Paquete ${index + 1}: el monto que cubriras del servicio no puede ser menor a 0`);
         return;
       }
-      const precioPaqueteActual = Number(rows[index]?.precio_paquete || 0);
-      if (Number(row.amortizacion_vendedor || 0) > precioPaqueteActual) {
+      const precioTotalActual = Number(rows[index]?.precio_total || 0);
+      if (Number(row.amortizacion_vendedor || 0) > precioTotalActual) {
         message.error(
-          `Paquete ${index + 1}: el monto que cubriras del servicio no puede ser mayor al precio del paquete`
+          `Paquete ${index + 1}: el monto que cubriras del servicio no puede ser mayor al precio total del servicio`
         );
         return;
       }
@@ -645,11 +644,17 @@ const SimplePackagesPage = () => {
               render: (_: any, row: any) => (
                 <InputNumber
                   min={0}
+                  max={Number(row.precio_total ?? Number(row.precio_paquete || 0) + Number(row.precio_entre_sucursal || 0))}
                   style={{ width: "100%" }}
                   addonBefore="Bs."
                   value={Number(row.amortizacion_vendedor || 0)}
                   onChange={(value) =>
-                    patchPendingRow(String(row._id), { amortizacion_vendedor: Number(value || 0) })
+                    patchPendingRow(String(row._id), {
+                      amortizacion_vendedor: Math.min(
+                        Number(row.precio_total ?? Number(row.precio_paquete || 0) + Number(row.precio_entre_sucursal || 0)),
+                        Math.max(0, Number(value || 0))
+                      ),
+                    })
                   }
                 />
               ),
@@ -814,13 +819,14 @@ const SimplePackagesPage = () => {
                       <td style={tableCellStyle}>
                         <InputNumber
                           min={0}
+                          max={Number(row.precio_total || 0)}
                           style={{ width: "100%" }}
                           addonBefore="Bs."
                           value={Number(row.amortizacion_vendedor || 0)}
                           onChange={(value) =>
                             updateRow(index, {
                               amortizacion_vendedor: Math.min(
-                                Number(row.precio_paquete || 0),
+                                Number(row.precio_total || 0),
                                 Math.max(0, Number(value || 0))
                               ),
                             })
@@ -913,13 +919,14 @@ const SimplePackagesPage = () => {
                         <InputNumber
                           className="mt-1"
                           min={0}
+                          max={Number(row.precio_total || 0)}
                           style={{ width: "100%" }}
                           addonBefore="Bs."
                           value={Number(row.amortizacion_vendedor || 0)}
                           onChange={(value) =>
                             updateRow(index, {
                               amortizacion_vendedor: Math.min(
-                                Number(row.precio_paquete || 0),
+                                Number(row.precio_total || 0),
                                 Math.max(0, Number(value || 0))
                               ),
                             })

@@ -12,6 +12,8 @@ import {
   Select,
   Modal,
   Radio,
+  Switch,
+  DatePicker,
 } from "antd";
 import { useContext, useEffect, useState } from "react";
 import dayjs from "dayjs";
@@ -23,7 +25,10 @@ import {
 } from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
+import { getSellersAPI } from "../../api/seller";
+import { getSucursalsAPI } from "../../api/sucursal";
 import { UserContext } from "../../context/userContext";
+import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
 const { Title } = Typography;
 type Metodo = "efectivo" | "qr";
 type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_cliente";
@@ -31,21 +36,22 @@ type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_c
 interface OperacionAdicional {
   tipo: TipoOperacion;
   descripcion: string;
+  concepto?: string;
+  categoria?: string;
   cliente?: string;
   metodo: Metodo;
   monto: number;
+  afecta_empresa?: boolean;
+  fecha?: string;
+  id_vendedor?: string;
+  id_sucursal?: string;
+  finance_flux_id?: string;
 }
 
 const roundAmount = (value: number) => Number(value.toFixed(2));
 
 const getOperationSign = (tipo: TipoOperacion) =>
   tipo === "gasto" || tipo === "gasto_profit" ? -1 : 1;
-
-const mapTipoToApi = (tipo: TipoOperacion): "delivery" | "gasto_profit" | "pago_cliente" => {
-  if (tipo === "ingreso") return "delivery";
-  if (tipo === "gasto") return "gasto_profit";
-  return tipo;
-};
 
 const tipoLabel = (tipo: string) => {
   if (tipo === "gasto" || tipo === "gasto_profit") return "Gastos (Salidas)";
@@ -79,10 +85,16 @@ const BoxCloseForm = ({
   const coins = Form.useWatch("coins", form) || {};
   const bills = Form.useWatch("bills", form) || {};
   const [admins, setAdmins] = useState<{ _id: string; name: string }[]>([]);
+  const [sellers, setSellers] = useState<any[]>([]);
+  const [sucursals, setSucursals] = useState<any[]>([]);
   const [operations, setOperations] = useState<OperacionAdicional[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [operationForm] = Form.useForm();
+  const operationAffectsCompany = Form.useWatch("afecta_empresa", operationForm);
   const { user } = useContext(UserContext) || {};
+  const fluxCategories = useFinanceFluxCategoryStore((state) => state.fluxCategories);
+  const fetchFluxCategory = useFinanceFluxCategoryStore((state) => state.fetchFluxCategory);
+  const currentSucursalId = localStorage.getItem("sucursalId") || "";
   const currentUserId = user?._id || user?.id;
   const currentUserAdmin = admins.find((admin) => String(admin._id) === String(currentUserId));
   const currentUserOption = currentUserId
@@ -172,11 +184,18 @@ const BoxCloseForm = ({
   }
 
   useEffect(() => {
-    const fetchAdmins = async () => {
-      const data = await getAdminsAPI();
-      if (data) setAdmins(data);
+    const loadModalData = async () => {
+      const [adminsData, sellersData, sucursalsData] = await Promise.all([
+        getAdminsAPI(),
+        getSellersAPI(),
+        getSucursalsAPI(),
+        fetchFluxCategory(),
+      ]);
+      if (adminsData) setAdmins(adminsData);
+      setSellers(Array.isArray(sellersData) ? sellersData : Array.isArray((sellersData as any)?.data) ? (sellersData as any).data : []);
+      setSucursals(Array.isArray(sucursalsData) ? sucursalsData : []);
     };
-    fetchAdmins();
+    void loadModalData();
   }, []);
 
   useEffect(() => {
@@ -339,6 +358,14 @@ const BoxCloseForm = ({
   }, [coinTotals, billTotals, Form.useWatch("bancario_real", form), Form.useWatch("bancario_esperado", form)]);
 
   const openOperationModal = () => {
+    operationForm.setFieldsValue({
+      afecta_empresa: true,
+      tipo: "ingreso",
+      metodo: "efectivo",
+      categoria: fluxCategories[0]?.nombre || "Caja",
+      fecha: selectedDate || dayjs(),
+      id_sucursal: currentSucursalId || undefined,
+    });
     setModalVisible(true);
   };
 
@@ -352,6 +379,8 @@ const BoxCloseForm = ({
       const newOp = await operationForm.validateFields();
       const op: OperacionAdicional = {
         ...newOp,
+        descripcion: String(newOp.concepto || "").trim(),
+        fecha: newOp.fecha?.toDate?.()?.toISOString?.() || newOp.fecha,
         monto: Math.abs(Number(newOp.monto || 0)), // siempre positivo
       };
 
@@ -388,7 +417,7 @@ const BoxCloseForm = ({
       ];
       const operationsPayload = operations.map((op) => ({
         ...op,
-        tipo: mapTipoToApi(op.tipo),
+        descripcion: op.descripcion || op.concepto || "",
       }));
 
       if (mode === "edit" && initialData?._id) {
@@ -453,7 +482,8 @@ const BoxCloseForm = ({
                 columns={[
                   { title: "Tipo", dataIndex: "tipo", key: "tipo", render: (v) => tipoLabel(String(v || "")) },
                   { title: "Método", dataIndex: "metodo", key: "metodo", render: (v) => metodoLabel(String(v || "")) },
-                  { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v) => v || "-" },
+                  { title: "Empresa", dataIndex: "afecta_empresa", key: "afecta_empresa", render: (v) => (v === false ? "No" : "Si") },
+                  { title: "Categoria", dataIndex: "categoria", key: "categoria", render: (v) => v || "-" },
                   { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
                   { title: "Monto", dataIndex: "monto", key: "monto", render: (monto) => `Bs. ${Number(monto).toFixed(2)}` },
                   {
@@ -479,6 +509,17 @@ const BoxCloseForm = ({
             onCancel={closeOperationModal}
         >
           <Form form={operationForm} layout="vertical">
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <Form.Item
+                name="afecta_empresa"
+                label="Afecta al dinero de la empresa"
+                valuePropName="checked"
+                initialValue={true}
+                style={{ marginBottom: 0 }}
+              >
+                <Switch checkedChildren="Si" unCheckedChildren="No" />
+              </Form.Item>
+            </Card>
             <Form.Item name="tipo" label="Tipo" rules={[{ required: true }]}>
               <Radio.Group buttonStyle="solid" className="w-full">
                 <Radio.Button value="ingreso" style={{ width: "50%", textAlign: "center" }}>
@@ -490,7 +531,30 @@ const BoxCloseForm = ({
               </Radio.Group>
             </Form.Item>
 
-            <Form.Item name="metodo" label="Método" rules={[{ required: true }]}>
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item name="categoria" label="Categoria" rules={[{ required: true }]}>
+                  <Select
+                    showSearch
+                    placeholder="Selecciona una categoria"
+                    options={fluxCategories.map((category) => ({
+                      value: category.nombre,
+                      label: category.nombre,
+                    }))}
+                    filterOption={(input, option: any) =>
+                      String(option?.label || "").toLowerCase().includes(input.toLowerCase())
+                    }
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="fecha" label="Fecha" rules={[{ required: true }]}>
+                  <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item name="metodo" label="Metodo" rules={[{ required: true }]}>
               <Radio.Group buttonStyle="solid" className="w-full">
                 <Radio.Button value="efectivo" style={{ width: "50%", textAlign: "center" }}>
                   Efectivo
@@ -501,25 +565,52 @@ const BoxCloseForm = ({
               </Radio.Group>
             </Form.Item>
 
-            {/* Campo cliente temporalmente deshabilitado al simplificar Tipo en Ingreso/Gasto */}
-            {/* <Form.Item shouldUpdate noStyle>
-              {() => {
-                const t = operationForm.getFieldValue("tipo");
-                return t === "pago_cliente" ? (
-                    <Form.Item name="cliente" label="Cliente" rules={[{ required: true }]}>
-                      <Input />
-                    </Form.Item>
-                ) : null;
-              }}
-            </Form.Item> */}
+            <Row gutter={12}>
+              <Col span={12}>
+                <Form.Item name="id_vendedor" label="Vendedor">
+                  <Select
+                    allowClear
+                    showSearch
+                    placeholder="Selecciona un vendedor"
+                    options={sellers.map((seller: any) => ({
+                      value: seller._id,
+                      label: `${seller.nombre || ""} ${seller.apellido || ""}`.trim() || seller.vendedor || "Vendedor",
+                    }))}
+                    filterOption={(input, option: any) =>
+                      String(option?.label || "").toLowerCase().includes(input.toLowerCase())
+                    }
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="id_sucursal" label="Sucursal" rules={[{ required: true }]}>
+                  <Select
+                    showSearch
+                    placeholder="Selecciona una sucursal"
+                    options={sucursals.map((sucursal: any) => ({
+                      value: sucursal._id,
+                      label: sucursal.nombre,
+                    }))}
+                    filterOption={(input, option: any) =>
+                      String(option?.label || "").toLowerCase().includes(input.toLowerCase())
+                    }
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-            <Form.Item name="descripcion" label="Descripción" rules={[{ required: true }]}>
+            <Form.Item name="concepto" label="Concepto" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
 
             <Form.Item name="monto" label="Monto" rules={[{ required: true }]}>
               <InputNumber min={0} className="w-full" />
             </Form.Item>
+            {operationAffectsCompany === false && (
+              <Typography.Text type="secondary">
+                Esta operacion solo ajustara la caja de la sucursal y no aparecera en Gastos e Ingresos.
+              </Typography.Text>
+            )}
           </Form>
         </Modal>
         <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
