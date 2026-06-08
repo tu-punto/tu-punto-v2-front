@@ -12,18 +12,20 @@ const parseError = (error: AxiosError) => {
 export const getSucursalsAPI = async () => {
   try {
     const response = await apiClient.get("/sucursal");
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     parseError(error as AxiosError);
+    return [];
   }
 };
 
 export const getSucursalsBasicAPI = async () => {
   try {
     const response = await apiClient.get("/sucursal/basic");
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     parseError(error as AxiosError);
+    return [];
   }
 };
 

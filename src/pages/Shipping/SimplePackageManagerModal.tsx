@@ -326,9 +326,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     Math.max(1, Number(spaces || 1)) > getSmallSpaceLimit(routeId) ? "grande" : "estandar";
 
   const getEffectiveDeliverySpaces = (originId: string, destinationId?: string, spaces = 1) =>
-    String(originId || "") === String(destinationId || "")
-      ? 1
-      : Math.max(1, Number(spaces || 1));
+    Math.max(1, Number(spaces || 1));
 
   const getDeliveryRoutePrice = (originId: string, destinationId?: string, spaces = 1, escalationSpaces = spaces) => {
     if (String(originId || "") === String(destinationId || "")) return 0;
