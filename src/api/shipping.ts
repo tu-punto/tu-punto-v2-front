@@ -131,6 +131,16 @@ const markSellerWithdrawalAPI = async (payload: {
     return { success: false };
   }
 };
+
+const rejectCatalogOrderAPI = async (shippingId: string, reason: string) => {
+  try {
+    const res = await apiClient.post(`/shipping/${shippingId}/reject-catalog`, { reason });
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    return { success: false, ...(err.response?.data as object || {}) };
+  }
+};
 const addTemporaryProductsToShippingAPI = async (shippingId: string, productosTemporales: any[]) => {
   try {
     const res = await apiClient.put(`/shipping/${shippingId}/temporales`, {
@@ -227,4 +237,5 @@ export {
   getSalesHistoryAPI,
   getTrackingFreezeConfigAPI,
   updateTrackingFreezeConfigAPI
+  ,rejectCatalogOrderAPI
 };

@@ -30,7 +30,7 @@ export const buildPackagePricing = (
   deliverySpaces = 1
 ) => {
   const precioPaqueteUnitario = roundCurrency(unitPrice);
-  const precioPaquete = roundCurrency(packageSize === "grande" ? Number(largeUnitPrice ?? unitPrice * 2) : unitPrice);
+  const precioPaquete = roundCurrency(packageSize === "grande" ? Number(largeUnitPrice ?? unitPrice) : unitPrice);
   const precioEntreSucursal = roundCurrency(branchRoutePrice);
   const precioTotal = roundCurrency(precioPaquete + precioEntreSucursal);
   const deudaVendedor = roundCurrency(Math.min(Math.max(0, amortizacion), precioTotal));

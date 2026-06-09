@@ -1,7 +1,7 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { Button, DatePicker, Input, message, Modal, Pagination, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI } from '../../api/shipping';
+import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
@@ -149,6 +149,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [mobilePage, setMobilePage] = useState(1);
     const [selectedRowKeys, setSelectedRowKeys] = useState<any[]>([]);
     const [markingSellerWithdrawal, setMarkingSellerWithdrawal] = useState(false);
+    const [rejectingCatalogOrderId, setRejectingCatalogOrderId] = useState("");
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator;
@@ -603,6 +604,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             }
         },
         {
+            title: 'Origen',
+            key: 'origen_pedido',
+            render: (_: any, record: any) =>
+                record?.origen_pedido === "catalogo"
+                    ? <span style={{ color: "#0958d9", background: "#e6f4ff", border: "1px solid #91caff", borderRadius: 999, padding: "3px 9px", fontWeight: 700 }}>Catalogo</span>
+                    : <span>Interno</span>,
+        },
+        {
             title: 'Cliente',
             dataIndex: 'cliente',
             key: 'cliente',
@@ -618,6 +627,48 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             dataIndex: 'carnet_cliente',
             key: 'carnet_cliente',
             render: (value: any) => value || '—',
+        },
+        {
+            title: 'Acciones',
+            key: 'catalog_actions',
+            render: (_: any, record: any) =>
+                record?.origen_pedido === "catalogo" && record?.estado_pedido === "En Espera" && canManageExternal ? (
+                    <Button
+                        danger
+                        loading={rejectingCatalogOrderId === String(record._id)}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            let reason = "";
+                            Modal.confirm({
+                                title: "Rechazar pedido de catalogo",
+                                content: (
+                                    <Input
+                                        placeholder="Motivo del rechazo"
+                                        onChange={(inputEvent) => { reason = inputEvent.target.value; }}
+                                    />
+                                ),
+                                okText: "Rechazar",
+                                okButtonProps: { danger: true },
+                                cancelText: "Cancelar",
+                                onOk: async () => {
+                                    setRejectingCatalogOrderId(String(record._id));
+                                    try {
+                                        const result = await rejectCatalogOrderAPI(String(record._id), reason);
+                                        if (!result?.success) throw new Error(result?.message || "No se pudo rechazar");
+                                        message.success("Pedido rechazado y notificado al catalogo");
+                                        await fetchShippings();
+                                    } catch (error: any) {
+                                        message.error(error?.message || "No se pudo rechazar el pedido");
+                                    } finally {
+                                        setRejectingCatalogOrderId("");
+                                    }
+                                },
+                            });
+                        }}
+                    >
+                        Rechazar
+                    </Button>
+                ) : null,
         },
     ];
     const visibleColumns = columns.filter((column: any) => column?.key !== 'lugar_origen');

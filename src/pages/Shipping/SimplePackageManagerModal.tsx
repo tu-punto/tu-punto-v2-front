@@ -299,6 +299,37 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       )?.routeId || ""
     );
 
+  const getExistingPackagePriceConfig = (row: any, nextSize: string, routeId = "") => {
+    if (Number(sellerConfig.precio_paquete || 0) > 0) return sellerConfig;
+
+    const routeConfig = escalationConfigs.find(
+      (config: any) =>
+        config?.service_origin === "simple_package" &&
+        String(config?.route?._id || config?.route || "") === String(routeId || "")
+    );
+    const globalConfig = escalationConfigs.find(
+      (config: any) => config?.service_origin === "simple_package" && !config?.route
+    );
+    const ranges = Array.isArray(routeConfig?.ranges) && routeConfig.ranges.length
+      ? routeConfig.ranges
+      : Array.isArray(globalConfig?.ranges) && globalConfig.ranges.length
+        ? globalConfig.ranges
+        : DEFAULT_SIMPLE_RANGES;
+    const currentSize = row?.package_size === "grande" ? "grande" : "estandar";
+    const currentPrice = Number(row?.precio_paquete || 0);
+    const matchedRange = ranges.find((range: PackageEscalationRange) => {
+      const configuredPrice = currentSize === "grande" ? range.large_price : range.small_price;
+      return Math.abs(Number(configuredPrice || 0) - currentPrice) <= 0.01;
+    });
+
+    if (!matchedRange) return sellerConfig;
+    return {
+      ...sellerConfig,
+      precio_paquete: Number(matchedRange.small_price || 0),
+      precio_paquete_grande: Number(matchedRange.large_price || 0),
+    };
+  };
+
   const getSmallSpaceLimit = (routeId = "") => {
     const globalConfig = escalationConfigs.find(
       (row: any) => !String(row?.route?._id || row?.route || "") && row?.service_origin === "delivery"
@@ -416,7 +447,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
           delivery_spaces: spaces,
           precio_entre_sucursal: routePrice,
         },
-        sellerConfig
+        getExistingPackagePriceConfig(row, packageSize, routeId)
       );
     });
 
