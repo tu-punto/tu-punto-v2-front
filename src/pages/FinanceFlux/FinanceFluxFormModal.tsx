@@ -13,15 +13,16 @@ import {
 } from "antd";
 import { CommentOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
   registerFinanceFluxAPI,
   updateFinanceFluxAPI,
 } from "../../api/financeFlux";
-import { getWorkersAPI } from "../../api/worker";
 import { getSellersAPI, registerSellerAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { getAdminsAPI } from "../../api/user";
 import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
+import { UserContext } from "../../context/userContext";
 
 function FinanceFluxFormModal({
   visible,
@@ -30,12 +31,23 @@ function FinanceFluxFormModal({
   editingFlux,
 }: any) {
   const [loading, setLoading] = useState(false);
-  const [workers, setWorkers] = useState([]);
+  const [admins, setAdmins] = useState<{ _id: string; name: string }[]>([]);
   const [sellers, setSellers] = useState([]);
   const [sucursals, setSucursals] = useState([]);
   const [newSeller, setNewSeller] = useState("");
   const [newFluxCategory, setNewFluxCategory] = useState("");
   const [form] = Form.useForm();
+  const { user } = useContext(UserContext) || {};
+  const currentUserId = user?._id || user?.id;
+  const currentUserAdmin = admins.find(
+    (admin) => String(admin._id) === String(currentUserId)
+  );
+  const currentResponsible =
+    currentUserAdmin?.name ||
+    user?.nombre_vendedor ||
+    user?.name ||
+    user?.email ||
+    "Usuario actual";
   const isServiceMatrixFlux =
     editingFlux &&
     Array.isArray(editingFlux.detalle_servicios) &&
@@ -55,6 +67,7 @@ function FinanceFluxFormModal({
     const payload = {
       ...financeFluxData,
       fecha: financeFluxData.fecha?.toDate()?.toISOString(),
+      ...(!editingFlux && { founder: currentResponsible }),
     };
     if (payload.id_vendedor === "") {
       delete payload.id_vendedor;
@@ -102,12 +115,12 @@ function FinanceFluxFormModal({
     }
   };
 
-  const fetchWorkers = async () => {
+  const fetchAdmins = async () => {
     try {
-      const response = await getWorkersAPI();
-      setWorkers(response);
+      const response = await getAdminsAPI();
+      setAdmins(response || []);
     } catch (error) {
-      message.error("Error al obtener los trabajadores");
+      console.error("Error al obtener los responsables", error);
     }
   };
 
@@ -134,7 +147,7 @@ function FinanceFluxFormModal({
   };
 
   useEffect(() => {
-    fetchWorkers();
+    fetchAdmins();
     fetchSellers();
     fetchSucursals();
   }, []);
@@ -153,12 +166,13 @@ function FinanceFluxFormModal({
       });
     } else {
       form.resetFields();
+      form.setFieldValue("founder", currentResponsible);
       const currentSucursal = localStorage.getItem("sucursalId");
       if (currentSucursal) {
         form.setFieldValue("id_sucursal", currentSucursal);
       }
     }
-  }, [editingFlux, form]);
+  }, [editingFlux, form, currentResponsible]);
 
   return (
     <Modal
@@ -327,36 +341,9 @@ function FinanceFluxFormModal({
           <Col span={12}>
             <Form.Item
               name="founder"
-              label="Founder"
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (getFieldValue("tipo") === "Inversion" && !value) {
-                      return Promise.reject(
-                        new Error("Este campo es obligatorio")
-                      );
-                    }
-                    return Promise.resolve();
-                  },
-                }),
-              ]}
+              label="Responsable"
             >
-              <Select
-                placeholder="Selecciona un Founder"
-                allowClear
-                options={[
-                  { value: "Sebas", label: "Sebas" },
-                  { value: "Diego", label: "Diego" },
-                  { value: "Elian", label: "Elian" },
-                  { value: "Giorgio", label: "Giorgio" },
-                  { value: "Mayuki", label: "Mayuki" },
-                  { value: "Eddy Choque", label: "Eddy Choque" },
-                ]}
-                showSearch
-                filterOption={(input, option: any) =>
-                  option.label.toLowerCase().includes(input.toLowerCase())
-                }
-              />
+              <Input disabled />
             </Form.Item>
           </Col>
         </Row>

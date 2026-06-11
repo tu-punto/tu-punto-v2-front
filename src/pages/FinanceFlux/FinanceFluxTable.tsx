@@ -191,11 +191,13 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       onFilter: (value: any, record: any) => record.esDeuda === value,
     },
     {
-      title: "Founder",
+      title: "Responsable",
       dataIndex: "founder",
-      key: "finance_flux_worker",
+      key: "finance_flux_responsible",
       className: "text-mobile-sm xl:text-desktop-sm",
-      sorter: (a: any, b: any) => a.encargado.localeCompare(b.encargado),
+      render: (responsible: string) => responsible || "N/A",
+      sorter: (a: any, b: any) =>
+        String(a.founder || "").localeCompare(String(b.founder || "")),
     },
     {
       title: "Acciones",

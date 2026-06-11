@@ -25,10 +25,7 @@ import {
 } from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
-import { getSellersAPI } from "../../api/seller";
-import { getSucursalsAPI } from "../../api/sucursal";
 import { UserContext } from "../../context/userContext";
-import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
 const { Title } = Typography;
 type Metodo = "efectivo" | "qr";
 type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_cliente";
@@ -49,6 +46,9 @@ interface OperacionAdicional {
 }
 
 const roundAmount = (value: number) => Number(value.toFixed(2));
+
+const getDefaultOperationCategory = (tipo: string) =>
+  tipo === "gasto" || tipo === "gasto_profit" ? "Gasto (Cierre)" : "Ingreso (Cierre)";
 
 const getOperationSign = (tipo: TipoOperacion) =>
   tipo === "gasto" || tipo === "gasto_profit" ? -1 : 1;
@@ -85,15 +85,11 @@ const BoxCloseForm = ({
   const coins = Form.useWatch("coins", form) || {};
   const bills = Form.useWatch("bills", form) || {};
   const [admins, setAdmins] = useState<{ _id: string; name: string }[]>([]);
-  const [sellers, setSellers] = useState<any[]>([]);
-  const [sucursals, setSucursals] = useState<any[]>([]);
   const [operations, setOperations] = useState<OperacionAdicional[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [operationForm] = Form.useForm();
   const operationAffectsCompany = Form.useWatch("afecta_empresa", operationForm);
   const { user } = useContext(UserContext) || {};
-  const fluxCategories = useFinanceFluxCategoryStore((state) => state.fluxCategories);
-  const fetchFluxCategory = useFinanceFluxCategoryStore((state) => state.fetchFluxCategory);
   const currentSucursalId = localStorage.getItem("sucursalId") || "";
   const currentUserId = user?._id || user?.id;
   const currentUserAdmin = admins.find((admin) => String(admin._id) === String(currentUserId));
@@ -185,15 +181,8 @@ const BoxCloseForm = ({
 
   useEffect(() => {
     const loadModalData = async () => {
-      const [adminsData, sellersData, sucursalsData] = await Promise.all([
-        getAdminsAPI(),
-        getSellersAPI(),
-        getSucursalsAPI(),
-        fetchFluxCategory(),
-      ]);
+      const adminsData = await getAdminsAPI();
       if (adminsData) setAdmins(adminsData);
-      setSellers(Array.isArray(sellersData) ? sellersData : Array.isArray((sellersData as any)?.data) ? (sellersData as any).data : []);
-      setSucursals(Array.isArray(sucursalsData) ? sucursalsData : []);
     };
     void loadModalData();
   }, []);
@@ -362,9 +351,10 @@ const BoxCloseForm = ({
       afecta_empresa: true,
       tipo: "ingreso",
       metodo: "efectivo",
-      categoria: fluxCategories[0]?.nombre || "Caja",
+      categoria: getDefaultOperationCategory("ingreso"),
       fecha: selectedDate || dayjs(),
       id_sucursal: currentSucursalId || undefined,
+      id_vendedor: undefined,
     });
     setModalVisible(true);
   };
@@ -379,9 +369,13 @@ const BoxCloseForm = ({
       const newOp = await operationForm.validateFields();
       const op: OperacionAdicional = {
         ...newOp,
+        tipo: newOp.tipo || "ingreso",
+        categoria: getDefaultOperationCategory(newOp.tipo || "ingreso"),
         descripcion: String(newOp.concepto || "").trim(),
         fecha: newOp.fecha?.toDate?.()?.toISOString?.() || newOp.fecha,
         monto: Math.abs(Number(newOp.monto || 0)), // siempre positivo
+        id_sucursal: currentSucursalId || undefined,
+        id_vendedor: undefined,
       };
 
       const updatedOperations = [...operations, op];
@@ -521,7 +515,13 @@ const BoxCloseForm = ({
               </Form.Item>
             </Card>
             <Form.Item name="tipo" label="Tipo" rules={[{ required: true }]}>
-              <Radio.Group buttonStyle="solid" className="w-full">
+              <Radio.Group
+                buttonStyle="solid"
+                className="w-full"
+                onChange={(event) => {
+                  operationForm.setFieldValue("categoria", getDefaultOperationCategory(event.target.value));
+                }}
+              >
                 <Radio.Button value="ingreso" style={{ width: "50%", textAlign: "center" }}>
                   Ingresos (Entradas)
                 </Radio.Button>
@@ -531,28 +531,9 @@ const BoxCloseForm = ({
               </Radio.Group>
             </Form.Item>
 
-            <Row gutter={12}>
-              <Col span={12}>
-                <Form.Item name="categoria" label="Categoria" rules={[{ required: true }]}>
-                  <Select
-                    showSearch
-                    placeholder="Selecciona una categoria"
-                    options={fluxCategories.map((category) => ({
-                      value: category.nombre,
-                      label: category.nombre,
-                    }))}
-                    filterOption={(input, option: any) =>
-                      String(option?.label || "").toLowerCase().includes(input.toLowerCase())
-                    }
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="fecha" label="Fecha" rules={[{ required: true }]}>
-                  <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
+            <Form.Item name="fecha" label="Fecha" rules={[{ required: true }]}>
+              <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
+            </Form.Item>
 
             <Form.Item name="metodo" label="Metodo" rules={[{ required: true }]}>
               <Radio.Group buttonStyle="solid" className="w-full">
@@ -564,40 +545,6 @@ const BoxCloseForm = ({
                 </Radio.Button>
               </Radio.Group>
             </Form.Item>
-
-            <Row gutter={12}>
-              <Col span={12}>
-                <Form.Item name="id_vendedor" label="Vendedor">
-                  <Select
-                    allowClear
-                    showSearch
-                    placeholder="Selecciona un vendedor"
-                    options={sellers.map((seller: any) => ({
-                      value: seller._id,
-                      label: `${seller.nombre || ""} ${seller.apellido || ""}`.trim() || seller.vendedor || "Vendedor",
-                    }))}
-                    filterOption={(input, option: any) =>
-                      String(option?.label || "").toLowerCase().includes(input.toLowerCase())
-                    }
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="id_sucursal" label="Sucursal" rules={[{ required: true }]}>
-                  <Select
-                    showSearch
-                    placeholder="Selecciona una sucursal"
-                    options={sucursals.map((sucursal: any) => ({
-                      value: sucursal._id,
-                      label: sucursal.nombre,
-                    }))}
-                    filterOption={(input, option: any) =>
-                      String(option?.label || "").toLowerCase().includes(input.toLowerCase())
-                    }
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
 
             <Form.Item name="concepto" label="Concepto" rules={[{ required: true }]}>
               <Input />
