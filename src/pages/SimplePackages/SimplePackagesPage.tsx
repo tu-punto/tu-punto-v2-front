@@ -198,6 +198,36 @@ const SimplePackagesPage = () => {
   const getPackageSizeBySpaces = (spaces = 1, routeId = "") =>
     Math.max(1, Number(spaces || 1)) > getSmallSpaceLimit(routeId) ? "grande" : "estandar";
 
+  const getSameBranchRouteDraftConfig = (index: number, packageSize: string, routeId = "") => {
+    if (!routeId) return null;
+    const routeConfig = escalationConfigs.find(
+      (row: any) =>
+        row?.service_origin === "simple_package" &&
+        String(row?.route?._id || row?.route || "") === String(routeId)
+    );
+    if (!routeConfig) return null;
+
+    const ranges = Array.isArray(routeConfig?.ranges) && routeConfig.ranges.length
+      ? routeConfig.ranges
+      : escalationRanges;
+    const position = monthlyPackageCount + index + 1;
+    const range =
+      ranges.find(
+        (row: PackageEscalationRange) =>
+          position >= row.from && (row.to === null || row.to === undefined || position <= row.to)
+      ) ||
+      ranges[ranges.length - 1];
+    if (!range) return null;
+
+    const price = Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+    return {
+      ...sellerConfig,
+      precio_paquete: Number(range.small_price || 0),
+      precio_paquete_grande: Number(range.large_price || range.small_price || 0),
+      amortizacion: Math.min(Number(sellerConfig.amortizacion || 0), price),
+    };
+  };
+
   const getDeliveryRoutePrice = (
     originId: string,
     destinationId?: string,
@@ -250,8 +280,12 @@ const SimplePackagesPage = () => {
       const deliverySpaces = Math.max(1, Number(row.delivery_spaces || 1));
       const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
       const routePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, totalDeliverySpaces);
+      const config =
+        String(originId || "") === String(destinationId || "")
+          ? getSameBranchRouteDraftConfig(index, packageSize, routeId) || buildDraftConfig(index, { ...row, package_size: packageSize })
+          : buildDraftConfig(index, { ...row, package_size: packageSize });
 
-      return createDraftRow(index, buildDraftConfig(index, { ...row, package_size: packageSize }), {
+      return createDraftRow(index, config, {
         ...row,
         package_size: packageSize,
         delivery_spaces: deliverySpaces,

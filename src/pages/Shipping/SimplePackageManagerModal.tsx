@@ -205,6 +205,36 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     ),
   });
 
+  const getRouteSimplePackageConfig = (index: number, packageSize: string, routeId = "") => {
+    if (!routeId) return null;
+    const routeConfig = escalationConfigs.find(
+      (config: any) =>
+        config?.service_origin === "simple_package" &&
+        String(config?.route?._id || config?.route || "") === String(routeId)
+    );
+    if (!routeConfig) return null;
+
+    const ranges = Array.isArray(routeConfig?.ranges) && routeConfig.ranges.length
+      ? routeConfig.ranges
+      : createEscalationRanges;
+    const position = createMonthlyCount + index + 1;
+    const range =
+      ranges.find(
+        (row: PackageEscalationRange) =>
+          position >= row.from && (row.to === null || row.to === undefined || position <= row.to)
+      ) ||
+      ranges[ranges.length - 1];
+    if (!range) return null;
+
+    const price = Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+    return {
+      ...createSellerConfig,
+      precio_paquete: Number(range.small_price || 0),
+      precio_paquete_grande: Number(range.large_price || range.small_price || 0),
+      amortizacion: Math.min(Number(createSellerConfig.amortizacion || 0), price),
+    };
+  };
+
   const rebuildCreateRows = (
     count: number,
     currentRows: SimplePackageDraftRow[] = createRows,
@@ -300,8 +330,6 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     );
 
   const getExistingPackagePriceConfig = (row: any, nextSize: string, routeId = "") => {
-    if (Number(sellerConfig.precio_paquete || 0) > 0) return sellerConfig;
-
     const routeConfig = escalationConfigs.find(
       (config: any) =>
         config?.service_origin === "simple_package" &&
@@ -415,8 +443,13 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         spaces,
         getTotalDeliverySpacesForRows(normalizedRows, createOriginId)
       );
+      const config =
+        String(createOriginId || "") === String(destinationId || "")
+          ? getRouteSimplePackageConfig(index, packageSize, routeId) ||
+            getCreateRowConfig(index, { ...row, package_size: packageSize })
+          : getCreateRowConfig(index, { ...row, package_size: packageSize });
 
-      return createDraftRow(index, getCreateRowConfig(index, { ...row, package_size: packageSize }), {
+      return createDraftRow(index, config, {
         ...row,
         destino_sucursal_id: destinationId,
         package_size: packageSize,
