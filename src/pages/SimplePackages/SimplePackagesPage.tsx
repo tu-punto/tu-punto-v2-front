@@ -3,11 +3,14 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { getSellerAPI } from "../../api/seller";
 import {
   getSimplePackageBranchPricesAPI,
+  getPackageEscalationConfigAPI,
   getSimplePackageEscalationStatusAPI,
   getSimplePackagesListAPI,
   registerSimplePackagesAPI,
   updateSimplePackageAPI,
   deleteSimplePackageAPI,
+  PackageDeliverySpace,
+  PackageEscalationRange,
 } from "../../api/simplePackage";
 import { UserContext } from "../../context/userContext";
 import {
@@ -17,6 +20,15 @@ import {
 } from "./simplePackageHelpers";
 
 const MIN_PACKAGES = 1;
+const DEFAULT_DELIVERY_RANGES: PackageEscalationRange[] = [
+  { from: 1, to: 5, small_price: 5, large_price: 5 },
+  { from: 6, to: 15, small_price: 4, large_price: 4 },
+  { from: 16, to: null, small_price: 3, large_price: 3 },
+];
+const DEFAULT_DELIVERY_SPACES: PackageDeliverySpace[] = [
+  { size: "estandar", spaces: 1 },
+  { size: "grande", spaces: 2 },
+];
 
 const tableCellStyle: React.CSSProperties = {
   border: "1px solid #d9d9d9",
@@ -44,6 +56,7 @@ const SimplePackagesPage = () => {
   const [missingForNextRange, setMissingForNextRange] = useState(0);
   const [useEscalation, setUseEscalation] = useState(false);
   const [escalationRanges, setEscalationRanges] = useState<any[]>([]);
+  const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
   const [pendingModalVisible, setPendingModalVisible] = useState(false);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingSavingId, setPendingSavingId] = useState("");
@@ -156,6 +169,97 @@ const SimplePackagesPage = () => {
     return String(routeIdMap.get(`${originId}::${destinationId}`) || "");
   };
 
+  const getSmallSpaceLimit = (routeId = "") => {
+    const globalConfig = escalationConfigs.find(
+      (row: any) => !String(row?.route?._id || row?.route || "") && row?.service_origin === "delivery"
+    );
+    const config = escalationConfigs.find(
+      (row: any) =>
+        String(row?.route?._id || row?.route || "") === String(routeId) &&
+        row?.service_origin === "delivery"
+    );
+    const spacesRows =
+      Array.isArray(globalConfig?.delivery_spaces) && globalConfig.delivery_spaces.length
+        ? globalConfig.delivery_spaces
+        : Array.isArray(config?.delivery_spaces) && config.delivery_spaces.length
+          ? config.delivery_spaces
+          : DEFAULT_DELIVERY_SPACES;
+
+    return Math.max(
+      1,
+      Number(
+        spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === "small_limit")?.spaces ??
+          spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === "estandar")?.spaces ??
+          1
+      )
+    );
+  };
+
+  const getPackageSizeBySpaces = (spaces = 1, routeId = "") =>
+    Math.max(1, Number(spaces || 1)) > getSmallSpaceLimit(routeId) ? "grande" : "estandar";
+
+  const getDeliveryRoutePrice = (
+    originId: string,
+    destinationId?: string,
+    spaces = 1,
+    escalationSpaces = spaces
+  ) => {
+    if (!originId || !destinationId || String(originId) === String(destinationId)) return 0;
+    const routeId = getRouteId(originId, destinationId);
+    const config =
+      escalationConfigs.find(
+        (row: any) =>
+          row?.service_origin === "delivery" &&
+          String(row?.route?._id || row?.route || "") === String(routeId)
+      ) ||
+      escalationConfigs.find((row: any) => row?.service_origin === "delivery" && !row?.route);
+
+    if (!config) {
+      return Number((getBranchRoutePrice(originId, destinationId) * Math.max(1, Number(spaces || 1))).toFixed(2));
+    }
+
+    const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
+    const safePosition = Math.max(1, Number(escalationSpaces || spaces || 1));
+    const range =
+      ranges.find(
+        (row: PackageEscalationRange) =>
+          safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)
+      ) ||
+      ranges[ranges.length - 1] ||
+      DEFAULT_DELIVERY_RANGES[0];
+    const unitPrice = Number(range?.small_price ?? getBranchRoutePrice(originId, destinationId) ?? 0);
+    return Number((unitPrice * Math.max(1, Number(spaces || 1))).toFixed(2));
+  };
+
+  const getTotalDeliverySpacesForRows = (sourceRows: SimplePackageDraftRow[], originId: string) =>
+    (sourceRows || []).reduce((sum, row) => {
+      const destinationId = String(row?.destino_sucursal_id || "");
+      if (!originId || !destinationId || String(originId) === String(destinationId)) return sum;
+      return sum + Math.max(1, Number(row?.delivery_spaces || 1));
+    }, 0);
+
+  const recalculateRowsByDeliveryPricing = (
+    sourceRows: SimplePackageDraftRow[],
+    originId = selectedOriginId
+  ) => {
+    const totalDeliverySpaces = getTotalDeliverySpacesForRows(sourceRows, originId);
+
+    return sourceRows.map((row, index) => {
+      const destinationId = String(row.destino_sucursal_id || "");
+      const routeId = getRouteId(originId, destinationId);
+      const deliverySpaces = Math.max(1, Number(row.delivery_spaces || 1));
+      const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
+      const routePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, totalDeliverySpaces);
+
+      return createDraftRow(index, buildDraftConfig(index, { ...row, package_size: packageSize }), {
+        ...row,
+        package_size: packageSize,
+        delivery_spaces: deliverySpaces,
+        precio_entre_sucursal: routePrice,
+      });
+    });
+  };
+
   const getBranchId = (value: any) => String(value?._id || value?.id_sucursal || value || "");
   const simpleBranchOptions = useMemo(
     () =>
@@ -204,6 +308,7 @@ const SimplePackagesPage = () => {
         descripcion_paquete: String(row.descripcion_paquete || "").trim(),
         origen_sucursal_id: getBranchId(row.origen_sucursal || row.sucursal),
         destino_sucursal_id: getBranchId(row.destino_sucursal),
+        delivery_spaces: Math.max(1, Number(row.delivery_spaces || 1)),
         amortizacion_vendedor: Number(row.amortizacion_vendedor || 0),
         saldo_por_paquete: Number(row.saldo_por_paquete || 0),
       });
@@ -257,9 +362,10 @@ const SimplePackagesPage = () => {
       }
 
       try {
-        const [seller, branchPricesResponse] = await Promise.all([
+        const [seller, branchPricesResponse, escalationResponse] = await Promise.all([
           getSellerAPI(user.id_vendedor),
           getSimplePackageBranchPricesAPI(),
+          getPackageEscalationConfigAPI(),
         ]);
 
         const nextConfig = {
@@ -288,9 +394,10 @@ const SimplePackagesPage = () => {
         setSellerConfig(nextConfig);
         setSellerBranches(nextBranches);
         setBranchPrices(Array.isArray(branchPricesResponse?.rows) ? branchPricesResponse.rows : []);
+        setEscalationConfigs(Array.isArray(escalationResponse?.data) ? escalationResponse.data : []);
         setSelectedOriginId(String(defaultOriginId || ""));
         setSelectedDestinationId(String(defaultOriginId || ""));
-        setRows(resizeDraftRows(MIN_PACKAGES, [], nextConfig));
+        setRows(recalculateRowsByDeliveryPricing(resizeDraftRows(MIN_PACKAGES, [], nextConfig), String(defaultOriginId || "")));
       } catch (error) {
         console.error(error);
         message.error("No se pudo cargar la configuracion del servicio");
@@ -314,21 +421,23 @@ const SimplePackagesPage = () => {
         : String(selectedOriginId || "")
     );
     setRows((prev) =>
-      prev.map((row, index) => {
-        const nextDestinationId =
-          row.destino_sucursal_id &&
-          destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
-            ? row.destino_sucursal_id
-            : "";
+      recalculateRowsByDeliveryPricing(
+        prev.map((row, index) => {
+          const nextDestinationId =
+            row.destino_sucursal_id &&
+            destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
+              ? row.destino_sucursal_id
+              : "";
 
-        return createDraftRow(index, buildDraftConfig(index, row), {
-          ...row,
-          destino_sucursal_id: nextDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, nextDestinationId),
-        });
-      })
+          return createDraftRow(index, buildDraftConfig(index, row), {
+            ...row,
+            destino_sucursal_id: nextDestinationId,
+          });
+        }),
+        selectedOriginId
+      )
     );
-  }, [destinationOptions, selectedOriginId, sellerConfig, routePriceMap]);
+  }, [destinationOptions, selectedOriginId, sellerConfig, routePriceMap, escalationConfigs]);
 
   useEffect(() => {
     if (!user?.id_vendedor) return;
@@ -347,8 +456,10 @@ const SimplePackagesPage = () => {
           setEscalationRanges(nextRanges);
           if (useEscalation) {
             setRows((current) =>
-              current.map((row, index) =>
-                createDraftRow(index, buildDraftConfig(index, row, nextRanges, nextMonthCount, true), row)
+              recalculateRowsByDeliveryPricing(
+                current.map((row, index) =>
+                  createDraftRow(index, buildDraftConfig(index, row, nextRanges, nextMonthCount, true), row)
+                )
               )
             );
           }
@@ -363,23 +474,22 @@ const SimplePackagesPage = () => {
 
   const updateRow = (index: number, patch: Partial<SimplePackageDraftRow>) => {
     setRows((prev) =>
-      prev.map((row, rowIndex) => {
+      recalculateRowsByDeliveryPricing(prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const nextDestinationId = String(patch.destino_sucursal_id ?? (row.destino_sucursal_id || ""));
         return createDraftRow(index, buildDraftConfig(index, row), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, nextDestinationId),
         });
-      })
+      }))
     );
   };
 
   const handlePackageCountChange = (value: number | null) => {
     const nextCount = Math.max(MIN_PACKAGES, Number(value || MIN_PACKAGES));
     setPackageCount(nextCount);
-    setRows((prev) => rebuildRows(nextCount, prev));
+    setRows((prev) => recalculateRowsByDeliveryPricing(rebuildRows(nextCount, prev)));
   };
 
   const handleApplyDescription = () => {
@@ -407,12 +517,13 @@ const SimplePackagesPage = () => {
     }
 
     setRows((prev) =>
-      prev.map((row, index) =>
-        createDraftRow(index, buildDraftConfig(index, row), {
-          ...row,
-          destino_sucursal_id: selectedDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, selectedDestinationId),
-        })
+      recalculateRowsByDeliveryPricing(
+        prev.map((row, index) =>
+          createDraftRow(index, buildDraftConfig(index, row), {
+            ...row,
+            destino_sucursal_id: selectedDestinationId,
+          })
+        )
       )
     );
     message.success("Sucursal destino aplicada a todos los paquetes");
@@ -430,6 +541,7 @@ const SimplePackagesPage = () => {
       descripcion_paquete: String(row.descripcion_paquete || "").trim(),
       destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
       package_size: row.package_size,
+      delivery_spaces: Math.max(1, Number(row.delivery_spaces || 1)),
       amortizacion_vendedor: Number(row.amortizacion_vendedor || 0),
       saldo_por_paquete: Number(row.saldo_por_paquete || 0),
     }));
@@ -638,6 +750,21 @@ const SimplePackagesPage = () => {
               ),
             },
             {
+              title: "Espacios delivery",
+              dataIndex: "delivery_spaces",
+              width: 150,
+              render: (_: any, row: any) => (
+                <InputNumber
+                  min={1}
+                  style={{ width: "100%" }}
+                  value={Number(row.delivery_spaces || 1)}
+                  onChange={(value) =>
+                    patchPendingRow(String(row._id), { delivery_spaces: Math.max(1, Number(value || 1)) })
+                  }
+                />
+              ),
+            },
+            {
               title: "Cubre vendedor",
               dataIndex: "amortizacion_vendedor",
               width: 150,
@@ -764,6 +891,8 @@ const SimplePackagesPage = () => {
                     <th style={tableCellStyle}>Descripcion del paquete</th>
                     <th style={tableCellStyle}>Celular</th>
                     <th style={tableCellStyle}>Sucursal destino</th>
+                    <th style={tableCellStyle}>Espacios delivery</th>
+                    <th style={tableCellStyle}>TamaÃ±o</th>
                     <th style={tableCellStyle}>Monto que cubriras del servicio</th>
                     <th style={tableCellStyle}>Saldo del paquete</th>
                     <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
@@ -815,6 +944,17 @@ const SimplePackagesPage = () => {
                             updateRow(index, { destino_sucursal_id: String(value || "") })
                           }
                         />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <InputNumber
+                          min={1}
+                          style={{ width: "100%" }}
+                          value={Number(row.delivery_spaces || 1)}
+                          onChange={(value) => updateRow(index, { delivery_spaces: Math.max(1, Number(value || 1)) })}
+                        />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <Input value={row.package_size === "grande" ? "Grande" : "Estandar"} readOnly />
                       </td>
                       <td style={tableCellStyle}>
                         <InputNumber
@@ -911,6 +1051,24 @@ const SimplePackagesPage = () => {
                         placeholder="Destino"
                         disabled={!selectedOriginId}
                         onChange={(value) => updateRow(index, { destino_sucursal_id: String(value || "") })}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text strong>Espacios delivery</Typography.Text>
+                      <InputNumber
+                        className="mt-1"
+                        min={1}
+                        style={{ width: "100%" }}
+                        value={Number(row.delivery_spaces || 1)}
+                        onChange={(value) => updateRow(index, { delivery_spaces: Math.max(1, Number(value || 1)) })}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text strong>TamaÃ±o</Typography.Text>
+                      <Input
+                        className="mt-1"
+                        value={row.package_size === "grande" ? "Grande" : "Estandar"}
+                        readOnly
                       />
                     </div>
                     <div className="grid grid-cols-1 gap-3">
