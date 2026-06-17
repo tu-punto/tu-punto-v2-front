@@ -79,10 +79,11 @@ const SimplePackagesPage = () => {
     row?: Partial<SimplePackageDraftRow>,
     ranges = escalationRanges,
     monthCount = monthlyPackageCount,
-    shouldUseEscalation = useEscalation
+    shouldUseEscalation = useEscalation,
+    visibleCount = packageCount
   ) => {
     if (!shouldUseEscalation) return sellerConfig;
-    const position = monthCount + index + 1;
+    const position = monthCount + Math.max(1, Number(visibleCount || 1));
     const range =
       ranges.find(
         (item: any) => position >= Number(item?.from || 1) && (item?.to == null || position <= Number(item.to))
@@ -100,7 +101,7 @@ const SimplePackagesPage = () => {
   const rebuildRows = (count: number, currentRows: SimplePackageDraftRow[] = rows) =>
     Array.from({ length: count }, (_, index) => {
       const row = currentRows[index];
-      return createDraftRow(index, buildDraftConfig(index, row), row);
+      return createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, count), row);
     });
 
   const routePriceMap = useMemo(() => {
@@ -198,7 +199,7 @@ const SimplePackagesPage = () => {
   const getPackageSizeBySpaces = (spaces = 1, routeId = "") =>
     Math.max(1, Number(spaces || 1)) > getSmallSpaceLimit(routeId) ? "grande" : "estandar";
 
-  const getSameBranchRouteDraftConfig = (index: number, packageSize: string, routeId = "") => {
+  const getSameBranchRouteDraftConfig = (index: number, packageSize: string, routeId = "", visibleCount = packageCount) => {
     if (!routeId) return null;
     const routeConfig = escalationConfigs.find(
       (row: any) =>
@@ -210,7 +211,7 @@ const SimplePackagesPage = () => {
     const ranges = Array.isArray(routeConfig?.ranges) && routeConfig.ranges.length
       ? routeConfig.ranges
       : escalationRanges;
-    const position = monthlyPackageCount + index + 1;
+    const position = monthlyPackageCount + Math.max(1, Number(visibleCount || 1));
     const range =
       ranges.find(
         (row: PackageEscalationRange) =>
@@ -273,6 +274,7 @@ const SimplePackagesPage = () => {
     originId = selectedOriginId
   ) => {
     const totalDeliverySpaces = getTotalDeliverySpacesForRows(sourceRows, originId);
+    const visibleCount = Math.max(1, sourceRows.length || packageCount);
 
     return sourceRows.map((row, index) => {
       const destinationId = String(row.destino_sucursal_id || "");
@@ -282,8 +284,9 @@ const SimplePackagesPage = () => {
       const routePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, totalDeliverySpaces);
       const config =
         String(originId || "") === String(destinationId || "")
-          ? getSameBranchRouteDraftConfig(index, packageSize, routeId) || buildDraftConfig(index, { ...row, package_size: packageSize })
-          : buildDraftConfig(index, { ...row, package_size: packageSize });
+          ? getSameBranchRouteDraftConfig(index, packageSize, routeId, visibleCount) ||
+            buildDraftConfig(index, { ...row, package_size: packageSize }, escalationRanges, monthlyPackageCount, useEscalation, visibleCount)
+          : buildDraftConfig(index, { ...row, package_size: packageSize }, escalationRanges, monthlyPackageCount, useEscalation, visibleCount);
 
       return createDraftRow(index, config, {
         ...row,
@@ -463,7 +466,7 @@ const SimplePackagesPage = () => {
               ? row.destino_sucursal_id
               : "";
 
-          return createDraftRow(index, buildDraftConfig(index, row), {
+          return createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, prev.length), {
             ...row,
             destino_sucursal_id: nextDestinationId,
           });
@@ -492,7 +495,7 @@ const SimplePackagesPage = () => {
             setRows((current) =>
               recalculateRowsByDeliveryPricing(
                 current.map((row, index) =>
-                  createDraftRow(index, buildDraftConfig(index, row, nextRanges, nextMonthCount, true), row)
+                  createDraftRow(index, buildDraftConfig(index, row, nextRanges, nextMonthCount, true, current.length), row)
                 )
               )
             );
@@ -511,7 +514,7 @@ const SimplePackagesPage = () => {
       recalculateRowsByDeliveryPricing(prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const nextDestinationId = String(patch.destino_sucursal_id ?? (row.destino_sucursal_id || ""));
-        return createDraftRow(index, buildDraftConfig(index, row), {
+        return createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, prev.length), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
@@ -535,7 +538,7 @@ const SimplePackagesPage = () => {
 
     setRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, buildDraftConfig(index, row), {
+        createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, prev.length), {
           ...row,
           descripcion_paquete: description,
         })
@@ -553,7 +556,7 @@ const SimplePackagesPage = () => {
     setRows((prev) =>
       recalculateRowsByDeliveryPricing(
         prev.map((row, index) =>
-          createDraftRow(index, buildDraftConfig(index, row), {
+          createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, prev.length), {
             ...row,
             destino_sucursal_id: selectedDestinationId,
           })

@@ -195,17 +195,29 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     return Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
   };
 
-  const getCreateRowConfig = (index: number, row?: Partial<SimplePackageDraftRow>) => ({
-    ...createSellerConfig,
-    precio_paquete: getSimpleEscalatedPrice(createMonthlyCount + index + 1, "estandar"),
-    precio_paquete_grande: getSimpleEscalatedPrice(createMonthlyCount + index + 1, "grande"),
-    amortizacion: Math.min(
-      Number(createSellerConfig.amortizacion || 0),
-      getSimpleEscalatedPrice(createMonthlyCount + index + 1, row?.package_size || "estandar")
-    ),
-  });
+  const getCreateRowConfig = (
+    index: number,
+    row?: Partial<SimplePackageDraftRow>,
+    visibleCount = createPackageCount
+  ) => {
+    const position = createMonthlyCount + Math.max(1, Number(visibleCount || 1));
+    return {
+      ...createSellerConfig,
+      precio_paquete: getSimpleEscalatedPrice(position, "estandar"),
+      precio_paquete_grande: getSimpleEscalatedPrice(position, "grande"),
+      amortizacion: Math.min(
+        Number(createSellerConfig.amortizacion || 0),
+        getSimpleEscalatedPrice(position, row?.package_size || "estandar")
+      ),
+    };
+  };
 
-  const getRouteSimplePackageConfig = (index: number, packageSize: string, routeId = "") => {
+  const getRouteSimplePackageConfig = (
+    index: number,
+    packageSize: string,
+    routeId = "",
+    visibleCount = createPackageCount
+  ) => {
     if (!routeId) return null;
     const routeConfig = escalationConfigs.find(
       (config: any) =>
@@ -217,7 +229,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     const ranges = Array.isArray(routeConfig?.ranges) && routeConfig.ranges.length
       ? routeConfig.ranges
       : createEscalationRanges;
-    const position = createMonthlyCount + index + 1;
+    const position = createMonthlyCount + Math.max(1, Number(visibleCount || 1));
     const range =
       ranges.find(
         (row: PackageEscalationRange) =>
@@ -241,12 +253,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     patch?: (row: SimplePackageDraftRow, index: number) => Partial<SimplePackageDraftRow>
   ) =>
     Array.from({ length: count }, (_, index) => {
-      const row = currentRows[index] || createDraftRow(index, getCreateRowConfig(index));
+      const row = currentRows[index] || createDraftRow(index, getCreateRowConfig(index, undefined, count));
       const nextRow = {
         ...row,
         ...(patch ? patch(row, index) : {}),
       };
-      return createDraftRow(index, getCreateRowConfig(index, nextRow), nextRow);
+      return createDraftRow(index, getCreateRowConfig(index, nextRow, count), nextRow);
     });
 
   const generalPaymentMethod = useMemo(() => {
@@ -431,6 +443,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       ...row,
       destino_sucursal_id: row.destino_sucursal_id || createDestinationId || "",
     }));
+    const visibleCount = Math.max(1, normalizedRows.length || createPackageCount);
 
     return normalizedRows.map((row, index) => {
       const destinationId = String(row.destino_sucursal_id || createDestinationId || "");
@@ -445,9 +458,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       );
       const config =
         String(createOriginId || "") === String(destinationId || "")
-          ? getRouteSimplePackageConfig(index, packageSize, routeId) ||
-            getCreateRowConfig(index, { ...row, package_size: packageSize })
-          : getCreateRowConfig(index, { ...row, package_size: packageSize });
+          ? getRouteSimplePackageConfig(index, packageSize, routeId, visibleCount) ||
+            getCreateRowConfig(index, { ...row, package_size: packageSize }, visibleCount)
+          : getCreateRowConfig(index, { ...row, package_size: packageSize }, visibleCount);
 
       return createDraftRow(index, config, {
         ...row,
@@ -691,7 +704,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       setCreateRows((prev) =>
         Array.from({ length: createPackageCount }, (_, index) => {
           const previousRow = prev[index];
-          const position = nextMonthlyCount + index + 1;
+          const position = nextMonthlyCount + Math.max(1, Number(createPackageCount || 1));
           const smallPrice = shouldUseEscalation
             ? getSimpleEscalatedPriceFromRanges(nextRanges, position, "estandar")
             : fixedPackagePrice;
@@ -993,7 +1006,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                 )
               );
 
-        return createDraftRow(index, getCreateRowConfig(index, { ...row, ...patch, package_size: nextSize }), {
+        return createDraftRow(index, getCreateRowConfig(index, { ...row, ...patch, package_size: nextSize }, prev.length), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
@@ -1020,7 +1033,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
     setCreateRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, getCreateRowConfig(index, row), {
+        createDraftRow(index, getCreateRowConfig(index, row, prev.length), {
           ...row,
           descripcion_paquete: description,
         })
