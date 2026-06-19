@@ -152,12 +152,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     currentSucursal?.nombre || localStorage.getItem("sucursalNombre") || "Sucursal actual"
   ).trim();
 
-  const getEscalatedPackagePrice = (count = packageCount, packageSize = "estandar", routeId = "") => {
+  const getEscalatedPackagePrice = (position = packageCount, packageSize = "estandar", routeId = "") => {
     const config = escalationConfigs.find(
       (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "external"
     );
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : escalationRanges;
-    const safeCount = Math.max(MIN_PACKAGES, Number(count || MIN_PACKAGES));
+    const safeCount = Math.max(MIN_PACKAGES, Number(position || MIN_PACKAGES));
     const range =
       ranges.find((row: PackageEscalationRange) => safeCount >= row.from && (row.to === null || row.to === undefined || safeCount <= row.to)) ||
       ranges[ranges.length - 1] ||
@@ -258,13 +258,13 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
     const totalDeliverySpaces = getTotalDeliverySpacesForRows(normalizedRows, originId);
 
-    return normalizedRows.map((row) => {
+    return normalizedRows.map((row, index) => {
       const destinationId = row.destino_sucursal_id || generalDestinationId;
       const routeId = getRouteId(originId, destinationId);
       const deliverySpaces = getEffectiveDeliverySpaces(originId, destinationId, row.delivery_spaces);
       const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
       const branchRoutePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, totalDeliverySpaces);
-      const packagePrice = getEscalatedPackagePrice(count, packageSize, routeId);
+      const packagePrice = getEscalatedPackagePrice(index + 1, packageSize, routeId);
 
       return applyPaymentAmounts(
         {
@@ -738,7 +738,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       const routeId = getRouteId(originBranchId, row.destino_sucursal_id);
       const deliverySpaces = getEffectiveDeliverySpaces(originBranchId, row.destino_sucursal_id, row.delivery_spaces);
       const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
-      const price = getEscalatedPackagePrice(packageCount, packageSize, routeId);
+      const price = getEscalatedPackagePrice(index + 1, packageSize, routeId);
       const branchRoutePrice = roundCurrency(
         getDeliveryRoutePrice(originBranchId, row.destino_sucursal_id, deliverySpaces, totalDeliverySpaces)
       );
