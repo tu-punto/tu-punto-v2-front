@@ -28,10 +28,12 @@ import {
   downloadComisiones3MesesXlsx,
   downloadInventarioActualXlsx,
   downloadIngresos3MesesXlsx,
+  downloadIngresosMensualesSucursalServicioXlsx,
   getClientesActivosMesesAPI,
   getComisionesMesesAPI,
   getInventarioActualAPI,
   getIngresosMesesAPI,
+  getIngresosMensualesSucursalServicioAPI,
   downloadOperacionMensualXlsx,
   downloadReporteEntregasSimplesExternasXlsx,
   downloadStockProductosXlsx,
@@ -44,6 +46,7 @@ import {
   type TicketPromedioMode,
   getVentasVendedoresMesesAPI,
   getVentasQrAPI,
+  getRiesgoClientesVentasAPI,
 } from "../api/reports";
 import { getAllSucursalsAPI } from "../api/sucursal";
 import { getSellersBasicAPI } from "../api/seller";
@@ -67,8 +70,10 @@ type ReportId =
   | "inventarioActual"
   | "comisiones3m"
   | "ingresos3m"
+  | "ingresosSucursalServicio"
   | "clientesActivos3m"
   | "ventasVendedores4m"
+  | "riesgoClientesVentas"
   | "entregasNuevoServicio"
   | "reporteEntregasSimplesExternas"
   | "ventasQr"
@@ -86,8 +91,10 @@ type ReportDefinition = {
     | "ventasQr"
     | "comisiones"
     | "ingresos"
+    | "ingresosSucursalServicio"
     | "clientesActivosServicio"
-    | "ventasVendedores"
+  | "ventasVendedores"
+    | "riesgoClientesVentas"
     | "inventario"
     | "entregasNuevoServicio"
     | "reporteEntregasSimplesExternas"
@@ -257,6 +264,15 @@ const REPORTS: ReportDefinition[] = [
     requires: { meses: true, incluirDeuda: true },
   },
   {
+    id: "ingresosSucursalServicio",
+    title: "Ingresos mensuales por sucursal y servicio",
+    description: "Ingresos registrados en Gastos e Ingresos, agrupados por sucursal y servicio/categoria.",
+    category: "Reportes adicionales",
+    previewMode: "ingresosSucursalServicio",
+    requires: { meses: true, sucursales: true },
+    isNew: true,
+  },
+  {
     id: "clientesActivos3m",
     title: "Clientes activos por meses",
     description: "Clientes de servicio activos con vista previa y XLSX.",
@@ -273,13 +289,20 @@ const REPORTS: ReportDefinition[] = [
     requires: { meses: true },
   },
   {
+    id: "riesgoClientesVentas",
+    title: "Alertas de clientes por ventas",
+    description: "Compara el mes actual contra mes anterior y promedios de 3 y 6 meses.",
+    category: "Reportes adicionales",
+    previewMode: "riesgoClientesVentas",
+    requires: { meses: true },
+  },
+  {
     id: "reporteEntregasSimplesExternas",
     title: "Reporte de entregas simples y externas",
     description: "Vista previa y XLSX con resumen total, por sucursal, detalle de simples y externas.",
     category: "Reportes adicionales",
     previewMode: "reporteEntregasSimplesExternas",
     requires: { meses: true, sucursales: true },
-    isNew: true,
   },
   {
     id: "ventasQr",
@@ -583,6 +606,13 @@ export default function ReportsLauncher() {
         return;
       }
 
+      if (selectedReport.previewMode === "ingresosSucursalServicio") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getIngresosMensualesSucursalServicioAPI({ meses, sucursales: vals.sucursales });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
       if (selectedReport.previewMode === "clientesActivosServicio") {
         const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
         const data = await getClientesActivosMesesAPI({ meses });
@@ -593,6 +623,13 @@ export default function ReportsLauncher() {
       if (selectedReport.previewMode === "ventasVendedores") {
         const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
         const data = await getVentasVendedoresMesesAPI({ meses });
+        setPreview({ mode: "additional", reportId: selectedReport.id, data });
+        return;
+      }
+
+      if (selectedReport.previewMode === "riesgoClientesVentas") {
+        const meses = (vals.meses || []).map((m) => m.format("YYYY-MM"));
+        const data = await getRiesgoClientesVentasAPI({ meses });
         setPreview({ mode: "additional", reportId: selectedReport.id, data });
         return;
       }
@@ -677,11 +714,17 @@ export default function ReportsLauncher() {
         case "ingresos3m":
           await downloadIngresos3MesesXlsx({ meses, mesFin, incluirDeuda: !!vals.incluirDeuda });
           break;
+        case "ingresosSucursalServicio":
+          await downloadIngresosMensualesSucursalServicioXlsx({ meses, sucursales: vals.sucursales });
+          break;
         case "clientesActivos3m":
           await downloadClientesActivos3MesesXlsx({ meses, mesFin });
           break;
         case "ventasVendedores4m":
           await downloadVentasVendedores4mXlsx({ meses, mesFin });
+          break;
+        case "riesgoClientesVentas":
+          message.info("Este reporte solo tiene vista previa por ahora.");
           break;
         case "entregasNuevoServicio":
           await downloadEntregasNuevoServicioXlsx({ meses, sellerId: vals.sellerId });
@@ -848,6 +891,22 @@ export default function ReportsLauncher() {
       };
     }
 
+    if (preview.reportId === "ingresosSucursalServicio") {
+      return {
+        cards: [
+          {
+            title: "Ingresos mensuales",
+            value: formatBs(data?.totalGeneral?.monto_bs),
+            subtitle: `Sucursales: ${data?.totalGeneral?.sucursales ?? 0}`,
+          },
+        ],
+        tables: [
+          { title: "Resumen por sucursal", rows: data.resumenPorSucursal || [] },
+          { title: "Detalle por servicio", rows: data.rows || [] },
+        ],
+      };
+    }
+
     if (preview.reportId === "clientesActivos3m") {
       return {
         cards: [
@@ -900,6 +959,24 @@ export default function ReportsLauncher() {
           { title: "Resumen por vendedor", rows: data.resumen || [] },
           { title: "Detalle", rows: data.detalle || [] },
         ],
+      };
+    }
+
+    if (preview.reportId === "riesgoClientesVentas") {
+      return {
+        cards: [
+          {
+            title: "Clientes evaluados",
+            value: `${data?.resumen?.clientes ?? 0}`,
+            subtitle: `Mes actual: ${data?.mes || ""}`,
+          },
+          {
+            title: "Alertas",
+            value: `${data?.resumen?.alertas ?? 0}`,
+            subtitle: `Analisis: ${(data?.mesesAnalisis || []).join(", ")}`,
+          },
+        ],
+        tables: [{ title: "Comparacion historica", rows: data.rows || [] }],
       };
     }
 

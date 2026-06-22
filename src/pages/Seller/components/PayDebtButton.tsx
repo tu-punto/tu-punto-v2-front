@@ -21,6 +21,20 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       return;
     }
 
+    const receiptWindow = window.open("", "_blank");
+    if (receiptWindow) {
+      receiptWindow.document.write(`
+        <html>
+          <head><title>Generando comprobante</title></head>
+          <body style="font-family: Arial, sans-serif; padding: 24px;">
+            <h3>Generando comprobante de pago...</h3>
+            <p>Espera un momento, el PDF se abrira automaticamente.</p>
+          </body>
+        </html>
+      `);
+      receiptWindow.document.close();
+    }
+
     setLoading(true);
     try {
       const res = await paySellerDebtAPI(seller._id, { payAll: true });
@@ -28,12 +42,37 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
 
       const pdfBlob = new Blob([res.data], { type: "application/pdf" });
       const pdfUrl = window.URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, "_blank");
+      if (receiptWindow) {
+        receiptWindow.location.href = pdfUrl;
+      } else {
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.download = `comprobante_pago_${seller?._id || Date.now()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        message.warning("El navegador bloqueo la ventana. Se intento abrir el comprobante por descarga.");
+      }
 
       message.success("Pago realizado con éxito y PDF generado");
       onSuccess();
     } catch (err) {
       console.error(err);
+      if (receiptWindow) {
+        receiptWindow.document.open();
+        receiptWindow.document.write(`
+          <html>
+            <head><title>Error de comprobante</title></head>
+            <body style="font-family: Arial, sans-serif; padding: 24px;">
+              <h3>No se pudo generar el comprobante</h3>
+              <p>Revisa el pago e intenta nuevamente.</p>
+            </body>
+          </html>
+        `);
+        receiptWindow.document.close();
+      }
       message.error("Error al realizar el pago");
     } finally {
       setLoading(false);

@@ -62,7 +62,7 @@ export const getSellerAccountingSimplePackagesAPI = async (params?: { sellerId?:
 export const upsertSimplePackageBranchPriceAPI = async (payload: {
   originBranchId: string;
   destinationBranchId: string;
-  precio: number;
+  precio?: number;
 }) => {
   try {
     const res = await apiClient.post("/simple-packages/branch-prices", payload);
@@ -81,7 +81,11 @@ export const updateSimplePackageAPI = async (id: string, payload: any) => {
   }
 };
 
-export const createSimplePackageOrdersAPI = async (payload: { packageIds: string[]; paymentMethod?: "efectivo" | "qr" | "" }) => {
+export const createSimplePackageOrdersAPI = async (payload: {
+  packageIds: string[];
+  paymentMethod?: "efectivo" | "qr" | "";
+  skipGuideNotification?: boolean;
+}) => {
   try {
     const res = await apiClient.post("/simple-packages/create-orders", payload);
     return { success: true, ...res.data };
@@ -94,6 +98,50 @@ export const printSimplePackageGuidesAPI = async (payload: { packageIds: string[
   try {
     const res = await apiClient.post("/simple-packages/print-guides", payload);
     return { success: true, ...res.data };
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
+export type PackageEscalationRange = {
+  from: number;
+  to?: number | null;
+  small_price: number;
+  large_price: number;
+};
+
+export type PackageDeliverySpace = {
+  size: string;
+  spaces: number;
+};
+
+export const getPackageEscalationConfigAPI = async (params?: { routeId?: string }) => {
+  try {
+    const res = await apiClient.get("/simple-packages/escalation-config", { params });
+    return res.data;
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
+export const upsertPackageEscalationConfigAPI = async (payload: {
+  routeId?: string;
+  serviceOrigin: "external" | "simple_package" | "delivery";
+  ranges: PackageEscalationRange[];
+  deliverySpaces?: PackageDeliverySpace[];
+}) => {
+  try {
+    const res = await apiClient.post("/simple-packages/escalation-config", payload);
+    return { success: true, ...res.data };
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
+export const getSimplePackageEscalationStatusAPI = async (params: { routeId?: string; sellerId?: string }) => {
+  try {
+    const res = await apiClient.get("/simple-packages/escalation-status", { params });
+    return res.data;
   } catch (error) {
     return parseAxiosError(error);
   }

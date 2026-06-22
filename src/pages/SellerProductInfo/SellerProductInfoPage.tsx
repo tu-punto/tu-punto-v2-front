@@ -228,7 +228,7 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
       try {
         const sellerResponse = await getSellerAPI(String(targetSellerId));
         const sellerBranches = Array.isArray(sellerResponse?.pago_sucursales)
-          ? sellerResponse.pago_sucursales.map((branch: any) => ({
+          ? sellerResponse.pago_sucursales.filter((branch: any) => branch?.activo !== false).map((branch: any) => ({
               value: String(branch?.id_sucursal?._id || branch?.id_sucursal || ""),
               label: String(branch?.sucursalName || branch?.id_sucursal?.nombre || "Sucursal"),
             }))

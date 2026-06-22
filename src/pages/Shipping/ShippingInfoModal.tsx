@@ -27,6 +27,29 @@ import {
 } from "./shippingQrLabel";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 
+const TZ = "America/La_Paz";
+const calculateEstimatedBranchPickupDate = (value?: unknown) => {
+    const createdAt = value ? moment.tz(value as any, TZ) : moment.tz(TZ);
+    if (!createdAt.isValid()) return null;
+
+    const day = createdAt.isoWeekday();
+    const daysToAdd = day === 2 ? 2 : day === 3 ? 1 : day === 4 ? 5 : day === 5 ? 4 : day === 6 ? 3 : day === 7 ? 2 : 1;
+    return createdAt.add(daysToAdd, "days");
+};
+
+const resolveBranchPickupFeeStart = (order: any) => {
+    const scheduleBaseAt = order?.public_tracking_schedule_base_at || order?.fecha_pedido;
+    return calculateEstimatedBranchPickupDate(scheduleBaseAt) || scheduleBaseAt || order?.fecha_pedido;
+};
+
+const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()) => {
+    if (!startAt) return 0;
+    const start = moment.tz(startAt as any, TZ);
+    const pickedUp = moment.tz(pickedUpAt as any, TZ);
+    if (!start.isValid() || !pickedUp.isValid()) return 0;
+    return Math.max(0, pickedUp.startOf("day").diff(start.startOf("day"), "days") - 7);
+};
+
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
 
@@ -187,10 +210,28 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         () => Number((simplePackagePrice + simplePackageShippingPrice).toFixed(2)),
         [simplePackagePrice, simplePackageShippingPrice]
     );
-    const simplePackageBuyerDebt = useMemo(
-        () => Number(shipping?.deuda_comprador ?? 0),
-        [shipping]
-    );
+    const simplePackageLatePickupFee = useMemo(() => {
+        if (!isSimplePackageOrder) return 0;
+        if (shipping?.estado_pedido === "Entregado") {
+            return Number(shipping?.late_pickup_fee || 0);
+        }
+        if (shipping?.public_tracking_frozen === true) {
+            return Number(shipping?.late_pickup_fee || 0);
+        }
+        const destinationBranchId = deliveryOwnerBranchId || paymentBranchId;
+        const feeStartAt =
+            origenBranchId && destinationBranchId && String(origenBranchId) !== String(destinationBranchId)
+                ? shipping?.public_tracking_frozen === true
+                    ? null
+                    : resolveBranchPickupFeeStart(shipping)
+                : shipping?.fecha_pedido;
+        return calculateLatePickupFee(feeStartAt);
+    }, [isSimplePackageOrder, shipping, origenBranchId, deliveryOwnerBranchId, paymentBranchId]);
+    const simplePackageBuyerDebt = useMemo(() => {
+        const baseDebt = Number(shipping?.deuda_comprador ?? 0);
+        const lateFee = shipping?.estado_pedido === "Entregado" ? 0 : simplePackageLatePickupFee;
+        return Number((baseDebt + lateFee).toFixed(2));
+    }, [shipping, simplePackageLatePickupFee]);
     const deliveryPermissionBranchId = paymentBranchId || deliveryOwnerBranchId;
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryPermissionBranchId || String(deliveryPermissionBranchId) === String(currentSucursalId);
@@ -851,6 +892,17 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     <Input value={`Bs. ${simplePackageSaldo.toFixed(2)}`} readOnly />
                                 </Form.Item>
                             </Col>
+                            {simplePackageLatePickupFee > 0 && (
+                                <Col span={24}>
+                                    <Form.Item label="Multa por recojo tardio">
+                                        <Input
+                                            value={`Bs. ${simplePackageLatePickupFee.toFixed(2)}`}
+                                            readOnly
+                                            style={{ backgroundColor: '#fff7e6', fontWeight: 'bold' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            )}
                             <Col span={24}>
                                 <Form.Item label="Deuda del comprador">
                                     <Input value={`Bs. ${simplePackageBuyerDebt.toFixed(2)}`} readOnly />

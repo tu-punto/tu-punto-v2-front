@@ -23,13 +23,14 @@ import InventoryQRModal from "./InventoryQRModal.tsx";
 import StockQRInfoModal from "./StockQRInfoModal.tsx";
 import SellerWithdrawalRequestModal from "./SellerWithdrawalRequestModal.tsx";
 import StockWithdrawalRequestsPanel from "./StockWithdrawalRequestsPanel.tsx";
+import { normalizeRole } from "../../utils/role";
 import "./StockManagement.css";
 //test
 const SELLERS_PAGE_SIZE = 10;
 
 const StockManagement = () => {
     const { user }: any = useContext(UserContext);
-    const isSeller = user?.role === 'seller';
+    const isSeller = normalizeRole(user?.role) === 'seller';
     const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
     const [resetSignal, setResetSignal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -52,6 +53,7 @@ const StockManagement = () => {
     const [isInventoryQRModalVisible, setIsInventoryQRModalVisible] = useState(false);
     const [isStockQRInfoModalVisible, setIsStockQRInfoModalVisible] = useState(false);
     const [isWithdrawalRequestModalVisible, setIsWithdrawalRequestModalVisible] = useState(false);
+    const [withdrawalProducts, setWithdrawalProducts] = useState<any[]>([]);
     const [isWithdrawalRequestsListVisible, setIsWithdrawalRequestsListVisible] = useState(false);
     const [pendingWithdrawalCount, setPendingWithdrawalCount] = useState(0);
 
@@ -75,6 +77,7 @@ const StockManagement = () => {
         return (seller?.pago_sucursales || []).some((pago: any) => {
             const idSucursal = pago?.id_sucursal?._id || pago?.id_sucursal;
             if (String(idSucursal) !== String(branchId)) return false;
+            if (pago?.activo === false) return false;
             const rawExit = pago?.fecha_salida || seller?.fecha_vigencia;
             if (!rawExit) return true;
             const exit = new Date(rawExit);
@@ -177,7 +180,7 @@ const StockManagement = () => {
             if (isSeller) {
                 const sellerBasic = await getSellersBasicAPI();
                 const seller = Array.isArray(sellerBasic) && sellerBasic.length > 0 ? sellerBasic[0] : null;
-                const sucursales = (seller?.pago_sucursales || []).map((p: any) => ({
+                const sucursales = (seller?.pago_sucursales || []).filter((p: any) => p?.activo !== false).map((p: any) => ({
                     _id: String(p.id_sucursal?._id || p.id_sucursal),
                     nombre: p.sucursalName || "Sucursal"
                 }));
@@ -424,27 +427,9 @@ const StockManagement = () => {
         color: "#ffffff"
     };
 
-    const buildDraftKey = (item: any) => {
-        const productId = String(item?.product?._id || item?.product?.id_producto || "");
-        const variantKey = String(item?.product?.variantKey || "");
-        const variantHash = JSON.stringify(item?.product?.variantes || item?.product?.variantes_obj || {});
-        return `${productId}::${variantKey || variantHash}`;
-    };
-
-    const mergeStockDrafts = (baseDraft: any[], incomingDraft: any[]) => {
-        const nextMap = new Map<string, any>();
-
-        [...(baseDraft || []), ...(incomingDraft || [])].forEach((item) => {
-            nextMap.set(buildDraftKey(item), item);
-        });
-
-        return Array.from(nextMap.values());
-    };
-
     const selectedSellerRecord = !isSeller
         ? sellers.find((seller: any) => String(seller?._id) === String(selectedSeller || ""))
         : null;
-    const effectiveSellerId = isSeller ? String(user?.id_vendedor || "") : String(selectedSeller || "");
     const effectiveSellerLabel = isSeller
         ? String(user?.nombre_vendedor || "Vendedor")
         : String(selectedSellerRecord?.name || "Vendedor");
@@ -457,14 +442,23 @@ const StockManagement = () => {
             "Sucursal actual"
         )
         : "Sucursal actual";
-    const qrToolsDisabled = !effectiveSellerId || !effectiveBranchId;
+    const inventoryQrDisabled = !effectiveBranchId;
+    const infoQrDisabled = !effectiveBranchId;
 
-    const openConfirmWithDraft = (draft: any[]) => {
-        const mergedDraft = mergeStockDrafts(stockListForConfirmModal, draft);
-        saveTempStock(mergedDraft);
-        setStockListForConfirmModal(mergedDraft);
-        setStock(mergedDraft);
-        setIsConfirmModalVisible(true);
+    const openWithdrawalRequestModal = async () => {
+        if (!sellerSucursales.length) {
+            message.warning("No tienes sucursales disponibles para solicitar salida.");
+            return;
+        }
+
+        try {
+            const rows = await getSellerInventoryAllAPI({});
+            setWithdrawalProducts(Array.isArray(rows) ? rows : []);
+            setIsWithdrawalRequestModalVisible(true);
+        } catch (error) {
+            console.error("Error al cargar inventario para solicitud de salida:", error);
+            message.error("No se pudo cargar el inventario para la solicitud.");
+        }
     };
 
 
@@ -640,9 +634,9 @@ const StockManagement = () => {
                                 icon={<QrcodeOutlined />}
                                 block
                                 style={actionButtonStyle}
-                                disabled={qrToolsDisabled}
+                                disabled={inventoryQrDisabled}
                                 onClick={() => setIsInventoryQRModalVisible(true)}
-                                title={qrToolsDisabled ? "Debe seleccionar un vendedor primero" : undefined}
+                                title={inventoryQrDisabled ? "Debe seleccionar una sucursal primero" : undefined}
                             >
                                 Inventario QR
                             </Button>
@@ -652,9 +646,9 @@ const StockManagement = () => {
                                 icon={<InfoCircleOutlined />}
                                 block
                                 style={actionButtonStyle}
-                                disabled={qrToolsDisabled}
+                                disabled={infoQrDisabled}
                                 onClick={() => setIsStockQRInfoModalVisible(true)}
-                                title={qrToolsDisabled ? "Debe seleccionar un vendedor primero" : undefined}
+                                title={infoQrDisabled ? "Debe seleccionar una sucursal primero" : undefined}
                             >
                                 Informacion QR
                             </Button>
@@ -736,8 +730,8 @@ const StockManagement = () => {
                         <Button
                             type="primary"
                             icon={<ExportOutlined />}
-                            disabled={!effectiveBranchId}
-                            onClick={() => setIsWithdrawalRequestModalVisible(true)}
+                            disabled={!sellerSucursales.length}
+                            onClick={() => void openWithdrawalRequestModal()}
                         >
                             Solicitar salida de productos
                         </Button>
@@ -845,20 +839,14 @@ const StockManagement = () => {
             <InventoryQRModal
                 open={isInventoryQRModalVisible}
                 onClose={() => setIsInventoryQRModalVisible(false)}
-                sellerId={effectiveSellerId || undefined}
-                sellerLabel={effectiveSellerLabel}
+                sellerLabel={selectedSeller ? effectiveSellerLabel : "Cualquier vendedor"}
                 sucursalId={effectiveBranchId || undefined}
                 sucursalLabel={effectiveBranchLabel}
-                onUseDifferences={(draft) => {
-                    setIsInventoryQRModalVisible(false);
-                    openConfirmWithDraft(draft);
-                }}
             />
             <StockQRInfoModal
                 open={isStockQRInfoModalVisible}
                 onClose={() => setIsStockQRInfoModalVisible(false)}
-                sellerId={effectiveSellerId || undefined}
-                sellerLabel={effectiveSellerLabel}
+                sellerLabel={selectedSeller ? effectiveSellerLabel : "Cualquier vendedor"}
                 sucursalId={effectiveBranchId || undefined}
                 sucursalLabel={effectiveBranchLabel}
             />
@@ -889,9 +877,8 @@ const StockManagement = () => {
                 visible={isWithdrawalRequestModalVisible}
                 onClose={() => setIsWithdrawalRequestModalVisible(false)}
                 onCreated={() => fetchInventoryPage(true)}
-                products={finalProductList}
+                products={withdrawalProducts}
                 branches={sellerSucursales}
-                defaultBranchId={effectiveBranchId || undefined}
             />
         </div>
 

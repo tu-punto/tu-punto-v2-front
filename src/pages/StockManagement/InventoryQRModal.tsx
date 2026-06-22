@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Empty, InputNumber, Modal, Table, Typography, message } from "antd";
-import { CheckOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Empty, InputNumber, Modal, Table, Typography } from "antd";
+import { FileExcelOutlined, ReloadOutlined } from "@ant-design/icons";
 
+import { downloadInventoryQRReportAPI } from "../../api/product";
 import QRScanner from "../Sales/QRScanner";
 import { buildVariantEntryKey, getVariantLabel, toVariantRecord } from "./variantScanUtils";
 
@@ -10,6 +11,7 @@ const { Text, Title } = Typography;
 type InventoryRow = {
   key: string;
   productId: string;
+  sellerId: string;
   productName: string;
   categoryName: string;
   variantKey?: string;
@@ -24,11 +26,9 @@ type InventoryRow = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  sellerId?: string | null;
   sellerLabel?: string;
   sucursalId?: string;
   sucursalLabel?: string;
-  onUseDifferences?: (draft: any[]) => void;
 };
 
 const normalizeNumber = (value: any) => {
@@ -39,27 +39,30 @@ const normalizeNumber = (value: any) => {
 const InventoryQRModal = ({
   open,
   onClose,
-  sellerId,
-  sellerLabel,
   sucursalId,
-  sucursalLabel,
-  onUseDifferences
+  sucursalLabel
 }: Props) => {
   const [rows, setRows] = useState<InventoryRow[]>([]);
   const [scannerVisible, setScannerVisible] = useState(true);
   const [scannerSession, setScannerSession] = useState(0);
+  const [successPulse, setSuccessPulse] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const isCompactLayout = typeof window !== "undefined" && window.innerWidth < 768;
 
   useEffect(() => {
     if (!open) {
       setRows([]);
       setScannerVisible(true);
       setScannerSession(0);
+      setSuccessPulse(false);
+      setReportLoading(false);
       return;
     }
 
     setRows([]);
     setScannerVisible(true);
     setScannerSession((current) => current + 1);
+    setSuccessPulse(false);
   }, [open]);
 
   const totalCountedUnits = useMemo(
@@ -72,11 +75,6 @@ const InventoryQRModal = ({
     [rows]
   );
 
-  const rowsWithDifference = useMemo(
-    () => rows.filter((row) => normalizeNumber(row.countedStock) !== normalizeNumber(row.systemStock)),
-    [rows]
-  );
-
   const handleRestartScanner = () => {
     setScannerVisible(false);
     window.setTimeout(() => {
@@ -86,34 +84,32 @@ const InventoryQRModal = ({
   };
 
   const handleScannedVariant = (item: any) => {
-    if (sellerId && String(item?.id_vendedor || "") !== String(sellerId)) {
-      message.error("El QR escaneado no pertenece al vendedor seleccionado.");
-      return;
-    }
-
     const entryKey = buildVariantEntryKey({
       productId: item?.id_producto,
       variantKey: item?.variantKey,
       variantes: item?.variantes
     });
     const variantLabel = item?.variantLabel || getVariantLabel(toVariantRecord(item?.variantes));
+    setSuccessPulse(true);
+    window.setTimeout(() => setSuccessPulse(false), 650);
 
     setRows((current) => {
       const index = current.findIndex((row) => row.key === entryKey);
       if (index >= 0) {
         const next = [...current];
-        next[index] = {
+        const updatedRow = {
           ...next[index],
           countedStock: normalizeNumber(next[index].countedStock) + 1
         };
-        return next;
+        next.splice(index, 1);
+        return [updatedRow, ...next];
       }
 
       return [
-        ...current,
         {
           key: entryKey,
           productId: String(item?.id_producto || ""),
+          sellerId: String(item?.id_vendedor || ""),
           productName: String(item?.nombre_producto || "Producto"),
           categoryName: String(item?.nombre_categoria || item?.categoria || "Sin categoria"),
           variantKey: String(item?.variantKey || ""),
@@ -123,7 +119,8 @@ const InventoryQRModal = ({
           precio: normalizeNumber(item?.precio),
           systemStock: normalizeNumber(item?.stock),
           countedStock: 1
-        }
+        },
+        ...current
       ];
     });
   };
@@ -139,40 +136,43 @@ const InventoryQRModal = ({
     setRows((current) => current.filter((row) => row.key !== record.key));
   };
 
-  const handleUseDifferences = () => {
-    const draft = rowsWithDifference.map((row) => ({
-      product: {
-        _id: row.productId,
-        nombre_producto: row.productName,
-        nombre_categoria: row.categoryName,
-        categoria: row.categoryName,
-        variantes: row.variantes,
-        variantKey: row.variantKey,
-        variantLabel: row.variantLabel,
-        precio: row.precio,
-        stock: row.systemStock,
-        sucursalId: row.sucursalId || sucursalId
-      },
-      newStock: {
-        productId: row.productId,
-        sucursalId: row.sucursalId || sucursalId,
-        stock: normalizeNumber(row.countedStock) - normalizeNumber(row.systemStock)
-      }
-    }));
-
-    onUseDifferences?.(draft);
+  const handleDownloadReport = async () => {
+    if (!sucursalId || sucursalId === "all") return;
+    setReportLoading(true);
+    try {
+      await downloadInventoryQRReportAPI({
+        sucursalId,
+        sucursalLabel,
+        rows: rows.map((row) => ({
+          productId: row.productId,
+          productName: row.productName,
+          categoryName: row.categoryName,
+          variantKey: row.variantKey,
+          variantLabel: row.variantLabel,
+          variantes: row.variantes,
+          sellerId: row.sellerId,
+          sucursalId: row.sucursalId || sucursalId,
+          sucursalLabel,
+          precio: row.precio,
+          systemStock: row.systemStock,
+          countedStock: row.countedStock
+        }))
+      });
+    } finally {
+      setReportLoading(false);
+    }
   };
 
-  const isReady = Boolean(sellerId && sucursalId && sucursalId !== "all");
+  const isReady = Boolean(sucursalId && sucursalId !== "all");
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
       footer={null}
-      width={1100}
+      width={isCompactLayout ? "96%" : 1100}
       destroyOnClose
-      title="Inventario por sucursal con QR"
+      title="Inventario QR por sucursal"
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div
@@ -189,7 +189,7 @@ const InventoryQRModal = ({
               Conteo QR
             </Title>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {sellerLabel || "Vendedor"} | {sucursalLabel || "Sucursal actual"}
+              {sucursalLabel || "Sucursal actual"}
             </Text>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -198,11 +198,12 @@ const InventoryQRModal = ({
             </Button>
             <Button
               type="primary"
-              icon={<CheckOutlined />}
-              onClick={handleUseDifferences}
-              disabled={!rowsWithDifference.length}
+              icon={<FileExcelOutlined />}
+              onClick={handleDownloadReport}
+              disabled={!isReady}
+              loading={reportLoading}
             >
-              Enviar diferencias a actualizar stock
+              Descargar reporte Excel
             </Button>
           </div>
         </div>
@@ -210,12 +211,22 @@ const InventoryQRModal = ({
         {!isReady ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="Selecciona un vendedor y una sucursal para iniciar el inventario QR."
+            description="Selecciona una sucursal para iniciar el inventario QR."
           />
         ) : (
           <>
             {scannerVisible && (
-              <div style={{ maxWidth: 720, marginInline: "auto", width: "100%" }}>
+              <div
+                style={{
+                  maxWidth: 720,
+                  marginInline: "auto",
+                  width: "100%",
+                  border: successPulse ? "3px solid #52c41a" : "3px solid transparent",
+                  borderRadius: 16,
+                  boxShadow: successPulse ? "0 0 0 4px rgba(82, 196, 26, 0.14)" : "none",
+                  transition: "border-color 0.12s ease, box-shadow 0.12s ease"
+                }}
+              >
                 <QRScanner
                   key={`inventory-qr-${scannerSession}`}
                   onProductScanned={handleScannedVariant}
@@ -225,7 +236,8 @@ const InventoryQRModal = ({
                   successLabel="Unidad contada"
                   groupSuccessLabel="Unidad del grupo contada"
                   appearance="simple"
-                  simpleVideoMinHeight={240}
+                  simpleVideoMinHeight={isCompactLayout ? 220 : 260}
+                  sucursalId={sucursalId}
                 />
               </div>
             )}
@@ -251,7 +263,7 @@ const InventoryQRModal = ({
               <Table
                 dataSource={rows}
                 rowKey="key"
-                pagination={{ pageSize: 8, showSizeChanger: false }}
+                pagination={{ pageSize: isCompactLayout ? 5 : 8, showSizeChanger: false }}
                 scroll={{ x: "max-content" }}
                 columns={[
                   {

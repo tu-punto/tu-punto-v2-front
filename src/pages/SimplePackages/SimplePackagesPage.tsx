@@ -1,7 +1,17 @@
-import { Button, Card, Input, InputNumber, Select, Space, Spin, Typography, message } from "antd";
+import { Button, Card, Input, InputNumber, Modal, Select, Space, Spin, Table, Typography, message } from "antd";
 import { useContext, useEffect, useMemo, useState } from "react";
 import { getSellerAPI } from "../../api/seller";
-import { getSimplePackageBranchPricesAPI, registerSimplePackagesAPI } from "../../api/simplePackage";
+import {
+  getSimplePackageBranchPricesAPI,
+  getPackageEscalationConfigAPI,
+  getSimplePackageEscalationStatusAPI,
+  getSimplePackagesListAPI,
+  registerSimplePackagesAPI,
+  updateSimplePackageAPI,
+  deleteSimplePackageAPI,
+  PackageDeliverySpace,
+  PackageEscalationRange,
+} from "../../api/simplePackage";
 import { UserContext } from "../../context/userContext";
 import {
   createDraftRow,
@@ -10,6 +20,15 @@ import {
 } from "./simplePackageHelpers";
 
 const MIN_PACKAGES = 1;
+const DEFAULT_DELIVERY_RANGES: PackageEscalationRange[] = [
+  { from: 1, to: 5, small_price: 5, large_price: 5 },
+  { from: 6, to: 15, small_price: 4, large_price: 4 },
+  { from: 16, to: null, small_price: 3, large_price: 3 },
+];
+const DEFAULT_DELIVERY_SPACES: PackageDeliverySpace[] = [
+  { size: "estandar", spaces: 1 },
+  { size: "grande", spaces: 2 },
+];
 
 const tableCellStyle: React.CSSProperties = {
   border: "1px solid #d9d9d9",
@@ -33,18 +52,57 @@ const SimplePackagesPage = () => {
   const [selectedDestinationId, setSelectedDestinationId] = useState("");
   const [sellerBranches, setSellerBranches] = useState<any[]>([]);
   const [branchPrices, setBranchPrices] = useState<any[]>([]);
+  const [monthlyPackageCount, setMonthlyPackageCount] = useState(0);
+  const [missingForNextRange, setMissingForNextRange] = useState(0);
+  const [useEscalation, setUseEscalation] = useState(false);
+  const [escalationRanges, setEscalationRanges] = useState<any[]>([]);
+  const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
+  const [pendingModalVisible, setPendingModalVisible] = useState(false);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingSavingId, setPendingSavingId] = useState("");
+  const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
     precio_paquete: Number(user?.seller_precio_paquete || 0),
-    amortizacion: Number(user?.seller_amortizacion || 0),
+    amortizacion: 0,
     saldo_por_paquete: 0,
   });
   const [rows, setRows] = useState<SimplePackageDraftRow[]>([
     createDraftRow(0, {
       precio_paquete: Number(user?.seller_precio_paquete || 0),
-      amortizacion: Number(user?.seller_amortizacion || 0),
+      amortizacion: 0,
       saldo_por_paquete: 0,
     }),
   ]);
+
+  const buildDraftConfig = (
+    index: number,
+    row?: Partial<SimplePackageDraftRow>,
+    ranges = escalationRanges,
+    monthCount = monthlyPackageCount,
+    shouldUseEscalation = useEscalation,
+    positionOffset = index + 1
+  ) => {
+    if (!shouldUseEscalation) return sellerConfig;
+    const position = monthCount + Math.max(1, Number(positionOffset || index + 1));
+    const range =
+      ranges.find(
+        (item: any) => position >= Number(item?.from || 1) && (item?.to == null || position <= Number(item.to))
+      ) || ranges[ranges.length - 1];
+    const packageSize = row?.package_size === "grande" ? "grande" : "estandar";
+    const price = Number(packageSize === "grande" ? range?.large_price || 0 : range?.small_price || 0);
+    return {
+      ...sellerConfig,
+      precio_paquete: Number(range?.small_price || 0),
+      precio_paquete_grande: Number(range?.large_price || range?.small_price || 0),
+      amortizacion: Math.min(Number(sellerConfig.amortizacion || 0), price),
+    };
+  };
+
+  const rebuildRows = (count: number, currentRows: SimplePackageDraftRow[] = rows) =>
+    Array.from({ length: count }, (_, index) => {
+      const row = currentRows[index];
+      return createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, index + 1), row);
+    });
 
   const routePriceMap = useMemo(() => {
     const map = new Map<string, { precio: number; destino: any }>();
@@ -56,6 +114,17 @@ const SimplePackagesPage = () => {
         precio: Number(row?.precio || 0),
         destino: row?.destino_sucursal,
       });
+    });
+    return map;
+  }, [branchPrices]);
+
+  const routeIdMap = useMemo(() => {
+    const map = new Map<string, string>();
+    branchPrices.forEach((row: any) => {
+      const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
+      const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
+      if (!originId || !destinationId) return;
+      map.set(`${originId}::${destinationId}`, String(row?._id || ""));
     });
     return map;
   }, [branchPrices]);
@@ -96,6 +165,230 @@ const SimplePackagesPage = () => {
     return Number(routePriceMap.get(`${originId}::${destinationId}`)?.precio || 0);
   };
 
+  const getRouteId = (originId: string, destinationId?: string) => {
+    if (!originId || !destinationId) return "";
+    return String(routeIdMap.get(`${originId}::${destinationId}`) || "");
+  };
+
+  const getSmallSpaceLimit = (routeId = "") => {
+    const globalConfig = escalationConfigs.find(
+      (row: any) => !String(row?.route?._id || row?.route || "") && row?.service_origin === "delivery"
+    );
+    const config = escalationConfigs.find(
+      (row: any) =>
+        String(row?.route?._id || row?.route || "") === String(routeId) &&
+        row?.service_origin === "delivery"
+    );
+    const spacesRows =
+      Array.isArray(globalConfig?.delivery_spaces) && globalConfig.delivery_spaces.length
+        ? globalConfig.delivery_spaces
+        : Array.isArray(config?.delivery_spaces) && config.delivery_spaces.length
+          ? config.delivery_spaces
+          : DEFAULT_DELIVERY_SPACES;
+
+    return Math.max(
+      1,
+      Number(
+        spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === "small_limit")?.spaces ??
+          spacesRows.find((row: PackageDeliverySpace) => String(row.size).toLowerCase() === "estandar")?.spaces ??
+          1
+      )
+    );
+  };
+
+  const getPackageSizeBySpaces = (spaces = 1, routeId = "") =>
+    Math.max(1, Number(spaces || 1)) > getSmallSpaceLimit(routeId) ? "grande" : "estandar";
+
+  const getSameBranchRouteDraftConfig = (index: number, packageSize: string, routeId = "", positionOffset = index + 1) => {
+    if (!routeId) return null;
+    const routeConfig = escalationConfigs.find(
+      (row: any) =>
+        row?.service_origin === "simple_package" &&
+        String(row?.route?._id || row?.route || "") === String(routeId)
+    );
+    if (!routeConfig) return null;
+
+    const ranges = Array.isArray(routeConfig?.ranges) && routeConfig.ranges.length
+      ? routeConfig.ranges
+      : escalationRanges;
+    const position = monthlyPackageCount + Math.max(1, Number(positionOffset || index + 1));
+    const range =
+      ranges.find(
+        (row: PackageEscalationRange) =>
+          position >= row.from && (row.to === null || row.to === undefined || position <= row.to)
+      ) ||
+      ranges[ranges.length - 1];
+    if (!range) return null;
+
+    const price = Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+    return {
+      ...sellerConfig,
+      precio_paquete: Number(range.small_price || 0),
+      precio_paquete_grande: Number(range.large_price || range.small_price || 0),
+      amortizacion: Math.min(Number(sellerConfig.amortizacion || 0), price),
+    };
+  };
+
+  const getDeliveryRoutePrice = (
+    originId: string,
+    destinationId?: string,
+    spaces = 1,
+    escalationSpaces = spaces
+  ) => {
+    if (!originId || !destinationId || String(originId) === String(destinationId)) return 0;
+    const routeId = getRouteId(originId, destinationId);
+    const config =
+      escalationConfigs.find(
+        (row: any) =>
+          row?.service_origin === "delivery" &&
+          String(row?.route?._id || row?.route || "") === String(routeId)
+      ) ||
+      escalationConfigs.find((row: any) => row?.service_origin === "delivery" && !row?.route);
+
+    if (!config) {
+      return Number((getBranchRoutePrice(originId, destinationId) * Math.max(1, Number(spaces || 1))).toFixed(2));
+    }
+
+    const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : DEFAULT_DELIVERY_RANGES;
+    const safePosition = Math.max(1, Number(escalationSpaces || spaces || 1));
+    const range =
+      ranges.find(
+        (row: PackageEscalationRange) =>
+          safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)
+      ) ||
+      ranges[ranges.length - 1] ||
+      DEFAULT_DELIVERY_RANGES[0];
+    const unitPrice = Number(range?.small_price ?? getBranchRoutePrice(originId, destinationId) ?? 0);
+    return Number((unitPrice * Math.max(1, Number(spaces || 1))).toFixed(2));
+  };
+
+  const getTotalDeliverySpacesForRows = (sourceRows: SimplePackageDraftRow[], originId: string) =>
+    (sourceRows || []).reduce((sum, row) => {
+      const destinationId = String(row?.destino_sucursal_id || "");
+      if (!originId || !destinationId || String(originId) === String(destinationId)) return sum;
+      return sum + Math.max(1, Number(row?.delivery_spaces || 1));
+    }, 0);
+
+  const recalculateRowsByDeliveryPricing = (
+    sourceRows: SimplePackageDraftRow[],
+    originId = selectedOriginId
+  ) => {
+    const totalDeliverySpaces = getTotalDeliverySpacesForRows(sourceRows, originId);
+    return sourceRows.map((row, index) => {
+      const destinationId = String(row.destino_sucursal_id || "");
+      const routeId = getRouteId(originId, destinationId);
+      const deliverySpaces = Math.max(1, Number(row.delivery_spaces || 1));
+      const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
+      const routePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, totalDeliverySpaces);
+      const config =
+        String(originId || "") === String(destinationId || "")
+          ? getSameBranchRouteDraftConfig(index, packageSize, routeId, index + 1) ||
+            buildDraftConfig(index, { ...row, package_size: packageSize }, escalationRanges, monthlyPackageCount, useEscalation, index + 1)
+          : buildDraftConfig(index, { ...row, package_size: packageSize }, escalationRanges, monthlyPackageCount, useEscalation, index + 1);
+
+      return createDraftRow(index, config, {
+        ...row,
+        package_size: packageSize,
+        delivery_spaces: deliverySpaces,
+        precio_entre_sucursal: routePrice,
+      });
+    });
+  };
+
+  const getBranchId = (value: any) => String(value?._id || value?.id_sucursal || value || "");
+  const simpleBranchOptions = useMemo(
+    () =>
+      sellerBranches
+        .map((branch: any) => ({
+          value: getBranchId(branch?.id_sucursal),
+          label: String(branch?.sucursalName || branch?.id_sucursal?.nombre || "Sucursal"),
+        }))
+        .filter((option) => option.value),
+    [sellerBranches]
+  );
+
+  const fetchPendingPackages = async () => {
+    if (!user?.id_vendedor) return;
+    setPendingLoading(true);
+    try {
+      const response = await getSimplePackagesListAPI({ sellerId: user.id_vendedor });
+      if (response?.success === false) {
+        message.error(response.message || "No se pudieron cargar los paquetes pendientes");
+        return;
+      }
+      setPendingRows(Array.isArray(response?.rows) ? response.rows : []);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudieron cargar los paquetes pendientes");
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
+  const patchPendingRow = (id: string, patch: Record<string, any>) => {
+    setPendingRows((current) =>
+      current.map((row) => (String(row?._id) === String(id) ? { ...row, ...patch } : row))
+    );
+  };
+
+  const savePendingRow = async (row: any) => {
+    const rowId = String(row?._id || "");
+    if (!rowId) return;
+
+    setPendingSavingId(rowId);
+    try {
+      const response = await updateSimplePackageAPI(rowId, {
+        comprador: String(row.comprador || "").trim(),
+        telefono_comprador: String(row.telefono_comprador || "").trim(),
+        descripcion_paquete: String(row.descripcion_paquete || "").trim(),
+        origen_sucursal_id: getBranchId(row.origen_sucursal || row.sucursal),
+        destino_sucursal_id: getBranchId(row.destino_sucursal),
+        delivery_spaces: Math.max(1, Number(row.delivery_spaces || 1)),
+        amortizacion_vendedor: Number(row.amortizacion_vendedor || 0),
+        saldo_por_paquete: Number(row.saldo_por_paquete || 0),
+      });
+
+      if (!response.success) {
+        message.error(response.message || "No se pudo guardar el paquete");
+        return;
+      }
+
+      message.success("Paquete actualizado");
+      await fetchPendingPackages();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo guardar el paquete");
+    } finally {
+      setPendingSavingId("");
+    }
+  };
+
+  const deletePendingRow = (row: any) => {
+    Modal.confirm({
+      title: "Eliminar paquete pendiente",
+      content: "Solo se puede eliminar si todavia no fue convertido en pedido.",
+      okText: "Eliminar",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        const response = await deleteSimplePackageAPI(String(row?._id || ""));
+        if (!response.success) {
+          message.error(response.message || "No se pudo eliminar el paquete");
+          return;
+        }
+        message.success("Paquete eliminado");
+        await fetchPendingPackages();
+      },
+    });
+  };
+
+  const nextMonthlyNumber = monthlyPackageCount + 1;
+  const progressTarget = missingForNextRange > 0 ? nextMonthlyNumber + missingForNextRange : nextMonthlyNumber;
+  const progressPercent =
+    missingForNextRange > 0
+      ? Math.max(8, Math.min(100, Math.round((nextMonthlyNumber / progressTarget) * 100)))
+      : 100;
+
   useEffect(() => {
     const fetchSellerConfig = async () => {
       if (!user?.id_vendedor) {
@@ -104,16 +397,18 @@ const SimplePackagesPage = () => {
       }
 
       try {
-        const [seller, branchPricesResponse] = await Promise.all([
+        const [seller, branchPricesResponse, escalationResponse] = await Promise.all([
           getSellerAPI(user.id_vendedor),
           getSimplePackageBranchPricesAPI(),
+          getPackageEscalationConfigAPI(),
         ]);
 
         const nextConfig = {
           precio_paquete: Number(seller?.precio_paquete ?? user?.seller_precio_paquete ?? 0),
-          amortizacion: Number(seller?.amortizacion ?? user?.seller_amortizacion ?? 0),
+          amortizacion: 0,
           saldo_por_paquete: 0,
         };
+        setUseEscalation(seller?.precio_paquete === null || seller?.precio_paquete === undefined);
         const nextBranches = Array.isArray(seller?.pago_sucursales)
           ? seller.pago_sucursales.filter(
               (branch: any) => branch?.activo !== false && Number(branch?.entrega_simple || 0) > 0
@@ -134,9 +429,10 @@ const SimplePackagesPage = () => {
         setSellerConfig(nextConfig);
         setSellerBranches(nextBranches);
         setBranchPrices(Array.isArray(branchPricesResponse?.rows) ? branchPricesResponse.rows : []);
+        setEscalationConfigs(Array.isArray(escalationResponse?.data) ? escalationResponse.data : []);
         setSelectedOriginId(String(defaultOriginId || ""));
         setSelectedDestinationId(String(defaultOriginId || ""));
-        setRows(resizeDraftRows(MIN_PACKAGES, [], nextConfig));
+        setRows(recalculateRowsByDeliveryPricing(resizeDraftRows(MIN_PACKAGES, [], nextConfig), String(defaultOriginId || "")));
       } catch (error) {
         console.error(error);
         message.error("No se pudo cargar la configuracion del servicio");
@@ -148,7 +444,6 @@ const SimplePackagesPage = () => {
     void fetchSellerConfig();
   }, [
     user?.id_vendedor,
-    user?.seller_amortizacion,
     user?.seller_precio_paquete,
   ]);
 
@@ -161,41 +456,75 @@ const SimplePackagesPage = () => {
         : String(selectedOriginId || "")
     );
     setRows((prev) =>
-      prev.map((row, index) => {
-        const nextDestinationId =
-          row.destino_sucursal_id &&
-          destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
-            ? row.destino_sucursal_id
-            : "";
+      recalculateRowsByDeliveryPricing(
+        prev.map((row, index) => {
+          const nextDestinationId =
+            row.destino_sucursal_id &&
+            destinationOptions.some((option) => String(option.value) === String(row.destino_sucursal_id))
+              ? row.destino_sucursal_id
+              : "";
 
-        return createDraftRow(index, sellerConfig, {
-          ...row,
-          destino_sucursal_id: nextDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, nextDestinationId),
-        });
-      })
+          return createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, index + 1), {
+            ...row,
+            destino_sucursal_id: nextDestinationId,
+          });
+        }),
+        selectedOriginId
+      )
     );
-  }, [destinationOptions, selectedOriginId, sellerConfig, routePriceMap]);
+  }, [destinationOptions, selectedOriginId, sellerConfig, routePriceMap, escalationConfigs]);
+
+  useEffect(() => {
+    if (!user?.id_vendedor) return;
+
+    const fetchEscalationStatus = async () => {
+      try {
+        const response = await getSimplePackageEscalationStatusAPI({
+          sellerId: user.id_vendedor,
+          routeId: getRouteId(selectedOriginId, selectedDestinationId),
+        });
+        if (response?.success && response?.data) {
+          const nextMonthCount = Number(response.data.monthCount || 0);
+          const nextRanges = Array.isArray(response.data.ranges) ? response.data.ranges : [];
+          setMonthlyPackageCount(nextMonthCount);
+          setMissingForNextRange(Number(response.data.missingForNextRange || 0));
+          setEscalationRanges(nextRanges);
+          if (useEscalation) {
+            setRows((current) =>
+              recalculateRowsByDeliveryPricing(
+                current.map((row, index) =>
+                  createDraftRow(index, buildDraftConfig(index, row, nextRanges, nextMonthCount, true, index + 1), row)
+                )
+              )
+            );
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void fetchEscalationStatus();
+  }, [selectedOriginId, selectedDestinationId, routeIdMap, user?.id_vendedor, useEscalation]);
 
   const updateRow = (index: number, patch: Partial<SimplePackageDraftRow>) => {
     setRows((prev) =>
-      prev.map((row, rowIndex) => {
+      recalculateRowsByDeliveryPricing(prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const nextDestinationId = String(patch.destino_sucursal_id ?? (row.destino_sucursal_id || ""));
-        return createDraftRow(index, sellerConfig, {
+        return createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, index + 1), {
           ...row,
           ...patch,
           destino_sucursal_id: nextDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, nextDestinationId),
         });
-      })
+      }))
     );
   };
 
   const handlePackageCountChange = (value: number | null) => {
     const nextCount = Math.max(MIN_PACKAGES, Number(value || MIN_PACKAGES));
     setPackageCount(nextCount);
-    setRows((prev) => resizeDraftRows(nextCount, prev, sellerConfig));
+    setRows((prev) => recalculateRowsByDeliveryPricing(rebuildRows(nextCount, prev)));
   };
 
   const handleApplyDescription = () => {
@@ -207,7 +536,7 @@ const SimplePackagesPage = () => {
 
     setRows((prev) =>
       prev.map((row, index) =>
-        createDraftRow(index, sellerConfig, {
+        createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, index + 1), {
           ...row,
           descripcion_paquete: description,
         })
@@ -223,12 +552,13 @@ const SimplePackagesPage = () => {
     }
 
     setRows((prev) =>
-      prev.map((row, index) =>
-        createDraftRow(index, sellerConfig, {
-          ...row,
-          destino_sucursal_id: selectedDestinationId,
-          precio_entre_sucursal: getBranchRoutePrice(selectedOriginId, selectedDestinationId),
-        })
+      recalculateRowsByDeliveryPricing(
+        prev.map((row, index) =>
+          createDraftRow(index, buildDraftConfig(index, row, escalationRanges, monthlyPackageCount, useEscalation, index + 1), {
+            ...row,
+            destino_sucursal_id: selectedDestinationId,
+          })
+        )
       )
     );
     message.success("Sucursal destino aplicada a todos los paquetes");
@@ -246,6 +576,7 @@ const SimplePackagesPage = () => {
       descripcion_paquete: String(row.descripcion_paquete || "").trim(),
       destino_sucursal_id: String(row.destino_sucursal_id || "").trim(),
       package_size: row.package_size,
+      delivery_spaces: Math.max(1, Number(row.delivery_spaces || 1)),
       amortizacion_vendedor: Number(row.amortizacion_vendedor || 0),
       saldo_por_paquete: Number(row.saldo_por_paquete || 0),
     }));
@@ -268,10 +599,10 @@ const SimplePackagesPage = () => {
         message.error(`Paquete ${index + 1}: el monto que cubriras del servicio no puede ser menor a 0`);
         return;
       }
-      const precioPaqueteActual = Number(rows[index]?.precio_paquete || 0);
-      if (Number(row.amortizacion_vendedor || 0) > precioPaqueteActual) {
+      const precioTotalActual = Number(rows[index]?.precio_total || 0);
+      if (Number(row.amortizacion_vendedor || 0) > precioTotalActual) {
         message.error(
-          `Paquete ${index + 1}: el monto que cubriras del servicio no puede ser mayor al precio del paquete`
+          `Paquete ${index + 1}: el monto que cubriras del servicio no puede ser mayor al precio total del servicio`
         );
         return;
       }
@@ -291,10 +622,11 @@ const SimplePackagesPage = () => {
       }
 
       message.success(`Se registraron ${response.createdCount || payloadRows.length} paquetes`);
+      await fetchPendingPackages();
       setPackageCount(MIN_PACKAGES);
       setGeneralDescription("");
       setSelectedDestinationId(String(selectedOriginId || ""));
-      setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
+      setRows(rebuildRows(MIN_PACKAGES, []));
     } catch (error) {
       console.error(error);
       message.error("Error registrando paquetes");
@@ -305,19 +637,236 @@ const SimplePackagesPage = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-3 mb-4">
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/box-icon.png" alt="Paquetes" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">Paquetes del servicio</h1>
         </div>
+        <Button
+          onClick={() => {
+            setPendingModalVisible(true);
+            void fetchPendingPackages();
+          }}
+          size="large"
+          style={{
+            minHeight: 46,
+            paddingInline: 24,
+            borderRadius: 10,
+            borderColor: "#d97706",
+            background: "linear-gradient(180deg, #f59e0b 0%, #d97706 100%)",
+            color: "#ffffff",
+            fontWeight: 800,
+            letterSpacing: 0,
+            boxShadow: "0 5px 0 #92400e, 0 12px 24px rgba(217, 119, 6, 0.22)",
+            transform: "translateY(-2px)",
+          }}
+        >
+          PEDIDOS PENDIENTES
+        </Button>
+        <div
+          style={{
+            minWidth: 280,
+            maxWidth: 520,
+            border: "1px solid #fed7aa",
+            borderRadius: 10,
+            padding: "10px 14px",
+            background: "linear-gradient(135deg, #fff7ed 0%, #ffffff 58%, #eff6ff 100%)",
+            boxShadow: "0 10px 28px rgba(249, 115, 22, 0.12)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <div>
+              <Typography.Text strong style={{ color: "#9a3412" }}>
+                Racha mensual: {monthlyPackageCount} paquete(s)
+              </Typography.Text>
+              <div style={{ color: "#1f2937", fontWeight: 700, marginTop: 2 }}>
+                {missingForNextRange > 0
+                  ? `Te faltan ${missingForNextRange} paquetes para desbloquear el siguiente rango`
+                  : "Ya estas en el mejor rango del mes"}
+              </div>
+            </div>
+            <div
+              style={{
+                minWidth: 56,
+                height: 56,
+                borderRadius: 10,
+                display: "grid",
+                placeItems: "center",
+                background: "#ffedd5",
+                color: "#9a3412",
+                fontWeight: 800,
+                fontSize: 18,
+              }}
+            >
+              <div style={{ textAlign: "center", lineHeight: 1.1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>Siguiente paquete:</div>
+                <div>{nextMonthlyNumber}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ height: 7, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", marginTop: 8 }}>
+            <div
+              style={{
+                height: "100%",
+                width: `${progressPercent}%`,
+                borderRadius: 999,
+                background: "linear-gradient(90deg, #f97316 0%, #2563eb 100%)",
+              }}
+            />
+          </div>
+        </div>
       </div>
+
+      <Modal
+        title="Paquetes simples en espera"
+        open={pendingModalVisible}
+        onCancel={() => setPendingModalVisible(false)}
+        footer={null}
+        width={1180}
+      >
+        <Table
+          loading={pendingLoading}
+          dataSource={pendingRows}
+          rowKey={(row: any) => String(row?._id)}
+          pagination={{ pageSize: 8 }}
+          scroll={{ x: "max-content" }}
+          columns={[
+            {
+              title: "Comprador",
+              dataIndex: "comprador",
+              width: 180,
+              render: (_: any, row: any) => (
+                <Input
+                  value={row.comprador}
+                  onChange={(event) => patchPendingRow(String(row._id), { comprador: event.target.value })}
+                />
+              ),
+            },
+            {
+              title: "Celular",
+              dataIndex: "telefono_comprador",
+              width: 140,
+              render: (_: any, row: any) => (
+                <Input
+                  value={row.telefono_comprador}
+                  onChange={(event) =>
+                    patchPendingRow(String(row._id), {
+                      telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
+                    })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Descripcion",
+              dataIndex: "descripcion_paquete",
+              width: 260,
+              render: (_: any, row: any) => (
+                <Input.TextArea
+                  value={row.descripcion_paquete}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  onChange={(event) =>
+                    patchPendingRow(String(row._id), { descripcion_paquete: event.target.value })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Destino",
+              dataIndex: "destino_sucursal",
+              width: 220,
+              render: (_: any, row: any) => (
+                <Select
+                  style={{ width: "100%" }}
+                  value={getBranchId(row.destino_sucursal) || undefined}
+                  options={simpleBranchOptions}
+                  onChange={(value) => patchPendingRow(String(row._id), { destino_sucursal: value })}
+                />
+              ),
+            },
+            {
+              title: "Espacios delivery",
+              dataIndex: "delivery_spaces",
+              width: 150,
+              render: (_: any, row: any) => (
+                <InputNumber
+                  min={1}
+                  style={{ width: "100%" }}
+                  value={Number(row.delivery_spaces || 1)}
+                  onChange={(value) =>
+                    patchPendingRow(String(row._id), { delivery_spaces: Math.max(1, Number(value || 1)) })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Cubre vendedor",
+              dataIndex: "amortizacion_vendedor",
+              width: 150,
+              render: (_: any, row: any) => (
+                <InputNumber
+                  min={0}
+                  max={Number(row.precio_total ?? Number(row.precio_paquete || 0) + Number(row.precio_entre_sucursal || 0))}
+                  style={{ width: "100%" }}
+                  addonBefore="Bs."
+                  value={Number(row.amortizacion_vendedor || 0)}
+                  onChange={(value) =>
+                    patchPendingRow(String(row._id), {
+                      amortizacion_vendedor: Math.min(
+                        Number(row.precio_total ?? Number(row.precio_paquete || 0) + Number(row.precio_entre_sucursal || 0)),
+                        Math.max(0, Number(value || 0))
+                      ),
+                    })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Saldo paquete",
+              dataIndex: "saldo_por_paquete",
+              width: 150,
+              render: (_: any, row: any) => (
+                <InputNumber
+                  min={0}
+                  style={{ width: "100%" }}
+                  addonBefore="Bs."
+                  value={Number(row.saldo_por_paquete || 0)}
+                  onChange={(value) =>
+                    patchPendingRow(String(row._id), { saldo_por_paquete: Number(value || 0) })
+                  }
+                />
+              ),
+            },
+            {
+              title: "Acciones",
+              key: "actions",
+              fixed: "right",
+              width: 180,
+              render: (_: any, row: any) => (
+                <Space>
+                  <Button
+                    type="primary"
+                    loading={pendingSavingId === String(row._id)}
+                    onClick={() => void savePendingRow(row)}
+                  >
+                    Guardar
+                  </Button>
+                  <Button danger onClick={() => deletePendingRow(row)}>
+                    Borrar
+                  </Button>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Modal>
 
       <Spin spinning={loadingConfig}>
         <Space direction="vertical" size={16} style={{ display: "flex" }}>
           <Card>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[220px_240px_1fr_auto] gap-3 items-end">
               <div>
-                <Typography.Text strong>Numero de paquetes</Typography.Text>
+                <Typography.Text strong>Número de paquetes</Typography.Text>
                 <InputNumber
                   min={MIN_PACKAGES}
                   style={{ width: "100%", marginTop: 8 }}
@@ -372,10 +921,13 @@ const SimplePackagesPage = () => {
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ ...tableCellStyle, width: 72 }}>#</th>
                     <th style={tableCellStyle}>Nombre del comprador</th>
                     <th style={tableCellStyle}>Descripcion del paquete</th>
                     <th style={tableCellStyle}>Celular</th>
                     <th style={tableCellStyle}>Sucursal destino</th>
+                    <th style={tableCellStyle}>Espacios delivery</th>
+                    <th style={tableCellStyle}>TamaÃ±o</th>
                     <th style={tableCellStyle}>Monto que cubriras del servicio</th>
                     <th style={tableCellStyle}>Saldo del paquete</th>
                     <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
@@ -385,6 +937,9 @@ const SimplePackagesPage = () => {
                 <tbody>
                   {rows.map((row, index) => (
                     <tr key={row.key}>
+                      <td style={tableCellStyle}>
+                        <Typography.Text strong>{monthlyPackageCount + index + 1}</Typography.Text>
+                      </td>
                       <td style={tableCellStyle}>
                         <Input
                           value={row.comprador}
@@ -427,14 +982,26 @@ const SimplePackagesPage = () => {
                       </td>
                       <td style={tableCellStyle}>
                         <InputNumber
+                          min={1}
+                          style={{ width: "100%" }}
+                          value={Number(row.delivery_spaces || 1)}
+                          onChange={(value) => updateRow(index, { delivery_spaces: Math.max(1, Number(value || 1)) })}
+                        />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <Input value={row.package_size === "grande" ? "Grande" : "Estandar"} readOnly />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <InputNumber
                           min={0}
+                          max={Number(row.precio_total || 0)}
                           style={{ width: "100%" }}
                           addonBefore="Bs."
                           value={Number(row.amortizacion_vendedor || 0)}
                           onChange={(value) =>
                             updateRow(index, {
                               amortizacion_vendedor: Math.min(
-                                Number(row.precio_paquete || 0),
+                                Number(row.precio_total || 0),
                                 Math.max(0, Number(value || 0))
                               ),
                             })
@@ -470,7 +1037,7 @@ const SimplePackagesPage = () => {
               {rows.map((row, index) => (
                 <div key={row.key} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
                   <div className="mb-3 flex items-center justify-between">
-                    <Typography.Text strong>Paquete {index + 1}</Typography.Text>
+                    <Typography.Text strong>Paquete #{monthlyPackageCount + index + 1}</Typography.Text>
                     <Typography.Text type="secondary">
                       Total: Bs. {Number(row.precio_total || 0).toFixed(2)}
                     </Typography.Text>
@@ -521,19 +1088,38 @@ const SimplePackagesPage = () => {
                         onChange={(value) => updateRow(index, { destino_sucursal_id: String(value || "") })}
                       />
                     </div>
+                    <div>
+                      <Typography.Text strong>Espacios delivery</Typography.Text>
+                      <InputNumber
+                        className="mt-1"
+                        min={1}
+                        style={{ width: "100%" }}
+                        value={Number(row.delivery_spaces || 1)}
+                        onChange={(value) => updateRow(index, { delivery_spaces: Math.max(1, Number(value || 1)) })}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text strong>TamaÃ±o</Typography.Text>
+                      <Input
+                        className="mt-1"
+                        value={row.package_size === "grande" ? "Grande" : "Estandar"}
+                        readOnly
+                      />
+                    </div>
                     <div className="grid grid-cols-1 gap-3">
                       <div>
                         <Typography.Text strong>Monto que cubriras del servicio</Typography.Text>
                         <InputNumber
                           className="mt-1"
                           min={0}
+                          max={Number(row.precio_total || 0)}
                           style={{ width: "100%" }}
                           addonBefore="Bs."
                           value={Number(row.amortizacion_vendedor || 0)}
                           onChange={(value) =>
                             updateRow(index, {
                               amortizacion_vendedor: Math.min(
-                                Number(row.precio_paquete || 0),
+                                Number(row.precio_total || 0),
                                 Math.max(0, Number(value || 0))
                               ),
                             })
@@ -577,7 +1163,7 @@ const SimplePackagesPage = () => {
                 setPackageCount(MIN_PACKAGES);
                 setGeneralDescription("");
                 setSelectedDestinationId(String(selectedOriginId || ""));
-                setRows(resizeDraftRows(MIN_PACKAGES, [], sellerConfig));
+                setRows(rebuildRows(MIN_PACKAGES, []));
               }}
             >
               Limpiar

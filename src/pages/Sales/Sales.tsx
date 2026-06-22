@@ -1,4 +1,5 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -12,12 +13,15 @@ import { UserContext } from "../../context/userContext";
 import ProductSellerViewModal from "../Seller/ProductSellerViewModal";
 import useProductsFlat from "../../hooks/useProductsFlat.tsx";
 import QRScanner from "./QRScanner.tsx";
+import StockQRInfoModal from "../StockManagement/StockQRInfoModal.tsx";
+import { normalizeRole } from "../../utils/role";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 
 export const Sales = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showInfoQRScanner, setShowInfoQRScanner] = useState(false);
   const { user }: any = useContext(UserContext);
-  const normalizedRole = String(user?.role || "").toLowerCase();
+  const normalizedRole = normalizeRole(user?.role);
   const isAdmin = normalizedRole === "admin";
   const isOperator = normalizedRole === "operator";
   //console.log ("🚀 user en Sales:", user);
@@ -72,7 +76,7 @@ export const Sales = () => {
         const vendedor = await getSellerAPI(user.id_vendedor);
 
         if (vendedor?.pago_sucursales?.length > 0) {
-          const sucursales = vendedor.pago_sucursales.map((s: any) => ({
+          const sucursales = vendedor.pago_sucursales.filter((s: any) => s?.activo !== false).map((s: any) => ({
             value: s.id_sucursal?.$oid || s.id_sucursal,
             label: s.sucursalName,
           }));
@@ -656,6 +660,15 @@ export const Sales = () => {
                         Agregar por QR
                       </Button>
                     )}
+                    {(isAdmin || isOperator) && (
+                      <Button
+                        icon={<InfoCircleOutlined />}
+                        className="text-mobile-sm xl:text-desktop-sm"
+                        onClick={() => setShowInfoQRScanner(true)}
+                      >
+                        Informacion QR
+                      </Button>
+                    )}
                   </Space>
                 </Col>
               </Row>
@@ -709,6 +722,13 @@ export const Sales = () => {
               />
             </div>
           )}
+          <StockQRInfoModal
+            open={showInfoQRScanner}
+            onClose={() => setShowInfoQRScanner(false)}
+            sellerLabel="Cualquier vendedor"
+            sucursalId={fallbackSucursalId || undefined}
+            sucursalLabel="Sucursal actual"
+          />
         </Col>
       </Row>
       <ProductSellerViewModal

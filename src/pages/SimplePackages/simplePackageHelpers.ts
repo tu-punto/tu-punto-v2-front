@@ -4,6 +4,7 @@ export type SimplePackageDraftRow = {
   telefono_comprador: string;
   descripcion_paquete: string;
   package_size: "estandar" | "grande";
+  delivery_spaces?: number;
   destino_sucursal_id?: string;
   precio_paquete_unitario: number;
   precio_paquete: number;
@@ -24,14 +25,16 @@ export const buildPackagePricing = (
   amortizacion: number,
   saldoPorPaquete: number,
   packageSize: "estandar" | "grande",
-  branchRoutePrice = 0
+  branchRoutePrice = 0,
+  largeUnitPrice?: number,
+  deliverySpaces = 1
 ) => {
-  const multiplier = packageSize === "grande" ? 2 : 1;
   const precioPaqueteUnitario = roundCurrency(unitPrice);
-  const precioPaquete = roundCurrency(precioPaqueteUnitario * multiplier);
-  const deudaVendedor = roundCurrency(amortizacion);
+  const precioPaquete = roundCurrency(packageSize === "grande" ? Number(largeUnitPrice ?? unitPrice) : unitPrice);
   const precioEntreSucursal = roundCurrency(branchRoutePrice);
-  const deudaComprador = roundCurrency(Math.max(0, precioPaquete + precioEntreSucursal - deudaVendedor));
+  const precioTotal = roundCurrency(precioPaquete + precioEntreSucursal);
+  const deudaVendedor = roundCurrency(Math.min(Math.max(0, amortizacion), precioTotal));
+  const deudaComprador = roundCurrency(Math.max(0, precioTotal - deudaVendedor));
 
   return {
     precio_paquete_unitario: precioPaqueteUnitario,
@@ -39,18 +42,20 @@ export const buildPackagePricing = (
     amortizacion_vendedor: deudaVendedor,
     saldo_por_paquete: roundCurrency(saldoPorPaquete),
     deuda_comprador: deudaComprador,
+    delivery_spaces: Math.max(1, Number(deliverySpaces || 1)),
     precio_entre_sucursal: precioEntreSucursal,
-    precio_total: roundCurrency(precioPaquete + precioEntreSucursal),
+    precio_total: precioTotal,
   };
 };
 
 export const createDraftRow = (
   index: number,
-  config: { precio_paquete: number; amortizacion: number; saldo_por_paquete: number },
+  config: { precio_paquete: number; precio_paquete_grande?: number; amortizacion: number; saldo_por_paquete: number },
   existing?: Partial<SimplePackageDraftRow>
 ): SimplePackageDraftRow => {
   const packageSize = existing?.package_size === "grande" ? "grande" : "estandar";
   const routePrice = Number(existing?.precio_entre_sucursal || 0);
+  const deliverySpaces = Math.max(1, Number(existing?.delivery_spaces || 1));
   const saldoPorPaquete = Number(existing?.saldo_por_paquete ?? config.saldo_por_paquete ?? 0);
   const amortizacion = Number(existing?.amortizacion_vendedor ?? config.amortizacion ?? 0);
   const initialPaymentMethod =
@@ -63,6 +68,7 @@ export const createDraftRow = (
     telefono_comprador: existing?.telefono_comprador || "",
     descripcion_paquete: existing?.descripcion_paquete || "",
     package_size: packageSize,
+    delivery_spaces: deliverySpaces,
     destino_sucursal_id: existing?.destino_sucursal_id || "",
     esta_pagado: existing?.esta_pagado || "no",
     metodo_pago: initialPaymentMethod,
@@ -72,7 +78,9 @@ export const createDraftRow = (
       amortizacion,
       saldoPorPaquete,
       packageSize,
-      routePrice
+      routePrice,
+      config.precio_paquete_grande,
+      deliverySpaces
     ),
   };
 };
@@ -80,7 +88,7 @@ export const createDraftRow = (
 export const resizeDraftRows = (
   count: number,
   rows: SimplePackageDraftRow[],
-  config: { precio_paquete: number; amortizacion: number; saldo_por_paquete: number }
+  config: { precio_paquete: number; precio_paquete_grande?: number; amortizacion: number; saldo_por_paquete: number }
 ) => {
   return Array.from({ length: count }, (_, index) => createDraftRow(index, config, rows[index]));
 };
@@ -112,7 +120,7 @@ export const calculateSimplePackageTotals = (rows: SimplePackageDraftRow[]) =>
 export const applyPackagePatch = (
   row: any,
   patch: Record<string, unknown>,
-  config?: { precio_paquete?: number; amortizacion?: number; saldo_por_paquete?: number }
+  config?: { precio_paquete?: number; precio_paquete_grande?: number; amortizacion?: number; saldo_por_paquete?: number }
 ) => {
   const nextSize =
     patch.package_size === "grande"
@@ -120,7 +128,21 @@ export const applyPackagePatch = (
       : patch.package_size === "estandar"
         ? "estandar"
         : row.package_size;
-  const unitPrice = Number(config?.precio_paquete ?? (row?.precio_paquete_unitario || 0));
+  const currentPackagePrice = Number(row?.precio_paquete || 0);
+  const currentUnitPrice = Number(row?.precio_paquete_unitario || 0);
+  const hasConfigSmallPrice = config?.precio_paquete !== undefined && config?.precio_paquete !== null && Number(config.precio_paquete) > 0;
+  const hasConfigLargePrice =
+    config?.precio_paquete_grande !== undefined &&
+    config?.precio_paquete_grande !== null &&
+    Number(config.precio_paquete_grande) > 0;
+  const unitPrice = hasConfigSmallPrice
+    ? Number(config?.precio_paquete || 0)
+    : currentUnitPrice || (nextSize === "estandar" ? currentPackagePrice : 0);
+  const largeUnitPrice = hasConfigLargePrice
+    ? Number(config?.precio_paquete_grande || 0)
+    : nextSize === "grande" && currentPackagePrice > unitPrice
+      ? currentPackagePrice
+      : undefined;
   const amortizacion = Number(
     patch.amortizacion_vendedor ?? config?.amortizacion ?? (row?.amortizacion_vendedor || 0)
   );
@@ -128,12 +150,15 @@ export const applyPackagePatch = (
     patch.saldo_por_paquete ?? config?.saldo_por_paquete ?? (row?.saldo_por_paquete || 0)
   );
   const branchRoutePrice = Number(patch.precio_entre_sucursal ?? (row?.precio_entre_sucursal || 0));
+  const deliverySpaces = Math.max(1, Number(patch.delivery_spaces ?? row?.delivery_spaces ?? 1));
   const pricing = buildPackagePricing(
     unitPrice,
     amortizacion,
     saldoPorPaquete,
     nextSize,
-    branchRoutePrice
+    branchRoutePrice,
+    largeUnitPrice,
+    deliverySpaces
   );
   const paid = patch.esta_pagado === "si" || patch.esta_pagado === "no" ? patch.esta_pagado : row.esta_pagado;
   const metodoPago =

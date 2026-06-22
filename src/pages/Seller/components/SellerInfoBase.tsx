@@ -20,6 +20,7 @@ import {
   PhoneOutlined,
   MailOutlined,
   PercentageOutlined,
+  DeleteOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
@@ -46,6 +47,7 @@ import {
   cancelSellerServiceDeclineAPI,
   requestSellerPaymentAPI,
   updateSellerAPI,
+  createSellerRecoveryChargeAPI,
 } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
@@ -85,7 +87,7 @@ const formatPaymentDate = (value: any) =>
   value ? parsePaymentDate(value).format("DD/MM/YYYY") : "";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
+const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any) => {
   const [form] = Form.useForm();
 
   /* ───── estado global para submit ───── */
@@ -114,11 +116,14 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
   const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
   const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
   const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
+  const [recoveryChargeModalOpen, setRecoveryChargeModalOpen] = useState(false);
+  const [recoveryChargeLoading, setRecoveryChargeLoading] = useState(false);
   const [declineServiceLoading, setDeclineServiceLoading] = useState(false);
   const [declineServiceDate, setDeclineServiceDate] = useState(
     seller?.declinacion_servicio_fecha || null
   );
   const [qrFileList, setQrFileList] = useState<any[]>([]);
+  const [recoveryChargeForm] = Form.useForm();
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
@@ -149,8 +154,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
       fecha_vigencia: sellerData?.fecha_vigencia ? dayjs(sellerData.fecha_vigencia, "D-M-YYYY") : null,
       mail: sellerData?.mail || "",
       comision_porcentual: sellerData?.comision_porcentual || 0,
-      amortizacion: sellerData?.amortizacion || 0,
-      precio_paquete: sellerData?.precio_paquete || 0,
+      amortizacion: sellerData?.amortizacion ?? null,
+      precio_paquete: sellerData?.precio_paquete ?? null,
       sucursales: branches,
     };
   };
@@ -323,7 +328,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta actualizada correctamente");
       await fetchSales(); // Refresca ventas
-      onSuccess();
+      onRefresh?.();
     } else {
       message.error("Error al actualizar la venta");
     }
@@ -335,7 +340,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     if (res?.success) {
       message.success("Venta eliminada correctamente");
       await fetchSales(); // Refresca ventas
-      onSuccess();
+      onRefresh?.();
     } else {
       message.error("Error al eliminar la venta");
     }
@@ -488,6 +493,32 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
     }
   };
 
+  const handleCreateRecoveryCharge = async () => {
+    if (!seller?.key) return;
+
+    const values = await recoveryChargeForm.validateFields();
+    setRecoveryChargeLoading(true);
+    try {
+      const res = await createSellerRecoveryChargeAPI(String(seller.key), {
+        monto: Number(values.monto || 0),
+        concepto: values.concepto,
+        fecha: values.fecha?.toISOString(),
+      });
+      if (!res?.success) throw new Error("No se pudo registrar el cobro");
+
+      message.success("Cobro de recuperacion registrado");
+      recoveryChargeForm.resetFields();
+      setRecoveryChargeModalOpen(false);
+      setRefreshKey((prev) => prev + 1);
+      onSuccess();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo registrar el cobro de recuperacion.");
+    } finally {
+      setRecoveryChargeLoading(false);
+    }
+  };
+
   /* ─────────── submit final ─────────── */
   const handleFinish = async (formValues: any) => {
     setLoading(true);
@@ -617,6 +648,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
 
       {!isSeller && (
         <div className="mb-5 flex justify-center gap-3">
+          <Button onClick={() => setRecoveryChargeModalOpen(true)}>
+            Cobro recuperacion
+          </Button>
           {declineServiceDate ? (
             <Button loading={declineServiceLoading} onClick={handleCancelDeclineService}>
               Anular declinacion
@@ -633,6 +667,39 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           )}
         </div>
       )}
+
+      <Modal
+        title="Cobro de recuperacion"
+        open={recoveryChargeModalOpen}
+        onCancel={() => {
+          setRecoveryChargeModalOpen(false);
+          recoveryChargeForm.resetFields();
+        }}
+        onOk={handleCreateRecoveryCharge}
+        okText="Registrar cobro"
+        cancelText="Cancelar"
+        confirmLoading={recoveryChargeLoading}
+      >
+        <Form form={recoveryChargeForm} layout="vertical" initialValues={{ fecha: dayjs() }}>
+          <Form.Item
+            name="monto"
+            label="Monto"
+            rules={[{ required: true, message: "Ingresa el monto" }]}
+          >
+            <InputNumber min={0.01} precision={2} addonBefore="Bs." style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item
+            name="concepto"
+            label="Concepto"
+            rules={[{ required: true, message: "Ingresa el concepto" }]}
+          >
+            <Input placeholder="Ej. Recuperacion por error de envio" />
+          </Form.Item>
+          <Form.Item name="fecha" label="Fecha" rules={[{ required: true }]}>
+            <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Solicitar cobro"
@@ -715,8 +782,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
           mail: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
-          amortizacion: seller.amortizacion || 0,
-          precio_paquete: seller.precio_paquete || 0,
+          amortizacion: seller.amortizacion ?? null,
+          precio_paquete: seller.precio_paquete ?? null,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -789,7 +856,10 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                       if (!serviceFlags.hasSimplePackageServiceEnabled) {
                         return Promise.resolve();
                       }
-                      const precioPaquete = Number(getFieldValue("precio_paquete") || 0);
+                      const precioPaquete = getFieldValue("precio_paquete");
+                      if (value === null || value === undefined || precioPaquete === null || precioPaquete === undefined) {
+                        return Promise.resolve();
+                      }
                       if (Number(value || 0) <= precioPaquete) {
                         return Promise.resolve();
                       }
@@ -804,8 +874,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                   min={0}
                   disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
                   style={{ width: "100%" }}
-                  placeholder="0"
+                  placeholder="Vacío"
                   addonBefore="Bs."
+                  addonAfter={
+                  <Button
+                    type="text"
+                    aria-label="Borrar amortización"
+                    title="Borrar amortización"
+                    icon={<DeleteOutlined />}
+                    disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                    onClick={() => form.setFieldValue("amortizacion", null)}
+                  />
+                  }
                 />
               </Form.Item>
             </Col>
@@ -815,8 +895,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, seller }: any) => {
                   min={0}
                   disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
                   style={{ width: "100%" }}
-                  placeholder="0"
+                  placeholder="Vacío"
                   addonBefore="Bs."
+                  addonAfter={
+                  <Button
+                    type="text"
+                    aria-label="Borrar precio por paquete"
+                    title="Borrar precio por paquete"
+                    icon={<DeleteOutlined />}
+                    disabled={isSeller || !serviceFlags.hasSimplePackageServiceEnabled}
+                    onClick={() => form.setFieldValue("precio_paquete", null)}
+                  />
+                  }
                 />
               </Form.Item>
             </Col>

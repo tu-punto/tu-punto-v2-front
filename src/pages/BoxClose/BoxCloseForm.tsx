@@ -12,8 +12,10 @@ import {
   Select,
   Modal,
   Radio,
+  Switch,
+  DatePicker,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { IBoxClose } from "../../models/boxClose";
 import {
@@ -23,6 +25,7 @@ import {
 } from "../../helpers/shippingHelpers";
 import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
+import { UserContext } from "../../context/userContext";
 const { Title } = Typography;
 type Metodo = "efectivo" | "qr";
 type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_cliente";
@@ -30,21 +33,25 @@ type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_c
 interface OperacionAdicional {
   tipo: TipoOperacion;
   descripcion: string;
+  concepto?: string;
+  categoria?: string;
   cliente?: string;
   metodo: Metodo;
   monto: number;
+  afecta_empresa?: boolean;
+  fecha?: string;
+  id_vendedor?: string;
+  id_sucursal?: string;
+  finance_flux_id?: string;
 }
 
 const roundAmount = (value: number) => Number(value.toFixed(2));
 
+const getDefaultOperationCategory = (tipo: string) =>
+  tipo === "gasto" || tipo === "gasto_profit" ? "Gasto (Cierre)" : "Ingreso (Cierre)";
+
 const getOperationSign = (tipo: TipoOperacion) =>
   tipo === "gasto" || tipo === "gasto_profit" ? -1 : 1;
-
-const mapTipoToApi = (tipo: TipoOperacion): "delivery" | "gasto_profit" | "pago_cliente" => {
-  if (tipo === "ingreso") return "delivery";
-  if (tipo === "gasto") return "gasto_profit";
-  return tipo;
-};
 
 const tipoLabel = (tipo: string) => {
   if (tipo === "gasto" || tipo === "gasto_profit") return "Gastos (Salidas)";
@@ -81,6 +88,21 @@ const BoxCloseForm = ({
   const [operations, setOperations] = useState<OperacionAdicional[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [operationForm] = Form.useForm();
+  const operationAffectsCompany = Form.useWatch("afecta_empresa", operationForm);
+  const { user } = useContext(UserContext) || {};
+  const currentSucursalId = localStorage.getItem("sucursalId") || "";
+  const currentUserId = user?._id || user?.id;
+  const currentUserAdmin = admins.find((admin) => String(admin._id) === String(currentUserId));
+  const currentUserOption = currentUserId
+    ? {
+        label: currentUserAdmin?.name || user?.nombre_vendedor || user?.name || user?.email || "Usuario actual",
+        value: currentUserId,
+      }
+    : undefined;
+  const responsibleOptions =
+    currentUserOption && !admins.some((admin) => String(admin._id) === String(currentUserOption.value))
+      ? [currentUserOption, ...admins.map((admin) => ({ label: admin.name, value: admin._id }))]
+      : admins.map((admin) => ({ label: admin.name, value: admin._id }));
 
   const getOperationTotals = (ops: OperacionAdicional[]) => {
     let deltaEf = 0;
@@ -158,12 +180,18 @@ const BoxCloseForm = ({
   }
 
   useEffect(() => {
-    const fetchAdmins = async () => {
-      const data = await getAdminsAPI();
-      if (data) setAdmins(data);
+    const loadModalData = async () => {
+      const adminsData = await getAdminsAPI();
+      if (adminsData) setAdmins(adminsData);
     };
-    fetchAdmins();
+    void loadModalData();
   }, []);
+
+  useEffect(() => {
+    if (mode !== "create" || !currentUserOption || form.getFieldValue("responsable")) return;
+    form.setFieldValue("responsable", currentUserOption);
+  }, [mode, currentUserOption?.value, currentUserOption?.label, form]);
+
   const buildClosingAtISO = () => {
     const now = new Date();
     const selected = selectedDate?.toDate();
@@ -319,6 +347,15 @@ const BoxCloseForm = ({
   }, [coinTotals, billTotals, Form.useWatch("bancario_real", form), Form.useWatch("bancario_esperado", form)]);
 
   const openOperationModal = () => {
+    operationForm.setFieldsValue({
+      afecta_empresa: true,
+      tipo: "ingreso",
+      metodo: "efectivo",
+      categoria: getDefaultOperationCategory("ingreso"),
+      fecha: selectedDate || dayjs(),
+      id_sucursal: currentSucursalId || undefined,
+      id_vendedor: undefined,
+    });
     setModalVisible(true);
   };
 
@@ -332,7 +369,13 @@ const BoxCloseForm = ({
       const newOp = await operationForm.validateFields();
       const op: OperacionAdicional = {
         ...newOp,
+        tipo: newOp.tipo || "ingreso",
+        categoria: getDefaultOperationCategory(newOp.tipo || "ingreso"),
+        descripcion: String(newOp.concepto || "").trim(),
+        fecha: newOp.fecha?.toDate?.()?.toISOString?.() || newOp.fecha,
         monto: Math.abs(Number(newOp.monto || 0)), // siempre positivo
+        id_sucursal: currentSucursalId || undefined,
+        id_vendedor: undefined,
       };
 
       const updatedOperations = [...operations, op];
@@ -368,7 +411,7 @@ const BoxCloseForm = ({
       ];
       const operationsPayload = operations.map((op) => ({
         ...op,
-        tipo: mapTipoToApi(op.tipo),
+        descripcion: op.descripcion || op.concepto || "",
       }));
 
       if (mode === "edit" && initialData?._id) {
@@ -433,7 +476,8 @@ const BoxCloseForm = ({
                 columns={[
                   { title: "Tipo", dataIndex: "tipo", key: "tipo", render: (v) => tipoLabel(String(v || "")) },
                   { title: "Método", dataIndex: "metodo", key: "metodo", render: (v) => metodoLabel(String(v || "")) },
-                  { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v) => v || "-" },
+                  { title: "Empresa", dataIndex: "afecta_empresa", key: "afecta_empresa", render: (v) => (v === false ? "No" : "Si") },
+                  { title: "Categoria", dataIndex: "categoria", key: "categoria", render: (v) => v || "-" },
                   { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
                   { title: "Monto", dataIndex: "monto", key: "monto", render: (monto) => `Bs. ${Number(monto).toFixed(2)}` },
                   {
@@ -459,8 +503,25 @@ const BoxCloseForm = ({
             onCancel={closeOperationModal}
         >
           <Form form={operationForm} layout="vertical">
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <Form.Item
+                name="afecta_empresa"
+                label="Afecta al dinero de la empresa"
+                valuePropName="checked"
+                initialValue={true}
+                style={{ marginBottom: 0 }}
+              >
+                <Switch checkedChildren="Si" unCheckedChildren="No" />
+              </Form.Item>
+            </Card>
             <Form.Item name="tipo" label="Tipo" rules={[{ required: true }]}>
-              <Radio.Group buttonStyle="solid" className="w-full">
+              <Radio.Group
+                buttonStyle="solid"
+                className="w-full"
+                onChange={(event) => {
+                  operationForm.setFieldValue("categoria", getDefaultOperationCategory(event.target.value));
+                }}
+              >
                 <Radio.Button value="ingreso" style={{ width: "50%", textAlign: "center" }}>
                   Ingresos (Entradas)
                 </Radio.Button>
@@ -470,7 +531,11 @@ const BoxCloseForm = ({
               </Radio.Group>
             </Form.Item>
 
-            <Form.Item name="metodo" label="Método" rules={[{ required: true }]}>
+            <Form.Item name="fecha" label="Fecha" rules={[{ required: true }]}>
+              <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
+            </Form.Item>
+
+            <Form.Item name="metodo" label="Metodo" rules={[{ required: true }]}>
               <Radio.Group buttonStyle="solid" className="w-full">
                 <Radio.Button value="efectivo" style={{ width: "50%", textAlign: "center" }}>
                   Efectivo
@@ -481,25 +546,18 @@ const BoxCloseForm = ({
               </Radio.Group>
             </Form.Item>
 
-            {/* Campo cliente temporalmente deshabilitado al simplificar Tipo en Ingreso/Gasto */}
-            {/* <Form.Item shouldUpdate noStyle>
-              {() => {
-                const t = operationForm.getFieldValue("tipo");
-                return t === "pago_cliente" ? (
-                    <Form.Item name="cliente" label="Cliente" rules={[{ required: true }]}>
-                      <Input />
-                    </Form.Item>
-                ) : null;
-              }}
-            </Form.Item> */}
-
-            <Form.Item name="descripcion" label="Descripción" rules={[{ required: true }]}>
+            <Form.Item name="concepto" label="Concepto" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
 
             <Form.Item name="monto" label="Monto" rules={[{ required: true }]}>
               <InputNumber min={0} className="w-full" />
             </Form.Item>
+            {operationAffectsCompany === false && (
+              <Typography.Text type="secondary">
+                Esta operacion solo ajustara la caja de la sucursal y no aparecera en Gastos e Ingresos.
+              </Typography.Text>
+            )}
           </Form>
         </Modal>
         <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
@@ -513,16 +571,13 @@ const BoxCloseForm = ({
                 rules={[{ required: true, message: "Campo requerido" }]}
               >
                 <Select
-                  placeholder="Selecciona un responsable"
+                  placeholder="Responsable"
                   labelInValue
-                  disabled={mode === "edit"}
+                  disabled
                   onChange={(option) => {
                     form.setFieldValue("responsable", option); // <- ¡simplemente esto!
                   }}
-                  options={admins.map((admin) => ({
-                    label: admin.name,
-                    value: admin._id,
-                  }))}
+                  options={responsibleOptions}
                 />
               </Form.Item>
             </Col>

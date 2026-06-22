@@ -23,7 +23,7 @@ export default function LoginForm({
   useEffect(() => {
     if (!showBranchSelect) return;
     getSucursalsAPI()
-      .then((data) => setBranches(data))
+      .then((data) => setBranches(Array.isArray(data) ? data : []))
       .catch(() => message.error("No se pudieron cargar las sucursales"));
   }, [showBranchSelect]);
 
@@ -67,7 +67,7 @@ export default function LoginForm({
           rules={[{ required: true, message: "Selecciona una sucursal" }]}
         >
           <Select placeholder="Sucursal" size="large">
-            {branches.map((b) => (
+            {(Array.isArray(branches) ? branches : []).map((b) => (
               <Select.Option key={b._id} value={b._id}>
                 {b.nombre}
               </Select.Option>

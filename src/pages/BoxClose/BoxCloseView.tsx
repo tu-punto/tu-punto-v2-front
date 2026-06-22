@@ -29,22 +29,14 @@ const BoxCloseView = ({ boxClose }: Props) => {
     const metodoLabel = (metodo: string) => (metodo === "qr" ? "QR/Bancario" : "Efectivo");
 
     const {
-        fecha,
-        responsible,
         efectivo_inicial,
         ventas_efectivo,
         efectivo_esperado,
         efectivo_real,
         diferencia_efectivo,
-        bancario_inicial,
-        ventas_qr,
-        bancario_esperado,
-        bancario_real,
-        diferencia_bancario,
         observaciones,
         total_coins,
         total_bills,
-        id_efectivo_diario,
     } = boxClose;
 
     const monedas = (boxClose.efectivo_diario || [])
@@ -237,7 +229,8 @@ const BoxCloseView = ({ boxClose }: Props) => {
                             columns={[
                                 { title: "Tipo", dataIndex: "tipo", key: "tipo", render: (v: any) => tipoLabel(String(v || "")) },
                                 { title: "Método", dataIndex: "metodo", key: "metodo", render: (v: any) => metodoLabel(String(v || "")) },
-                                { title: "Cliente", dataIndex: "cliente", key: "cliente", render: (v: any) => v || "-" },
+                                { title: "Empresa", dataIndex: "afecta_empresa", key: "afecta_empresa", render: (v: any) => v === false ? "No" : "Si" },
+                                { title: "Categoria", dataIndex: "categoria", key: "categoria", render: (v: any) => v || "-" },
                             { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
                             { title: "Monto", dataIndex: "monto", key: "monto", render: (v: any) => `Bs. ${Number(v || 0).toFixed(2)}` },
                         ]}

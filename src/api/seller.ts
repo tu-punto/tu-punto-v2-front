@@ -7,7 +7,7 @@ export const getSellersAPI = async (params?: {
     status?: "activo" | "debe_renovar" | "ya_no_es_cliente" | "declinando_servicio";
     pendingPayment?: "con_deuda" | "sin_deuda";
     assignedPaymentDay?: "sin_solicitud" | "8" | "18" | "28";
-    sortBy?: "fecha_pago_asignada";
+    sortBy?: "nombre" | "estado" | "pago_pendiente" | "fecha_vigencia" | "fecha_pago_asignada" | "pago_mensual" | "comision_porcentual" | "emite_factura";
     sortOrder?: "asc" | "desc";
     page?: number;
     pageSize?: number;
@@ -116,6 +116,18 @@ export const cancelSellerServiceDeclineAPI = async (sellerId: string) => {
 export const getSellerDebtsAPI  = async (sellerId: string) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}/debts`)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const createSellerRecoveryChargeAPI = async (
+    sellerId: string,
+    payload: { monto: number; concepto: string; fecha?: string }
+) => {
+    try {
+        const res = await apiClient.post(`/seller/${sellerId}/recovery-charge`, payload)
         return { success: true, data: res.data }
     } catch (error) {
         parseError(error as AxiosError)

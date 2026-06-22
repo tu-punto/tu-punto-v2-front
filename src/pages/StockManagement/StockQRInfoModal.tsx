@@ -29,7 +29,6 @@ type VariantInfoDetails = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  sellerId?: string | null;
   sellerLabel?: string;
   sucursalId?: string;
   sucursalLabel?: string;
@@ -47,7 +46,7 @@ const formatDate = (value?: string | null) => {
   return parsed.toLocaleDateString("es-BO");
 };
 
-const StockQRInfoModal = ({ open, onClose, sellerId, sellerLabel, sucursalId, sucursalLabel }: Props) => {
+const StockQRInfoModal = ({ open, onClose, sellerLabel, sucursalId, sucursalLabel }: Props) => {
   const [scannerVisible, setScannerVisible] = useState(true);
   const [scannerSession, setScannerSession] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -88,11 +87,6 @@ const StockQRInfoModal = ({ open, onClose, sellerId, sellerLabel, sucursalId, su
   };
 
   const handleScannedVariant = async (item: any) => {
-    if (sellerId && String(item?.id_vendedor || "") !== String(sellerId)) {
-      message.error("El QR escaneado no pertenece al vendedor seleccionado.");
-      return;
-    }
-
     setLoading(true);
     try {
       const product = await getProductByIdAPI(String(item?.id_producto || ""));
@@ -134,7 +128,7 @@ const StockQRInfoModal = ({ open, onClose, sellerId, sellerLabel, sucursalId, su
     }
   };
 
-  const isReady = Boolean(sellerId && sucursalId && sucursalId !== "all");
+  const isReady = Boolean(sucursalId && sucursalId !== "all");
 
   return (
     <Modal
@@ -160,7 +154,7 @@ const StockQRInfoModal = ({ open, onClose, sellerId, sellerLabel, sucursalId, su
               Consulta QR
             </Title>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {sellerLabel || "Vendedor"} | {sucursalLabel || "Sucursal actual"}
+              {sellerLabel || "Cualquier vendedor"} | {sucursalLabel || "Sucursal actual"}
             </Text>
           </div>
           <Button icon={<ReloadOutlined />} onClick={handleRestartScanner} disabled={!isReady}>
@@ -171,7 +165,7 @@ const StockQRInfoModal = ({ open, onClose, sellerId, sellerLabel, sucursalId, su
         {!isReady ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="Selecciona un vendedor y una sucursal para consultar informacion por QR."
+            description="Selecciona una sucursal para consultar informacion por QR."
           />
         ) : (
           <>

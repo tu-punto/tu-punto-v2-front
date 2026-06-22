@@ -110,6 +110,37 @@ const updateShippingAPI = async (updateShippingData: any, shippingId: string) =>
     return { success: false };
   }
 };
+
+const markSellerWithdrawalAPI = async (payload: {
+  shippingIds?: string[];
+  externalSaleIds?: string[];
+  withdrawnAt?: string;
+}) => {
+  try {
+    const currentBranchId = localStorage.getItem("sucursalId") || undefined;
+    const res = await apiClient.post("/shipping/seller-withdrawal", {
+      ...payload,
+      currentBranchId,
+    });
+    return { success: true, ...res.data };
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
+const rejectCatalogOrderAPI = async (shippingId: string, reason: string) => {
+  try {
+    const res = await apiClient.post(`/shipping/${shippingId}/reject-catalog`, { reason });
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    return { success: false, ...(err.response?.data as object || {}) };
+  }
+};
 const addTemporaryProductsToShippingAPI = async (shippingId: string, productosTemporales: any[]) => {
   try {
     const res = await apiClient.put(`/shipping/${shippingId}/temporales`, {
@@ -141,6 +172,33 @@ const deleteShippingAPI = async (id: string) => {
     return { success: false };
   }
 };
+
+const getTrackingFreezeConfigAPI = async () => {
+  try {
+    const res = await apiClient.get("/tracking-freeze");
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
+const updateTrackingFreezeConfigAPI = async (enabled: boolean) => {
+  try {
+    const res = await apiClient.patch("/tracking-freeze", { enabled });
+    return { success: true, ...res.data };
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
 const getSalesHistoryAPI = async (
   date?: string,
   sucursalId?: string,
@@ -170,10 +228,14 @@ export {
   registerShippingAPI,
   registerSalesToShippingAPI,
   updateShippingAPI,
+  markSellerWithdrawalAPI,
   getShipingByIdsAPI,
   getShippingByIdAPI,
   getShippingsBySellerIdAPI,
   addTemporaryProductsToShippingAPI,
   deleteShippingAPI,
-  getSalesHistoryAPI
+  getSalesHistoryAPI,
+  getTrackingFreezeConfigAPI,
+  updateTrackingFreezeConfigAPI
+  ,rejectCatalogOrderAPI
 };

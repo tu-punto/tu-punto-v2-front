@@ -1,4 +1,4 @@
-import { Button, Empty, InputNumber, Modal, Select, Space, Spin, Typography, message } from "antd";
+import { Button, Empty, Modal, Select, Space, Spin, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { getSimplePackageBranchPricesAPI, upsertSimplePackageBranchPriceAPI } from "../../api/simplePackage";
 import { getSucursalsAPI } from "../../api/sucursal";
@@ -15,8 +15,6 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
   const [rows, setRows] = useState<any[]>([]);
   const [newOriginId, setNewOriginId] = useState("");
   const [newDestinationId, setNewDestinationId] = useState("");
-  const [newPrice, setNewPrice] = useState<number | null>(0);
-  const [editingPrices, setEditingPrices] = useState<Record<string, number>>({});
 
   const loadData = async () => {
     setLoading(true);
@@ -28,15 +26,9 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
       setBranches(Array.isArray(branchResponse) ? branchResponse : []);
       const nextRows = Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : [];
       setRows(nextRows);
-      setEditingPrices(
-        nextRows.reduce((acc: Record<string, number>, row: any) => {
-          acc[String(row?._id || `${row?.origen_sucursal?._id}-${row?.destino_sucursal?._id}`)] = Number(row?.precio || 0);
-          return acc;
-        }, {})
-      );
     } catch (error) {
       console.error(error);
-      message.error("No se pudieron cargar los precios entre sucursales");
+      message.error("No se pudieron cargar las rutas");
     } finally {
       setLoading(false);
     }
@@ -67,7 +59,7 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
     return branches
       .filter((branch: any) => {
         const branchId = String(branch?._id || "");
-        return branchId && branchId !== String(newOriginId) && !usedDestinations.has(branchId);
+        return branchId && !usedDestinations.has(branchId);
       })
       .map((branch: any) => ({
         value: String(branch?._id || ""),
@@ -75,19 +67,19 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
       }));
   }, [branches, newOriginId, rows]);
 
-  const handleUpsert = async (payload: { originBranchId: string; destinationBranchId: string; precio: number }) => {
+  const handleUpsert = async (payload: { originBranchId: string; destinationBranchId: string }) => {
     setSaving(true);
     try {
       const response = await upsertSimplePackageBranchPriceAPI(payload);
       if (!response.success) {
-        message.error(response.message || "No se pudo guardar el precio");
+        message.error(response.message || "No se pudo guardar la ruta");
         return false;
       }
       await loadData();
       return true;
     } catch (error) {
       console.error(error);
-      message.error("Error guardando el precio");
+      message.error("Error guardando la ruta");
       return false;
     } finally {
       setSaving(false);
@@ -96,7 +88,7 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
 
   return (
     <Modal
-      title="Precios entre sucursales"
+      title="Rutas"
       open={visible}
       onCancel={onClose}
       footer={null}
@@ -107,7 +99,7 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 14, padding: 16 }}>
             <Typography.Text strong>Nueva ruta</Typography.Text>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_32px_1fr_180px_auto] gap-3 items-end mt-3">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_32px_1fr_auto] gap-3 items-end mt-3">
               <Select
                 value={newOriginId || undefined}
                 onChange={(value) => {
@@ -129,13 +121,6 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
                 showSearch
                 optionFilterProp="label"
               />
-              <InputNumber
-                min={0}
-                value={newPrice}
-                onChange={setNewPrice}
-                addonBefore="Bs."
-                style={{ width: "100%" }}
-              />
               <Button
                 type="primary"
                 loading={saving}
@@ -144,21 +129,19 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
                   const ok = await handleUpsert({
                     originBranchId: newOriginId,
                     destinationBranchId: newDestinationId,
-                    precio: Number(newPrice || 0),
                   });
                   if (ok) {
                     setNewDestinationId("");
-                    setNewPrice(0);
                   }
                 }}
               >
-                Guardar
+                Crear ruta
               </Button>
             </div>
           </div>
 
           {rows.length === 0 ? (
-            <Empty description="Aun no hay precios entre sucursales configurados" />
+            <Empty description="Aun no hay rutas configuradas" />
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
               {rows.map((row: any) => {
@@ -168,7 +151,7 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
                     key={rowId}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1fr 32px 1fr 180px auto",
+                      gridTemplateColumns: "1fr 32px 1fr",
                       gap: 12,
                       alignItems: "center",
                       border: "1px solid #e5e7eb",
@@ -180,27 +163,6 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
                     <div style={{ fontWeight: 600 }}>{row?.origen_sucursal?.nombre || "Origen"}</div>
                     <div style={{ textAlign: "center", fontSize: 22, color: "#6b7280" }}>→</div>
                     <div style={{ fontWeight: 600 }}>{row?.destino_sucursal?.nombre || "Destino"}</div>
-                    <InputNumber
-                      min={0}
-                      value={editingPrices[rowId]}
-                      onChange={(value) =>
-                        setEditingPrices((current) => ({ ...current, [rowId]: Number(value || 0) }))
-                      }
-                      addonBefore="Bs."
-                      style={{ width: "100%" }}
-                    />
-                    <Button
-                      loading={saving}
-                      onClick={() =>
-                        void handleUpsert({
-                          originBranchId: String(row?.origen_sucursal?._id || row?.origen_sucursal || ""),
-                          destinationBranchId: String(row?.destino_sucursal?._id || row?.destino_sucursal || ""),
-                          precio: Number(editingPrices[rowId] || 0),
-                        })
-                      }
-                    >
-                      Guardar
-                    </Button>
                   </div>
                 );
               })}
