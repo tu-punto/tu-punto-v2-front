@@ -25,7 +25,7 @@ import {
     printShippingTemporaryLabel,
     toBase64Png
 } from "./shippingQrLabel";
-import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
+import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 
 const TZ = "America/La_Paz";
 const calculateEstimatedBranchPickupDate = (value?: unknown) => {
@@ -524,24 +524,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         return Array.from(merged.values());
     }, [products, shipping]);
 
-    const resolveDirectPrintPrinter = async () => {
-        const printers = await findQzPrinters();
-        if (!printers.length) return "";
-
-        const storedPrinter = localStorage.getItem("qzPrinterName") || "";
-        if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
-
-        const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
-        localStorage.setItem("qzPrinterName", selectedPrinter);
-        return selectedPrinter;
-    };
-
     const handlePrintShippingQRDirect = async () => {
         if (!shipping?._id) return;
 
         setQrLoading(true);
         try {
-            const printerName = await resolveDirectPrintPrinter();
+            const printerName = await resolvePreferredQzPrinter();
             if (!printerName) {
                 message.warning("No se encontraron impresoras en QZ Tray");
                 return;

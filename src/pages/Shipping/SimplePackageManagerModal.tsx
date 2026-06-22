@@ -30,7 +30,8 @@ import {
   ShippingLabelPrintOptions,
   toBase64Png,
 } from "./shippingQrLabel";
-import { createPixelConfig, findQzPrinters, qzPrint } from "../../utils/qzTray";
+import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import QzPrinterSelector from "./QzPrinterSelector";
 
 interface SimplePackageManagerModalProps {
   visible: boolean;
@@ -1118,19 +1119,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     }
   };
 
-  const resolveDirectPrintPrinter = async () => {
-    const printers = await findQzPrinters();
-    if (!printers.length) return "";
-
-    const storedPrinter = localStorage.getItem("qzPrinterName") || "";
-    if (storedPrinter && printers.includes(storedPrinter)) return storedPrinter;
-
-    const selectedPrinter = printers.find((name) => /epson|tm-l90|m313a/i.test(name)) || printers[0];
-    localStorage.setItem("qzPrinterName", selectedPrinter);
-    return selectedPrinter;
-  };
-
   const buildPrintOptionsContent = (draftOptions: ShippingLabelPrintOptions) => (
+    <div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
       <div>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Ancho ticket</div>
@@ -1166,10 +1156,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         />
       </div>
     </div>
+    <QzPrinterSelector />
+    </div>
   );
 
   const printSimplePackageRows = async (rowsToPrint: any[], options = labelPrintOptions) => {
-    const printerName = await resolveDirectPrintPrinter();
+    const printerName = await resolvePreferredQzPrinter();
     if (!printerName) {
       message.warning("No se encontraron impresoras en QZ Tray");
       return false;
@@ -1304,6 +1296,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     }
     Modal.confirm({
       title: "Crear pedidos simples",
+      width: 900,
       content: `Se crearán ${pendingRows.length} pedidos simples con método de pago: ${
         paymentMethod === "efectivo" ? "Efectivo" : paymentMethod === "qr" ? "QR" : "No pagado"
       }. ¿Continuar?`,
