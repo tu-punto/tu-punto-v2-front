@@ -929,7 +929,7 @@ const SimplePackagesPage = () => {
                     <th style={tableCellStyle}>Celular</th>
                     <th style={tableCellStyle}>Sucursal destino</th>
                     <th style={tableCellStyle}>Espacios delivery</th>
-                    <th style={tableCellStyle}>TamaÃ±o</th>
+                    <th style={tableCellStyle}>Tamaño</th>
                     <th style={tableCellStyle}>Monto que cubriras del servicio</th>
                     <th style={tableCellStyle}>Saldo del paquete</th>
                     <th style={tableCellStyle}>Precio del envio (sujeto a variacion segun el tamaño del paquete)</th>
@@ -1101,7 +1101,7 @@ const SimplePackagesPage = () => {
                       />
                     </div>
                     <div>
-                      <Typography.Text strong>TamaÃ±o</Typography.Text>
+                      <Typography.Text strong>Tamaño</Typography.Text>
                       <Input
                         className="mt-1"
                         value={row.package_size === "grande" ? "Grande" : "Estandar"}
