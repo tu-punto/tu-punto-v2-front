@@ -456,7 +456,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         getTotalDeliverySpacesForRows(normalizedRows, createOriginId)
       );
       const config =
-        String(createOriginId || "") === String(destinationId || "")
+        createUseEscalation && String(createOriginId || "") === String(destinationId || "")
           ? getRouteSimplePackageConfig(index, packageSize, routeId, index + 1) ||
             getCreateRowConfig(index, { ...row, package_size: packageSize }, index + 1)
           : getCreateRowConfig(index, { ...row, package_size: packageSize }, index + 1);
@@ -694,7 +694,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       setCreateSellerBranches(nextBranches);
       setCreateSellerConfig({
         precio_paquete: shouldUseEscalation ? Number(nextRanges[0]?.small_price ?? 0) : fixedPackagePrice,
-        precio_paquete_grande: shouldUseEscalation ? Number(nextRanges[0]?.large_price ?? 0) : fixedPackagePrice,
+        precio_paquete_grande: shouldUseEscalation ? Number(nextRanges[0]?.large_price ?? 0) : fixedPackagePrice * 2,
         amortizacion: Number(sellerResponse?.amortizacion ?? 0),
         saldo_por_paquete: 0,
       });
@@ -709,7 +709,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
             : fixedPackagePrice;
           const largePrice = shouldUseEscalation
             ? getSimpleEscalatedPriceFromRanges(nextRanges, position, "grande")
-            : fixedPackagePrice;
+            : fixedPackagePrice * 2;
           const nextConfig = {
             precio_paquete: smallPrice,
             precio_paquete_grande: largePrice,
@@ -1520,7 +1520,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                     <Button onClick={handleApplyCreateDescription}>Usar en todos</Button>
                   </div>
 
-                  <div style={{ border: "1px solid #dbeafe", background: "#eff6ff", borderRadius: 8, padding: 12 }}>
+                  {createUseEscalation && <div style={{ border: "1px solid #dbeafe", background: "#eff6ff", borderRadius: 8, padding: 12 }}>
                     <Typography.Text strong>
                       Paquetes acumulados este mes: {createMonthlyCount}
                     </Typography.Text>
@@ -1529,7 +1529,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                         ? `Faltan ${missingForNextRange} paquete(s) para el siguiente rango.`
                         : "Este vendedor ya esta en el ultimo rango del mes."}
                     </div>
-                  </div>
+                  </div>}
 
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>

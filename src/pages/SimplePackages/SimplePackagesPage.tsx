@@ -38,6 +38,7 @@ const tableCellStyle: React.CSSProperties = {
 
 type SellerConfig = {
   precio_paquete: number;
+  precio_paquete_grande?: number;
   amortizacion: number;
   saldo_por_paquete: number;
 };
@@ -281,7 +282,7 @@ const SimplePackagesPage = () => {
       const packageSize = getPackageSizeBySpaces(deliverySpaces, routeId);
       const routePrice = getDeliveryRoutePrice(originId, destinationId, deliverySpaces, totalDeliverySpaces);
       const config =
-        String(originId || "") === String(destinationId || "")
+        useEscalation && String(originId || "") === String(destinationId || "")
           ? getSameBranchRouteDraftConfig(index, packageSize, routeId, index + 1) ||
             buildDraftConfig(index, { ...row, package_size: packageSize }, escalationRanges, monthlyPackageCount, useEscalation, index + 1)
           : buildDraftConfig(index, { ...row, package_size: packageSize }, escalationRanges, monthlyPackageCount, useEscalation, index + 1);
@@ -405,6 +406,7 @@ const SimplePackagesPage = () => {
 
         const nextConfig = {
           precio_paquete: Number(seller?.precio_paquete ?? user?.seller_precio_paquete ?? 0),
+          precio_paquete_grande: Number(seller?.precio_paquete ?? user?.seller_precio_paquete ?? 0) * 2,
           amortizacion: 0,
           saldo_por_paquete: 0,
         };
@@ -663,7 +665,7 @@ const SimplePackagesPage = () => {
         >
           PEDIDOS PENDIENTES
         </Button>
-        <div
+        {useEscalation && <div
           style={{
             minWidth: 280,
             maxWidth: 520,
@@ -714,7 +716,7 @@ const SimplePackagesPage = () => {
               }}
             />
           </div>
-        </div>
+        </div>}
       </div>
 
       <Modal

@@ -22,6 +22,7 @@ const tableCellStyle: React.CSSProperties = {
 
 type SellerConfig = {
   precio_paquete: number;
+  precio_paquete_grande?: number;
   amortizacion: number;
   saldo_por_paquete: number;
 };
@@ -141,6 +142,10 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
         const seller = await getSellerAPI(selectedSellerId);
         const nextConfig = {
           precio_paquete: Number(seller?.precio_paquete ?? 0),
+          precio_paquete_grande:
+            seller?.precio_paquete === null || seller?.precio_paquete === undefined
+              ? undefined
+              : Number(seller.precio_paquete) * 2,
           amortizacion: Number(seller?.amortizacion ?? 0),
           saldo_por_paquete: 0,
         };
