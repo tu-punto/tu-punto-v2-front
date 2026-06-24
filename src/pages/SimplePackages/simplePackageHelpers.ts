@@ -130,16 +130,15 @@ export const applyPackagePatch = (
         : row.package_size;
   const currentPackagePrice = Number(row?.precio_paquete || 0);
   const currentUnitPrice = Number(row?.precio_paquete_unitario || 0);
-  const hasConfigSmallPrice = config?.precio_paquete !== undefined && config?.precio_paquete !== null && Number(config.precio_paquete) > 0;
+  const hasConfigSmallPrice = config?.precio_paquete !== undefined && config?.precio_paquete !== null;
   const hasConfigLargePrice =
     config?.precio_paquete_grande !== undefined &&
-    config?.precio_paquete_grande !== null &&
-    Number(config.precio_paquete_grande) > 0;
+    config?.precio_paquete_grande !== null;
   const unitPrice = hasConfigSmallPrice
-    ? Number(config?.precio_paquete || 0)
+    ? Number(config?.precio_paquete)
     : currentUnitPrice || (nextSize === "estandar" ? currentPackagePrice : 0);
   const largeUnitPrice = hasConfigLargePrice
-    ? Number(config?.precio_paquete_grande || 0)
+    ? Number(config?.precio_paquete_grande)
     : nextSize === "grande" && currentPackagePrice > unitPrice
       ? currentPackagePrice
       : undefined;

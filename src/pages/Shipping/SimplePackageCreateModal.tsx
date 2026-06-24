@@ -140,8 +140,8 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
       try {
         const seller = await getSellerAPI(selectedSellerId);
         const nextConfig = {
-          precio_paquete: Number(seller?.precio_paquete || 0),
-          amortizacion: Number(seller?.amortizacion || 0),
+          precio_paquete: Number(seller?.precio_paquete ?? 0),
+          amortizacion: Number(seller?.amortizacion ?? 0),
           saldo_por_paquete: 0,
         };
         const nextBranches = Array.isArray(seller?.pago_sucursales)

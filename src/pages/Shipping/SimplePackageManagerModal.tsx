@@ -64,7 +64,7 @@ const getSimpleEscalatedPriceFromRanges = (
     ranges.find((row) => safePosition >= row.from && (row.to === null || row.to === undefined || safePosition <= row.to)) ||
     ranges[ranges.length - 1] ||
     DEFAULT_SIMPLE_RANGES[0];
-  return Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+  return Number(packageSize === "grande" ? range.large_price ?? 0 : range.small_price ?? 0);
 };
 const waitMs = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 
@@ -182,8 +182,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     if (!createUseEscalation) {
       return Number(
         packageSize === "grande"
-          ? createSellerConfig.precio_paquete_grande || createSellerConfig.precio_paquete || 0
-          : createSellerConfig.precio_paquete || 0
+          ? createSellerConfig.precio_paquete_grande ?? createSellerConfig.precio_paquete ?? 0
+          : createSellerConfig.precio_paquete ?? 0
       );
     }
     const safePosition = Math.max(1, Number(position || 1));
@@ -193,7 +193,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       ) ||
       createEscalationRanges[createEscalationRanges.length - 1] ||
       DEFAULT_SIMPLE_RANGES[0];
-    return Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+    return Number(packageSize === "grande" ? range.large_price ?? 0 : range.small_price ?? 0);
   };
 
   const getCreateRowConfig = (
@@ -239,12 +239,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       ranges[ranges.length - 1];
     if (!range) return null;
 
-    const price = Number(packageSize === "grande" ? range.large_price || 0 : range.small_price || 0);
+    const price = Number(packageSize === "grande" ? range.large_price ?? 0 : range.small_price ?? 0);
     return {
       ...createSellerConfig,
-      precio_paquete: Number(range.small_price || 0),
-      precio_paquete_grande: Number(range.large_price || range.small_price || 0),
-      amortizacion: Math.min(Number(createSellerConfig.amortizacion || 0), price),
+      precio_paquete: Number(range.small_price ?? 0),
+      precio_paquete_grande: Number(range.large_price ?? range.small_price ?? 0),
+      amortizacion: Math.min(Number(createSellerConfig.amortizacion ?? 0), price),
     };
   };
 
@@ -357,17 +357,17 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         ? globalConfig.ranges
         : DEFAULT_SIMPLE_RANGES;
     const currentSize = row?.package_size === "grande" ? "grande" : "estandar";
-    const currentPrice = Number(row?.precio_paquete || 0);
+    const currentPrice = Number(row?.precio_paquete ?? 0);
     const matchedRange = ranges.find((range: PackageEscalationRange) => {
       const configuredPrice = currentSize === "grande" ? range.large_price : range.small_price;
-      return Math.abs(Number(configuredPrice || 0) - currentPrice) <= 0.01;
+      return Math.abs(Number(configuredPrice ?? 0) - currentPrice) <= 0.01;
     });
 
     if (!matchedRange) return sellerConfig;
     return {
       ...sellerConfig,
-      precio_paquete: Number(matchedRange.small_price || 0),
-      precio_paquete_grande: Number(matchedRange.large_price || 0),
+      precio_paquete: Number(matchedRange.small_price ?? 0),
+      precio_paquete_grande: Number(matchedRange.large_price ?? 0),
     };
   };
 
@@ -629,8 +629,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
       setRows(Array.isArray(response?.rows) ? response.rows : []);
       setSellerConfig({
-        precio_paquete: Number(sellerResponse?.precio_paquete || 0),
-        amortizacion: Number(sellerResponse?.amortizacion || 0),
+        precio_paquete: Number(sellerResponse?.precio_paquete ?? 0),
+        amortizacion: Number(sellerResponse?.amortizacion ?? 0),
         saldo_por_paquete: 0,
       });
       setSelectedSellerBranches(
@@ -690,12 +690,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       setCreateEscalationRanges(nextRanges);
       setCreateUseEscalation(shouldUseEscalation);
       setCreateMonthlyCount(nextMonthlyCount);
-      setMissingForNextRange(Number(statusResponse?.data?.missingForNextRange || 0));
+      setMissingForNextRange(Number(statusResponse?.data?.missingForNextRange ?? 0));
       setCreateSellerBranches(nextBranches);
       setCreateSellerConfig({
-        precio_paquete: shouldUseEscalation ? Number(nextRanges[0]?.small_price || 0) : fixedPackagePrice,
-        precio_paquete_grande: shouldUseEscalation ? Number(nextRanges[0]?.large_price || 0) : fixedPackagePrice,
-        amortizacion: Number(sellerResponse?.amortizacion || 0),
+        precio_paquete: shouldUseEscalation ? Number(nextRanges[0]?.small_price ?? 0) : fixedPackagePrice,
+        precio_paquete_grande: shouldUseEscalation ? Number(nextRanges[0]?.large_price ?? 0) : fixedPackagePrice,
+        amortizacion: Number(sellerResponse?.amortizacion ?? 0),
         saldo_por_paquete: 0,
       });
       setCreateOriginId(nextOriginId);

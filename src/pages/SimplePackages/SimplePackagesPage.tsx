@@ -62,13 +62,13 @@ const SimplePackagesPage = () => {
   const [pendingSavingId, setPendingSavingId] = useState("");
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [sellerConfig, setSellerConfig] = useState<SellerConfig>({
-    precio_paquete: Number(user?.seller_precio_paquete || 0),
+    precio_paquete: Number(user?.seller_precio_paquete ?? 0),
     amortizacion: 0,
     saldo_por_paquete: 0,
   });
   const [rows, setRows] = useState<SimplePackageDraftRow[]>([
     createDraftRow(0, {
-      precio_paquete: Number(user?.seller_precio_paquete || 0),
+      precio_paquete: Number(user?.seller_precio_paquete ?? 0),
       amortizacion: 0,
       saldo_por_paquete: 0,
     }),
