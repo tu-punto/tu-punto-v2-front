@@ -302,7 +302,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     status,
                     from,
                     to,
-                    originId: originBranchId,
                     sellerId: sellerIdToQuery,
                     client: searchCliente.trim() || undefined
                 }),
@@ -604,7 +603,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             }
         },
         {
-            title: 'Origen',
+            title: 'Canal',
             key: 'origen_pedido',
             render: (_: any, record: any) =>
                 record?.origen_pedido === "catalogo"
@@ -671,7 +670,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 ) : null,
         },
     ];
-    const visibleColumns = columns.filter((column: any) => column?.key !== 'lugar_origen');
+    const visibleColumns = columns.filter(Boolean);
     const currentRows =
         selectedStatus === 'entregado'
             ? filteredEntregadoData
