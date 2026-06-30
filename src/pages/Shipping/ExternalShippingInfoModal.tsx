@@ -23,7 +23,7 @@ interface ExternalShippingInfoModalProps {
 
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
 const TZ = "America/La_Paz";
-const LATE_PICKUP_GRACE_DAYS = 20;
+const LATE_PICKUP_GRACE_DAYS = 200;
 const getBranchId = (value: any): string => String(value?._id ?? value?.$oid ?? value ?? "").trim();
 const calculateEstimatedBranchPickupDate = (value?: unknown) => {
   const createdAt = value ? moment.tz(value as any, TZ) : moment.tz(TZ);

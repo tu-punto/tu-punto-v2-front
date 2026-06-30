@@ -28,7 +28,7 @@ import {
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 
 const TZ = "America/La_Paz";
-const LATE_PICKUP_GRACE_DAYS = 20;
+const LATE_PICKUP_GRACE_DAYS = 200;
 const calculateEstimatedBranchPickupDate = (value?: unknown) => {
     const createdAt = value ? moment.tz(value as any, TZ) : moment.tz(TZ);
     if (!createdAt.isValid()) return null;

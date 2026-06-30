@@ -16,25 +16,27 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        fetchBranchs();
-    })
+        if (visible) {
+            fetchBranchs();
+        }
+    }, [visible, user?.id_vendedor])
 
     const fetchBranchs = async () => {
         const branches = await getSucursalsAPI();
         const sellerData = await getSellerAPI(user.id_vendedor);
         const branchData = sellerData.pago_sucursales;
         
-        const activeBranchIDs: Set<number> = new Set();
+        const activeBranchIDs: Set<string> = new Set();
         const sellerFinalDate = new Date(sellerData.fecha_vigencia);
         branchData.forEach((branch: IBranch) => {
             if (isActiveSellerBranch(branch, sellerFinalDate)) {
-                activeBranchIDs.add(branch.id_sucursal);
+                activeBranchIDs.add(String((branch as any).id_sucursal?._id || branch.id_sucursal || ""));
             }
         });
 
         const filteredBranches: IBranch[] = [];
         branches.forEach((branch: IBranch) => {
-            if (activeBranchIDs.has(branch._id)) {
+            if (activeBranchIDs.has(String(branch._id || ""))) {
                 filteredBranches.push(branch);
             }
         })
@@ -79,7 +81,7 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
             const response = await registerShippingGuideAPI(formData);
 
             if (!response.success) {
-                message.error("Error registrando la guia");
+                message.error(response.message || response.msg || "Error registrando la guia");
                 setLoading(false);
                 return;
             } else {

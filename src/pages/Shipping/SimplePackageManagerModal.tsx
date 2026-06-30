@@ -1075,6 +1075,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         delivery_spaces: spaces,
         saldo_por_paquete: Number(row.saldo_por_paquete || 0),
         precio_entre_sucursal: Number(row.precio_entre_sucursal || 0),
+        precio_paquete: Number(row.precio_paquete || 0),
       };
     });
 
