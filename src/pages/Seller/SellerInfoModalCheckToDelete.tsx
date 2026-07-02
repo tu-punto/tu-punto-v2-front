@@ -190,6 +190,7 @@ const SellerInfoModal = ({ visible, onSuccess, onCancel, seller }: any) => {
         onSuccess()
         setLoading(false)
     }
+
     const ventasNoPagadasProductos = products.filter((product: any) => product.deposito_realizado === false);
     return (
         <Modal

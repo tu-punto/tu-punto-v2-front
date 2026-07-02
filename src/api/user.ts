@@ -90,6 +90,15 @@ export const changePasswordAPI = async (passwordData: {
   }
 };
 
+export const resetSellerPasswordAPI = async (sellerId: string, payload: { newPassword: string }) => {
+  try {
+    const res = await apiClient.post(`/user/sellers/${sellerId}/reset-password`, payload);
+    return { success: true, data: res.data };
+  } catch (error) {
+    return parseError(error as AxiosError);
+  }
+};
+
 export const deleteUserAPI = async (id: string) => {
   try {
     const res = await apiClient.delete(`/user/${id}`);
