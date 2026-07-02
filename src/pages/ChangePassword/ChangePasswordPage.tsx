@@ -10,11 +10,11 @@ import { normalizeRole } from "../../utils/role";
 const { Text, Title } = Typography;
 
 const passwordChecks = [
-  { key: "length", label: "Minimo 8 caracteres", test: (value: string) => value.length >= 8 },
+  { key: "length", label: "Mínimo 8 caracteres", test: (value: string) => value.length >= 8 },
   { key: "lowercase", label: "Una letra minúscula", test: (value: string) => /[a-z]/.test(value) },
   { key: "uppercase", label: "Una letra mayúscula", test: (value: string) => /[A-Z]/.test(value) },
-  { key: "number", label: "Un numero", test: (value: string) => /\d/.test(value) },
-  { key: "symbol", label: "Un simbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
+  { key: "number", label: "Un número", test: (value: string) => /\d/.test(value) },
+  { key: "symbol", label: "Un símbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
 ];
 
 const getPasswordStatus = (password: string) => {
