@@ -77,6 +77,19 @@ export const updateUserAPI = async (id: string, userData: any) => {
   }
 };
 
+export const changePasswordAPI = async (passwordData: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}) => {
+  try {
+    const res = await apiClient.post("/user/change-password", passwordData);
+    return { success: true, data: res.data };
+  } catch (error) {
+    return parseError(error as AxiosError);
+  }
+};
+
 export const deleteUserAPI = async (id: string) => {
   try {
     const res = await apiClient.delete(`/user/${id}`);

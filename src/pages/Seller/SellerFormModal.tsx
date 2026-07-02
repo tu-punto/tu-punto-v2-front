@@ -24,16 +24,12 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 
 import { registerSellerAPI } from "../../api/seller";
-import { registerUserAPI } from "../../api/user";
 import { getSucursalsAPI } from "../../api/sucursal";
-import { roles } from "../../constants/roles";
 import BranchFields from "./components/BranchFields";
 import {
   branchesEnableCommissionService,
   branchesEnableSimplePackageService,
 } from "../../utils/sellerServiceAccess";
-
-const { SELLER } = roles;
 
 export default function SellerFormModal({
   visible,
@@ -112,15 +108,7 @@ export default function SellerFormModal({
         esDeuda: true, // alta siempre entra como deuda
       };
 
-      const newSeller = await registerSellerAPI(payload);
-
-      // 1· alta de usuario
-      await registerUserAPI({
-        email: values.mail,
-        password: `${values.carnet}`,
-        role: SELLER,
-        seller: newSeller._id,
-      });
+      await registerSellerAPI(payload);
       message.success("Vendedor registrado");
       onSuccess();
     } catch {

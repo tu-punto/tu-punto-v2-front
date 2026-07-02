@@ -5,4 +5,5 @@ export interface IUser {
     sucursalId?: string;
     sucursal?: string | { _id: string; nombre?: string };
     email: string;
+    must_change_password?: boolean;
 }

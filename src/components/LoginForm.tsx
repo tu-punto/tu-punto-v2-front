@@ -49,8 +49,13 @@ export default function LoginForm({
       setUser({
         ...userRes.data,
         role: normalizeRole(userRes.data?.role),
+        must_change_password: userRes.data?.must_change_password === true,
       });
       message.success("¡Bienvenido!");
+      if (userRes.data?.must_change_password === true) {
+        navigate("/change-password", { replace: true });
+        return;
+      }
       navigate(redirectTo);
     } catch {
       message.error("Error en el proceso de login");

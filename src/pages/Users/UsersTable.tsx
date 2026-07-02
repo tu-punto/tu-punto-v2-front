@@ -1,4 +1,4 @@
-import { Button, Table, Space, Popconfirm } from "antd";
+import { Button, Table, Space, Popconfirm, Tag } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useEffect } from "react";
 import { useUserStore } from "../../stores/userStore";
@@ -46,6 +46,17 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
         if (record.role === "seller") return "-";
         return record.sucursal?.nombre || "Sin asignar";
       },
+    },
+    {
+      title: "Contrasena",
+      key: "passwordStatus",
+      width: 160,
+      render: (_: any, record: any) =>
+        record.must_change_password === true ? (
+          <Tag color="warning">Cambio pendiente</Tag>
+        ) : (
+          <Tag color="success">Actualizada</Tag>
+        ),
     },
     {
       title: "Acciones",
