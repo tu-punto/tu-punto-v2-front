@@ -7,6 +7,7 @@ import { useContext } from "react";
 import { UserContext } from "../../context/userContext";
 import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
 import NotificationBell from "../../components/NotificationBell";
+import { KeyOutlined } from "@ant-design/icons";
 
 const Header = () => {
   const { user, setUser } = useContext(UserContext)!;
@@ -58,6 +59,14 @@ const Header = () => {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <NotificationBell />
+        <Button
+          onClick={() => navigate("/change-password")}
+          icon={<KeyOutlined />}
+          type="text"
+          className="bg-light-blue text-dark-blue text-mobile-sm xl:text-desktop-sm"
+        >
+          Cambiar contraseña
+        </Button>
         <Button onClick={handleLogout} type="text" className="bg-light-blue text-dark-blue text-mobile-sm xl:text-desktop-sm">
           Cerrar sesion
         </Button>

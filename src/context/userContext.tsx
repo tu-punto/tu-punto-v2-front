@@ -16,6 +16,7 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
           setUser({
             ...res.data,
             role: normalizeRole(res.data?.role),
+            must_change_password: res.data?.must_change_password === true,
           });
         }
       } catch (e) {

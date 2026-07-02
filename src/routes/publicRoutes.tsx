@@ -4,6 +4,7 @@ import ErrorPage from "../pages/ErrorPage";
 import SellerLoginPage from "../pages/Login/SellerLoginPage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
 import TrackingPage from "../pages/Tracking/TrackingPage";
+import ChangePasswordPage from "../pages/ChangePassword/ChangePasswordPage";
 
 const publicRoutes = [
   {
@@ -17,6 +18,10 @@ const publicRoutes = [
   {
     path: "/unauthorized",
     element: <UnauthorizedPage />,
+  },
+  {
+    path: "/change-password",
+    element: <ChangePasswordPage />,
   },
   {
     path: "/tracking/:code",

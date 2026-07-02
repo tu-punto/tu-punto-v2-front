@@ -5,6 +5,7 @@ import { UserContext } from "../../context/userContext";
 import { menu } from "../../constants/menu";
 import { Button, message } from "antd";
 import { logoutUserAPI } from "../../api/user";
+import { KeyOutlined } from "@ant-design/icons";
 import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
 import { canSellerAccessInventory, canSellerAccessShop } from "../../utils/sellerServiceAccess";
@@ -69,6 +70,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
       {isMobile && (
+        <>
+        <Link to="/change-password">
+          <Button
+            icon={<KeyOutlined />}
+            type="text"
+            className="bg-light-blue text-dark-blue text-mobile-sm"
+          >
+            Cambiar contraseña
+          </Button>
+        </Link>
         <Button
           onClick={handleLogout}
           type="text"
@@ -76,6 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           Cerrar sesión
         </Button>
+        </>
       )}
     </div>
   );

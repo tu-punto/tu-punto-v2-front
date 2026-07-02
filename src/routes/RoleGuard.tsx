@@ -24,6 +24,10 @@ const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) => {
     return <Navigate to="/login-admin" replace />;
   }
 
+  if (user?.must_change_password === true) {
+    return <Navigate to="/change-password" replace />;
+  }
+
   const userRole = normalizeRole(user?.role);
   if (!allowedRoles.includes(userRole)) {
     return <Navigate to="/unauthorized" replace />;

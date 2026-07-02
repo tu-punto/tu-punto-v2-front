@@ -19,7 +19,7 @@ const isExcludedAuthEndpoint = (url?: string) => {
   return url.includes("/user/login") || url.includes("/user/info");
 };
 
-const handleAuthRedirect = (status?: number, url?: string) => {
+const handleAuthRedirect = (status?: number, url?: string, data?: any) => {
   const currentHash = window.location.hash || "";
 
   if (status === 401 && !isExcludedAuthEndpoint(url)) {
@@ -28,6 +28,14 @@ const handleAuthRedirect = (status?: number, url?: string) => {
     if (!isAlreadyOnLogin) {
       window.location.hash = "/login-admin";
     }
+  }
+
+  if (status === 403 && data?.code === "PASSWORD_CHANGE_REQUIRED") {
+    const isAlreadyOnChangePassword = currentHash.startsWith("#/change-password");
+    if (!isAlreadyOnChangePassword) {
+      window.location.hash = "/change-password";
+    }
+    return;
   }
 
   if (status === 403 && !url?.includes("/user/login")) {
@@ -44,7 +52,7 @@ const attachAuthInterceptor = (client: AxiosInstance) => {
     (error) => {
       const status = error?.response?.status as number | undefined;
       const url = error?.config?.url as string | undefined;
-      handleAuthRedirect(status, url);
+      handleAuthRedirect(status, url, error?.response?.data);
       return Promise.reject(error);
     }
   );
