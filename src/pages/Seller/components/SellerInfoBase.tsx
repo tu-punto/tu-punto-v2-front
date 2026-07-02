@@ -52,6 +52,7 @@ import {
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
 import { getSellerAccountingSimplePackagesAPI } from "../../../api/simplePackage";
+import { resetSellerPasswordAPI } from "../../../api/user";
 
 import { UserContext } from "../../../context/userContext";
 
@@ -119,6 +120,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
   const [recoveryChargeModalOpen, setRecoveryChargeModalOpen] = useState(false);
   const [recoveryChargeLoading, setRecoveryChargeLoading] = useState(false);
   const [declineServiceLoading, setDeclineServiceLoading] = useState(false);
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [declineServiceDate, setDeclineServiceDate] = useState(
     seller?.declinacion_servicio_fecha || null
   );
@@ -127,6 +131,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
+  const isSuperadmin = user?.is_superadmin === true;
   const [serviceFlags, setServiceFlags] = useState({
     hasCommissionService: false,
     hasSimplePackageServiceEnabled: false,
@@ -517,6 +522,39 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     } finally {
       setRecoveryChargeLoading(false);
     }
+  };
+
+  const openResetPasswordModal = () => {
+    setResetPasswordValue("");
+    setResetPasswordModalOpen(true);
+  };
+
+  const handleResetPassword = () => {
+    Modal.confirm({
+      title: "Restablecer contraseña",
+      content: "¿Estás seguro de que deseas restablecer esta contraseña?",
+      okText: "Sí, restablecer",
+      cancelText: "Cancelar",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setResetPasswordLoading(true);
+        try {
+          const res = await resetSellerPasswordAPI(String(seller?.key || seller?._id || ""), {
+            newPassword: resetPasswordValue,
+          });
+
+          if (!res?.success) {
+            throw new Error(res?.msg || "No se pudo restablecer la contraseña");
+          }
+
+          message.success("Contraseña restablecida");
+          setResetPasswordModalOpen(false);
+          setResetPasswordValue("");
+        } finally {
+          setResetPasswordLoading(false);
+        }
+      },
+    });
   };
 
   /* ─────────── submit final ─────────── */
@@ -984,6 +1022,14 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
         <PaymentProofSection proofs={paymentProofs} sellerId={seller.key} />
 
+        {isSuperadmin && (
+          <div className="mb-5 flex justify-end">
+            <Button danger onClick={openResetPasswordModal}>
+              Restablecer contraseña
+            </Button>
+          </div>
+        )}
+
         {/* Botones */}
         <Form.Item>
           <ActionButtons
@@ -993,6 +1039,37 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           />
         </Form.Item>
       </Form>
+
+      <Modal
+        title="Restablecer contraseña"
+        open={resetPasswordModalOpen}
+        onCancel={() => setResetPasswordModalOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+          <div>Escribe la contraseña nueva o usa el carnet del vendedor.</div>
+          <Input.Password
+            value={resetPasswordValue}
+            onChange={(event) => setResetPasswordValue(event.target.value)}
+            placeholder="Nueva contraseña"
+          />
+          <Space>
+            <Button onClick={() => setResetPasswordValue(String(seller?.carnet ?? ""))}>
+              Usar carnet
+            </Button>
+            <Button onClick={() => setResetPasswordModalOpen(false)}>Cancelar</Button>
+            <Button
+              type="primary"
+              danger
+              loading={resetPasswordLoading}
+              onClick={handleResetPassword}
+            >
+              Restablecer
+            </Button>
+          </Space>
+        </Space>
+      </Modal>
     </div>
   );
 };
