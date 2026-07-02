@@ -11,8 +11,8 @@ const { Text, Title } = Typography;
 
 const passwordChecks = [
   { key: "length", label: "Minimo 8 caracteres", test: (value: string) => value.length >= 8 },
-  { key: "lowercase", label: "Una letra minuscula", test: (value: string) => /[a-z]/.test(value) },
-  { key: "uppercase", label: "Una letra mayuscula", test: (value: string) => /[A-Z]/.test(value) },
+  { key: "lowercase", label: "Una letra minúscula", test: (value: string) => /[a-z]/.test(value) },
+  { key: "uppercase", label: "Una letra mayúscula", test: (value: string) => /[A-Z]/.test(value) },
   { key: "number", label: "Un numero", test: (value: string) => /\d/.test(value) },
   { key: "symbol", label: "Un simbolo", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
 ];
@@ -45,7 +45,7 @@ export default function ChangePasswordPage() {
 
   const validateNewPassword = (_: unknown, value: string) => {
     const password = String(value || "");
-    if (!password) return Promise.reject(new Error("Ingresa una nueva contrasena"));
+    if (!password) return Promise.reject(new Error("Ingresa una nueva contraseña"));
 
     const missing = getPasswordStatus(password)
       .checks
@@ -66,8 +66,8 @@ export default function ChangePasswordPage() {
       const response = await changePasswordAPI(values);
       if (!response?.success) {
         const details = Array.isArray(response?.details) ? response.details.map(String) : [];
-        setServerErrors(details.length ? details : [response?.msg || response?.error || "No se pudo cambiar la contrasena"]);
-        message.error(response?.msg || response?.error || "No se pudo cambiar la contrasena");
+        setServerErrors(details.length ? details : [response?.msg || response?.error || "No se pudo cambiar la contraseña"]);
+        message.error(response?.msg || response?.error || "No se pudo cambiar la contraseña");
         return;
       }
 
@@ -79,7 +79,7 @@ export default function ChangePasswordPage() {
         role: nextRole,
         must_change_password: false,
       });
-      message.success("Contrasena actualizada");
+      message.success("Contraseña actualizada");
       navigate(getDefaultRedirect(nextRole), { replace: true });
     } finally {
       setLoading(false);
@@ -113,7 +113,7 @@ export default function ChangePasswordPage() {
                 type="error"
                 showIcon
                 style={{ marginBottom: 18 }}
-                message="No se pudo cambiar la contrasena"
+                message="No se pudo cambiar la contraseña"
                 description={
                   <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                     {serverErrors.map((error) => (
@@ -127,15 +127,15 @@ export default function ChangePasswordPage() {
             <Form form={form} layout="vertical" onFinish={onFinish} className="space-y-4">
               <Form.Item
                 name="currentPassword"
-                label="Contrasena actual"
-                rules={[{ required: true, message: "Ingresa tu contrasena actual" }]}
+                label="Contraseña actual"
+                rules={[{ required: true, message: "Ingresa tu contraseña actual" }]}
               >
                 <Input.Password prefix={<LockOutlined />} size="large" autoComplete="current-password" />
               </Form.Item>
 
               <Form.Item
                 name="newPassword"
-                label="Nueva contrasena"
+                label="Nueva contraseña"
                 validateTrigger={["onChange", "onBlur"]}
                 rules={[{ validator: validateNewPassword }]}
               >
@@ -168,16 +168,16 @@ export default function ChangePasswordPage() {
 
               <Form.Item
                 name="confirmPassword"
-                label="Confirmar contrasena"
+                label="Confirmar contraseña"
                 dependencies={["newPassword"]}
                 rules={[
-                  { required: true, message: "Confirma la nueva contrasena" },
+                  { required: true, message: "Confirma la nueva contraseña" },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
                       if (!value || getFieldValue("newPassword") === value) {
                         return Promise.resolve();
                       }
-                      return Promise.reject(new Error("Las contrasenas no coinciden"));
+                      return Promise.reject(new Error("Las contraseñas no coinciden"));
                     },
                   }),
                 ]}
@@ -187,7 +187,7 @@ export default function ChangePasswordPage() {
 
               <Form.Item>
                 <Button type="primary" htmlType="submit" block loading={loading} size="large">
-                  Guardar contrasena
+                  Guardar contraseña
                 </Button>
               </Form.Item>
             </Form>
