@@ -65,7 +65,7 @@ const Header = () => {
           type="text"
           className="bg-light-blue text-dark-blue text-mobile-sm xl:text-desktop-sm"
         >
-          Cambiar contrasena
+          Cambiar contraseña
         </Button>
         <Button onClick={handleLogout} type="text" className="bg-light-blue text-dark-blue text-mobile-sm xl:text-desktop-sm">
           Cerrar sesion

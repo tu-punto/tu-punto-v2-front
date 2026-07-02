@@ -93,17 +93,15 @@ export default function ChangePasswordPage() {
           <div className="bg-[#f97316] p-8 text-white">
             <img alt="logo" src={logoImg} className="h-20 w-20 rounded-full bg-white object-contain p-1" />
             <Title level={2} style={{ color: "white", marginTop: 28, marginBottom: 10 }}>
-              Cambiar contrasena
+              Cambiar contraseña
             </Title>
-            <Text style={{ color: "rgba(255,255,255,0.86)" }}>
-              Protege tu cuenta con una contrasena distinta a la actual.
-            </Text>
+          
             <div className="mt-8 rounded-md bg-white/12 p-4">
               <Space align="center">
                 <SafetyCertificateOutlined style={{ fontSize: 22 }} />
                 <div>
-                  <div className="font-semibold">Acceso para todos los roles</div>
-                  <div className="text-sm text-white/80">Admin, operador, superadmin y vendedor.</div>
+                  <div className="font-semibold">Por seguridad</div>
+                  <div className="text-sm text-white/80">Protege tu cuenta con una contraseña distinta a la actual.</div>
                 </div>
               </Space>
             </div>

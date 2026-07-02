@@ -77,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             type="text"
             className="bg-light-blue text-dark-blue text-mobile-sm"
           >
-            Cambiar contrasena
+            Cambiar contraseña
           </Button>
         </Link>
         <Button
