@@ -897,12 +897,12 @@ export default function ReportsLauncher() {
           {
             title: "Ingresos mensuales",
             value: formatBs(data?.totalGeneral?.monto_bs),
-            subtitle: `Sucursales: ${data?.totalGeneral?.sucursales ?? 0}`,
+            subtitle: `Sucursales: ${data?.totalGeneral?.sucursales ?? 0} | Servicios: ${data?.totalGeneral?.servicios ?? 0}`,
           },
         ],
         tables: [
-          { title: "Resumen por sucursal", rows: data.resumenPorSucursal || [] },
-          { title: "Detalle por servicio", rows: data.rows || [] },
+          { title: "Matriz", rows: data.matriz || data.rows || [] },
+          { title: "Detalle de origen", rows: data.detalleOrigen || [] },
         ],
       };
     }

@@ -30,14 +30,6 @@ const handleAuthRedirect = (status?: number, url?: string, data?: any) => {
     }
   }
 
-  if (status === 403 && data?.code === "PASSWORD_CHANGE_REQUIRED") {
-    const isAlreadyOnChangePassword = currentHash.startsWith("#/change-password");
-    if (!isAlreadyOnChangePassword) {
-      window.location.hash = "/change-password";
-    }
-    return;
-  }
-
   if (status === 403 && !url?.includes("/user/login")) {
     const isUnauthorizedPage = currentHash.startsWith("#/unauthorized");
     if (!isUnauthorizedPage) {
