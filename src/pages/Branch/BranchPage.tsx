@@ -5,6 +5,7 @@ import { IBranch } from "../../models/branchModel";
 import { Button } from "antd";
 import BranchFormModal from "./BranchFormModal";
 import { UserContext } from "../../context/userContext";
+import BranchSellerInfoPanel from "./BranchSellerInfoPanel";
 
 const BranchPage = () => {
   const [branches, setBranches] = useState<IBranch[]>();
@@ -14,7 +15,7 @@ const BranchPage = () => {
 
   const { user } = useContext(UserContext);
   const isAdmin = user?.role?.toLowerCase() === 'admin';
-  const isOperator = user?.role.toLowerCase() === 'operator';
+  const isOperator = user?.role?.toLowerCase() === 'operator';
 
   const fetchBranches = async () => {
     try {
@@ -42,7 +43,7 @@ const BranchPage = () => {
             Sucursales
           </h1>
         </div>
-        {isAdmin || isOperator && (
+        {(isAdmin || isOperator) && (
           <Button
             onClick={() => {
               setIsFormModal(true);
@@ -61,6 +62,12 @@ const BranchPage = () => {
         branches={branches || []}
         showEditModal={showEditModal}
       />
+      {isOperator && (
+        <BranchSellerInfoPanel
+          branchId={localStorage.getItem("sucursalId") || undefined}
+          branchName={localStorage.getItem("sucursalNombre") || undefined}
+        />
+      )}
       <BranchFormModal
         visible={isFormModal}
         onClose={() => setIsFormModal(false)}

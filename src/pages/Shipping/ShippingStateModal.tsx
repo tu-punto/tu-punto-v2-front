@@ -13,6 +13,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
     const [loading, setLoading] = useState(false);
     const [form] = Form.useForm();
+    const isPaidToSeller = Boolean(shipping?.pagado_al_vendedor);
 
     const tipoPagoMap: any = {
         1: 'Transferencia o QR',
@@ -42,6 +43,10 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     }, [shipping, form]);
 
     const handleFinish = async (shippingStateData: any) => {
+        if (isPaidToSeller) {
+            message.warning('No se puede editar una entrega ya pagada al vendedor');
+            return;
+        }
         setLoading(true);
         const intTipoPago = parseInt(shippingStateData.tipo_de_pago);
         const intEstadoPedido = parseInt(shippingStateData.estado_pedido);
@@ -117,7 +122,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
             onCancel={onClose}
             footer={[
                 <Button key="back" onClick={onClose}>Cancelar</Button>,
-                <Button key="submit" type="primary" loading={loading} onClick={() => form.submit()}>
+                <Button key="submit" type="primary" loading={loading} disabled={isPaidToSeller} onClick={() => form.submit()}>
                     Guardar
                 </Button>
             ]}

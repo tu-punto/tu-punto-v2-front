@@ -697,7 +697,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             <Button
               danger
               loading={declineServiceLoading}
-              disabled={!serviceEndDate.isValid() || Boolean(serviceDeclineDeadline && dayjs().isAfter(serviceDeclineDeadline))}
+              disabled={!serviceEndDate.isValid()}
               onClick={handleAdminDeclineService}
             >
               Declinar servicio

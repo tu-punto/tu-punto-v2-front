@@ -19,7 +19,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
 }) => {
   const { user } = useContext(UserContext);
   const isAdmin = user?.role?.toLowerCase() === 'admin';
-  const isOperator = user?.role.toLowerCase() === 'operator';
+  const isOperator = user?.role?.toLowerCase() === 'operator';
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<IBranch>();
   const [filteredBranches, setFilteredBranches] = useState<IBranch[]>(branches);
@@ -34,7 +34,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
   useEffect(() => {
     if (isAdmin || isOperator) {
       setFilteredBranches(branches);
-    } else if (user.role == "seller") {
+    } else if (user?.role == "seller") {
       filterSellerBranchs();
     }
   }, [branches]);
@@ -73,7 +73,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
   useEffect(() => {
     if (isAdmin || isOperator) {
       setTableColumns([...cols, ...adminCols]);
-    }else if (user.role == "seller") {
+    }else if (user?.role == "seller") {
       setTableColumns([...cols, ...sellerCols])
     }else {
       setTableColumns(cols)

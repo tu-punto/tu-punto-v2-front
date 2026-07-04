@@ -159,9 +159,7 @@ export default function SellerTable({
 
   const canDeclineSeller = (row: SellerRow) => {
     if (row.declinacion_servicio_fecha) return false;
-    const vigencia = parseSellerDate(row.fecha_vigencia);
-    if (!vigencia.isValid()) return false;
-    return !dayjs().isAfter(vigencia.subtract(5, "day").endOf("day"));
+    return true;
   };
 
   const canRenewSeller = (row: SellerRow) =>
@@ -230,7 +228,7 @@ export default function SellerTable({
           title={
             canDeclineSeller(row)
               ? "Declinar servicio"
-              : "La declinacion solo esta habilitada hasta 5 dias antes de la vigencia"
+              : "Ya existe una declinacion registrada"
           }
         >
           <Button

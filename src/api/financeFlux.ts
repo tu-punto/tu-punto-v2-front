@@ -13,7 +13,7 @@ export const getFinancesFluxAPI = async () => {
 
 export const registerFinanceFluxAPI = async (financeFluxData: any) => {
     try {
-        const res = await apiClient.post(`/financeFlux/register`, financeFluxData)
+        const res = await apiClientNoJSON.post(`/financeFlux/register`, financeFluxData)
         return res.data
     } catch (error) {
         parseError(error as AxiosError)
@@ -22,7 +22,7 @@ export const registerFinanceFluxAPI = async (financeFluxData: any) => {
 
 export const updateFinanceFluxAPI = async (id: string, data: any) => {
     try {
-        const res = await apiClient.put(`/financeFlux/${id}`, data);
+        const res = await apiClientNoJSON.put(`/financeFlux/${id}`, data);
         return res.data
     } catch (error) {
         parseError(error as AxiosError)

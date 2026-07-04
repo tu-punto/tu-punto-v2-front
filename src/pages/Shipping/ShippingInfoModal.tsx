@@ -112,6 +112,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [confirmDeleteAdelanto, setConfirmDeleteAdelanto] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [clickedOnce, setClickedOnce] = useState(false);
+    const isPaidToSeller = Boolean(shipping?.pagado_al_vendedor);
     const cargoDelivery = useWatch('cargo_delivery', internalForm);
     const estadoPedidoForm = useWatch("estado_pedido", internalForm);
     const normalizarTipoPago = (valor: string): string | null => {
@@ -581,6 +582,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         onClose();
     };
     const handleSave = async (values: any) => {
+        if (isPaidToSeller) {
+            message.warning("No se puede editar una entrega ya pagada al vendedor");
+            return;
+        }
         setLoading(true);
         const newProducts = products.filter((p: any) => !p.id_venta);
         const existingProducts = products.filter((p: any) => p.id_venta);
@@ -1081,6 +1086,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         isAdmin && (
                             <Button
                                 icon={<EditOutlined />}
+                                disabled={isPaidToSeller}
                                 onClick={() => {
                                     setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
                                     setEditProductsModalVisible(true);
@@ -1375,7 +1381,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     <Button style={{ marginRight: 8 }} onClick={handleCancelChanges}>
                         Cancelar
                     </Button>
-                    <Button type="primary" loading={loading} onClick={() => internalForm.submit()}>
+                    <Button type="primary" loading={loading} disabled={isPaidToSeller} onClick={() => internalForm.submit()}>
                         Guardar Cambios
                     </Button>
                 </div>
