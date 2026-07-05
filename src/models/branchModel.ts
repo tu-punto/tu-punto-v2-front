@@ -12,6 +12,8 @@ export interface IBranch {
   direccion: string;
   ciudad: string;
   telefono: number;
+  delivery_cutoff_enabled?: boolean;
+  delivery_cutoff_time?: string;
   imagen_header?: string;
 
   producto_sucursal?: IProduct_Branch[];

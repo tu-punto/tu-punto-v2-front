@@ -1,7 +1,7 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Input, message, Modal, Pagination, Select, Table, Tooltip } from 'antd';
+import { Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI } from '../../api/shipping';
+import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
@@ -48,6 +48,15 @@ const isDeliveryOrder = (pedido: any) => {
         pedido?.cargo_delivery ||
         pedido?.costo_delivery
     );
+};
+
+const resolveBranchId = (value: any) => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "object") {
+        return String(value?._id || value?.id_sucursal || value?.id || "");
+    }
+    return "";
 };
 
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
@@ -120,8 +129,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const { user }: any = useContext(UserContext);
     const [shippingData, setShippingData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
+    const [enCaminoData, setEnCaminoData] = useState([]);
     const [entregadoData, setEntregadoData] = useState([]);
     const [filteredEsperaData, setFilteredEsperaData] = useState([]);
+    const [filteredEnCaminoData, setFilteredEnCaminoData] = useState([]);
     const [filteredEntregadoData, setFilteredEntregadoData] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState<'En Espera' | 'en_camino' | 'entregado'>('En Espera');
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
@@ -149,7 +160,19 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [mobilePage, setMobilePage] = useState(1);
     const [selectedRowKeys, setSelectedRowKeys] = useState<any[]>([]);
     const [markingSellerWithdrawal, setMarkingSellerWithdrawal] = useState(false);
+    const [markingBranchTransfer, setMarkingBranchTransfer] = useState(false);
     const [rejectingCatalogOrderId, setRejectingCatalogOrderId] = useState("");
+    const [branchTransferModal, setBranchTransferModal] = useState<{
+        open: boolean;
+        mode: "send" | "receive" | null;
+        rows: any[];
+        expensePerPackage: number;
+    }>({
+        open: false,
+        mode: null,
+        rows: [],
+        expensePerPackage: 0,
+    });
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator;
@@ -158,7 +181,33 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         String(s._id) === String(currentSucursalId) ||
         String(s.id_sucursal) === String(currentSucursalId)
     );
-    const inTransitCount = filteredEsperaData.filter((pedido: any) => getVisualStatusMeta(pedido, statusNow).isVisualOnly).length;
+    const inTransitCount = filteredEnCaminoData.length;
+
+    const getOriginBranchId = (pedido: any) =>
+        resolveBranchId(pedido?.lugar_origen) ||
+        resolveBranchId(pedido?.origen_sucursal) ||
+        resolveBranchId(pedido?.sucursal);
+
+    const getDestinationBranchId = (pedido: any) =>
+        resolveBranchId(pedido?.destino_sucursal) ||
+        resolveBranchId(pedido?.sucursal) ||
+        resolveBranchId(pedido?.lugar_entrega);
+
+    const isInterbranchTransfer = (pedido: any) => {
+        const originId = getOriginBranchId(pedido);
+        const destinationId = getDestinationBranchId(pedido);
+        return Boolean(originId && destinationId && String(originId) !== String(destinationId));
+    };
+
+    const isPendingSend = (pedido: any) =>
+        String(pedido?.estado_pedido || "") === "En Espera" &&
+        isInterbranchTransfer(pedido) &&
+        String(getOriginBranchId(pedido)) === String(currentSucursalId);
+
+    const isPendingReceive = (pedido: any) =>
+        String(pedido?.estado_pedido || "") === "En camino" &&
+        isInterbranchTransfer(pedido) &&
+        String(getDestinationBranchId(pedido)) === String(currentSucursalId);
 
     const mapExternalToShipping = (externalSale: any) => {
         const estaPagado =
@@ -208,7 +257,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         };
     };
 
-    const filteredInTransitData = filteredEsperaData.filter((pedido: any) => getVisualStatusMeta(pedido, statusNow).isVisualOnly);
     const isSellerWithdrawalCandidate = (pedido: any) =>
         canManageExternal &&
         String(pedido?.estado_pedido || "") === "En Espera" &&
@@ -218,7 +266,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             selectedStatus === 'entregado'
                 ? filteredEntregadoData
                 : selectedStatus === 'en_camino'
-                    ? filteredInTransitData
+                    ? filteredEnCaminoData
                     : filteredEsperaData;
         const selectedKeys = new Set(selectedRowKeys.map(String));
         return (activeRows as any[]).filter((row: any) => {
@@ -281,6 +329,72 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 }
             },
         });
+    };
+
+    const handleBranchTransfer = (mode: "send" | "receive") => {
+        const rowsToUpdate = (selectedStatus === "en_camino" ? filteredEnCaminoData : filteredEsperaData).filter((row: any) => {
+            const rowKey = String(row?.key ?? row?._id ?? "");
+            const isSelected = selectedRowKeys.map(String).includes(rowKey);
+            if (!isSelected) return false;
+            return mode === "send" ? isPendingSend(row) : isPendingReceive(row);
+        });
+
+        if (!rowsToUpdate.length) {
+            message.warning(mode === "send" ? "Selecciona paquetes pendientes de enviar" : "Selecciona paquetes pendientes de recibir");
+            return;
+        }
+
+        setBranchTransferModal({
+            open: true,
+            mode,
+            rows: rowsToUpdate,
+            expensePerPackage: 0,
+        });
+    };
+
+    const closeBranchTransferModal = () => {
+        if (markingBranchTransfer) return;
+        setBranchTransferModal({ open: false, mode: null, rows: [], expensePerPackage: 0 });
+    };
+
+    const submitBranchTransfer = async () => {
+        const { mode, rows, expensePerPackage } = branchTransferModal;
+        if (!mode || !rows.length) return;
+
+        setMarkingBranchTransfer(true);
+        try {
+            const updates = await Promise.all(
+                rows.map((row: any) =>
+                    updateShippingAPI(
+                        mode === "send"
+                            ? { estado_pedido: "En camino", costo_delivery: expensePerPackage }
+                            : {
+                                estado_pedido: "Entregado",
+                                hora_entrega_real: moment().tz("America/La_Paz").toISOString(),
+                                public_tracking_ready_for_pickup_at: moment().tz("America/La_Paz").toISOString(),
+                                costo_delivery: expensePerPackage,
+                            },
+                        String(row._id)
+                    )
+                )
+            );
+
+            const failed = updates.filter((item: any) => !item?.success).length;
+            if (failed > 0) {
+                message.warning(`Se actualizaron ${rows.length - failed}; ${failed} fallaron`);
+            } else {
+                message.success(
+                    mode === "send"
+                        ? `Se marcaron ${rows.length} paquete(s) como enviados`
+                        : `Se confirmaron ${rows.length} llegada(s)`
+                );
+            }
+            setSelectedRowKeys([]);
+            setBranchTransferModal({ open: false, mode: null, rows: [], expensePerPackage: 0 });
+            fetchShippings();
+        } finally {
+            setMarkingBranchTransfer(false);
+        }
     };
 
     const fetchShippings = async () => {
@@ -672,11 +786,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     ];
     const visibleColumns = columns.filter(Boolean);
     const currentRows =
-        selectedStatus === 'entregado'
-            ? filteredEntregadoData
-            : selectedStatus === 'en_camino'
-                ? filteredInTransitData
-                : filteredEsperaData;
+            selectedStatus === 'entregado'
+                ? filteredEntregadoData
+                : selectedStatus === 'en_camino'
+                    ? filteredEnCaminoData
+                    : filteredEsperaData;
     const mobileRows = (currentRows as any[]).slice(
         (mobilePage - 1) * MOBILE_CARD_PAGE_SIZE,
         mobilePage * MOBILE_CARD_PAGE_SIZE
@@ -727,13 +841,15 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
     useEffect(() => {
         setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En Espera'));
+        setEnCaminoData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En camino'));
         setEntregadoData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'Entregado'));
     }, [shippingData]);
 
     useEffect(() => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
+        setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [esperaData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
+    }, [esperaData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -919,6 +1035,34 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
                         >
                             Retiro vendedor{selectedSellerWithdrawalCount ? ` (${selectedSellerWithdrawalCount})` : ""}
+                        </Button>
+                    </Tooltip>
+                )}
+                {canManageExternal && selectedStatus === "En Espera" && (
+                    <Tooltip title="Marcar paquetes seleccionados como enviados a su sucursal destino">
+                        <Button
+                            className="shipping-filter-action"
+                            type="primary"
+                            loading={markingBranchTransfer}
+                            disabled={!selectedRowKeys.length}
+                            onClick={() => handleBranchTransfer("send")}
+                            style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
+                        >
+                            Enviar sucursal
+                        </Button>
+                    </Tooltip>
+                )}
+                {canManageExternal && selectedStatus === "en_camino" && (
+                    <Tooltip title="Confirmar que los paquetes llegaron a la sucursal destino">
+                        <Button
+                            className="shipping-filter-action"
+                            type="primary"
+                            loading={markingBranchTransfer}
+                            disabled={!selectedRowKeys.length}
+                            onClick={() => handleBranchTransfer("receive")}
+                            style={{ height: 46, borderRadius: 10, fontWeight: 700, background: "#16a34a", borderColor: "#16a34a" }}
+                        >
+                            Confirmar llegada
                         </Button>
                     </Tooltip>
                 )}
@@ -1174,7 +1318,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     selectedStatus === 'entregado'
                         ? filteredEntregadoData
                         : selectedStatus === 'en_camino'
-                            ? filteredInTransitData
+                            ? filteredEnCaminoData
                             : filteredEsperaData
                 }
                 pagination={{
@@ -1190,7 +1334,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                                 setSelectedRowKeys(keys);
                             },
                             getCheckboxProps: (record: any) => ({
-                                disabled: !isSellerWithdrawalCandidate(record),
+                                disabled: !(isSellerWithdrawalCandidate(record) || isPendingSend(record) || isPendingReceive(record)),
                             }),
                         }
                         : undefined
@@ -1216,6 +1360,61 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 })}
             />
 
+
+            <Modal
+                open={branchTransferModal.open}
+                title={branchTransferModal.mode === "send" ? "Confirmar envio entre sucursales" : "Confirmar llegada a sucursal destino"}
+                onCancel={closeBranchTransferModal}
+                onOk={submitBranchTransfer}
+                okText={branchTransferModal.mode === "send" ? "Marcar enviado" : "Confirmar llegada"}
+                cancelText="Cancelar"
+                confirmLoading={markingBranchTransfer}
+                destroyOnClose
+            >
+                <div className="space-y-4">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                        <div className="text-sm text-slate-500">Paquetes seleccionados</div>
+                        <div className="text-2xl font-bold text-slate-900">{branchTransferModal.rows.length}</div>
+                        <div className="mt-1 text-sm text-slate-600">
+                            {branchTransferModal.mode === "send"
+                                ? "Se marcarán como saliendo hacia la sucursal destino."
+                                : "Se confirmará su llegada y el cliente podrá retirarlo."}
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-slate-200 p-3">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo por paquete</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {branchTransferModal.expensePerPackage.toFixed(2)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 p-3">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo total</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {(branchTransferModal.expensePerPackage * branchTransferModal.rows.length).toFixed(2)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 p-3">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Impacto</div>
+                            <div className="mt-1 text-sm font-medium text-slate-700">Se registrará en <code className="rounded bg-slate-100 px-1 py-0.5">costo_delivery</code> y alimentará los reportes.</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="mb-1 text-sm font-medium text-neutral-700">Costo de delivery por paquete</div>
+                        <InputNumber
+                            min={0}
+                            precision={2}
+                            prefix="Bs."
+                            style={{ width: "100%" }}
+                            value={branchTransferModal.expensePerPackage}
+                            onChange={(value) =>
+                                setBranchTransferModal((current) => ({
+                                    ...current,
+                                    expensePerPackage: Number(value || 0),
+                                }))
+                            }
+                        />
+                    </div>
+                </div>
+            </Modal>
 
             <ShippingInfoModal
                 visible={isModalVisible && !isModaStatelVisible}

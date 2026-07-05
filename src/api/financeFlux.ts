@@ -103,6 +103,11 @@ export const getFinancialSummaryAPI = async (options?: {
         to?: string;
         mode?: string;
         sucursalIds?: string[];
+        months?: string[];
+        expenseCategories?: string[];
+        includeCommissions?: boolean;
+        includeDeliveries?: boolean;
+        deliveryMode?: "real" | "potential";
 }) => {
         const params = new URLSearchParams();
         if (options?.range) params.append("range", options.range);
@@ -110,6 +115,11 @@ export const getFinancialSummaryAPI = async (options?: {
         if (options?.to) params.append("to", options.to);
         if (options?.mode) params.append("mode", options.mode);
         if (options?.sucursalIds?.length) params.append("sucursalIds", options.sucursalIds.join(","));
+        if (options?.months?.length) params.append("months", options.months.join(","));
+        if (options?.expenseCategories?.length) params.append("expenseCategories", options.expenseCategories.join(","));
+        if (typeof options?.includeCommissions === "boolean") params.append("includeCommissions", String(options.includeCommissions));
+        if (typeof options?.includeDeliveries === "boolean") params.append("includeDeliveries", String(options.includeDeliveries));
+        if (options?.deliveryMode) params.append("deliveryMode", options.deliveryMode);
         const qs = params.toString();
         const url = qs ? `/financeFlux/financial-summary?${qs}` : "/financeFlux/financial-summary";
         const res = await apiClient.get(url);

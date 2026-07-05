@@ -21,6 +21,16 @@ const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
 const buildGoogleMapsSearchUrl = (query: string) =>
     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 
+const parseCutoffTime = (value?: string | null) => {
+    const [hoursRaw, minutesRaw] = String(value || "").split(":");
+    const hours = Number(hoursRaw);
+    const minutes = Number(minutesRaw);
+    return {
+        hours: Number.isFinite(hours) ? hours : 0,
+        minutes: Number.isFinite(minutes) ? minutes : 0,
+    };
+};
+
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
@@ -52,6 +62,10 @@ function ShippingFormModal({
             ? s._id === localStorage.getItem("sucursalId")
             : s._id === branchIdFromProps
     );
+    const deliveryCutoffConfig = useMemo(() => ({
+        enabled: Boolean(sucursalSeleccionada?.delivery_cutoff_enabled),
+        time: String(sucursalSeleccionada?.delivery_cutoff_time || "").trim(),
+    }), [sucursalSeleccionada]);
     const nombreSucursal = sucursalSeleccionada?.nombre || '';
 
     useEffect(() => {
@@ -203,6 +217,21 @@ function ShippingFormModal({
             const fechaPedido = moment.tz("America/La_Paz").toDate();
             const horaEntregaAcordada = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "America/La_Paz").toDate();
             const horaEntregaReal = moment.tz("America/La_Paz").toDate(); // si querés registrar el momento actual
+
+            const isDeliveryToCustomer = effectiveDestinationType === "otro_lugar";
+            if (isDeliveryToCustomer && deliveryCutoffConfig.enabled && deliveryCutoffConfig.time) {
+                const now = moment().tz("America/La_Paz");
+                const selectedDate = moment.tz(fechaSeleccionada, "America/La_Paz");
+                if (selectedDate.format("YYYY-MM-DD") === now.format("YYYY-MM-DD")) {
+                    const cutoffParts = parseCutoffTime(deliveryCutoffConfig.time);
+                    const cutoff = now.clone().hour(cutoffParts.hours).minute(cutoffParts.minutes).second(0).millisecond(0);
+                    if (now.isAfter(cutoff)) {
+                        message.error(`La hora limite para delivery en ${nombreSucursal || "esta sucursal"} es ${cutoff.format("HH:mm")}. Puedes registrar el pedido para el dia siguiente.`);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            }
 
             const response = await registerShippingAPI({
                 ...values,
@@ -395,6 +424,11 @@ function ShippingFormModal({
                             <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
+                            {deliveryCutoffConfig.enabled && deliveryCutoffConfig.time && (
+                                <div style={{ marginTop: -8, marginBottom: 12, color: "#7c3aed", fontSize: 12 }}>
+                                    La hora limite para delivery de esta sucursal es {deliveryCutoffConfig.time}.
+                                </div>
+                            )}
                         </Col>
                     </Row>
                     <Row gutter={16}>

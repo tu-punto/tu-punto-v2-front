@@ -1,6 +1,7 @@
 import { UploadOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Upload, message } from "antd";
+import { Button, Form, Input, Modal, Switch, TimePicker, Upload, message } from "antd";
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
 import {
   registerSucursalAPI,
   updateSucursalAPI,
@@ -41,6 +42,14 @@ const BranchFormModal: React.FC<{
     return uploadRes?.imageUrl || uploadRes?.updatedSucursal?.imagen_header || "";
   };
 
+  const normalizeBranchPayload = (values: IBranch & { delivery_cutoff_time?: any }) => ({
+    ...values,
+    delivery_cutoff_time:
+      values.delivery_cutoff_enabled && values.delivery_cutoff_time?.format
+        ? values.delivery_cutoff_time.format("HH:mm")
+        : "",
+  });
+
   const handleEdit = async (values: IBranch) => {
     if (!branch || !branch._id) {
       message.error("Error al actualizar la informacion");
@@ -51,7 +60,7 @@ const BranchFormModal: React.FC<{
       setSaving(true);
       message.loading({ content: "Actualizando...", key: "branch-save" });
 
-      const updateRes = await updateSucursalAPI(branch._id, values);
+      const updateRes = await updateSucursalAPI(branch._id, normalizeBranchPayload(values as any));
       if (!updateRes?.status && !updateRes?.success) {
         throw new Error(updateRes?.msg || "No se pudo actualizar la sucursal");
       }
@@ -78,7 +87,7 @@ const BranchFormModal: React.FC<{
       setSaving(true);
       message.loading({ content: "Creando sucursal...", key: "branch-save" });
 
-      const createRes = await registerSucursalAPI(values);
+      const createRes = await registerSucursalAPI(normalizeBranchPayload(values as any));
       if (!createRes?.status && !createRes?.success) {
         throw new Error(createRes?.msg || "No se pudo crear la sucursal");
       }
@@ -116,7 +125,10 @@ const BranchFormModal: React.FC<{
     if (!visible) return;
 
     if (branch) {
-      form.setFieldsValue(branch);
+      form.setFieldsValue({
+        ...branch,
+        delivery_cutoff_time: branch.delivery_cutoff_time ? dayjs(branch.delivery_cutoff_time, "HH:mm") : undefined,
+      });
       setPreviewUrl(branch.imagen_header || "");
     } else {
       form.resetFields();
@@ -168,6 +180,33 @@ const BranchFormModal: React.FC<{
           ]}
         >
           <Input className="w-full" type="tel" maxLength={13} />
+        </Form.Item>
+
+        <Form.Item
+          className="text-mobile-sm xl:text-desktop-sm"
+          name="delivery_cutoff_enabled"
+          label="Bloqueo horario delivery"
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item
+          shouldUpdate={(prev, current) => prev.delivery_cutoff_enabled !== current.delivery_cutoff_enabled}
+          noStyle
+        >
+          {({ getFieldValue }) =>
+            getFieldValue("delivery_cutoff_enabled") ? (
+              <Form.Item
+                className="text-mobile-sm xl:text-desktop-sm"
+                name="delivery_cutoff_time"
+                label="Hora limite delivery"
+                rules={[{ required: true, message: "Selecciona la hora limite" }]}
+              >
+                <TimePicker format="HH:mm" style={{ width: "100%" }} />
+              </Form.Item>
+            ) : null
+          }
         </Form.Item>
 
         <Form.Item className="text-mobile-sm xl:text-desktop-sm" label="Imagen de header (AWS)">

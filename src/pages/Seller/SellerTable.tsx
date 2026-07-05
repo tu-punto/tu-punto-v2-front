@@ -349,7 +349,7 @@ export default function SellerTable({
         fixed: "right" as const,
       },
     ],
-    [sellers, tableSort]
+    [tableSort]
   );
 
   useEffect(() => {

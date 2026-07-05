@@ -1,362 +1,457 @@
 import {
-  Card,
-  Row,
-  Col,
-  Spin,
-  Tag,
-  DatePicker,
-  Typography,
-  Space,
-  Alert,
-  Select,
-} from "antd";
-import {
-  DollarOutlined,
-  ShoppingCartOutlined,
-  RiseOutlined,
+  BarChartOutlined,
+  BankOutlined,
   CarOutlined,
+  DollarOutlined,
+  FilterOutlined,
+  RiseOutlined,
 } from "@ant-design/icons";
-import { useCallback, useEffect, useState } from "react";
-import { DATE_TAGS } from "../../constants/fluxes";
-import { getFilteredStats } from "../../helpers/financeFluxesHelpers";
+import {
+  Card,
+  Col,
+  Empty,
+  Row,
+  Select,
+  Segmented,
+  Space,
+  Spin,
+  Switch,
+  Tag,
+  Typography,
+} from "antd";
 import dayjs from "dayjs";
+import { useEffect, useMemo, useState } from "react";
 import StatisticCard from "../../components/StatisticCard";
-import ReportsLauncher from "../../components/ReportsLauncher";
+import { getFinanceFluxCategoriesAPI, getFinancialSummaryAPI } from "../../api/financeFlux";
 import { getSucursalsAPI } from "../../api/sucursal";
 
-const EMPTY_STATS = {
-  income: 0,
-  expenses: 0,
-  investments: 0,
-  utility: 0,
-  commission: 0,
-  merchandiseSold: 0,
-  deliveryIncome: 0,
-  deliveryExpenses: 0,
-  deliveryBalance: 0,
-  externalDeliveryIncome: 0,
-  externalDeliveredPackageTotal: 0,
-  simplePackagesNoDeliveryTotal: 0,
-  simplePackagesInterbranchTotal: 0,
-  caja: 0,
+type SummaryShape = {
+  monthlyPaymentsIncome?: number;
+  commissionIncome?: number;
+  deliveryPackagesIncome?: number;
+  deliveryIncome?: number;
+  deliveryExpenses?: number;
+  balanceDelivery?: number;
+  expenses?: number;
+  utility?: number;
+  caja?: number;
+  historicalIncome?: number;
+  historicalExpenses?: number;
+  simplePackagesInterbranchTotal?: number;
+  simplePackagesNoDeliveryTotal?: number;
+  externalDeliveredPackageTotal?: number;
+};
+
+type BranchOption = { value: string; label: string };
+type CategoryOption = { value: string; label: string };
+type BranchChartRow = { id: string; label: string; utility: number; income: number; expenses: number };
+
+const money = (value: number) =>
+  new Intl.NumberFormat("es-BO", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+
+const monthOptions = Array.from({ length: 12 }, (_, index) => {
+  const date = dayjs().subtract(index, "month").startOf("month");
+  return {
+    value: date.format("YYYY-MM"),
+    label: date.format("YYYY-MM"),
+  };
+});
+
+const monthToLabel = (value: string) => {
+  const parsed = dayjs(`${value}-01`);
+  return parsed.isValid() ? parsed.format("MMM YYYY") : value;
+};
+
+const toNumber = (value: unknown) => Number(value || 0) || 0;
+
+const getSummaryIncome = (summary: SummaryShape) => {
+  const monthly = toNumber(summary.monthlyPaymentsIncome);
+  const commissions = toNumber(summary.commissionIncome);
+  const deliveries = toNumber(summary.deliveryPackagesIncome);
+  return { monthly, commissions, deliveries, total: monthly + commissions + deliveries };
+};
+
+const BranchBars = ({ rows, loading }: { rows: BranchChartRow[]; loading: boolean }) => {
+  const maxAbs = Math.max(1, ...rows.flatMap((row) => [Math.abs(row.income), Math.abs(row.expenses), Math.abs(row.utility)]));
+
+  return (
+    <Card className="shadow-sm" bodyStyle={{ padding: 20 }}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <Typography.Title level={4} className="!mb-0">
+            Utilidad por sucursal
+          </Typography.Title>
+          <Typography.Text type="secondary">Ingresos menos gastos, usando los filtros activos.</Typography.Text>
+        </div>
+        <Tag color="blue" className="rounded-full px-3 py-1">
+          {rows.length} sucursal{rows.length === 1 ? "" : "es"}
+        </Tag>
+      </div>
+
+      {loading ? (
+        <div className="grid min-h-[240px] place-items-center">
+          <Spin size="large" />
+        </div>
+      ) : rows.length ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => {
+            const incomeHeight = Math.max(18, Math.round((Math.abs(row.income) / maxAbs) * 180));
+            const expenseHeight = Math.max(18, Math.round((Math.abs(row.expenses) / maxAbs) * 180));
+            const utilityHeight = Math.max(18, Math.round((Math.abs(row.utility) / maxAbs) * 180));
+            const positive = row.utility >= 0;
+            return (
+              <div key={row.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-900">{row.label}</div>
+                    <div className="text-xs text-slate-500">Ingresos: Bs. {money(row.income)} · Gastos: Bs. {money(row.expenses)}</div>
+                  </div>
+                  <Tag color={positive ? "green" : "red"} className="rounded-full px-3 py-1">
+                    {positive ? "+" : ""}{money(row.utility)}
+                  </Tag>
+                </div>
+
+                <div className="flex h-[210px] items-end rounded-2xl bg-white/90 p-3 shadow-inner">
+                  <div className="flex h-full w-full items-end gap-3">
+                    <div className="flex flex-1 flex-col items-center gap-2 text-center">
+                      <div className="flex h-full items-end gap-2">
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="w-8 rounded-t-2xl bg-sky-500 transition-all" style={{ height: incomeHeight }} />
+                          <span className="text-[11px] font-medium text-slate-600">Ing.</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="w-8 rounded-t-2xl bg-rose-500 transition-all" style={{ height: expenseHeight }} />
+                          <span className="text-[11px] font-medium text-slate-600">Gasto</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                          <div className={`w-8 rounded-t-2xl transition-all ${positive ? "bg-emerald-500" : "bg-amber-500"}`} style={{ height: utilityHeight }} />
+                          <span className="text-[11px] font-medium text-slate-600">Util.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Empty description="No hay datos para el filtro actual" />
+      )}
+    </Card>
+  );
 };
 
 const StatisticsDashboard = () => {
-  const [stats, setStats] = useState<any>(EMPTY_STATS);
-  const [selectedTag, setSelectedTag] = useState<string | null>(DATE_TAGS.LAST_30_DAYS);
-  const [customDateRange, setCustomDateRange] = useState<any>([]);
-  const [branches, setBranches] = useState<Array<{ value: string; label: string }>>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [selectedPeriodMode, setSelectedPeriodMode] = useState<"historico" | "1-mes" | "varios-meses">("historico");
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format("YYYY-MM"));
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([dayjs().format("YYYY-MM")]);
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
-  const [branchesLoading, setBranchesLoading] = useState(false);
-  const [loading, setLoading] = useState({
-    income: true,
-    expenses: true,
-    utility: true,
-    deliveryIncome: true,
-    deliveryExpenses: true,
-  });
+  const [selectedExpenseCategories, setSelectedExpenseCategories] = useState<string[]>([]);
+  const [includeCommissions, setIncludeCommissions] = useState(true);
+  const [includeDeliveries, setIncludeDeliveries] = useState(true);
+  const [deliveryMode, setDeliveryMode] = useState<"real" | "potential">("real");
+  const [summary, setSummary] = useState<SummaryShape>({});
+  const [historicalSummary, setHistoricalSummary] = useState<SummaryShape>({});
+  const [branchRows, setBranchRows] = useState<BranchChartRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const fetchStats = useCallback(async (filter: string = DATE_TAGS.ALL_TIME, branchIds: string[] = []) => {
-    setLoading({
-      income: true,
-      expenses: true,
-      utility: true,
-      deliveryIncome: true,
-      deliveryExpenses: true,
-    });
+  const monthSelection = useMemo(() => {
+    if (selectedPeriodMode === "1-mes") return [selectedMonth];
+    if (selectedPeriodMode === "varios-meses") return selectedMonths;
+    return [];
+  }, [selectedMonth, selectedMonths, selectedPeriodMode]);
 
-    try {
-      const statsInfo = await getFilteredStats(filter, customDateRange, branchIds);
-      setStats(statsInfo);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading({
-        income: false,
-        expenses: false,
-        utility: false,
-        deliveryIncome: false,
-        deliveryExpenses: false,
-      });
-    }
-  }, [customDateRange]);
+  const summaryParams = useMemo(() => ({
+    months: monthSelection,
+    sucursalIds: selectedBranchIds,
+    expenseCategories: selectedExpenseCategories,
+    includeCommissions,
+    includeDeliveries,
+    deliveryMode,
+  }), [deliveryMode, includeCommissions, includeDeliveries, monthSelection, selectedBranchIds, selectedExpenseCategories]);
 
-  const fetchBranches = useCallback(async () => {
-    setBranchesLoading(true);
-    try {
-      const response = await getSucursalsAPI();
-      const nextBranches = (Array.isArray(response) ? response : [])
-        .map((branch: any) => ({
-          value: String(branch?._id || ""),
-          label: String(branch?.nombre || branch?.sucursal || "Sucursal").trim(),
-        }))
-        .filter((branch) => branch.value);
-      setBranches(nextBranches);
-    } catch (error) {
-      console.error("Error al cargar sucursales para estadísticas:", error);
-    } finally {
-      setBranchesLoading(false);
-    }
+  useEffect(() => {
+    const loadBaseData = async () => {
+      const [branchResponse, categoryResponse] = await Promise.all([
+        getSucursalsAPI(),
+        getFinanceFluxCategoriesAPI(),
+      ]);
+
+      setBranches(
+        (Array.isArray(branchResponse) ? branchResponse : [])
+          .map((branch: any) => ({
+            value: String(branch?._id || branch?.id_sucursal || "").trim(),
+            label: String(branch?.nombre || "Sucursal").trim(),
+          }))
+          .filter((branch: BranchOption) => branch.value)
+      );
+
+      setCategories(
+        (Array.isArray(categoryResponse) ? categoryResponse : [])
+          .map((item: any) => ({
+            value: String(item?.nombre || "").trim(),
+            label: String(item?.nombre || "Categoria").trim(),
+          }))
+          .filter((item: CategoryOption) => item.value)
+      );
+    };
+
+    void loadBaseData();
   }, []);
 
-  const onTagClick = (tag: string) => {
-    setSelectedTag(tag);
-    if (tag !== DATE_TAGS.CUSTOM) {
-      setCustomDateRange([]);
+  useEffect(() => {
+    const loadSummary = async () => {
+      setLoading(true);
+      try {
+        const [current, historical, perBranch] = await Promise.all([
+          getFinancialSummaryAPI(summaryParams),
+          getFinancialSummaryAPI({
+            includeCommissions: true,
+            includeDeliveries: true,
+            deliveryMode: "real",
+            expenseCategories: selectedExpenseCategories,
+          }),
+          Promise.all(
+            (selectedBranchIds.length ? selectedBranchIds : branches.map((branch) => branch.value))
+              .slice(0, 8)
+              .map(async (branchId) => ({
+                branchId,
+                summary: await getFinancialSummaryAPI({
+                  ...summaryParams,
+                  sucursalIds: [branchId],
+                }),
+              }))
+          ),
+        ]);
+
+        setSummary(current || {});
+        setHistoricalSummary(historical || {});
+        setBranchRows(
+          perBranch
+            .map(({ branchId, summary: branchSummary }: any) => {
+              const branch = branches.find((item) => item.value === branchId);
+              const incomeParts = getSummaryIncome(branchSummary || {});
+              const expenses = toNumber(branchSummary?.gastos);
+              return {
+                id: branchId,
+                label: branch?.label || branchId,
+                utility: toNumber(branchSummary?.utility ?? incomeParts.total - expenses),
+                income: incomeParts.total,
+                expenses,
+              };
+            })
+            .sort((a, b) => Math.abs(b.utility) - Math.abs(a.utility))
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!branches.length && selectedBranchIds.length) return;
+    void loadSummary();
+  }, [branches, selectedBranchIds, selectedExpenseCategories, summaryParams]);
+
+  const income = getSummaryIncome(summary);
+  const expenses = toNumber(summary.expenses);
+  const totalIncome = income.total;
+  const utility = toNumber(summary.utility ?? totalIncome - expenses);
+  const breakEven = totalIncome > 0 ? (expenses / totalIncome) * 100 : 0;
+  const historicalIncome = getSummaryIncome(historicalSummary).total;
+  const historicalExpenses = toNumber(historicalSummary.expenses);
+  const companyTotal = toNumber(historicalSummary.utility ?? historicalIncome - historicalExpenses);
+  const deliveryIncome = toNumber(summary.deliveryIncome ?? summary.deliveryPackagesIncome);
+  const deliveryExpenses = toNumber(summary.deliveryExpenses);
+  const deliveryBalance = toNumber(summary.balanceDelivery ?? deliveryIncome - deliveryExpenses);
+
+  const monthLabels = selectedPeriodMode === "historico"
+    ? []
+    : selectedPeriodMode === "1-mes"
+      ? [selectedMonth]
+      : selectedMonths;
+
+  const toggleMonth = (month: string) => {
+    if (selectedPeriodMode === "1-mes") {
+      setSelectedMonth(month);
+      return;
     }
+
+    setSelectedMonths((current) =>
+      current.includes(month)
+        ? current.filter((item) => item !== month)
+        : [...current, month]
+    );
   };
-
-  const onBranchChange = (values: string[]) => {
-    setSelectedBranchIds(Array.from(new Set((values || []).filter(Boolean))));
-  };
-
-  useEffect(() => {
-    fetchBranches();
-  }, [fetchBranches]);
-
-  useEffect(() => {
-    if (selectedTag === DATE_TAGS.CUSTOM && customDateRange?.length !== 2) return;
-    fetchStats(selectedTag || DATE_TAGS.ALL_TIME, selectedBranchIds);
-  }, [selectedTag, customDateRange, selectedBranchIds, fetchStats]);
-
-  const espTags = [
-    "ULTIMOS 7 DIAS",
-    "ULTIMOS 30 DIAS",
-    "ULTIMOS 90 DIAS",
-    "ESTE AÑO",
-    "FECHA PERSONALIZADA",
-    "TODO EL TIEMPO",
-  ];
 
   return (
-    <Card className="m-4 shadow-md">
-      <div className="absolute right-4 top-4">
-        <ReportsLauncher />
+    <Card className="m-4 overflow-hidden border-0 shadow-xl" bodyStyle={{ padding: 0 }}>
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 px-6 py-5 text-white">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Typography.Title level={2} className="!mb-1 !text-white">
+              Control financiero
+            </Typography.Title>
+            <Typography.Text className="!text-slate-300">
+              Dashboard de ingresos, gastos, utilidad y punto de equilibrio.
+            </Typography.Text>
+          </div>
+          <Tag color="geekblue" className="rounded-full border-0 px-4 py-1.5 text-sm">
+            {selectedPeriodMode === "historico" ? "Historico" : monthLabels.join(", ")}
+          </Tag>
+        </div>
       </div>
 
-      <Space direction="vertical" className="w-full" size="large">
-        <div>
-          <Space wrap className="mb-4">
-            {Object.entries(DATE_TAGS).map(([key, value], index: number) => (
-              <Tag.CheckableTag
-                key={key}
-                checked={selectedTag === value}
-                onChange={() => onTagClick(value)}
-                className={`px-4 py-2 border rounded transition-all ${
-                  selectedTag === value
-                    ? "border-blue-500 bg-blue-50 !text-blue-600"
-                    : "border-gray-200 hover:border-blue-400"
-                }`}
-              >
-                {espTags[index]}
-              </Tag.CheckableTag>
-            ))}
-          </Space>
+      <div className="space-y-6 bg-slate-50 p-5 lg:p-6">
+        <Card className="shadow-sm" bodyStyle={{ padding: 16 }}>
+          <div className="mb-4 flex items-center gap-2 text-slate-800">
+            <FilterOutlined />
+            <Typography.Text strong>Filtros</Typography.Text>
+          </div>
 
-          <Card
-            className="border-gray-200 bg-slate-50/80"
-            bodyStyle={{ padding: 16 }}
-          >
-            <Space direction="vertical" size="small" className="w-full">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <Typography.Text strong>Filtros por sucursal</Typography.Text>
-                <Tag color={selectedBranchIds.length ? "blue" : "default"} className="rounded-full px-3 py-1">
-                  {selectedBranchIds.length
-                    ? `${selectedBranchIds.length} sucursal${selectedBranchIds.length > 1 ? "es" : ""}`
-                    : "Global"}
-                </Tag>
-              </div>
-              <Space wrap size={[8, 8]}>
-                <Tag.CheckableTag
-                  checked={!selectedBranchIds.length}
-                  onChange={() => setSelectedBranchIds([])}
-                  className={`px-4 py-2 border rounded transition-all ${
-                    !selectedBranchIds.length
-                      ? "border-blue-500 bg-blue-50 !text-blue-600"
-                      : "border-gray-200 hover:border-blue-400"
-                  }`}
-                >
-                  Global
-                </Tag.CheckableTag>
-                {selectedBranchIds.length > 0 && (
-                  <Typography.Text type="secondary">
-                    Filtrando solo las sucursales seleccionadas
-                  </Typography.Text>
-                )}
-              </Space>
+          <Space direction="vertical" size={16} className="w-full">
+            <div className="flex flex-wrap items-center gap-3">
+              <Segmented
+                value={selectedPeriodMode}
+                options={[
+                  { label: "Historico", value: "historico" },
+                  { label: "1 mes", value: "1-mes" },
+                  { label: "Varios meses", value: "varios-meses" },
+                ]}
+                onChange={(value) => setSelectedPeriodMode(value as any)}
+              />
+
               <Select
+                className="min-w-[240px] flex-1"
                 mode="multiple"
-                size="large"
                 allowClear
-                className="w-full"
-                placeholder="Selecciona una o varias sucursales"
-                loading={branchesLoading}
+                placeholder="Sucursales para analisis"
                 value={selectedBranchIds}
-                onChange={onBranchChange}
+                onChange={(values) => setSelectedBranchIds(values)}
+                options={branches}
                 maxTagCount="responsive"
                 optionFilterProp="label"
-                options={branches}
               />
-              <Typography.Text type="secondary">
-                Global suma todo. Si eliges sucursales, todas las tarjetas se recalculan solo con esas sucursales.
-              </Typography.Text>
-            </Space>
-          </Card>
-        </div>
 
-        {selectedTag === DATE_TAGS.CUSTOM && (
-          <Card className="bg-gray-50 border-gray-200">
-            <Space direction="vertical" size="small" className="w-full">
-              <Typography.Text strong>Seleccione el rango de fechas:</Typography.Text>
-              <DatePicker.RangePicker
-                onChange={(dates) => {
-                  setCustomDateRange(dates);
-                }}
-                value={customDateRange}
-                format="DD-MM-YYYY"
-                className="w-full md:w-auto"
-                size="large"
-                placeholder={["Fecha inicial", "Fecha final"]}
+              <Select
+                className="min-w-[240px] flex-1"
+                mode="multiple"
+                allowClear
+                placeholder="Tipos de gasto"
+                value={selectedExpenseCategories}
+                onChange={(values) => setSelectedExpenseCategories(values)}
+                options={categories}
+                maxTagCount="responsive"
+                optionFilterProp="label"
               />
-              {customDateRange?.length === 2 && (
-                <div className="flex justify-center w-full">
-                  <Alert
-                    message={`Rango seleccionado: ${dayjs(customDateRange[0]).format("DD-MM-YYYY")} - ${dayjs(
-                      customDateRange[1]
-                    ).format("DD-MM-YYYY")}`}
-                    type="info"
-                    showIcon
-                  />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-slate-100 px-4 py-3">
+              <Space size={8}>
+                <Switch checked={includeCommissions} onChange={setIncludeCommissions} />
+                <span className="font-medium text-slate-700">Tomar comisiones</span>
+              </Space>
+              <Space size={8}>
+                <Switch checked={includeDeliveries} onChange={setIncludeDeliveries} />
+                <span className="font-medium text-slate-700">Tomar entregas simples y externas</span>
+              </Space>
+              <Segmented
+                value={deliveryMode}
+                options={[
+                  { label: "Real", value: "real" },
+                  { label: "Potencial", value: "potential" },
+                ]}
+                onChange={(value) => setDeliveryMode(value as any)}
+              />
+            </div>
+
+            {selectedPeriodMode !== "historico" ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <Typography.Text strong className="mb-3 block text-slate-700">
+                  Meses para analisis
+                </Typography.Text>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                  {monthOptions.map((month) => {
+                    const active = selectedPeriodMode === "1-mes"
+                      ? selectedMonth === month.value
+                      : selectedMonths.includes(month.value);
+
+                    return (
+                      <button
+                        key={month.value}
+                        type="button"
+                        onClick={() => toggleMonth(month.value)}
+                        className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"}`}
+                      >
+                        {monthToLabel(month.label)}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-            </Space>
-          </Card>
-        )}
+              </div>
+            ) : null}
+          </Space>
+        </Card>
 
-        <div>
-          <Typography.Title level={3} className="!mb-6">
-            Estadisticas Generales
-          </Typography.Title>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.income} tip="Cargando...">
-                <StatisticCard title="INGRESOS" value={stats?.income || 0} prefix={<DollarOutlined />} color="#20c997" />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.expenses} tip="Cargando...">
-                <StatisticCard title="GASTOS" value={stats?.expenses || 0} prefix={<ShoppingCartOutlined />} color="#dc3545" />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard title="UTILIDAD" value={stats?.utility ?? 0} prefix={<RiseOutlined />} color="#28a745" />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.expenses} tip="Cargando...">
-                <StatisticCard title="INVERSION" value={stats?.investments || 0} prefix={<RiseOutlined />} color="#007bff" />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard title="CAJA" value={stats?.caja ?? 0} prefix={<DollarOutlined />} color="#faad14" />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard title="COMISION" value={stats?.commission ?? 0} prefix={<RiseOutlined />} color="#6f42c1" />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard
-                  title="MERCADERIA VENDIDA"
-                  value={stats?.merchandiseSold ?? 0}
-                  prefix={<ShoppingCartOutlined />}
-                  color="#dc3545"
-                />
-              </Spin>
-            </Col>
-          </Row>
-        </div>
+        <Spin spinning={loading}>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <StatisticCard title="Pagos mensuales" value={income.monthly} prefix={<DollarOutlined />} color="#0f766e" />
+            <StatisticCard title="Comisiones" value={income.commissions} prefix={<RiseOutlined />} color="#7c3aed" />
+            <StatisticCard title="Entregas simples y externas" value={income.deliveries} prefix={<CarOutlined />} color="#ea580c" />
+            <StatisticCard title="Ingresos totales" value={totalIncome} prefix={<DollarOutlined />} color="#16a34a" />
+            <StatisticCard title="Gastos totales" value={expenses} prefix={<BankOutlined />} color="#dc2626" />
+            <StatisticCard title="Costo delivery" value={deliveryExpenses} prefix={<CarOutlined />} color="#f97316" />
+            <StatisticCard title="Ingreso delivery" value={deliveryIncome} prefix={<CarOutlined />} color="#0ea5e9" />
+            <StatisticCard title="Balance delivery" value={deliveryBalance} prefix={<RiseOutlined />} color="#059669" />
+            <StatisticCard title="Utilidad" value={utility} prefix={<RiseOutlined />} color="#2563eb" />
+            <StatisticCard title="Punto de equilibrio (%)" value={breakEven} prefix={<BarChartOutlined />} color="#ca8a04" />
+            <StatisticCard title="Total empresa historico" value={companyTotal} prefix={<BankOutlined />} color="#111827" />
+          </div>
+        </Spin>
 
-        <div>
-          <Typography.Title level={3} className="!mb-6">
-            Estadisticas de Delivery
-          </Typography.Title>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.deliveryIncome} tip="Cargando...">
-                <StatisticCard
-                  title="MONTO COBRADO DELIVERY"
-                  value={stats?.deliveryIncome ?? 0}
-                  prefix={<DollarOutlined />}
-                  color="#007bff"
-                />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
-                <StatisticCard
-                  title="COSTOS DELIVERY"
-                  value={stats?.deliveryExpenses ?? 0}
-                  prefix={<CarOutlined />}
-                  color="#6f42c1"
-                />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.deliveryExpenses} tip="Cargando...">
-                <StatisticCard
-                  title="BALANCE DELIVERY"
-                  value={stats?.deliveryBalance ?? 0}
-                  prefix={<CarOutlined />}
-                  color="#20c997"
-                />
-              </Spin>
-            </Col>
-          </Row>
-        </div>
-
-        <div>
-          <Typography.Title level={3} className="!mb-6">
-            Estadisticas de Paquetes
-          </Typography.Title>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard
-                  title="PRECIO PAQUETE EXTERNAS ENTREGADAS"
-                  value={stats?.externalDeliveredPackageTotal ?? 0}
-                  prefix={<DollarOutlined />}
-                  color="#0ea5e9"
-                />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard
-                  title="PAQUETES SIMPLES SIN DELIVERY"
-                  value={stats?.simplePackagesNoDeliveryTotal ?? 0}
-                  prefix={<ShoppingCartOutlined />}
-                  color="#f59e0b"
-                />
-              </Spin>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Spin spinning={loading.utility} tip="Cargando...">
-                <StatisticCard
-                  title="PAQUETES ENTRE SUCURSALES + ENVIO"
-                  value={stats?.simplePackagesInterbranchTotal ?? 0}
-                  prefix={<CarOutlined />}
-                  color="#14b8a6"
-                />
-              </Spin>
-            </Col>
-          </Row>
-        </div>
-      </Space>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={16}>
+            <BranchBars rows={branchRows} loading={loading} />
+          </Col>
+          <Col xs={24} xl={8}>
+            <Card className="h-full shadow-sm" bodyStyle={{ padding: 20 }}>
+              <Typography.Title level={4} className="!mb-3">
+                Resumen rapido
+              </Typography.Title>
+              <div className="space-y-3 text-sm text-slate-700">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="text-slate-500">Sucursales analizadas</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {selectedBranchIds.length ? selectedBranchIds.length : branches.length || 0}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="text-slate-500">Meses seleccionados</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {selectedPeriodMode === "historico" ? "Todo el historico" : monthLabels.length || 1}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="text-slate-500">Delivery</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {includeDeliveries ? (deliveryMode === "real" ? "Real" : "Potencial") : "Desactivado"}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="text-slate-500">Comisiones</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900">
+                    {includeCommissions ? "Incluidas" : "Excluidas"}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
     </Card>
   );
 };
