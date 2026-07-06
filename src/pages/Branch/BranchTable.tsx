@@ -72,9 +72,9 @@ const BranchTable: React.FC<BranchTableProps> = ({
   }
 
   useEffect(() => {
-    if (isSuperadmin) {
+    if (isAdmin || isSuperadmin) {
       setTableColumns([...cols, ...superadminCols]);
-    } else if (isAdmin || isOperator) {
+    } else if (isOperator) {
       setTableColumns([...cols, ...operatorCols]);
     } else if (user?.role == "seller") {
       setTableColumns([...cols, ...sellerCols]);

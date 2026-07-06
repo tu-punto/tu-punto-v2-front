@@ -4,6 +4,7 @@ import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { updateShippingAPI } from '../../api/shipping';
+import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
 
 dayjs.extend(utc);
 
@@ -15,6 +16,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     const [submitError, setSubmitError] = useState('');
     const [form] = Form.useForm();
     const isPaidToSeller = Boolean(shipping?.pagado_al_vendedor);
+    const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(shipping);
 
     const tipoPagoMap: any = {
         1: 'Transferencia o QR',
@@ -45,6 +47,10 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     }, [shipping, form]);
 
     const handleFinish = async (shippingStateData: any) => {
+        if (isDeliveryLocked) {
+            message.warning('Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.');
+            return;
+        }
         if (isPaidToSeller) {
             message.warning('No se puede editar una entrega ya pagada al vendedor');
             return;
@@ -130,7 +136,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
             }}
             footer={[
                 <Button key="back" onClick={onClose}>Cancelar</Button>,
-                <Button key="submit" type="primary" loading={loading} disabled={isPaidToSeller} onClick={() => form.submit()}>
+                <Button key="submit" type="primary" loading={loading} disabled={isPaidToSeller || isDeliveryLocked} onClick={() => form.submit()}>
                     Guardar
                 </Button>
             ]}
@@ -142,7 +148,16 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
                 layout="vertical"
                 name="shipping_info_form"
                 onFinish={handleFinish}
+                disabled={isPaidToSeller || isDeliveryLocked}
             >
+                {isDeliveryLocked && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        message="Esta entrega ya supero los 5 dias como entregada. Solo se puede ver."
+                        style={{ marginBottom: 16 }}
+                    />
+                )}
                 {submitError ? (
                     <Alert
                         type="error"

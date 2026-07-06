@@ -278,6 +278,12 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         });
     };
     const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
+    const getAutoBranchTransferRows = (mode: "send" | "receive") => {
+        const activeRows = mode === "send" ? filteredEsperaData : filteredEnCaminoData;
+        return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
+    };
+    const autoSendCount = getAutoBranchTransferRows("send").length;
+    const autoReceiveCount = getAutoBranchTransferRows("receive").length;
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -335,15 +341,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const handleBranchTransfer = (mode: "send" | "receive") => {
-        const rowsToUpdate = (selectedStatus === "en_camino" ? filteredEnCaminoData : filteredEsperaData).filter((row: any) => {
-            const rowKey = String(row?.key ?? row?._id ?? "");
-            const isSelected = selectedRowKeys.map(String).includes(rowKey);
-            if (!isSelected) return false;
-            return mode === "send" ? isPendingSend(row) : isPendingReceive(row);
-        });
+        const rowsToUpdate = getAutoBranchTransferRows(mode);
 
         if (!rowsToUpdate.length) {
-            message.warning(mode === "send" ? "Selecciona paquetes pendientes de enviar" : "Selecciona paquetes pendientes de recibir");
+            message.warning(
+                mode === "send"
+                    ? "No hay paquetes pendientes por enviar para tu sucursal"
+                    : "No hay paquetes pendientes por recibir para tu sucursal"
+            );
             return;
         }
 
@@ -374,21 +379,21 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         setBranchTransferError("");
         try {
             const updates = await Promise.all(
-                rows.map((row: any) =>
-                    updateShippingAPI(
-                        mode === "send"
-                            ? {
-                                estado_pedido: "En camino",
-                                costo_delivery: costPerPackage,
-                                tipo_de_pago: branchTransferModal.paymentMethod,
-                              }
-                            : {
-                                estado_pedido: "Entregado",
-                                hora_entrega_real: moment().tz("America/La_Paz").toISOString(),
-                                public_tracking_ready_for_pickup_at: moment().tz("America/La_Paz").toISOString(),
-                                costo_delivery: costPerPackage,
-                                tipo_de_pago: branchTransferModal.paymentMethod,
-                            },
+                    rows.map((row: any) =>
+                        updateShippingAPI(
+                            mode === "send"
+                                ? {
+                                    estado_pedido: "En camino",
+                                    costo_delivery: costPerPackage,
+                                    tipo_de_pago: branchTransferModal.paymentMethod,
+                                  }
+                                : {
+                                    estado_pedido: "Entregado",
+                                    hora_entrega_real: moment().tz("America/La_Paz").toISOString(),
+                                    public_tracking_ready_for_pickup_at: moment().tz("America/La_Paz").toISOString(),
+                                    costo_delivery: costPerPackage,
+                                    tipo_de_pago: branchTransferModal.paymentMethod,
+                                },
                         String(row._id)
                     )
                 )
@@ -1058,30 +1063,30 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     </Tooltip>
                 )}
                 {canManageExternal && selectedStatus === "En Espera" && (
-                    <Tooltip title="Marcar paquetes seleccionados como enviados a su sucursal destino">
+                    <Tooltip title="Marcar automaticamente todos los paquetes pendientes de tu sucursal como enviados">
                         <Button
                             className="shipping-filter-action"
                             type="primary"
                             loading={markingBranchTransfer}
-                            disabled={!selectedRowKeys.length}
+                            disabled={!autoSendCount}
                             onClick={() => handleBranchTransfer("send")}
                             style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
                         >
-                            Enviar sucursal
+                            Enviar sucursal{autoSendCount ? ` (${autoSendCount})` : ""}
                         </Button>
                     </Tooltip>
                 )}
                 {canManageExternal && selectedStatus === "en_camino" && (
-                    <Tooltip title="Confirmar que los paquetes llegaron a la sucursal destino">
+                    <Tooltip title="Confirmar automaticamente los paquetes pendientes de llegada para tu sucursal">
                         <Button
                             className="shipping-filter-action"
                             type="primary"
                             loading={markingBranchTransfer}
-                            disabled={!selectedRowKeys.length}
+                            disabled={!autoReceiveCount}
                             onClick={() => handleBranchTransfer("receive")}
                             style={{ height: 46, borderRadius: 10, fontWeight: 700, background: "#16a34a", borderColor: "#16a34a" }}
                         >
-                            Confirmar llegada
+                            Confirmar llegada{autoReceiveCount ? ` (${autoReceiveCount})` : ""}
                         </Button>
                     </Tooltip>
                 )}
@@ -1353,7 +1358,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                                 setSelectedRowKeys(keys);
                             },
                             getCheckboxProps: (record: any) => ({
-                                disabled: !(isSellerWithdrawalCandidate(record) || isPendingSend(record) || isPendingReceive(record)),
+                                disabled: !isSellerWithdrawalCandidate(record),
                             }),
                         }
                         : undefined
@@ -1407,6 +1412,21 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             {branchTransferModal.mode === "send"
                                 ? "Se marcarán como saliendo hacia la sucursal destino."
                                 : "Se confirmará su llegada y el cliente podrá retirarlo."}
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 p-3">
+                        <div className="text-xs uppercase tracking-wide text-slate-500">Paquetes detectados</div>
+                        <div className="mt-2 max-h-56 overflow-auto text-sm text-slate-700">
+                            {branchTransferModal.rows.map((row: any, index: number) => (
+                                <div key={String(row?._id || index)} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
+                                    <div>
+                                        <div className="font-medium">{row?.cliente || row?.comprador || "Sin cliente"}</div>
+                                        <div className="text-xs text-slate-500">{row?.numero_guia || row?._id || "Sin guia"}</div>
+                                    </div>
+                                    <div className="text-xs text-slate-500">{row?.lugar_entrega || "Sucursal"}</div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 

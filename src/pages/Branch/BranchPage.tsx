@@ -14,6 +14,7 @@ const BranchPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const { user } = useContext(UserContext);
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
   const isSuperadmin = user?.role?.toLowerCase() === 'superadmin';
   const isOperator = user?.role?.toLowerCase() === 'operator';
 
@@ -43,7 +44,7 @@ const BranchPage = () => {
             Sucursales
           </h1>
         </div>
-        {isSuperadmin && (
+        {(isAdmin || isSuperadmin) && (
           <Button
             onClick={() => {
               setIsFormModal(true);

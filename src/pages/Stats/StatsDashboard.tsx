@@ -237,7 +237,7 @@ const StatisticsDashboard = () => {
             .map(({ branchId, summary: branchSummary }: any) => {
               const branch = branches.find((item) => item.value === branchId);
               const incomeParts = getSummaryIncome(branchSummary || {});
-              const expenses = toNumber(branchSummary?.gastos);
+              const expenses = toNumber((branchSummary as any)?.expenses ?? (branchSummary as any)?.gastos);
               return {
                 id: branchId,
                 label: branch?.label || branchId,
@@ -258,24 +258,25 @@ const StatisticsDashboard = () => {
   }, [branches, selectedBranchIds, selectedExpenseCategories, summaryParams]);
 
   const income = getSummaryIncome(summary);
-  const expenses = toNumber(summary.expenses);
+  const expenses = toNumber((summary as any).expenses ?? (summary as any).gastos);
   const totalIncome = income.total;
   const utility = toNumber(summary.utility ?? totalIncome - expenses);
   const breakEven = totalIncome > 0 ? (expenses / totalIncome) * 100 : 0;
   const historicalIncome = getSummaryIncome(historicalSummary).total;
-  const historicalExpenses = toNumber(historicalSummary.expenses);
+  const historicalExpenses = toNumber((historicalSummary as any).expenses ?? (historicalSummary as any).gastos);
   const companyTotal = toNumber(historicalSummary.utility ?? historicalIncome - historicalExpenses);
   const deliveryIncome = toNumber(summary.deliveryIncome ?? summary.deliveryPackagesIncome);
   const deliveryExpenses = toNumber(summary.deliveryExpenses);
   const deliveryBalance = toNumber(summary.balanceDelivery ?? deliveryIncome - deliveryExpenses);
   const selectedBranchCount = selectedBranchIds.length || branches.length || 0;
-  const selectedMonthCount = selectedPeriodMode === "historico" ? 0 : monthLabels.length || 1;
 
   const monthLabels = selectedPeriodMode === "historico"
     ? []
     : selectedPeriodMode === "1-mes"
       ? [selectedMonth]
       : selectedMonths;
+
+  const selectedMonthCount = selectedPeriodMode === "historico" ? 0 : monthLabels.length || 1;
 
   const toggleMonth = (month: string) => {
     if (selectedPeriodMode === "1-mes") {

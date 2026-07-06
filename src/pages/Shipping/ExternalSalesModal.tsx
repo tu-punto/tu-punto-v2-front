@@ -9,6 +9,7 @@ import timezone from 'dayjs/plugin/timezone';
 import dayjs from 'dayjs';
 dayjs.extend(utc);
 dayjs.extend(timezone);
+import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
 
 interface ExternalSalesModalProps {
     visible: boolean, 
@@ -42,8 +43,13 @@ function ExternalSalesModal({visible, onCancel, onClose, externalSale}: External
     const [packageSizeZ, setPackageSizeZ] = useState(0);
     const [saleTotalPrice, setSaleTotalPrice] = useState(0);
     const [sucursales, setSucursales] = useState<any[]>([]);
+    const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(externalSale);
 
     const handleFinish = async (values: any) => {
+        if (externalSale && isDeliveryLocked) {
+            message.warning("Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.");
+            return;
+        }
         setLoading(true);
         if(saleTotalPrice < 0) {
             message.error("El precio total no puede ser menor a 0.");
@@ -205,7 +211,7 @@ function ExternalSalesModal({visible, onCancel, onClose, externalSale}: External
             width={800} 
             footer={null}
         >
-            <Form form={form} name='externalSaleForm' onFinish={handleFinish} layout='vertical'>
+            <Form form={form} name='externalSaleForm' onFinish={handleFinish} layout='vertical' disabled={Boolean(externalSale) && isDeliveryLocked}>
                 <Card title="Información del Vendedor" bordered={false}>
                     <Row gutter={16}>
                         <Col span={12}>

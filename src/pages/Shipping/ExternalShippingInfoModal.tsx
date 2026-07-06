@@ -4,6 +4,7 @@ import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Select,
 import moment from "moment-timezone";
 import { sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
 import {
   buildDirectShippingLabelImageData,
   DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS,
@@ -196,7 +197,8 @@ const ExternalShippingInfoModal = ({
     [baseBuyerDebt, latePickupFee, chargeSource]
   );
   const serviceLabel = isSimplePackage ? "Simple" : "Externo";
-  const canEditDelivery = isAdmin && externalShipping?.estado_pedido !== "Entregado" && externalShipping?.delivered !== true;
+  const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(externalShipping);
+  const canEditDelivery = isAdmin && !isDeliveryLocked;
   const canEditCreatedToday = canEditDelivery && isSameBusinessDay(externalShipping?.fecha_pedido);
   const canEditBuyerName = canEditCreatedToday && !isSimplePackage;
   const canEditChargeSummary = canEditCreatedToday;
@@ -547,6 +549,10 @@ const ExternalShippingInfoModal = ({
 
   const handleSave = async (values: any) => {
     if (!externalShipping?._id) return;
+    if (isDeliveryLocked) {
+      message.warning("Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.");
+      return;
+    }
     setLoading(true);
     try {
       if (values.estado_pedido === "Entregado" && buyerDebt > 0) {
@@ -643,6 +649,11 @@ const ExternalShippingInfoModal = ({
         )}
         </Space>
       </div>
+      {isDeliveryLocked && (
+        <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: "#fff7e6", border: "1px solid #ffd591", color: "#ad6800" }}>
+          Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.
+        </div>
+      )}
       <Form form={form} layout="vertical" onFinish={handleSave}>
         <Card title="Informacion del Vendedor" bordered={false}>
           <Row gutter={16}>

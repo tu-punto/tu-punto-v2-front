@@ -3,10 +3,9 @@ import SidebarNavButton from "../../components/SidebarNavButton";
 import ReportsLauncher from "../../components/ReportsLauncher";
 import sellerIcon from "../../assets/sellersIcon.svg";
 import servicesIcon from "../../assets/services.png";
-import { useState } from "react";
 
 const StatsPage = () => {
-  const [isOpen, setIsOpen] = useState(true);
+  const isOpen = true;
 
   return (
     <div>

@@ -5,6 +5,7 @@ import { getExternalSalesAPI } from '../../api/externalSale.ts'
 import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 import ExternalSalesModal from './ExternalSalesModal.tsx';
+import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
 
 const { Option } = Select;
 
@@ -107,12 +108,15 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
             title: 'Acciones',
             key: 'actions',
             render: (_:any, record: any) => {
+                const isLocked = isDeliveryEditLockedAfterFiveDays(record);
                 return (
                     <>
-                        <Tooltip title="Editar venta externa">
+                        <Tooltip title={isLocked ? "Solo se puede ver: ya pasaron 5 dias desde que se entrego" : "Editar venta externa"}>
                             <Button 
                                 icon={<EditOutlined />}
+                                disabled={isLocked}
                                 onClick={() => {
+                                    if (isLocked) return;
                                     setSelectedExternal(record)
                                     setIsModalExternalVisible(true)
                                 }}
