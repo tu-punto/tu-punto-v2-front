@@ -64,6 +64,7 @@ import EntryHistorySection from "./EntryHistorySection";
 import PaymentProofSection from "./PaymentProofSection";
 import ActionButtons from "./ActionButtons";
 import SellerDebtTable from "./SellerDebtTable";
+import DeclineServiceReasonModal from "../../../components/DeclineServiceReasonModal";
 import {
   branchesEnableCommissionService,
   branchesEnableSimplePackageService,
@@ -117,6 +118,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
   const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
   const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
   const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
+  const [adminDeclineServiceModalOpen, setAdminDeclineServiceModalOpen] = useState(false);
   const [recoveryChargeModalOpen, setRecoveryChargeModalOpen] = useState(false);
   const [recoveryChargeLoading, setRecoveryChargeLoading] = useState(false);
   const [declineServiceLoading, setDeclineServiceLoading] = useState(false);
@@ -436,12 +438,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     }
   };
 
-  const handleDeclineService = async () => {
+  const handleDeclineService = async (reason: string) => {
     if (!seller?.key) return;
 
     setDeclineServiceLoading(true);
     try {
-      const res = await declineSellerServiceAPI(String(seller.key));
+      const res = await declineSellerServiceAPI(String(seller.key), { reason });
       if (!res?.success) throw new Error("No se pudo registrar la declinacion");
 
       const updatedSeller = res.data?.seller || {};
@@ -459,12 +461,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     }
   };
 
-  const handleAdminDeclineService = async () => {
+  const handleAdminDeclineService = async (reason: string) => {
     if (!seller?.key) return;
 
     setDeclineServiceLoading(true);
     try {
-      const res = await adminDeclineSellerServiceAPI(String(seller.key));
+      const res = await adminDeclineSellerServiceAPI(String(seller.key), { reason });
       if (!res?.success) throw new Error("No se pudo registrar la declinacion");
       const updatedSeller = res.data?.seller || {};
       setDeclineServiceDate(
@@ -472,9 +474,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       );
       message.success("Declinacion del servicio registrada");
       onSuccess();
+      return true;
     } catch (error) {
       console.error(error);
       message.error("No se pudo declinar el servicio.");
+      return false;
     } finally {
       setDeclineServiceLoading(false);
     }
@@ -698,7 +702,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               danger
               loading={declineServiceLoading}
               disabled={!serviceEndDate.isValid()}
-              onClick={handleAdminDeclineService}
+              onClick={() => setAdminDeclineServiceModalOpen(true)}
             >
               Declinar servicio
             </Button>
@@ -788,25 +792,36 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         </Space>
       </Modal>
 
-      <Modal
-        title="Declinar el servicio"
+      <DeclineServiceReasonModal
         open={declineServiceModalOpen}
-        onCancel={() => setDeclineServiceModalOpen(false)}
-        onOk={handleDeclineService}
-        okText="Declinar el servicio"
-        okButtonProps={{ danger: true }}
-        cancelText="Cancelar"
-        confirmLoading={declineServiceLoading}
-      >
-        <p>
-          Esta seguro que desea abandonar el servicio? Se notificara a los encargados que a partir del{" "}
-          {serviceEndDate.isValid() ? serviceEndDate.format("DD/MM/YYYY") : "[fecha de vigencia]"} ya no usara el servicio para que no se proceda con la renovacion del mismo. Esto implica que hasta el{" "}
-          {serviceStockPickupDeadline?.isValid()
+        loading={declineServiceLoading}
+        title="Declinar el servicio"
+        description={`Esta acción notificará a los encargados. Tendrás hasta el ${
+          serviceStockPickupDeadline?.isValid()
             ? serviceStockPickupDeadline.format("DD/MM/YYYY")
-            : "[fecha de vigencia + 5 dias]"}{" "}
-          debe recoger su stock y sus pedidos del punto de entrega.
-        </p>
-      </Modal>
+            : "[fecha de vigencia + 5 días]"
+        } para recoger tu stock y pedidos.`}
+        okText="Declinar el servicio"
+        onCancel={() => setDeclineServiceModalOpen(false)}
+        onConfirm={handleDeclineService}
+      />
+
+      <DeclineServiceReasonModal
+        open={adminDeclineServiceModalOpen}
+        loading={declineServiceLoading}
+        title="Declinar el servicio"
+        description={`Registra el motivo interno de la baja. El vendedor tendrá hasta el ${
+          serviceStockPickupDeadline?.isValid()
+            ? serviceStockPickupDeadline.format("DD/MM/YYYY")
+            : "[fecha de vigencia + 5 días]"
+        } para retirar su stock.`}
+        okText="Declinar servicio"
+        onCancel={() => setAdminDeclineServiceModalOpen(false)}
+        onConfirm={async (reason) => {
+          const ok = await handleAdminDeclineService(reason);
+          if (ok) setAdminDeclineServiceModalOpen(false);
+        }}
+      />
 
       <Form
         form={form}

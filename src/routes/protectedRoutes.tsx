@@ -12,6 +12,7 @@ import ErrorPage from "../pages/ErrorPage";
 import StatsPage from "../pages/Stats/StatsPage";
 import SellerInfoPageWrapper from "../pages/Seller/SellerInfo";
 import CashReconciliationPage from "../pages/BoxClose/BoxClosePage";
+import BoxCloseSummaryPage from "../pages/BoxClose/BoxCloseSummaryPage";
 import CierreCajaPage from "../pages/BoxClose/DailyBoxClose";
 import BranchPage from "../pages/Branch/BranchPage";
 import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
@@ -86,6 +87,16 @@ const SuperadminVariantsRoute = () => {
   return <SuperadminVariantsPage />;
 };
 
+const BoxCloseSummaryRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!isSuperadminUser(user)) {
+    return <Navigate to="/stats" replace />;
+  }
+
+  return <BoxCloseSummaryPage />;
+};
+
 const protectedRoutes = [
   {
     path: "/",
@@ -126,6 +137,10 @@ const protectedRoutes = [
       {
         path: "/stats",
         element: guard("/stats", <StatsPage />),
+      },
+      {
+        path: "/box-close-summary",
+        element: guard("/box-close-summary", <BoxCloseSummaryRoute />),
       },
       {
         path: "/sellerFactura",

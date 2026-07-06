@@ -86,18 +86,18 @@ export const requestSellerPaymentAPI = async (sellerId: string, payload: FormDat
     }
 }
 
-export const declineSellerServiceAPI = async (sellerId: string) => {
+export const declineSellerServiceAPI = async (sellerId: string, payload?: { reason?: string }) => {
     try {
-        const res = await apiClient.post(`/seller/${sellerId}/decline-service`)
+        const res = await apiClient.post(`/seller/${sellerId}/decline-service`, payload || {})
         return { success: true, data: res.data }
     } catch (error) {
         parseError(error as AxiosError)
     }
 }
 
-export const adminDeclineSellerServiceAPI = async (sellerId: string) => {
+export const adminDeclineSellerServiceAPI = async (sellerId: string, payload?: { reason?: string }) => {
     try {
-        const res = await apiClient.post(`/seller/${sellerId}/admin-decline-service`)
+        const res = await apiClient.post(`/seller/${sellerId}/admin-decline-service`, payload || {})
         return { success: true, data: res.data }
     } catch (error) {
         parseError(error as AxiosError)

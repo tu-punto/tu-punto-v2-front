@@ -11,6 +11,25 @@ export const getBoxClosesAPI = async () => {
   }
 };
 
+export const getBoxCloseSummaryAPI = async (params?: {
+  from?: string;
+  to?: string;
+  sucursalIds?: string[];
+}) => {
+  try {
+    const res = await apiClient.get("/boxClose/summary", {
+      params: {
+        from: params?.from,
+        to: params?.to,
+        sucursalIds: params?.sucursalIds?.join(","),
+      },
+    });
+    return res.data;
+  } catch (error) {
+    parseError(error as AxiosError);
+  }
+};
+
 export const registerBoxCloseAPI = async (boxCloseData: any) => {
   try {
     const res = await apiClient.post("/boxClose/register", boxCloseData);
