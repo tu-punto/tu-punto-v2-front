@@ -78,7 +78,7 @@ const BranchBars = ({ rows, loading }: { rows: BranchChartRow[]; loading: boolea
   const maxAbs = Math.max(1, ...rows.flatMap((row) => [Math.abs(row.income), Math.abs(row.expenses), Math.abs(row.utility)]));
 
   return (
-    <Card className="shadow-sm" bodyStyle={{ padding: 20 }}>
+    <div className="p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <Typography.Title level={4} className="!mb-0">
@@ -92,7 +92,7 @@ const BranchBars = ({ rows, loading }: { rows: BranchChartRow[]; loading: boolea
       </div>
 
       {loading ? (
-        <div className="grid min-h-[240px] place-items-center">
+        <div className="grid min-h-[240px] place-items-center rounded-3xl bg-slate-50">
           <Spin size="large" />
         </div>
       ) : rows.length ? (
@@ -103,18 +103,18 @@ const BranchBars = ({ rows, loading }: { rows: BranchChartRow[]; loading: boolea
             const utilityHeight = Math.max(18, Math.round((Math.abs(row.utility) / maxAbs) * 180));
             const positive = row.utility >= 0;
             return (
-              <div key={row.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+              <div key={row.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-slate-900">{row.label}</div>
-                    <div className="text-xs text-slate-500">Ingresos: Bs. {money(row.income)} · Gastos: Bs. {money(row.expenses)}</div>
+                    <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">{row.label}</div>
+                    <div className="mt-1 text-xs text-slate-500">Ingresos: Bs. {money(row.income)} · Gastos: Bs. {money(row.expenses)}</div>
                   </div>
-                  <Tag color={positive ? "green" : "red"} className="rounded-full px-3 py-1">
+                  <Tag color={positive ? "green" : "red"} className="rounded-full px-3 py-1 font-semibold">
                     {positive ? "+" : ""}{money(row.utility)}
                   </Tag>
                 </div>
 
-                <div className="flex h-[210px] items-end rounded-2xl bg-white/90 p-3 shadow-inner">
+                <div className="flex h-[210px] items-end rounded-2xl bg-slate-50 p-3 shadow-inner">
                   <div className="flex h-full w-full items-end gap-3">
                     <div className="flex flex-1 flex-col items-center gap-2 text-center">
                       <div className="flex h-full items-end gap-2">
@@ -141,7 +141,7 @@ const BranchBars = ({ rows, loading }: { rows: BranchChartRow[]; loading: boolea
       ) : (
         <Empty description="No hay datos para el filtro actual" />
       )}
-    </Card>
+    </div>
   );
 };
 
@@ -268,6 +268,8 @@ const StatisticsDashboard = () => {
   const deliveryIncome = toNumber(summary.deliveryIncome ?? summary.deliveryPackagesIncome);
   const deliveryExpenses = toNumber(summary.deliveryExpenses);
   const deliveryBalance = toNumber(summary.balanceDelivery ?? deliveryIncome - deliveryExpenses);
+  const selectedBranchCount = selectedBranchIds.length || branches.length || 0;
+  const selectedMonthCount = selectedPeriodMode === "historico" ? 0 : monthLabels.length || 1;
 
   const monthLabels = selectedPeriodMode === "historico"
     ? []
@@ -290,32 +292,56 @@ const StatisticsDashboard = () => {
 
   return (
     <Card className="m-4 overflow-hidden border-0 shadow-xl" bodyStyle={{ padding: 0 }}>
-      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 px-6 py-5 text-white">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Typography.Title level={2} className="!mb-1 !text-white">
+      <div className="relative overflow-hidden bg-slate-950 px-5 py-5 text-white sm:px-8 sm:py-7">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.28),_transparent_32%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(135deg,_#0f172a_0%,_#111827_55%,_#1f2937_100%)]" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-emerald-400" />
+        <div className="relative grid gap-5 xl:grid-cols-[1.35fr_0.95fr] xl:items-center">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.28em] text-slate-200 backdrop-blur">
+              <BarChartOutlined />
               Control financiero
-            </Typography.Title>
-            <Typography.Text className="!text-slate-300">
+            </div>
+            <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl xl:text-5xl">
               Dashboard de ingresos, gastos, utilidad y punto de equilibrio.
-            </Typography.Text>
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+              Una vista clara para comparar sucursales, revisar gasto real y entender de un vistazo dónde se gana y dónde se fuga margen.
+            </p>
           </div>
-          <Tag color="geekblue" className="rounded-full border-0 px-4 py-1.5 text-sm">
-            {selectedPeriodMode === "historico" ? "Historico" : monthLabels.join(", ")}
-          </Tag>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:justify-self-end">
+            <div className="min-w-0 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+              <div className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">Periodo</div>
+              <div className="mt-1 truncate text-sm font-semibold text-white">{selectedPeriodMode === "historico" ? "Histórico" : monthLabels.join(", ")}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+              <div className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">Sucursales</div>
+              <div className="mt-1 text-sm font-semibold text-white">{selectedBranchCount}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+              <div className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-300">Meses</div>
+              <div className="mt-1 text-sm font-semibold text-white">{selectedMonthCount || "Todos"}</div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="space-y-6 bg-slate-50 p-5 lg:p-6">
-        <Card className="shadow-sm" bodyStyle={{ padding: 16 }}>
-          <div className="mb-4 flex items-center gap-2 text-slate-800">
-            <FilterOutlined />
-            <Typography.Text strong>Filtros</Typography.Text>
+        <Card className="border-slate-200/80 shadow-sm" bodyStyle={{ padding: 18 }}>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-800">
+              <FilterOutlined />
+              <Typography.Text strong>Filtros</Typography.Text>
+            </div>
+            <Typography.Text className="text-xs font-medium text-slate-500">
+              Los cambios se reflejan al instante en los indicadores.
+            </Typography.Text>
           </div>
 
-          <Space direction="vertical" size={16} className="w-full">
-            <div className="flex flex-wrap items-center gap-3">
+          <Space direction="vertical" size={18} className="w-full">
+            <div className="grid gap-3 xl:grid-cols-[180px_minmax(0,1fr)_minmax(0,1fr)]">
               <Segmented
+                className="w-full"
                 value={selectedPeriodMode}
                 options={[
                   { label: "Historico", value: "historico" },
@@ -326,7 +352,8 @@ const StatisticsDashboard = () => {
               />
 
               <Select
-                className="min-w-[240px] flex-1"
+                size="large"
+                className="w-full"
                 mode="multiple"
                 allowClear
                 placeholder="Sucursales para analisis"
@@ -338,7 +365,8 @@ const StatisticsDashboard = () => {
               />
 
               <Select
-                className="min-w-[240px] flex-1"
+                size="large"
+                className="w-full"
                 mode="multiple"
                 allowClear
                 placeholder="Tipos de gasto"
@@ -350,16 +378,17 @@ const StatisticsDashboard = () => {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-slate-100 px-4 py-3">
-              <Space size={8}>
+            <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-slate-200 bg-slate-100/80 px-4 py-4">
+              <Space size={8} className="rounded-2xl bg-white px-4 py-2 shadow-sm">
                 <Switch checked={includeCommissions} onChange={setIncludeCommissions} />
                 <span className="font-medium text-slate-700">Tomar comisiones</span>
               </Space>
-              <Space size={8}>
+              <Space size={8} className="rounded-2xl bg-white px-4 py-2 shadow-sm">
                 <Switch checked={includeDeliveries} onChange={setIncludeDeliveries} />
                 <span className="font-medium text-slate-700">Tomar entregas simples y externas</span>
               </Space>
               <Segmented
+                className="rounded-2xl bg-white shadow-sm"
                 value={deliveryMode}
                 options={[
                   { label: "Real", value: "real" },
@@ -370,7 +399,7 @@ const StatisticsDashboard = () => {
             </div>
 
             {selectedPeriodMode !== "historico" ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
                 <Typography.Text strong className="mb-3 block text-slate-700">
                   Meses para analisis
                 </Typography.Text>
@@ -385,7 +414,7 @@ const StatisticsDashboard = () => {
                         key={month.value}
                         type="button"
                         onClick={() => toggleMonth(month.value)}
-                        className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"}`}
+                        className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${active ? "border-slate-950 bg-slate-950 text-white shadow-md" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400 hover:bg-white"}`}
                       >
                         {monthToLabel(month.label)}
                       </button>
@@ -398,7 +427,7 @@ const StatisticsDashboard = () => {
         </Card>
 
         <Spin spinning={loading}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             <StatisticCard title="Pagos mensuales" value={income.monthly} prefix={<DollarOutlined />} color="#0f766e" />
             <StatisticCard title="Comisiones" value={income.commissions} prefix={<RiseOutlined />} color="#7c3aed" />
             <StatisticCard title="Entregas simples y externas" value={income.deliveries} prefix={<CarOutlined />} color="#ea580c" />
@@ -415,33 +444,40 @@ const StatisticsDashboard = () => {
 
         <Row gutter={[16, 16]}>
           <Col xs={24} xl={16}>
-            <BranchBars rows={branchRows} loading={loading} />
+            <Card className="h-full border-slate-200/80 shadow-sm" bodyStyle={{ padding: 0 }}>
+              <BranchBars rows={branchRows} loading={loading} />
+            </Card>
           </Col>
           <Col xs={24} xl={8}>
-            <Card className="h-full shadow-sm" bodyStyle={{ padding: 20 }}>
-              <Typography.Title level={4} className="!mb-3">
-                Resumen rapido
-              </Typography.Title>
+            <Card className="h-full border-slate-200/80 shadow-sm" bodyStyle={{ padding: 20 }}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <Typography.Title level={4} className="!mb-0">
+                  Resumen rapido
+                </Typography.Title>
+                <Tag color="default" className="rounded-full px-3 py-1">
+                  {selectedBranchCount} sucursales
+                </Tag>
+              </div>
               <div className="space-y-3 text-sm text-slate-700">
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <div className="text-slate-500">Sucursales analizadas</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {selectedBranchIds.length ? selectedBranchIds.length : branches.length || 0}
                   </div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <div className="text-slate-500">Meses seleccionados</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {selectedPeriodMode === "historico" ? "Todo el historico" : monthLabels.length || 1}
                   </div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <div className="text-slate-500">Delivery</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {includeDeliveries ? (deliveryMode === "real" ? "Real" : "Potencial") : "Desactivado"}
                   </div>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                   <div className="text-slate-500">Comisiones</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">
                     {includeCommissions ? "Incluidas" : "Excluidas"}

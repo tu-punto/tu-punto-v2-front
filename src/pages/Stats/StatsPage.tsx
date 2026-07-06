@@ -1,5 +1,6 @@
 import StatisticsDashboard from "./StatsDashboard";
 import SidebarNavButton from "../../components/SidebarNavButton";
+import ReportsLauncher from "../../components/ReportsLauncher";
 import sellerIcon from "../../assets/sellersIcon.svg";
 import servicesIcon from "../../assets/services.png";
 
@@ -10,6 +11,9 @@ const StatsPage = () => {
 
   return (
     <div>
+      <div className="px-4 pt-4 flex justify-end">
+        <ReportsLauncher />
+      </div>
       <StatisticsDashboard />
       <div className="p-2 space-y-2">
         <SidebarNavButton 

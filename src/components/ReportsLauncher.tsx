@@ -29,6 +29,7 @@ import {
   downloadInventarioActualXlsx,
   downloadIngresos3MesesXlsx,
   downloadIngresosMensualesSucursalServicioXlsx,
+  downloadRiesgoClientesVentasXlsx,
   getClientesActivosMesesAPI,
   getComisionesMesesAPI,
   getInventarioActualAPI,
@@ -724,7 +725,7 @@ export default function ReportsLauncher() {
           await downloadVentasVendedores4mXlsx({ meses, mesFin });
           break;
         case "riesgoClientesVentas":
-          message.info("Este reporte solo tiene vista previa por ahora.");
+          await downloadRiesgoClientesVentasXlsx({ meses, mesFin });
           break;
         case "entregasNuevoServicio":
           await downloadEntregasNuevoServicioXlsx({ meses, sellerId: vals.sellerId });
