@@ -282,8 +282,22 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         const activeRows = mode === "send" ? filteredEsperaData : filteredEnCaminoData;
         return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
     };
+    const getSelectedBranchTransferRows = (mode: "send" | "receive") => {
+        const activeRows = mode === "send" ? filteredEsperaData : filteredEnCaminoData;
+        const selectedKeys = new Set(selectedRowKeys.map(String));
+        return (activeRows as any[]).filter((row: any) => {
+            const rowKey = String(row?.key ?? row?._id ?? "");
+            return selectedKeys.has(rowKey) && (mode === "send" ? isPendingSend(row) : isPendingReceive(row));
+        });
+    };
+    const getBranchTransferRows = (mode: "send" | "receive") => {
+        const selectedRows = getSelectedBranchTransferRows(mode);
+        return selectedRows.length ? selectedRows : getAutoBranchTransferRows(mode);
+    };
     const autoSendCount = getAutoBranchTransferRows("send").length;
     const autoReceiveCount = getAutoBranchTransferRows("receive").length;
+    const sendCount = getBranchTransferRows("send").length;
+    const receiveCount = getBranchTransferRows("receive").length;
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -341,7 +355,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const handleBranchTransfer = (mode: "send" | "receive") => {
-        const rowsToUpdate = getAutoBranchTransferRows(mode);
+        const rowsToUpdate = getBranchTransferRows(mode);
 
         if (!rowsToUpdate.length) {
             message.warning(
@@ -1068,11 +1082,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             className="shipping-filter-action"
                             type="primary"
                             loading={markingBranchTransfer}
-                            disabled={!autoSendCount}
+                            disabled={!sendCount}
                             onClick={() => handleBranchTransfer("send")}
                             style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
                         >
-                            Enviar sucursal{autoSendCount ? ` (${autoSendCount})` : ""}
+                            Enviar sucursal{sendCount ? ` (${sendCount})` : ""}
                         </Button>
                     </Tooltip>
                 )}
@@ -1082,11 +1096,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             className="shipping-filter-action"
                             type="primary"
                             loading={markingBranchTransfer}
-                            disabled={!autoReceiveCount}
+                            disabled={!receiveCount}
                             onClick={() => handleBranchTransfer("receive")}
                             style={{ height: 46, borderRadius: 10, fontWeight: 700, background: "#16a34a", borderColor: "#16a34a" }}
                         >
-                            Confirmar llegada{autoReceiveCount ? ` (${autoReceiveCount})` : ""}
+                            Confirmar llegada{receiveCount ? ` (${receiveCount})` : ""}
                         </Button>
                     </Tooltip>
                 )}
