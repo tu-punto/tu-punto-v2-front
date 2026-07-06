@@ -86,7 +86,16 @@ export const requestSellerPaymentAPI = async (sellerId: string, payload: FormDat
     }
 }
 
-export const declineSellerServiceAPI = async (sellerId: string, payload?: { reason?: string }) => {
+export const declineSellerServiceAPI = async (
+    sellerId: string,
+    payload?: {
+        motivo_principal?: string;
+        motivo_principal_otro?: string;
+        probabilidad_retorno?: string;
+        omitir_motivo_principal?: boolean;
+        omitir_probabilidad_retorno?: boolean;
+    }
+) => {
     try {
         const res = await apiClient.post(`/seller/${sellerId}/decline-service`, payload || {})
         return { success: true, data: res.data }
@@ -95,7 +104,16 @@ export const declineSellerServiceAPI = async (sellerId: string, payload?: { reas
     }
 }
 
-export const adminDeclineSellerServiceAPI = async (sellerId: string, payload?: { reason?: string }) => {
+export const adminDeclineSellerServiceAPI = async (
+    sellerId: string,
+    payload?: {
+        motivo_principal?: string;
+        motivo_principal_otro?: string;
+        probabilidad_retorno?: string;
+        omitir_motivo_principal?: boolean;
+        omitir_probabilidad_retorno?: boolean;
+    }
+) => {
     try {
         const res = await apiClient.post(`/seller/${sellerId}/admin-decline-service`, payload || {})
         return { success: true, data: res.data }

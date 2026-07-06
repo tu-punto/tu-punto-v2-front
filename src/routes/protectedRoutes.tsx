@@ -23,6 +23,7 @@ import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
 import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoPage";
 import SuperadminVariantsPage from "../pages/SuperadminVariants/SuperadminVariantsPage";
 import SimplePackagesPage from "../pages/SimplePackages/SimplePackagesPage";
+import AttendancePage from "../pages/Attendance/AttendancePage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -181,6 +182,10 @@ const protectedRoutes = [
       {
         path: "/user",
         element: guard("/user", <UsersPage />),
+      },
+      {
+        path: "/attendance",
+        element: guard("/attendance", <AttendancePage />),
       },
       {
         path: "/shipping-guide",

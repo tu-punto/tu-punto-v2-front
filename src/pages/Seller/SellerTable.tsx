@@ -259,11 +259,17 @@ export default function SellerTable({
     </div>
   );
 
-  const handleSubmitDeclineReason = async (reason: string) => {
+  const handleSubmitDeclineReason = async (payload: {
+    motivo_principal?: string;
+    motivo_principal_otro?: string;
+    probabilidad_retorno?: string;
+    omitir_motivo_principal?: boolean;
+    omitir_probabilidad_retorno?: boolean;
+  }) => {
     if (!declineReasonTarget) return;
     setDeclineLoading(true);
     try {
-      const res = await adminDeclineSellerServiceAPI(declineReasonTarget.key, { reason });
+      const res = await adminDeclineSellerServiceAPI(declineReasonTarget.key, payload);
       if (!res?.success) throw new Error("No se pudo declinar");
       message.success("Declinacion registrada");
       setDeclineReasonOpen(false);
@@ -644,6 +650,7 @@ export default function SellerTable({
         title="Declinar servicio"
         description={declineReasonTarget ? `Se registrará la baja de ${declineReasonTarget.nombre}.` : undefined}
         okText="Declinar"
+        allowSkip
         onCancel={() => {
           setDeclineReasonOpen(false);
           setDeclineReasonTarget(null);

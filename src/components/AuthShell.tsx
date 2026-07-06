@@ -10,6 +10,7 @@ type AuthShellProps = {
   panelTitle: string;
   panelDescription: string;
   highlights: { title: string; value: string }[];
+  images?: { src: string; alt: string }[];
 };
 
 export default function AuthShell({
@@ -22,6 +23,7 @@ export default function AuthShell({
   panelTitle,
   panelDescription,
   highlights,
+  images = [],
 }: AuthShellProps) {
   return (
     <div className={`min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8 ${accentClassName}`}>
@@ -29,6 +31,23 @@ export default function AuthShell({
         <section className="relative flex flex-col justify-between overflow-hidden p-8 sm:p-10 lg:p-12">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.08),transparent_28%)]" />
           <div className="relative z-10">
+            {images.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {images.map((image) => (
+                  <div
+                    key={image.src}
+                    className="overflow-hidden rounded-2xl border border-white/10 bg-white/10 shadow-lg shadow-black/10"
+                  >
+                    <img
+                      src={image.src}
+                      alt={image.alt}
+                      className="h-32 w-full object-cover sm:h-40"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
               {badge}
             </div>

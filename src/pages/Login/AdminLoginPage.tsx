@@ -21,6 +21,11 @@ export default function AdminLoginPage() {
         { title: "Cierres", value: "Control centralizado" },
         { title: "Usuarios", value: "Acceso interno" },
       ]}
+      images={[
+        { src: "/login/admin-1.jpg", alt: "Panel admin 1" },
+        { src: "/login/admin-2.jpg", alt: "Panel admin 2" },
+        { src: "/login/admin-3.jpg", alt: "Panel admin 3" },
+      ]}
     >
       <div className="mb-8 flex items-center gap-4">
         <img alt="logo" src={logoImg} className="h-14 w-14 rounded-2xl object-contain shadow-sm" />

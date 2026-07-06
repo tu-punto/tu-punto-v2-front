@@ -17,6 +17,11 @@ export default function SellerLoginPage() {
         { title: "Stock", value: "Controlado por sucursal" },
         { title: "Cobros", value: "Sin pasos extra" },
       ]}
+      images={[
+        { src: "/login/seller-1.jpg", alt: "Vendedor 1" },
+        { src: "/login/seller-2.jpg", alt: "Vendedor 2" },
+        { src: "/login/seller-3.jpg", alt: "Vendedor 3" },
+      ]}
     >
       <div className="mb-8 flex items-center gap-4">
         <img alt="logo" src={logoImg} className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
