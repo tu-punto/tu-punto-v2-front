@@ -1,5 +1,5 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Select, Table, Tooltip } from 'antd';
+import { Alert, Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
 import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
@@ -166,16 +166,19 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         open: boolean;
         mode: "send" | "receive" | null;
         rows: any[];
-        expensePerPackage: number;
+        totalDeliveryCost: number;
+        paymentMethod: "1" | "2";
     }>({
         open: false,
         mode: null,
         rows: [],
-        expensePerPackage: 0,
+        totalDeliveryCost: 0,
+        paymentMethod: "2",
     });
+    const [branchTransferError, setBranchTransferError] = useState("");
 
     const [isMobile, setIsMobile] = useState(false);
-    const canManageExternal = isAdmin || isOperator;
+    const canManageExternal = isAdmin || isOperator || isSuperadminUser(user);
     const currentSucursalId = localStorage.getItem("sucursalId") || "";
     const currentSucursal = sucursal.find((s: any) =>
         String(s._id) === String(currentSucursalId) ||
@@ -348,50 +351,66 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             open: true,
             mode,
             rows: rowsToUpdate,
-            expensePerPackage: 0,
+            totalDeliveryCost: 0,
+            paymentMethod: "2",
         });
+        setBranchTransferError("");
     };
 
     const closeBranchTransferModal = () => {
         if (markingBranchTransfer) return;
-        setBranchTransferModal({ open: false, mode: null, rows: [], expensePerPackage: 0 });
+        setBranchTransferError("");
+        setBranchTransferModal({ open: false, mode: null, rows: [], totalDeliveryCost: 0, paymentMethod: "2" });
     };
 
     const submitBranchTransfer = async () => {
-        const { mode, rows, expensePerPackage } = branchTransferModal;
+        const { mode, rows } = branchTransferModal;
         if (!mode || !rows.length) return;
 
+        const totalDeliveryCost = Number(branchTransferModal.totalDeliveryCost || 0);
+        const costPerPackage = rows.length > 0 ? Number((totalDeliveryCost / rows.length).toFixed(2)) : 0;
+
         setMarkingBranchTransfer(true);
+        setBranchTransferError("");
         try {
             const updates = await Promise.all(
                 rows.map((row: any) =>
                     updateShippingAPI(
                         mode === "send"
-                            ? { estado_pedido: "En camino", costo_delivery: expensePerPackage }
+                            ? {
+                                estado_pedido: "En camino",
+                                costo_delivery: costPerPackage,
+                                tipo_de_pago: branchTransferModal.paymentMethod,
+                              }
                             : {
                                 estado_pedido: "Entregado",
                                 hora_entrega_real: moment().tz("America/La_Paz").toISOString(),
                                 public_tracking_ready_for_pickup_at: moment().tz("America/La_Paz").toISOString(),
-                                costo_delivery: expensePerPackage,
+                                costo_delivery: costPerPackage,
+                                tipo_de_pago: branchTransferModal.paymentMethod,
                             },
                         String(row._id)
                     )
                 )
             );
 
-            const failed = updates.filter((item: any) => !item?.success).length;
-            if (failed > 0) {
-                message.warning(`Se actualizaron ${rows.length - failed}; ${failed} fallaron`);
+            const failedRows = updates.filter((item: any) => !item?.success);
+            if (failedRows.length > 0) {
+                const firstFailure = failedRows[0];
+                const failureMessage = String(firstFailure?.message || firstFailure?.msg || "No se pudo actualizar el envio");
+                setBranchTransferError(failureMessage);
+                message.error(failureMessage);
             } else {
                 message.success(
                     mode === "send"
                         ? `Se marcaron ${rows.length} paquete(s) como enviados`
                         : `Se confirmaron ${rows.length} llegada(s)`
                 );
+                setBranchTransferError("");
+                setBranchTransferModal({ open: false, mode: null, rows: [], totalDeliveryCost: 0, paymentMethod: "2" });
+                fetchShippings();
             }
             setSelectedRowKeys([]);
-            setBranchTransferModal({ open: false, mode: null, rows: [], expensePerPackage: 0 });
-            fetchShippings();
         } finally {
             setMarkingBranchTransfer(false);
         }
@@ -1372,6 +1391,15 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 destroyOnClose
             >
                 <div className="space-y-4">
+                    {branchTransferError ? (
+                        <Alert
+                            type="error"
+                            showIcon
+                            message="No se pudo completar la operación"
+                            description={branchTransferError}
+                        />
+                    ) : null}
+
                     <div className="rounded-2xl bg-slate-50 p-4">
                         <div className="text-sm text-slate-500">Paquetes seleccionados</div>
                         <div className="text-2xl font-bold text-slate-900">{branchTransferModal.rows.length}</div>
@@ -1384,12 +1412,12 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
                     <div className="grid gap-3 sm:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 p-3">
-                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo por paquete</div>
-                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {branchTransferModal.expensePerPackage.toFixed(2)}</div>
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo total</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {Number(branchTransferModal.totalDeliveryCost || 0).toFixed(2)}</div>
                         </div>
                         <div className="rounded-2xl border border-slate-200 p-3">
-                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo total</div>
-                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {(branchTransferModal.expensePerPackage * branchTransferModal.rows.length).toFixed(2)}</div>
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo por paquete</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {branchTransferModal.rows.length > 0 ? (Number(branchTransferModal.totalDeliveryCost || 0) / branchTransferModal.rows.length).toFixed(2) : "0.00"}</div>
                         </div>
                         <div className="rounded-2xl border border-slate-200 p-3">
                             <div className="text-xs uppercase tracking-wide text-slate-500">Impacto</div>
@@ -1398,20 +1426,36 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     </div>
 
                     <div>
-                        <div className="mb-1 text-sm font-medium text-neutral-700">Costo de delivery por paquete</div>
+                        <div className="mb-1 text-sm font-medium text-neutral-700">Costo total del delivery</div>
                         <InputNumber
                             min={0}
                             precision={2}
                             prefix="Bs."
                             style={{ width: "100%" }}
-                            value={branchTransferModal.expensePerPackage}
+                            value={branchTransferModal.totalDeliveryCost}
                             onChange={(value) =>
                                 setBranchTransferModal((current) => ({
                                     ...current,
-                                    expensePerPackage: Number(value || 0),
+                                    totalDeliveryCost: Number(value || 0),
                                 }))
                             }
                         />
+                    </div>
+
+                    <div>
+                        <div className="mb-1 text-sm font-medium text-neutral-700">Método de pago</div>
+                        <Radio.Group
+                            value={branchTransferModal.paymentMethod}
+                            onChange={(event) =>
+                                setBranchTransferModal((current) => ({
+                                    ...current,
+                                    paymentMethod: event.target.value,
+                                }))
+                            }
+                        >
+                            <Radio.Button value="2">Efectivo</Radio.Button>
+                            <Radio.Button value="1">Transferencia o QR</Radio.Button>
+                        </Radio.Group>
                     </div>
                 </div>
             </Modal>

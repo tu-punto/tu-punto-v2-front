@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Button, Form, Row, Col, TimePicker, Radio, InputNumber, message } from 'antd';
+import { Alert, Modal, Button, Form, Row, Col, TimePicker, Radio, InputNumber, message } from 'antd';
 import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -12,6 +12,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     const [montoCobradoDelivery, setMontoCobradoDelivery] = useState<number>(0);
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
     const [loading, setLoading] = useState(false);
+    const [submitError, setSubmitError] = useState('');
     const [form] = Form.useForm();
     const isPaidToSeller = Boolean(shipping?.pagado_al_vendedor);
 
@@ -29,6 +30,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     useEffect(() => {
         if (shipping) {
             setEstadoPedido(shipping.estado_pedido?.toString());
+            setSubmitError('');
             form.setFieldsValue({
                 ...shipping,
                 fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
@@ -48,6 +50,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
             return;
         }
         setLoading(true);
+        setSubmitError('');
         const intTipoPago = parseInt(shippingStateData.tipo_de_pago);
         const intEstadoPedido = parseInt(shippingStateData.estado_pedido);
 
@@ -82,11 +85,13 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
         }
 
         const res = await updateShippingAPI(updateShippingInfo, shipping.id_pedido);
-        if (res) {
+        if (res?.success) {
             message.success('Pedido actualizado');
             onSave();
         } else {
-            message.error('Error al actualizar el pedido, inténtelo de nuevo');
+            const errorMessage = String(res?.message || res?.msg || 'Error al actualizar el pedido, inténtelo de nuevo');
+            setSubmitError(errorMessage);
+            message.error(errorMessage);
         }
         setLoading(false);
     };
@@ -119,7 +124,10 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
         <Modal
             title={`Estado del pedido ${shipping ? shipping.id_pedido : ''}`}
             open={visible}
-            onCancel={onClose}
+            onCancel={() => {
+                setSubmitError('');
+                onClose();
+            }}
             footer={[
                 <Button key="back" onClick={onClose}>Cancelar</Button>,
                 <Button key="submit" type="primary" loading={loading} disabled={isPaidToSeller} onClick={() => form.submit()}>
@@ -128,13 +136,23 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
             ]}
             centered
             width={500}
-        >
+            >
             <Form
                 form={form}
                 layout="vertical"
                 name="shipping_info_form"
                 onFinish={handleFinish}
             >
+                {submitError ? (
+                    <Alert
+                        type="error"
+                        showIcon
+                        message="No se pudo actualizar el pedido"
+                        description={submitError}
+                        style={{ marginBottom: 16 }}
+                    />
+                ) : null}
+
                 <Row gutter={16}>
                     <Col span={24}>
                         <Form.Item
