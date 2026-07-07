@@ -25,6 +25,10 @@ interface ExternalShippingInfoModalProps {
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
 const TZ = "America/La_Paz";
 const LATE_PICKUP_GRACE_DAYS = 200;
+const normalizePickupStatus = (value: unknown) => {
+  const status = String(value || "").trim();
+  return status === "En Espera" ? "LISTO PARA RECOGER" : status;
+};
 const getBranchId = (value: any): string => String(value?._id ?? value?.$oid ?? value ?? "").trim();
 const calculateEstimatedBranchPickupDate = (value?: unknown) => {
   const createdAt = value ? moment.tz(value as any, TZ) : moment.tz(TZ);
@@ -538,7 +542,7 @@ const ExternalShippingInfoModal = ({
       esta_pagado: externalShipping.esta_pagado || "no",
       metodo_pago: externalShipping.metodo_pago || "",
       monto_paga_vendedor: roundCurrency(Number(externalShipping.monto_paga_vendedor || 0)),
-      estado_pedido: externalShipping.estado_pedido || "En Espera",
+      estado_pedido: normalizePickupStatus(externalShipping.estado_pedido || "LISTO PARA RECOGER"),
       tipo_de_pago: nextDeliveryType,
       subtotal_qr: nextSubtotalQr,
       subtotal_efectivo: nextSubtotalEfectivo,
@@ -852,7 +856,7 @@ const ExternalShippingInfoModal = ({
             <Col span={24}>
               <Form.Item name="estado_pedido" label="Estado del pedido" rules={[{ required: true }]}>
                 <Radio.Group disabled={!canEditDelivery}>
-                  <Radio.Button value="En Espera">En espera</Radio.Button>
+                  <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>
                 </Radio.Group>
               </Form.Item>

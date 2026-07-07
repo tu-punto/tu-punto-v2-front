@@ -30,6 +30,10 @@ import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard
 
 const TZ = "America/La_Paz";
 const LATE_PICKUP_GRACE_DAYS = 200;
+const normalizePickupStatus = (value: unknown) => {
+    const status = String(value || "").trim();
+    return status === "En Espera" ? "LISTO PARA RECOGER" : status;
+};
 const calculateEstimatedBranchPickupDate = (value?: unknown) => {
     const createdAt = value ? moment.tz(value as any, TZ) : moment.tz(TZ);
     if (!createdAt.isValid()) return null;
@@ -413,8 +417,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
-        setEstadoPedido(shipping.estado_pedido || "En Espera");
-        setEstadoInicialPedido(shipping.estado_pedido || "En Espera");
+        const normalizedStatus = normalizePickupStatus(shipping.estado_pedido || "LISTO PARA RECOGER");
+        setEstadoPedido(normalizedStatus || "LISTO PARA RECOGER");
+        setEstadoInicialPedido(normalizedStatus || "LISTO PARA RECOGER");
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
             ...p,
             id_venta: p._id ?? null,
@@ -1187,8 +1192,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "En Espera"}>
-                                    <Radio.Button value="En Espera">En espera</Radio.Button>
+                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "LISTO PARA RECOGER"}>
+                                    <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                                     <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>

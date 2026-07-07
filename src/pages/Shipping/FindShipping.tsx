@@ -12,7 +12,7 @@ import ShippingInfoModal from "./ShippingInfoModal";
 
 const { Text } = Typography;
 
-const STATUS_OPTIONS = ["En Espera", "En camino", "No entregado", "Cancelado", "Entregado"];
+const STATUS_OPTIONS = ["LISTO PARA RECOGER", "En camino", "No entregado", "Cancelado", "Entregado"];
 
 const resolveBranchId = (value: any): string => {
   if (!value) return "";
@@ -57,7 +57,7 @@ function FindShipping() {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedShipping, setSelectedShipping] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [targetStatus, setTargetStatus] = useState<string>("En Espera");
+  const [targetStatus, setTargetStatus] = useState<string>("LISTO PARA RECOGER");
   const [statusHistory, setStatusHistory] = useState<any[]>([]);
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [sucursals, setSucursals] = useState<any[]>([]);
@@ -135,7 +135,7 @@ function FindShipping() {
     }
 
     setSelectedShipping(response.shipping);
-    setTargetStatus(response.shipping.estado_pedido || "En Espera");
+    setTargetStatus(response.shipping.estado_pedido === "En Espera" ? "LISTO PARA RECOGER" : response.shipping.estado_pedido || "LISTO PARA RECOGER");
     setModalVisible(true);
     void loadHistory(response.shipping._id);
   };

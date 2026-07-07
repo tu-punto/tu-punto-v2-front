@@ -73,9 +73,10 @@ export const getFinanceFluxCategoriesAPI = async () => {
     try {
         const res = await apiClient.get(`/financeFlux/category`)
         console.log("Categorias de flujo financiero:", res.data)
-        return res.data
+        return Array.isArray(res.data?.categories) ? res.data.categories : []
     } catch (error) {
         parseError(error as AxiosError)
+        return []
     }
 }
 

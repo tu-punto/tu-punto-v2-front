@@ -104,7 +104,7 @@ const EditProductsModal = ({
       .filter((p) => {
         const nombre = p.nombre_variante || p.producto;
         const stock = Number(p.stockActual ?? 0);
-        return !allSelectedNames.has(nombre) && stock > 0;
+        return !allSelectedNames.has(nombre) && (stock > 0 || p.isBaseProduct === true);
       })
       .map((p) => ({
         label: p.nombre_variante || p.producto || "Sin nombre",

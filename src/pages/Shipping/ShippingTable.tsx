@@ -2,7 +2,7 @@ import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/i
 import { Alert, Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
 import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
-import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
+import { getExternalSaleByIdAPI, getExternalSalesListAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
 import ExternalPackagesFormModal from './ExternalPackagesFormModal';
@@ -19,6 +19,9 @@ const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 const MOBILE_CARD_PAGE_SIZE = 12;
+const READY_FOR_PICKUP_STATUS = "LISTO PARA RECOGER";
+const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
+const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS, SEND_TO_BRANCH_STATUS]);
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -50,6 +53,11 @@ const isDeliveryOrder = (pedido: any) => {
     );
 };
 
+const normalizeStatus = (value: unknown) => String(value || "").trim();
+const isWaitingStatus = (value: unknown) => WAITING_STATUSES.has(normalizeStatus(value));
+const isReadyForPickupStatus = (value: unknown) => normalizeStatus(value) === READY_FOR_PICKUP_STATUS;
+const isSendToBranchStatus = (value: unknown) => normalizeStatus(value) === SEND_TO_BRANCH_STATUS;
+
 const resolveBranchId = (value: any) => {
     if (!value) return "";
     if (typeof value === "string") return value;
@@ -60,7 +68,7 @@ const resolveBranchId = (value: any) => {
 };
 
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
-    const estadoReal = String(pedido?.estado_pedido || "").trim();
+    const estadoReal = normalizeStatus(pedido?.estado_pedido);
 
     if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
         return {
@@ -93,7 +101,8 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     const fechaObjetivo = pedido?.hora_entrega_rango_final || pedido?.hora_entrega_acordada;
     const horaObjetivo = fechaObjetivo ? moment.parseZone(fechaObjetivo) : null;
     const shouldLookInTransit =
-        estadoReal === "En Espera" &&
+        isWaitingStatus(estadoReal) &&
+        estadoReal !== SEND_TO_BRANCH_STATUS &&
         isDeliveryOrder(pedido) &&
         horaObjetivo?.isValid() &&
         horaObjetivo.diff(now, "minutes", true) <= VISUAL_IN_TRANSIT_THRESHOLD_MINUTES;
@@ -113,7 +122,12 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     }
 
     return {
-        label: estadoReal || "En Espera",
+        label:
+            estadoReal === SEND_TO_BRANCH_STATUS
+                ? "Para enviar a otra sucursal"
+                : estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order || pedido?.is_external
+                    ? "Listo para recoger"
+                    : estadoReal || "En Espera",
         tone: {
             text: "#1d39c4",
             border: "#adc6ff",
@@ -203,12 +217,12 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const isPendingSend = (pedido: any) =>
-        String(pedido?.estado_pedido || "") === "En Espera" &&
+        isSendToBranchStatus(pedido?.estado_pedido) &&
         isInterbranchTransfer(pedido) &&
         String(getOriginBranchId(pedido)) === String(currentSucursalId);
 
     const isPendingReceive = (pedido: any) =>
-        String(pedido?.estado_pedido || "") === "En camino" &&
+        normalizeStatus(pedido?.estado_pedido) === "En camino" &&
         isInterbranchTransfer(pedido) &&
         String(getDestinationBranchId(pedido)) === String(currentSucursalId);
 
@@ -219,7 +233,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 : (externalSale?.esta_pagado === "si" ? "si" : "no");
         const precioPaquete = Number(externalSale?.precio_paquete ?? externalSale?.precio_total ?? 0);
         const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
-        const estadoPedido = externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : "En Espera");
+        const estadoPedido = externalSale?.estado_pedido === "En Espera"
+            ? READY_FOR_PICKUP_STATUS
+            : (externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : READY_FOR_PICKUP_STATUS));
         const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
         const sucursalOrigen =
             typeof externalSale?.origen_sucursal === "object"
@@ -262,7 +278,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
     const isSellerWithdrawalCandidate = (pedido: any) =>
         canManageExternal &&
-        String(pedido?.estado_pedido || "") === "En Espera" &&
+        isWaitingStatus(pedido?.estado_pedido) &&
+        !isSendToBranchStatus(pedido?.estado_pedido) &&
         (pedido?.is_external || pedido?.simple_package_order || pedido?.simple_package_source_id);
     const getCurrentSellerWithdrawalRows = () => {
         const activeRows =
@@ -388,29 +405,35 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
         const totalDeliveryCost = Number(branchTransferModal.totalDeliveryCost || 0);
         const costPerPackage = rows.length > 0 ? Number((totalDeliveryCost / rows.length).toFixed(2)) : 0;
+        const nowIso = moment().tz("America/La_Paz").toISOString();
 
         setMarkingBranchTransfer(true);
         setBranchTransferError("");
         try {
             const updates = await Promise.all(
-                    rows.map((row: any) =>
-                        updateShippingAPI(
-                            mode === "send"
-                                ? {
-                                    estado_pedido: "En camino",
-                                    costo_delivery: costPerPackage,
-                                    tipo_de_pago: branchTransferModal.paymentMethod,
-                                  }
-                                : {
-                                    estado_pedido: "Entregado",
-                                    hora_entrega_real: moment().tz("America/La_Paz").toISOString(),
-                                    public_tracking_ready_for_pickup_at: moment().tz("America/La_Paz").toISOString(),
-                                    costo_delivery: costPerPackage,
-                                    tipo_de_pago: branchTransferModal.paymentMethod,
-                                },
-                        String(row._id)
-                    )
-                )
+                rows.map((row: any) => {
+                    const payload =
+                        mode === "send"
+                            ? {
+                                estado_pedido: "En camino",
+                                costo_delivery: costPerPackage,
+                                tipo_de_pago: branchTransferModal.paymentMethod,
+                            }
+                            : {
+                                estado_pedido: READY_FOR_PICKUP_STATUS,
+                                public_tracking_ready_for_pickup_at: nowIso,
+                                costo_delivery: costPerPackage,
+                                tipo_de_pago: branchTransferModal.paymentMethod,
+                            };
+
+                    return row.is_external
+                        ? updateExternalSaleAPI(String(row._id), {
+                            ...payload,
+                            delivered: false,
+                            public_tracking_ready_for_pickup_at: mode === "send" ? undefined : nowIso,
+                        })
+                        : updateShippingAPI(payload, String(row._id));
+                })
             );
 
             const failedRows = updates.filter((item: any) => !item?.success);
@@ -440,7 +463,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         try {
             const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
             const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
-            const status = selectedStatus === "entregado" ? "Entregado" : "En Espera";
             const originBranchId = currentSucursalId || undefined;
             const sellerIdToQuery =
                 selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
@@ -451,7 +473,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 getShippingsListAPI({
                     page: 1,
                     limit: 300,
-                    status,
                     from,
                     to,
                     sellerId: sellerIdToQuery,
@@ -461,7 +482,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     ? getExternalSalesListAPI({
                         page: 1,
                         limit: 300,
-                        status,
                         from,
                         to,
                         sucursalId: originBranchId,
@@ -490,6 +510,9 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 key: pedido.is_external ? `external-${pedido._id}` : pedido._id
             }));
             setShippingData(dataWithKey);
+            setEsperaData(dataWithKey.filter((pedido: any) => isWaitingStatus(pedido.estado_pedido)));
+            setEnCaminoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino"));
+            setEntregadoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado"));
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
@@ -500,7 +523,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
 
     const getVendedoresConEntregas = () => {
-        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        const sourceData = selectedStatus === 'entregado'
+            ? entregadoData
+            : selectedStatus === 'en_camino'
+                ? enCaminoData
+                : esperaData;
         const vendedoresConEntregasSet = new Set<string>();
 
         sourceData.forEach((pedido: any) => {
@@ -529,7 +556,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         );
     };
     const hasExternalInCurrentStatus = () => {
-        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        const sourceData = selectedStatus === 'entregado'
+            ? entregadoData
+            : selectedStatus === 'en_camino'
+                ? enCaminoData
+                : esperaData;
         return sourceData.some((pedido: any) => !!pedido.is_external);
     };
 
@@ -783,7 +814,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             title: 'Acciones',
             key: 'catalog_actions',
             render: (_: any, record: any) =>
-                record?.origen_pedido === "catalogo" && record?.estado_pedido === "En Espera" && canManageExternal ? (
+                record?.origen_pedido === "catalogo" && isWaitingStatus(record?.estado_pedido) && canManageExternal ? (
                     <Button
                         danger
                         loading={rejectingCatalogOrderId === String(record._id)}
@@ -878,16 +909,20 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     ]);
 
     useEffect(() => {
-        setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En Espera'));
-        setEnCaminoData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En camino'));
-        setEntregadoData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'Entregado'));
-    }, [shippingData]);
-
-    useEffect(() => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
         setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
     }, [esperaData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
+
+    useEffect(() => {
+        if (selectedStatus === "entregado") {
+            setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
+        } else if (selectedStatus === "en_camino") {
+            setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
+        } else {
+            setFilteredEsperaData(filterByLocationAndDate(esperaData));
+        }
+    }, [selectedStatus, esperaData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -1192,7 +1227,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "En Espera" ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
-                        <span>En Espera</span>
+                        <span>Listo para recoger</span>
                         {filteredEsperaData.length > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "En Espera" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
                                 {filteredEsperaData.length}
@@ -1264,7 +1299,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             ${selectedStatus === 'En Espera' ? 'text-blue-700' : 'text-green-700'}
         `}
                 >
-                    {selectedStatus === 'En Espera' ? 'En Espera' : 'Entregado'}
+                    {selectedStatus === 'En Espera' ? 'Listo para recoger' : 'Entregado'}
                 </h2>
 
                 <button
@@ -1293,7 +1328,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             ⇆
         </span>
                     <span>
-            {selectedStatus === 'En Espera' ? 'Ver entregados' : 'Ver en espera'}
+            {selectedStatus === 'En Espera' ? 'Ver entregados' : 'Ver listos para recoger'}
         </span>
                 </button>
             </div>

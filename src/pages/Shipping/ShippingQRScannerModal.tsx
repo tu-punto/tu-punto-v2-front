@@ -10,7 +10,7 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import ShippingInfoModal from "./ShippingInfoModal";
 
 const { Text } = Typography;
-const STATUS_OPTIONS = ["En Espera", "En camino", "No entregado", "Cancelado", "Entregado"];
+const STATUS_OPTIONS = ["LISTO PARA RECOGER", "En camino", "No entregado", "Cancelado", "Entregado"];
 
 const resolveBranchId = (value: any): string => {
   if (!value) return "";
@@ -64,7 +64,7 @@ const ShippingQRScannerModal = ({ open, onClose }: Props) => {
   const [secondsLeft, setSecondsLeft] = useState(15);
   const [qrResult, setQrResult] = useState("");
   const [selectedShipping, setSelectedShipping] = useState<any>(null);
-  const [targetStatus, setTargetStatus] = useState<string>("En Espera");
+  const [targetStatus, setTargetStatus] = useState<string>("LISTO PARA RECOGER");
   const [statusHistory, setStatusHistory] = useState<any[]>([]);
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [shippingInfoVisible, setShippingInfoVisible] = useState(false);
@@ -162,7 +162,7 @@ const ShippingQRScannerModal = ({ open, onClose }: Props) => {
     }
 
     setSelectedShipping(response.shipping);
-    setTargetStatus(response.shipping.estado_pedido || "En Espera");
+    setTargetStatus(response.shipping.estado_pedido === "En Espera" ? "LISTO PARA RECOGER" : response.shipping.estado_pedido || "LISTO PARA RECOGER");
     await loadHistory(response.shipping._id);
     showFlash("success", "Pedido detectado");
   };
