@@ -7,7 +7,7 @@ export type AttendanceReportParams = {
   to?: string;
   search?: string;
   role?: string;
-  sucursalId?: string;
+  groupId?: string;
   status?: string;
   page?: number;
   pageSize?: number;

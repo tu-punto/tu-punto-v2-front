@@ -10,7 +10,7 @@ import salesHistoryIcon from "../assets/historyIcono.png";
 import infoProductIcon from "../assets/infoProductIcon.svg";
 import superadminVariantsIcon from "../assets/superadminVariantsIcon.svg";
 import servicesIcon from "../assets/services.png";
-import clockIcon from "../assets/statsIcon.svg";
+import attendanceClockIcon from "../assets/attendanceClockIcon.svg";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
@@ -89,7 +89,7 @@ export const menu = [
   {
     path: "/attendance",
     label: "Asistencia",
-    icon: clockIcon,
+    icon: attendanceClockIcon,
     roles: getAllowedRoles("/attendance"),
   },
   {

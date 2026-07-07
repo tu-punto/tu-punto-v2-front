@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, DatePicker, Form, Input, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
+import { Button, Card, Col, DatePicker, Form, Input, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
 import dayjs from "dayjs";
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
 import { getAttendanceReportAPI } from "../../api/attendance";
 
 const { RangePicker } = DatePicker;
@@ -11,10 +11,12 @@ type AttendanceRow = {
   id: string;
   fullName: string;
   email: string;
-  role: string;
   roleLabel: string;
-  sucursalName: string;
+  groupId: string;
+  groupName: string;
+  status: string;
   date: string;
+  isRestDay: boolean;
   expectedStartTime: string | null;
   expectedEndTime: string | null;
   actualStartTime: string | null;
@@ -22,6 +24,7 @@ type AttendanceRow = {
   expectedMinutes: number;
   workedMinutes: number;
   differenceMinutes: number;
+  missingMinutes: number;
   lateMinutes: number;
   earlyLeaveMinutes: number;
   overtimeMinutes: number;
@@ -42,40 +45,32 @@ type AttendanceResponse = {
     expectedMinutes: number;
     workedMinutes: number;
     differenceMinutes: number;
-    lateMinutes: number;
-    earlyLeaveMinutes: number;
+    missingMinutes: number;
     overtimeMinutes: number;
   };
   meta: {
     configured: boolean;
+    connected: boolean;
     timezone: string;
     schedule: {
-      weekday: { start: string; end: string };
-      saturday: { start: string; end: string };
+      weekday: { expectedMinutes: number; label: string };
+      saturday: { expectedMinutes: number; label: string };
     };
-    people: Array<{ value: string; label: string; role: string; sucursalId: string; sucursalName: string; email: string; jibbleMatched: boolean }>;
-    sucursales: Array<{ value: string; label: string }>;
+    people: Array<{ value: string; label: string; email: string; groupId: string; groupName: string; status: string }>;
+    groups: Array<{ value: string; label: string }>;
     integration: { configured: boolean; matchedPeople: number; unmatchedPeople: number; message: string };
   };
 };
 
 const statusOptions = [
   { value: "all", label: "Todos" },
-  { value: "normal", label: "A tiempo" },
-  { value: "late", label: "Tarde" },
-  { value: "early", label: "Salida temprana" },
+  { value: "normal", label: "Cumplió" },
+  { value: "missing-hours", label: "Faltan horas" },
   { value: "overtime", label: "Horas extra" },
   { value: "missing", label: "Sin marcacion" },
   { value: "rest", label: "Descanso" },
   { value: "rest-worked", label: "Descanso trabajado" },
   { value: "problematic", label: "Con incidencias" },
-];
-
-const roleOptions = [
-  { value: "all", label: "Todos" },
-  { value: "admin", label: "Admin" },
-  { value: "operator", label: "Operario" },
-  { value: "superadmin", label: "Superadmin" },
 ];
 
 const formatMinutes = (minutes?: number | null) => {
@@ -95,52 +90,87 @@ const formatTimeRange = (start?: string | null, end?: string | null) => {
   return start || end || "Sin datos";
 };
 
+const formatExpectedHours = (minutes: number) => formatMinutes(minutes);
+
+type DatePreset = "today" | "yesterday" | "last7" | "last30" | "custom";
+
+const datePresetOptions: Array<{ value: DatePreset; label: string }> = [
+  { value: "today", label: "Hoy" },
+  { value: "yesterday", label: "Ayer" },
+  { value: "last7", label: "Ultimos 7 dias" },
+  { value: "last30", label: "Ultimos 30 dias" },
+  { value: "custom", label: "Personalizado" },
+];
+
+const getPresetRange = (preset: DatePreset) => {
+  const today = dayjs();
+  if (preset === "today") return [today, today] as const;
+  if (preset === "yesterday") {
+    const yesterday = today.subtract(1, "day");
+    return [yesterday, yesterday] as const;
+  }
+  if (preset === "last30") return [today.subtract(29, "day"), today] as const;
+  return [today.subtract(6, "day"), today] as const;
+};
+
+const getCustomRange = () => [dayjs().startOf("month"), dayjs()] as const;
+
+const initialFilters = {
+  from: getPresetRange("last7")[0].format("YYYY-MM-DD"),
+  to: getPresetRange("last7")[1].format("YYYY-MM-DD"),
+  search: "",
+  personId: "",
+  groupId: "joined",
+  status: "all",
+  datePreset: "last7" as DatePreset,
+};
+
 const AttendancePage = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AttendanceResponse | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [query, setQuery] = useState<any>({
-    from: dayjs().startOf("month").format("YYYY-MM-DD"),
-    to: dayjs().format("YYYY-MM-DD"),
-    search: "",
-    personId: "",
-    role: "all",
-    sucursalId: "",
-    status: "all",
-  });
-
-  const loadReport = async (extra?: Record<string, any>) => {
-    try {
-      setLoading(true);
-      const params = {
-        ...query,
-        page,
-        pageSize,
-        ...(extra || {}),
-      };
-      const response = await getAttendanceReportAPI(params);
-      if (response?.success) {
-        setData(response.data);
-      } else {
-        message.error("No se pudo cargar el reporte de asistencia");
-      }
-    } catch (error) {
-      console.error(error);
-      message.error("No se pudo cargar el reporte de asistencia");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [query, setQuery] = useState(initialFilters);
+  const [datePreset, setDatePreset] = useState<DatePreset>("last7");
 
   useEffect(() => {
-    loadReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    form.setFieldsValue({
+      datePreset: "last7",
+      range: getCustomRange(),
+      search: "",
+      personId: undefined,
+      groupId: "joined",
+      status: "all",
+    });
+  }, [form]);
 
-  const sucursalOptions = useMemo(
-    () => (data?.meta.sucursales || []).map((item) => ({ value: item.value, label: item.label })),
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        setLoading(true);
+        const response = await getAttendanceReportAPI({ ...query, page, pageSize });
+        if (response?.success) {
+          setData(response.data);
+        } else {
+          message.error("No se pudo cargar el reporte de asistencia");
+        }
+      } catch (error) {
+        console.error(error);
+        message.error("No se pudo cargar el reporte de asistencia");
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [page, pageSize, query]);
+
+  const groupOptions = useMemo(
+    () => {
+      const options = (data?.meta.groups || []).map((item) => ({ value: item.value, label: item.label }));
+      return options.length ? options : [{ value: "joined", label: "Joined" }];
+    },
     [data]
   );
 
@@ -164,24 +194,27 @@ const AttendancePage = () => {
       ),
     },
     {
-      title: "Rol",
-      dataIndex: "roleLabel",
+      title: "Grupo",
+      dataIndex: "groupName",
       width: 110,
       render: (value: string) => <Tag color="blue">{value}</Tag>,
     },
     {
-      title: "Sucursal",
-      dataIndex: "sucursalName",
+      title: "Estado Jibble",
+      dataIndex: "status",
       width: 160,
       ellipsis: true,
+      render: (value: string) => value || "Sin estado",
     },
     {
-      title: "Esperado",
-      width: 140,
-      render: (_: unknown, record: AttendanceRow) => formatTimeRange(record.expectedStartTime, record.expectedEndTime),
+      title: "Jornada",
+      width: 120,
+      render: (_: unknown, record: AttendanceRow) => (
+        <Tag color={record.isRestDay ? "default" : "blue"}>{record.isRestDay ? "Descanso" : formatExpectedHours(record.expectedMinutes)}</Tag>
+      ),
     },
     {
-      title: "Real",
+      title: "Marcación",
       width: 140,
       render: (_: unknown, record: AttendanceRow) => formatTimeRange(record.actualStartTime, record.actualEndTime),
     },
@@ -199,27 +232,15 @@ const AttendancePage = () => {
       },
     },
     {
-      title: "Tarde",
-      width: 90,
-      render: (_: unknown, record: AttendanceRow) => <Tag color={record.lateMinutes > 0 ? "orange" : "default"}>{formatMinutes(record.lateMinutes)}</Tag>,
-    },
-    {
-      title: "Salida temprana",
-      width: 120,
-      render: (_: unknown, record: AttendanceRow) => <Tag color={record.earlyLeaveMinutes > 0 ? "volcano" : "default"}>{formatMinutes(record.earlyLeaveMinutes)}</Tag>,
-    },
-    {
-      title: "Extra",
-      width: 90,
-      render: (_: unknown, record: AttendanceRow) => <Tag color={record.overtimeMinutes > 0 ? "gold" : "default"}>{formatMinutes(record.overtimeMinutes)}</Tag>,
-    },
-    {
       title: "Estado",
       width: 180,
       render: (_: unknown, record: AttendanceRow) => (
         <Space wrap>
           {record.issueTags.map((tag) => (
-            <Tag key={tag} color={tag === "Sin marcacion" ? "red" : tag === "A tiempo" ? "green" : tag === "Descanso" ? "default" : "blue"}>
+            <Tag
+              key={tag}
+              color={tag === "Sin marcacion" ? "red" : tag === "Faltan horas" ? "orange" : tag === "Extra" ? "gold" : tag === "Descanso" ? "default" : "green"}
+            >
               {tag}
             </Tag>
           ))}
@@ -228,137 +249,122 @@ const AttendancePage = () => {
     },
   ];
 
-  const handleApply = async () => {
-    const values = await form.validateFields().catch(() => null);
-    if (!values) return;
-
+  const updateQueryFromForm = (_: unknown, allValues: any) => {
+    const preset = (allValues.datePreset || "last7") as DatePreset;
+    const [fromDate, toDate] = preset === "custom" && allValues.range?.[0] && allValues.range?.[1]
+      ? [allValues.range[0], allValues.range[1]]
+      : getPresetRange(preset);
     const nextQuery = {
-      from: values.range?.[0]?.format("YYYY-MM-DD"),
-      to: values.range?.[1]?.format("YYYY-MM-DD"),
-      search: values.search || "",
-      personId: values.personId || "",
-      role: values.role || "all",
-      sucursalId: values.sucursalId || "",
-      status: values.status || "all",
+      from: fromDate.format("YYYY-MM-DD"),
+      to: toDate.format("YYYY-MM-DD"),
+      search: allValues.search || "",
+      personId: allValues.personId || "",
+      groupId: allValues.groupId || "",
+      status: allValues.status || "all",
+      datePreset: preset,
     };
 
     setPage(1);
     setQuery(nextQuery);
-    const response = await getAttendanceReportAPI({ ...nextQuery, page: 1, pageSize });
-    if (response?.success) {
-      setData(response.data);
-    }
+    setDatePreset(preset);
   };
 
-  const handleReset = async () => {
-    const nextQuery = {
-      from: dayjs().startOf("month").format("YYYY-MM-DD"),
-      to: dayjs().format("YYYY-MM-DD"),
-      search: "",
-      personId: "",
-      role: "all",
-      sucursalId: "",
-      status: "all",
-    };
+  const handleReset = () => {
     form.setFieldsValue({
-      range: [dayjs().startOf("month"), dayjs()],
+      datePreset: "last7",
+      range: getCustomRange(),
       search: "",
       personId: undefined,
-      role: "all",
-      sucursalId: undefined,
+      groupId: "joined",
       status: "all",
     });
     setPage(1);
-    setQuery(nextQuery);
-    const response = await getAttendanceReportAPI({ ...nextQuery, page: 1, pageSize });
-    if (response?.success) {
-      setData(response.data);
-    }
+    setQuery(initialFilters);
+    setDatePreset("last7");
   };
 
   const pagination = data?.pagination || { page, pageSize, total: 0 };
+  const missingMinutes = Math.max(0, (data?.summary.expectedMinutes || 0) - (data?.summary.workedMinutes || 0));
 
   return (
     <Space direction="vertical" size="large" className="w-full">
-      <Card>
-        <Space direction="vertical" size={4}>
-          <Title level={2} style={{ margin: 0 }}>Asistencia</Title>
-          <Text type="secondary">Horas trabajadas vs horario esperado, con tardanzas, salidas tempranas y horas extra.</Text>
-        </Space>
+      <Card className="shadow-sm border border-slate-200/70" bodyStyle={{ padding: 20, background: "linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(248,250,252,1) 100%)" }}>
+        <Row align="middle" justify="space-between" gutter={[16, 16]} style={{ minHeight: 88 }}>
+          <Col>
+            <Space direction="vertical" size={2}>
+              <Title level={2} style={{ margin: 0, lineHeight: 1.1 }}>Asistencia</Title>
+              <Text type="secondary">Horas trabajadas vs jornada esperada por día, sin depender de horarios fijos de entrada/salida.</Text>
+            </Space>
+          </Col>
+          <Col>
+            <Tag color={data?.meta.connected ? "green" : "red"} style={{ margin: 0, borderRadius: 999, paddingInline: 12 }}>
+              {data?.meta.connected ? "Conectado" : "No conectado"}
+            </Tag>
+          </Col>
+        </Row>
       </Card>
-
-      {data?.meta.integration && (
-        <Alert
-          showIcon
-          type={data.meta.integration.configured ? (data.meta.integration.unmatchedPeople > 0 ? "warning" : "success") : "warning"}
-          message={data.meta.integration.configured ? "Jibble conectado" : "Jibble aun no configurado"}
-          description={data.meta.integration.message}
-        />
-      )}
 
       <Row gutter={[12, 12]}>
         <Col xs={24} md={6}><Card><Statistic title="Personas" value={data?.summary.people || 0} /></Card></Col>
         <Col xs={24} md={6}><Card><Statistic title="Horas trabajadas" value={formatMinutes(data?.summary.workedMinutes || 0)} /></Card></Col>
-        <Col xs={24} md={6}><Card><Statistic title="Tardanzas" value={formatMinutes(data?.summary.lateMinutes || 0)} /></Card></Col>
+        <Col xs={24} md={6}><Card><Statistic title="Horas faltantes" value={formatMinutes(missingMinutes)} /></Card></Col>
         <Col xs={24} md={6}><Card><Statistic title="Horas extra" value={formatMinutes(data?.summary.overtimeMinutes || 0)} /></Card></Col>
       </Row>
 
-      <Card>
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{
-            range: [dayjs().startOf("month"), dayjs()],
-            search: "",
-            personId: undefined,
-            role: "all",
-            sucursalId: undefined,
-            status: "all",
-          }}
-        >
-          <Row gutter={[12, 12]}>
-            <Col xs={24} md={8}>
-              <Form.Item name="range" label="Rango de fechas" rules={[{ required: true, message: "Selecciona un rango" }]}>
-                <RangePicker style={{ width: "100%" }} allowClear={false} format="DD/MM/YYYY" />
+      <Card className="shadow-sm border border-slate-200/70" bodyStyle={{ padding: 20 }}>
+        <Form form={form} layout="vertical" onValuesChange={updateQueryFromForm} initialValues={{
+          datePreset: "last7",
+          range: getCustomRange(),
+          search: "",
+          personId: undefined,
+          groupId: "joined",
+          status: "all",
+        }}>
+          <Row gutter={[16, 12]} align="bottom">
+            <Col xs={24} md={6} lg={5}>
+              <Form.Item name="datePreset" label="Rango de fechas" rules={[{ required: true, message: "Selecciona un rango" }]}> 
+                <Select options={datePresetOptions} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={6}>
+            {datePreset === "custom" && (
+              <Col xs={24} md={8} lg={7}>
+                <Form.Item name="range" label=" ">
+                  <RangePicker style={{ width: "100%" }} allowClear={false} format="DD/MM/YYYY" />
+                </Form.Item>
+              </Col>
+            )}
+            <Col xs={24} md={6} lg={6}>
               <Form.Item name="search" label="Buscar">
-                <Input prefix={<SearchOutlined />} placeholder="Nombre, email o sucursal" />
+                <Input prefix={<SearchOutlined />} placeholder="Nombre, email o grupo" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={6}>
+            <Col xs={24} md={5} lg={4}>
               <Form.Item name="personId" label="Persona">
                 <Select allowClear showSearch optionFilterProp="label" options={(data?.meta.people || []).map((item) => ({ value: item.value, label: item.label }))} placeholder="Todas" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={4}>
-              <Form.Item name="role" label="Rol">
-                <Select options={roleOptions} />
+            <Col xs={24} md={5} lg={4}>
+              <Form.Item name="groupId" label="Grupo">
+                <Select options={groupOptions} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={4}>
-              <Form.Item name="sucursalId" label="Sucursal">
-                <Select allowClear options={sucursalOptions} placeholder="Todas" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={4}>
+            <Col xs={24} md={4} lg={3}>
               <Form.Item name="status" label="Estado">
                 <Select options={statusOptions} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
-              <Space>
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleApply} loading={loading}>Aplicar</Button>
-                <Button icon={<ReloadOutlined />} onClick={handleReset} loading={loading}>Limpiar</Button>
-                <Button icon={<ReloadOutlined />} onClick={() => loadReport()} loading={loading}>Actualizar</Button>
-              </Space>
+            <Col xs={24} md={3} lg={2}>
+              <Form.Item label=" " colon={false} style={{ marginBottom: 0 }}>
+                <Button onClick={handleReset} loading={loading} className="w-full">
+                  Limpiar
+                </Button>
+              </Form.Item>
             </Col>
           </Row>
         </Form>
       </Card>
 
-      <Card>
+      <Card className="shadow-sm">
         <Table
           rowKey="id"
           loading={loading}
@@ -376,9 +382,8 @@ const AttendancePage = () => {
             const nextPageSize = paginationState.pageSize || 25;
             setPage(nextPage);
             setPageSize(nextPageSize);
-            loadReport({ page: nextPage, pageSize: nextPageSize });
           }}
-          scroll={{ x: 1600 }}
+          scroll={{ x: 1280 }}
         />
       </Card>
     </Space>

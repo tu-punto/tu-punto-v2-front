@@ -22,7 +22,7 @@ export const routeRoleMap: Record<string, string[]> = {
   "/branch": [ADMIN, SELLER, OPERATOR],
   "/sales-history": [ADMIN, OPERATOR],
   "/user": [ADMIN],
-  "/attendance": [ADMIN, OPERATOR],
+  "/attendance": [ADMIN],
   "/shipping-guide": [SELLER],
   "/seller-product-info": [SELLER],
   "/admin-seller-product-info": [ADMIN],
