@@ -91,6 +91,7 @@ export const menu = [
     label: "Asistencia",
     icon: attendanceClockIcon,
     roles: getAllowedRoles("/attendance"),
+    requiresSuperadmin: true,
   },
   {
     path: "/servicesPage",

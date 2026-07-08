@@ -98,6 +98,16 @@ const BoxCloseSummaryRoute = () => {
   return <BoxCloseSummaryPage />;
 };
 
+const AttendanceRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!isSuperadminUser(user)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return <AttendancePage />;
+};
+
 const protectedRoutes = [
   {
     path: "/",
@@ -185,7 +195,7 @@ const protectedRoutes = [
       },
       {
         path: "/attendance",
-        element: guard("/attendance", <AttendancePage />),
+        element: guard("/attendance", <AttendanceRoute />),
       },
       {
         path: "/shipping-guide",
