@@ -21,7 +21,7 @@ const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
 const buildGoogleMapsSearchUrl = (query: string) =>
     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 
-const parseCutoffTime = (value?: string | null) => {
+const parseTimeValue = (value?: string | null) => {
     const [hoursRaw, minutesRaw] = String(value || "").split(":");
     const hours = Number(hoursRaw);
     const minutes = Number(minutesRaw);
@@ -31,7 +31,8 @@ const parseCutoffTime = (value?: string | null) => {
     };
 };
 
-const isAfterCutoff = (value: moment.Moment, cutoff: moment.Moment) => value.isAfter(cutoff);
+const isOutsideWindow = (value: moment.Moment, start: moment.Moment, end: moment.Moment) =>
+    value.isBefore(start) || value.isAfter(end);
 
 
 function ShippingFormModal({
@@ -66,7 +67,8 @@ function ShippingFormModal({
     );
     const deliveryCutoffConfig = useMemo(() => ({
         enabled: Boolean(sucursalSeleccionada?.delivery_cutoff_enabled),
-        time: String(sucursalSeleccionada?.delivery_cutoff_time || "").trim(),
+        startTime: String(sucursalSeleccionada?.delivery_cutoff_start_time || "").trim(),
+        endTime: String(sucursalSeleccionada?.delivery_cutoff_end_time || sucursalSeleccionada?.delivery_cutoff_time || "").trim(),
     }), [sucursalSeleccionada]);
     const nombreSucursal = sucursalSeleccionada?.nombre || '';
 
@@ -221,21 +223,23 @@ function ShippingFormModal({
             const horaEntregaReal = moment.tz("America/La_Paz").toDate(); // si querés registrar el momento actual
 
             const isDeliveryToCustomer = effectiveDestinationType === "otro_lugar";
-            if (isDeliveryToCustomer && deliveryCutoffConfig.enabled && deliveryCutoffConfig.time) {
+            if (isDeliveryToCustomer && deliveryCutoffConfig.enabled && (deliveryCutoffConfig.startTime || deliveryCutoffConfig.endTime)) {
                 const now = moment().tz("America/La_Paz");
-                const cutoffParts = parseCutoffTime(deliveryCutoffConfig.time);
-                const cutoff = now.clone().hour(cutoffParts.hours).minute(cutoffParts.minutes).second(0).millisecond(0);
+                const startParts = parseTimeValue(deliveryCutoffConfig.startTime || "00:00");
+                const endParts = parseTimeValue(deliveryCutoffConfig.endTime || deliveryCutoffConfig.startTime || "00:00");
+                const start = now.clone().hour(startParts.hours).minute(startParts.minutes).second(0).millisecond(0);
+                const end = now.clone().hour(endParts.hours).minute(endParts.minutes).second(0).millisecond(0);
                 const scheduledDelivery = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "YYYY-MM-DD HH:mm:ss", "America/La_Paz");
                 const sameDayScheduledDelivery = scheduledDelivery.isValid() && scheduledDelivery.format("YYYY-MM-DD") === now.format("YYYY-MM-DD");
 
-                if (isAfterCutoff(now, cutoff)) {
-                    message.error(`La hora limite para delivery en ${nombreSucursal || "esta sucursal"} es ${cutoff.format("HH:mm")}. No puedes registrar pedidos despues de ese horario.`);
+                if (isOutsideWindow(now, start, end)) {
+                    message.error(`La hora para delivery en ${nombreSucursal || "esta sucursal"} debe estar entre ${start.format("HH:mm")} y ${end.format("HH:mm")}.`);
                     setLoading(false);
                     return;
                 }
 
-                if (sameDayScheduledDelivery && isAfterCutoff(scheduledDelivery, cutoff)) {
-                    message.error(`La entrega programada no puede superar la hora limite de delivery (${cutoff.format("HH:mm")}) en ${nombreSucursal || "esta sucursal"}.`);
+                if (sameDayScheduledDelivery && isOutsideWindow(scheduledDelivery, start, end)) {
+                    message.error(`La entrega programada debe estar entre ${start.format("HH:mm")} y ${end.format("HH:mm")} en ${nombreSucursal || "esta sucursal"}.`);
                     setLoading(false);
                     return;
                 }

@@ -42,11 +42,19 @@ const BranchFormModal: React.FC<{
     return uploadRes?.imageUrl || uploadRes?.updatedSucursal?.imagen_header || "";
   };
 
-  const normalizeBranchPayload = (values: IBranch & { delivery_cutoff_time?: any }) => ({
+  const normalizeBranchPayload = (values: IBranch & { delivery_cutoff_start_time?: any; delivery_cutoff_end_time?: any; delivery_cutoff_time?: any }) => ({
     ...values,
+    delivery_cutoff_start_time:
+      values.delivery_cutoff_enabled && values.delivery_cutoff_start_time?.format
+        ? values.delivery_cutoff_start_time.format("HH:mm")
+        : "",
+    delivery_cutoff_end_time:
+      values.delivery_cutoff_enabled && values.delivery_cutoff_end_time?.format
+        ? values.delivery_cutoff_end_time.format("HH:mm")
+        : "",
     delivery_cutoff_time:
-      values.delivery_cutoff_enabled && values.delivery_cutoff_time?.format
-        ? values.delivery_cutoff_time.format("HH:mm")
+      values.delivery_cutoff_enabled && values.delivery_cutoff_end_time?.format
+        ? values.delivery_cutoff_end_time.format("HH:mm")
         : "",
   });
 
@@ -127,7 +135,17 @@ const BranchFormModal: React.FC<{
     if (branch) {
       form.setFieldsValue({
         ...branch,
-        delivery_cutoff_time: branch.delivery_cutoff_time ? dayjs(branch.delivery_cutoff_time, "HH:mm") : undefined,
+        delivery_cutoff_start_time:
+          branch.delivery_cutoff_start_time
+            ? dayjs(branch.delivery_cutoff_start_time, "HH:mm")
+            : branch.delivery_cutoff_time
+              ? dayjs("00:00", "HH:mm")
+              : undefined,
+        delivery_cutoff_end_time: branch.delivery_cutoff_end_time
+          ? dayjs(branch.delivery_cutoff_end_time, "HH:mm")
+          : branch.delivery_cutoff_time
+            ? dayjs(branch.delivery_cutoff_time, "HH:mm")
+            : undefined,
       });
       setPreviewUrl(branch.imagen_header || "");
     } else {
@@ -197,14 +215,37 @@ const BranchFormModal: React.FC<{
         >
           {({ getFieldValue }) =>
             getFieldValue("delivery_cutoff_enabled") ? (
-              <Form.Item
-                className="text-mobile-sm xl:text-desktop-sm"
-                name="delivery_cutoff_time"
-                label="Hora limite delivery"
-                rules={[{ required: true, message: "Selecciona la hora limite" }]}
-              >
-                <TimePicker format="HH:mm" style={{ width: "100%" }} />
-              </Form.Item>
+              <>
+                <Form.Item
+                  className="text-mobile-sm xl:text-desktop-sm"
+                  name="delivery_cutoff_start_time"
+                  label="Hora inicio delivery"
+                  rules={[{ required: true, message: "Selecciona la hora de inicio" }]}
+                >
+                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item
+                  className="text-mobile-sm xl:text-desktop-sm"
+                  name="delivery_cutoff_end_time"
+                  label="Hora fin delivery"
+                  dependencies={["delivery_cutoff_start_time"]}
+                  rules={[
+                    { required: true, message: "Selecciona la hora de fin" },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        const start = getFieldValue("delivery_cutoff_start_time");
+                        if (!start || !value) return Promise.resolve();
+                        if (value.isSame(start) || value.isBefore(start)) {
+                          return Promise.reject(new Error("La hora fin debe ser mayor que la hora inicio"));
+                        }
+                        return Promise.resolve();
+                      },
+                    }),
+                  ]}
+                >
+                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                </Form.Item>
+              </>
             ) : null
           }
         </Form.Item>

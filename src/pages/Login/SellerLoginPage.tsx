@@ -9,19 +9,14 @@ export default function SellerLoginPage() {
       subtitle="Ingresa a tu panel con una experiencia más clara, rápida y enfocada en ventas y seguimiento diario."
       badge="Tu Punto · Vendedor"
       accentClassName="bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.28),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_28%)]"
-      panelLabel="Flujo vendedor"
-      panelTitle="Todo tu trabajo en un solo lugar"
-      panelDescription="Consulta ventas, servicios, stock y cobros con un acceso visualmente más limpio y moderno."
       highlights={[
-        { title: "Ventas", value: "Rápidas y seguras" },
-        { title: "Stock", value: "Controlado por sucursal" },
-        { title: "Cobros", value: "Sin pasos extra" },
+        { title: "vendedores activos", value: "120+" },
+        { title: "sucursales físicas", value: "5" },
+        { title: "ciudades principales", value: "4" },
       ]}
-      images={[
-        { src: "/login/seller-1.jpg", alt: "Vendedor 1" },
-        { src: "/login/seller-2.jpg", alt: "Vendedor 2" },
-        { src: "/login/seller-3.jpg", alt: "Vendedor 3" },
-      ]}
+      heroImage="/login-seller-hero.png"
+      heroImageAlt="Acceso de vendedor"
+      heroImageClassName="object-cover object-center"
     >
       <div className="mb-8 flex items-center gap-4">
         <img alt="logo" src={logoImg} className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
