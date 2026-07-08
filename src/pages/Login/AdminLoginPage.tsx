@@ -10,14 +10,10 @@ export default function AdminLoginPage() {
   return (
     <AuthShell
       title="Panel interno de administración"
-      subtitle="Accede a las herramientas operativas con una interfaz más seria, clara y pensada para control interno."
+      subtitle=""
       badge="Tu Punto · Admin"
       accentClassName="bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.26),transparent_28%)]"
-      highlights={[
-        { title: "vendedores activos", value: "120+" },
-        { title: "sucursales físicas", value: "5" },
-        { title: "ciudades principales", value: "4" },
-      ]}
+      highlights={[]}
       heroImage="/login-admin-hero.png"
       heroImageAlt="Panel interno de administración"
       heroImageClassName="object-cover object-center"
