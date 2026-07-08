@@ -31,6 +31,8 @@ const parseCutoffTime = (value?: string | null) => {
     };
 };
 
+const isAfterCutoff = (value: moment.Moment, cutoff: moment.Moment) => value.isAfter(cutoff);
+
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
@@ -221,15 +223,21 @@ function ShippingFormModal({
             const isDeliveryToCustomer = effectiveDestinationType === "otro_lugar";
             if (isDeliveryToCustomer && deliveryCutoffConfig.enabled && deliveryCutoffConfig.time) {
                 const now = moment().tz("America/La_Paz");
-                const selectedDate = moment.tz(fechaSeleccionada, "America/La_Paz");
-                if (selectedDate.format("YYYY-MM-DD") === now.format("YYYY-MM-DD")) {
-                    const cutoffParts = parseCutoffTime(deliveryCutoffConfig.time);
-                    const cutoff = now.clone().hour(cutoffParts.hours).minute(cutoffParts.minutes).second(0).millisecond(0);
-                    if (now.isAfter(cutoff)) {
-                        message.error(`La hora limite para delivery en ${nombreSucursal || "esta sucursal"} es ${cutoff.format("HH:mm")}. Puedes registrar el pedido para el dia siguiente.`);
-                        setLoading(false);
-                        return;
-                    }
+                const cutoffParts = parseCutoffTime(deliveryCutoffConfig.time);
+                const cutoff = now.clone().hour(cutoffParts.hours).minute(cutoffParts.minutes).second(0).millisecond(0);
+                const scheduledDelivery = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "YYYY-MM-DD HH:mm:ss", "America/La_Paz");
+                const sameDayScheduledDelivery = scheduledDelivery.isValid() && scheduledDelivery.format("YYYY-MM-DD") === now.format("YYYY-MM-DD");
+
+                if (isAfterCutoff(now, cutoff)) {
+                    message.error(`La hora limite para delivery en ${nombreSucursal || "esta sucursal"} es ${cutoff.format("HH:mm")}. No puedes registrar pedidos despues de ese horario.`);
+                    setLoading(false);
+                    return;
+                }
+
+                if (sameDayScheduledDelivery && isAfterCutoff(scheduledDelivery, cutoff)) {
+                    message.error(`La entrega programada no puede superar la hora limite de delivery (${cutoff.format("HH:mm")}) en ${nombreSucursal || "esta sucursal"}.`);
+                    setLoading(false);
+                    return;
                 }
             }
 
