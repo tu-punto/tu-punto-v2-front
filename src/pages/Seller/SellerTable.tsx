@@ -600,7 +600,9 @@ export default function SellerTable({
                 ? activeSorter.order
                 : undefined;
             const nextSortBy = String(activeSorter?.columnKey || "") as SellerSortBy;
-            setTableSort(nextOrder ? { sortBy: nextSortBy, order: nextOrder } : {});
+            if (nextOrder) {
+              setTableSort({ sortBy: nextSortBy, order: nextOrder });
+            }
             setPage(pagination.current || 1);
             setPageSize(pagination.pageSize || 10);
           }}
