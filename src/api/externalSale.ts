@@ -117,9 +117,16 @@ const updateExternalSaleAPI = async (saleId: any, saleData: any) => {
 const sendExternalGuideWhatsappAPI = async (id: string) => {
     try {
         const res = await apiClient.post(`/external/${id}/send-guide-whatsapp`);
-        return { success: true, ...res.data };
+        const response = { success: true, ...res.data };
+        console.log("[external-whatsapp] send-guide:response", response);
+        return response;
     } catch (error) {
         const err = error as AxiosError;
+        console.error("[external-whatsapp] send-guide:error", {
+            status: err?.response?.status,
+            data: err?.response?.data,
+            message: err?.message,
+        });
         if (err && err.response && err.response.data) {
             return {success: false, ...err.response.data};
         }

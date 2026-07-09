@@ -9,6 +9,29 @@ import {
 } from "../../api/sucursal";
 import { IBranch } from "../../models/branchModel";
 
+const deliveryCutoffSections = [
+  {
+    key: "weekdays",
+    label: "Lunes a viernes",
+    registrationField: "delivery_cutoff_weekdays_registration_time",
+    closingField: "delivery_cutoff_weekdays_closing_time",
+  },
+  {
+    key: "saturday",
+    label: "Sábado",
+    registrationField: "delivery_cutoff_saturday_registration_time",
+    closingField: "delivery_cutoff_saturday_closing_time",
+  },
+  {
+    key: "sunday",
+    label: "Domingo",
+    registrationField: "delivery_cutoff_sunday_registration_time",
+    closingField: "delivery_cutoff_sunday_closing_time",
+  },
+] as const;
+
+const toTimePickerValue = (value?: string | null) => (value ? dayjs(value, "HH:mm") : undefined);
+
 const BranchFormModal: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -42,21 +65,39 @@ const BranchFormModal: React.FC<{
     return uploadRes?.imageUrl || uploadRes?.updatedSucursal?.imagen_header || "";
   };
 
-  const normalizeBranchPayload = (values: IBranch & { delivery_cutoff_start_time?: any; delivery_cutoff_end_time?: any; delivery_cutoff_time?: any }) => ({
-    ...values,
-    delivery_cutoff_start_time:
-      values.delivery_cutoff_enabled && values.delivery_cutoff_start_time?.format
-        ? values.delivery_cutoff_start_time.format("HH:mm")
-        : "",
-    delivery_cutoff_end_time:
-      values.delivery_cutoff_enabled && values.delivery_cutoff_end_time?.format
-        ? values.delivery_cutoff_end_time.format("HH:mm")
-        : "",
-    delivery_cutoff_time:
-      values.delivery_cutoff_enabled && values.delivery_cutoff_end_time?.format
-        ? values.delivery_cutoff_end_time.format("HH:mm")
-        : "",
-  });
+  const normalizeBranchPayload = (
+    values: IBranch & {
+      delivery_cutoff_weekdays_registration_time?: any;
+      delivery_cutoff_weekdays_closing_time?: any;
+      delivery_cutoff_saturday_registration_time?: any;
+      delivery_cutoff_saturday_closing_time?: any;
+      delivery_cutoff_sunday_registration_time?: any;
+      delivery_cutoff_sunday_closing_time?: any;
+      delivery_cutoff_start_time?: any;
+      delivery_cutoff_end_time?: any;
+      delivery_cutoff_time?: any;
+    }
+  ) => {
+    const {
+      delivery_cutoff_start_time: _legacyStart,
+      delivery_cutoff_end_time: _legacyEnd,
+      delivery_cutoff_time: _legacyTime,
+      ...rest
+    } = values as any;
+
+    const formatGroupTime = (fieldValue: any) =>
+      values.delivery_cutoff_enabled && fieldValue?.format ? fieldValue.format("HH:mm") : "";
+
+    return {
+      ...rest,
+      delivery_cutoff_weekdays_registration_time: formatGroupTime(values.delivery_cutoff_weekdays_registration_time),
+      delivery_cutoff_weekdays_closing_time: formatGroupTime(values.delivery_cutoff_weekdays_closing_time),
+      delivery_cutoff_saturday_registration_time: formatGroupTime(values.delivery_cutoff_saturday_registration_time),
+      delivery_cutoff_saturday_closing_time: formatGroupTime(values.delivery_cutoff_saturday_closing_time),
+      delivery_cutoff_sunday_registration_time: formatGroupTime(values.delivery_cutoff_sunday_registration_time),
+      delivery_cutoff_sunday_closing_time: formatGroupTime(values.delivery_cutoff_sunday_closing_time),
+    };
+  };
 
   const handleEdit = async (values: IBranch) => {
     if (!branch || !branch._id) {
@@ -133,19 +174,28 @@ const BranchFormModal: React.FC<{
     if (!visible) return;
 
     if (branch) {
+      const legacyRegistration = branch.delivery_cutoff_start_time || branch.delivery_cutoff_time || "";
+      const legacyClosing = branch.delivery_cutoff_end_time || branch.delivery_cutoff_time || legacyRegistration;
       form.setFieldsValue({
         ...branch,
-        delivery_cutoff_start_time:
-          branch.delivery_cutoff_start_time
-            ? dayjs(branch.delivery_cutoff_start_time, "HH:mm")
-            : branch.delivery_cutoff_time
-              ? dayjs("00:00", "HH:mm")
-              : undefined,
-        delivery_cutoff_end_time: branch.delivery_cutoff_end_time
-          ? dayjs(branch.delivery_cutoff_end_time, "HH:mm")
-          : branch.delivery_cutoff_time
-            ? dayjs(branch.delivery_cutoff_time, "HH:mm")
-            : undefined,
+        delivery_cutoff_weekdays_registration_time: toTimePickerValue(
+          branch.delivery_cutoff_weekdays_registration_time || legacyRegistration
+        ),
+        delivery_cutoff_weekdays_closing_time: toTimePickerValue(
+          branch.delivery_cutoff_weekdays_closing_time || legacyClosing
+        ),
+        delivery_cutoff_saturday_registration_time: toTimePickerValue(
+          branch.delivery_cutoff_saturday_registration_time || legacyRegistration
+        ),
+        delivery_cutoff_saturday_closing_time: toTimePickerValue(
+          branch.delivery_cutoff_saturday_closing_time || legacyClosing
+        ),
+        delivery_cutoff_sunday_registration_time: toTimePickerValue(
+          branch.delivery_cutoff_sunday_registration_time || legacyRegistration
+        ),
+        delivery_cutoff_sunday_closing_time: toTimePickerValue(
+          branch.delivery_cutoff_sunday_closing_time || legacyClosing
+        ),
       });
       setPreviewUrl(branch.imagen_header || "");
     } else {
@@ -215,37 +265,57 @@ const BranchFormModal: React.FC<{
         >
           {({ getFieldValue }) =>
             getFieldValue("delivery_cutoff_enabled") ? (
-              <>
-                <Form.Item
-                  className="text-mobile-sm xl:text-desktop-sm"
-                  name="delivery_cutoff_start_time"
-                  label="Hora inicio delivery"
-                  rules={[{ required: true, message: "Selecciona la hora de inicio" }]}
-                >
-                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
-                </Form.Item>
-                <Form.Item
-                  className="text-mobile-sm xl:text-desktop-sm"
-                  name="delivery_cutoff_end_time"
-                  label="Hora fin delivery"
-                  dependencies={["delivery_cutoff_start_time"]}
-                  rules={[
-                    { required: true, message: "Selecciona la hora de fin" },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        const start = getFieldValue("delivery_cutoff_start_time");
-                        if (!start || !value) return Promise.resolve();
-                        if (value.isSame(start) || value.isBefore(start)) {
-                          return Promise.reject(new Error("La hora fin debe ser mayor que la hora inicio"));
-                        }
-                        return Promise.resolve();
-                      },
-                    }),
-                  ]}
-                >
-                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
-                </Form.Item>
-              </>
+              <div className="space-y-4">
+                {deliveryCutoffSections.map((section) => (
+                  <div key={section.key} className="rounded-lg border border-gray-200 p-4">
+                    <div className="mb-3 font-medium text-gray-800">{section.label}</div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <Form.Item
+                        className="text-mobile-sm xl:text-desktop-sm"
+                        name={section.registrationField}
+                        label="Hora límite de registro"
+                        dependencies={[section.closingField]}
+                        rules={[
+                          { required: true, message: "Selecciona la hora límite de registro" },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              const closing = getFieldValue(section.closingField);
+                              if (!value || !closing) return Promise.resolve();
+                              if (value.isAfter(closing)) {
+                                return Promise.reject(new Error("La hora límite de registro debe ser menor o igual a la de cierre operativo"));
+                              }
+                              return Promise.resolve();
+                            },
+                          }),
+                        ]}
+                      >
+                        <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                      </Form.Item>
+                      <Form.Item
+                        className="text-mobile-sm xl:text-desktop-sm"
+                        name={section.closingField}
+                        label="Hora de cierre operativo"
+                        dependencies={[section.registrationField]}
+                        rules={[
+                          { required: true, message: "Selecciona la hora de cierre operativo" },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              const registration = getFieldValue(section.registrationField);
+                              if (!value || !registration) return Promise.resolve();
+                              if (value.isBefore(registration)) {
+                                return Promise.reject(new Error("La hora de cierre operativo debe ser mayor o igual a la hora límite de registro"));
+                              }
+                              return Promise.resolve();
+                            },
+                          }),
+                        ]}
+                      >
+                        <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : null
           }
         </Form.Item>
