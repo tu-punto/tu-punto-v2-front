@@ -98,6 +98,20 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
+    if (estadoReal === "En camino") {
+        return {
+            label: "En camino",
+            tone: {
+                text: "#ad6800",
+                border: "#ffd591",
+                background: "#fff7e6",
+                dot: "#fa8c16",
+            },
+            tooltip: undefined,
+            isVisualOnly: false,
+        };
+    }
+
     const fechaObjetivo = pedido?.hora_entrega_rango_final || pedido?.hora_entrega_acordada;
     const horaObjetivo = fechaObjetivo ? moment.parseZone(fechaObjetivo) : null;
     const shouldLookInTransit =
