@@ -9,6 +9,7 @@ import {
 } from "../../api/qr";
 import { getSucursalsAPI } from "../../api/sucursal";
 import ShippingInfoModal from "./ShippingInfoModal";
+import { resolvePickupStatus } from "./shippingStatus";
 
 const { Text } = Typography;
 
@@ -135,7 +136,7 @@ function FindShipping() {
     }
 
     setSelectedShipping(response.shipping);
-    setTargetStatus(response.shipping.estado_pedido === "En Espera" ? "LISTO PARA RECOGER" : response.shipping.estado_pedido || "LISTO PARA RECOGER");
+    setTargetStatus(resolvePickupStatus(response.shipping.estado_pedido || "LISTO PARA RECOGER", response.shipping));
     setModalVisible(true);
     void loadHistory(response.shipping._id);
   };

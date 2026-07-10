@@ -12,6 +12,7 @@ import { getSucursalsBasicAPI } from '../../api/sucursal';
 import { getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext.tsx";
 import { isSuperadminUser } from "../../utils/role";
+import { READY_FOR_PICKUP_STATUS, resolvePickupStatus } from "./shippingStatus";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
@@ -19,7 +20,6 @@ const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 const MOBILE_CARD_PAGE_SIZE = 12;
-const READY_FOR_PICKUP_STATUS = "LISTO PARA RECOGER";
 const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
 const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS, SEND_TO_BRANCH_STATUS]);
 
@@ -233,9 +233,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 : (externalSale?.esta_pagado === "si" ? "si" : "no");
         const precioPaquete = Number(externalSale?.precio_paquete ?? externalSale?.precio_total ?? 0);
         const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
-        const estadoPedido = externalSale?.estado_pedido === "En Espera"
-            ? READY_FOR_PICKUP_STATUS
-            : (externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : READY_FOR_PICKUP_STATUS));
         const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
         const sucursalOrigen =
             typeof externalSale?.origen_sucursal === "object"
@@ -243,6 +240,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 : typeof externalSale?.sucursal === "object"
                     ? externalSale.sucursal
                     : null;
+        const estadoPedido = resolvePickupStatus(
+            externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : READY_FOR_PICKUP_STATUS),
+            externalSale
+        );
         const destinationLabel =
             externalSale?.lugar_entrega ||
             externalSale?.destino_sucursal?.nombre ||

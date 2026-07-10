@@ -5,14 +5,11 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { updateShippingAPI } from '../../api/shipping';
 import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
+import { resolvePickupStatus } from './shippingStatus';
 
 dayjs.extend(utc);
 
 const READY_FOR_PICKUP_STATUS = 'LISTO PARA RECOGER';
-const normalizePickupStatus = (value: unknown) => {
-    const status = String(value || '').trim();
-    return status === 'En Espera' ? READY_FOR_PICKUP_STATUS : status;
-};
 
 const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     const [estadoPedido, setEstadoPedido] = useState(null);
@@ -26,7 +23,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
 
     useEffect(() => {
         if (shipping) {
-            setEstadoPedido(normalizePickupStatus(shipping.estado_pedido?.toString()));
+            setEstadoPedido(resolvePickupStatus(shipping.estado_pedido?.toString(), shipping));
             setSubmitError('');
             form.setFieldsValue({
                 ...shipping,
@@ -52,7 +49,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
         }
         setLoading(true);
         setSubmitError('');
-        const selectedStatus = normalizePickupStatus(shippingStateData.estado_pedido || estadoPedido);
+        const selectedStatus = resolvePickupStatus(shippingStateData.estado_pedido || estadoPedido, shipping);
 
         let updateShippingInfo: any = {
             sucursal_id: localStorage.getItem("sucursalId")
@@ -62,6 +59,13 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
             updateShippingInfo = {
                 ...updateShippingInfo,
                 estado_pedido: READY_FOR_PICKUP_STATUS
+            };
+        }
+
+        if (selectedStatus === 'En camino') {
+            updateShippingInfo = {
+                ...updateShippingInfo,
+                estado_pedido: 'En camino'
             };
         }
 
@@ -104,6 +108,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     const renderEstadoOptions = () => {
         const opciones = [
             { value: READY_FOR_PICKUP_STATUS, label: 'Listo para recoger' },
+            { value: 'En camino', label: 'En camino' },
             { value: 'Entregado', label: 'Entregado' }
         ];
         return opciones;
