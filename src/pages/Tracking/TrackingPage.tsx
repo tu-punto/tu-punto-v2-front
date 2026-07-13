@@ -13,6 +13,7 @@ type TrackingData = {
   trackingCode: string;
   cliente: string;
   estado_pedido: string;
+  tracking_status_label?: string;
   lugar_entrega: string;
   hora_entrega_acordada?: string | null;
 };
@@ -170,7 +171,7 @@ const TrackingPage = () => {
                 TRACKING DE PEDIDO
               </Text>
               <Title level={2} style={{ marginTop: 8, marginBottom: 8 }}>
-                Estado actual: {tracking.estado_pedido}
+                Estado actual: {tracking.tracking_status_label || tracking.estado_pedido}
               </Title>
               <Paragraph style={{ marginBottom: 0, color: "#475569" }}>
                 Pedido para <strong>{tracking.cliente || "Cliente"}</strong> en{" "}

@@ -21,7 +21,7 @@ const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 const MOBILE_CARD_PAGE_SIZE = 12;
 const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
-const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS, SEND_TO_BRANCH_STATUS]);
+const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS]);
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -58,6 +58,12 @@ const isWaitingStatus = (value: unknown) => WAITING_STATUSES.has(normalizeStatus
 const isReadyForPickupStatus = (value: unknown) => normalizeStatus(value) === READY_FOR_PICKUP_STATUS;
 const isSendToBranchStatus = (value: unknown) => normalizeStatus(value) === SEND_TO_BRANCH_STATUS;
 
+const isInterbranchTransferOrder = (pedido: any) => {
+    const originId = resolveBranchId(pedido?.lugar_origen) || resolveBranchId(pedido?.origen_sucursal) || resolveBranchId(pedido?.sucursal);
+    const destinationId = resolveBranchId(pedido?.destino_sucursal) || resolveBranchId(pedido?.sucursal) || resolveBranchId(pedido?.lugar_entrega);
+    return Boolean(originId && destinationId && String(originId) !== String(destinationId));
+};
+
 const resolveBranchId = (value: any) => {
     if (!value) return "";
     if (typeof value === "string") return value;
@@ -69,6 +75,7 @@ const resolveBranchId = (value: any) => {
 
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     const estadoReal = normalizeStatus(pedido?.estado_pedido);
+    const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS || (estadoReal === "En Espera" && isInterbranchTransferOrder(pedido));
 
     if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
         return {
@@ -112,11 +119,24 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
+    if (isPendingBranchSend) {
+        return {
+            label: "Para enviar a otra sucursal",
+            tone: {
+                text: "#1d4ed8",
+                border: "#93c5fd",
+                background: "#eff6ff",
+                dot: "#2563eb",
+            },
+            tooltip: undefined,
+            isVisualOnly: true,
+        };
+    }
+
     const fechaObjetivo = pedido?.hora_entrega_rango_final || pedido?.hora_entrega_acordada;
     const horaObjetivo = fechaObjetivo ? moment.parseZone(fechaObjetivo) : null;
     const shouldLookInTransit =
         isWaitingStatus(estadoReal) &&
-        estadoReal !== SEND_TO_BRANCH_STATUS &&
         isDeliveryOrder(pedido) &&
         horaObjetivo?.isValid() &&
         horaObjetivo.diff(now, "minutes", true) <= VISUAL_IN_TRANSIT_THRESHOLD_MINUTES;
@@ -137,11 +157,9 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
 
     return {
         label:
-            estadoReal === SEND_TO_BRANCH_STATUS
-                ? "Para enviar a otra sucursal"
-                : estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order || pedido?.is_external
-                    ? "Listo para recoger"
-                    : estadoReal || "En Espera",
+            estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order || pedido?.is_external
+                ? "Listo para recoger"
+                : estadoReal || "En Espera",
         tone: {
             text: "#1d39c4",
             border: "#adc6ff",
@@ -231,7 +249,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const isPendingSend = (pedido: any) =>
-        isSendToBranchStatus(pedido?.estado_pedido) &&
+        (isSendToBranchStatus(pedido?.estado_pedido) || normalizeStatus(pedido?.estado_pedido) === "En Espera") &&
         isInterbranchTransfer(pedido) &&
         String(getOriginBranchId(pedido)) === String(currentSucursalId);
 
@@ -311,11 +329,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
     const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
     const getAutoBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = mode === "send" ? filteredEsperaData : filteredEnCaminoData;
+        const activeRows = filteredEnCaminoData;
         return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
     };
     const getSelectedBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = mode === "send" ? filteredEsperaData : filteredEnCaminoData;
+        const activeRows = filteredEnCaminoData;
         const selectedKeys = new Set(selectedRowKeys.map(String));
         return (activeRows as any[]).filter((row: any) => {
             const rowKey = String(row?.key ?? row?._id ?? "");
@@ -525,8 +543,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 key: pedido.is_external ? `external-${pedido._id}` : pedido._id
             }));
             setShippingData(dataWithKey);
-            setEsperaData(dataWithKey.filter((pedido: any) => isWaitingStatus(pedido.estado_pedido)));
-            setEnCaminoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino"));
+            setEsperaData(dataWithKey.filter((pedido: any) => isWaitingStatus(pedido.estado_pedido) && !isPendingSend(pedido)));
+            setEnCaminoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino" || isPendingSend(pedido)));
             setEntregadoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado"));
         } catch (error) {
             console.error("Error fetching shipping data:", error);
@@ -1126,7 +1144,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         </Button>
                     </Tooltip>
                 )}
-                {canManageExternal && selectedStatus === "En Espera" && (
+                {canManageExternal && selectedStatus === "en_camino" && (
                     <Tooltip title="Marcar automaticamente todos los paquetes pendientes de tu sucursal como enviados">
                         <Button
                             className="shipping-filter-action"

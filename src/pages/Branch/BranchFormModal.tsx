@@ -30,6 +30,21 @@ const deliveryCutoffSections = [
   },
 ] as const;
 
+const pickupScheduleSections = [
+  {
+    key: "weekdays",
+    label: "Lunes a viernes",
+    openField: "pickup_schedule_weekdays_open_time",
+    closeField: "pickup_schedule_weekdays_close_time",
+  },
+  {
+    key: "saturday",
+    label: "Sábado",
+    openField: "pickup_schedule_saturday_open_time",
+    closeField: "pickup_schedule_saturday_close_time",
+  },
+] as const;
+
 const toTimePickerValue = (value?: string | null) => (value ? dayjs(value, "HH:mm") : undefined);
 
 const BranchFormModal: React.FC<{
@@ -67,6 +82,10 @@ const BranchFormModal: React.FC<{
 
   const normalizeBranchPayload = (
     values: IBranch & {
+      pickup_schedule_weekdays_open_time?: any;
+      pickup_schedule_weekdays_close_time?: any;
+      pickup_schedule_saturday_open_time?: any;
+      pickup_schedule_saturday_close_time?: any;
       delivery_cutoff_weekdays_registration_time?: any;
       delivery_cutoff_weekdays_closing_time?: any;
       delivery_cutoff_saturday_registration_time?: any;
@@ -85,17 +104,22 @@ const BranchFormModal: React.FC<{
       ...rest
     } = values as any;
 
-    const formatGroupTime = (fieldValue: any) =>
+    const formatPickupTime = (fieldValue: any) => (fieldValue?.format ? fieldValue.format("HH:mm") : "");
+    const formatCutoffTime = (fieldValue: any) =>
       values.delivery_cutoff_enabled && fieldValue?.format ? fieldValue.format("HH:mm") : "";
 
     return {
       ...rest,
-      delivery_cutoff_weekdays_registration_time: formatGroupTime(values.delivery_cutoff_weekdays_registration_time),
-      delivery_cutoff_weekdays_closing_time: formatGroupTime(values.delivery_cutoff_weekdays_closing_time),
-      delivery_cutoff_saturday_registration_time: formatGroupTime(values.delivery_cutoff_saturday_registration_time),
-      delivery_cutoff_saturday_closing_time: formatGroupTime(values.delivery_cutoff_saturday_closing_time),
-      delivery_cutoff_sunday_registration_time: formatGroupTime(values.delivery_cutoff_sunday_registration_time),
-      delivery_cutoff_sunday_closing_time: formatGroupTime(values.delivery_cutoff_sunday_closing_time),
+      pickup_schedule_weekdays_open_time: formatPickupTime(values.pickup_schedule_weekdays_open_time),
+      pickup_schedule_weekdays_close_time: formatPickupTime(values.pickup_schedule_weekdays_close_time),
+      pickup_schedule_saturday_open_time: formatPickupTime(values.pickup_schedule_saturday_open_time),
+      pickup_schedule_saturday_close_time: formatPickupTime(values.pickup_schedule_saturday_close_time),
+      delivery_cutoff_weekdays_registration_time: formatCutoffTime(values.delivery_cutoff_weekdays_registration_time),
+      delivery_cutoff_weekdays_closing_time: formatCutoffTime(values.delivery_cutoff_weekdays_closing_time),
+      delivery_cutoff_saturday_registration_time: formatCutoffTime(values.delivery_cutoff_saturday_registration_time),
+      delivery_cutoff_saturday_closing_time: formatCutoffTime(values.delivery_cutoff_saturday_closing_time),
+      delivery_cutoff_sunday_registration_time: formatCutoffTime(values.delivery_cutoff_sunday_registration_time),
+      delivery_cutoff_sunday_closing_time: formatCutoffTime(values.delivery_cutoff_sunday_closing_time),
     };
   };
 
@@ -178,6 +202,18 @@ const BranchFormModal: React.FC<{
       const legacyClosing = branch.delivery_cutoff_end_time || branch.delivery_cutoff_time || legacyRegistration;
       form.setFieldsValue({
         ...branch,
+        pickup_schedule_weekdays_open_time: toTimePickerValue(
+          branch.pickup_schedule_weekdays_open_time || branch.delivery_cutoff_weekdays_registration_time || legacyRegistration
+        ),
+        pickup_schedule_weekdays_close_time: toTimePickerValue(
+          branch.pickup_schedule_weekdays_close_time || branch.delivery_cutoff_weekdays_closing_time || legacyClosing
+        ),
+        pickup_schedule_saturday_open_time: toTimePickerValue(
+          branch.pickup_schedule_saturday_open_time || branch.delivery_cutoff_saturday_registration_time || legacyRegistration
+        ),
+        pickup_schedule_saturday_close_time: toTimePickerValue(
+          branch.pickup_schedule_saturday_close_time || branch.delivery_cutoff_saturday_closing_time || legacyClosing
+        ),
         delivery_cutoff_weekdays_registration_time: toTimePickerValue(
           branch.delivery_cutoff_weekdays_registration_time || legacyRegistration
         ),
@@ -249,6 +285,33 @@ const BranchFormModal: React.FC<{
         >
           <Input className="w-full" type="tel" maxLength={13} />
         </Form.Item>
+
+        <div className="mb-2 mt-2 font-medium text-gray-800">Horario para recojo</div>
+        <div className="space-y-4 rounded-lg border border-gray-200 p-4">
+          {pickupScheduleSections.map((section) => (
+            <div key={section.key} className="rounded-lg border border-gray-100 p-3">
+              <div className="mb-3 font-medium text-gray-800">{section.label}</div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Form.Item
+                  className="text-mobile-sm xl:text-desktop-sm"
+                  name={section.openField}
+                  label="Hora de apertura"
+                  rules={[{ required: true, message: "Selecciona la hora de apertura" }]}
+                >
+                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item
+                  className="text-mobile-sm xl:text-desktop-sm"
+                  name={section.closeField}
+                  label="Hora de cierre"
+                  rules={[{ required: true, message: "Selecciona la hora de cierre" }]}
+                >
+                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                </Form.Item>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <Form.Item
           className="text-mobile-sm xl:text-desktop-sm"
