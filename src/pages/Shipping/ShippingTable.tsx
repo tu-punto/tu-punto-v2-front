@@ -466,11 +466,19 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             };
 
                     return row.is_external
-                        ? updateExternalSaleAPI(String(row._id), {
-                            ...payload,
-                            delivered: false,
-                            public_tracking_ready_for_pickup_at: mode === "send" ? undefined : nowIso,
-                        })
+                        ? updateExternalSaleAPI(String(row._id),
+                            mode === "send"
+                                ? {
+                                    ...payload,
+                                    delivered: false,
+                                    public_tracking_ready_for_pickup_at: undefined,
+                                }
+                                : {
+                                    estado_pedido: READY_FOR_PICKUP_STATUS,
+                                    public_tracking_ready_for_pickup_at: nowIso,
+                                    delivered: false,
+                                }
+                        )
                         : updateShippingAPI(payload, String(row._id));
                 })
             );
