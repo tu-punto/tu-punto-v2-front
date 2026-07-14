@@ -22,6 +22,7 @@ const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 const MOBILE_CARD_PAGE_SIZE = 12;
 const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
 const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS]);
+const FILTER_PENDING_SEND = "para_enviar";
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -175,12 +176,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const { user }: any = useContext(UserContext);
     const [shippingData, setShippingData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
+    const [pendingSendData, setPendingSendData] = useState([]);
     const [enCaminoData, setEnCaminoData] = useState([]);
     const [entregadoData, setEntregadoData] = useState([]);
     const [filteredEsperaData, setFilteredEsperaData] = useState([]);
+    const [filteredPendingSendData, setFilteredPendingSendData] = useState([]);
     const [filteredEnCaminoData, setFilteredEnCaminoData] = useState([]);
     const [filteredEntregadoData, setFilteredEntregadoData] = useState([]);
-    const [selectedStatus, setSelectedStatus] = useState<'En Espera' | 'en_camino' | 'entregado'>('En Espera');
+    const [selectedStatus, setSelectedStatus] = useState<'En Espera' | 'para_enviar' | 'en_camino' | 'entregado'>('En Espera');
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isModaStatelVisible, setIsModalStateVisible] = useState(false);
@@ -230,6 +233,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         String(s._id) === String(currentSucursalId) ||
         String(s.id_sucursal) === String(currentSucursalId)
     );
+    const pendingSendCount = filteredPendingSendData.length;
     const inTransitCount = filteredEnCaminoData.length;
 
     const getOriginBranchId = (pedido: any) =>
@@ -318,6 +322,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         const activeRows =
             selectedStatus === 'entregado'
                 ? filteredEntregadoData
+                : selectedStatus === 'para_enviar'
+                    ? filteredPendingSendData
                 : selectedStatus === 'en_camino'
                     ? filteredEnCaminoData
                     : filteredEsperaData;
@@ -329,11 +335,11 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
     const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
     const getAutoBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = filteredEnCaminoData;
+        const activeRows = mode === "send" ? filteredPendingSendData : filteredEnCaminoData;
         return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
     };
     const getSelectedBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = filteredEnCaminoData;
+        const activeRows = mode === "send" ? filteredPendingSendData : filteredEnCaminoData;
         const selectedKeys = new Set(selectedRowKeys.map(String));
         return (activeRows as any[]).filter((row: any) => {
             const rowKey = String(row?.key ?? row?._id ?? "");
@@ -544,7 +550,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             }));
             setShippingData(dataWithKey);
             setEsperaData(dataWithKey.filter((pedido: any) => isWaitingStatus(pedido.estado_pedido) && !isPendingSend(pedido)));
-            setEnCaminoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino" || isPendingSend(pedido)));
+            setPendingSendData(dataWithKey.filter((pedido: any) => isPendingSend(pedido)));
+            setEnCaminoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino"));
             setEntregadoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado"));
         } catch (error) {
             console.error("Error fetching shipping data:", error);
@@ -558,6 +565,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const getVendedoresConEntregas = () => {
         const sourceData = selectedStatus === 'entregado'
             ? entregadoData
+            : selectedStatus === 'para_enviar'
+                ? pendingSendData
             : selectedStatus === 'en_camino'
                 ? enCaminoData
                 : esperaData;
@@ -591,6 +600,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const hasExternalInCurrentStatus = () => {
         const sourceData = selectedStatus === 'entregado'
             ? entregadoData
+            : selectedStatus === 'para_enviar'
+                ? pendingSendData
             : selectedStatus === 'en_camino'
                 ? enCaminoData
                 : esperaData;
@@ -890,6 +901,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const currentRows =
             selectedStatus === 'entregado'
                 ? filteredEntregadoData
+                : selectedStatus === 'para_enviar'
+                    ? filteredPendingSendData
                 : selectedStatus === 'en_camino'
                     ? filteredEnCaminoData
                     : filteredEsperaData;
@@ -943,19 +956,22 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
     useEffect(() => {
         setFilteredEsperaData(filterByLocationAndDate(esperaData));
+        setFilteredPendingSendData(filterByLocationAndDate(pendingSendData));
         setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
         setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [esperaData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
+    }, [esperaData, pendingSendData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
 
     useEffect(() => {
         if (selectedStatus === "entregado") {
             setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
+        } else if (selectedStatus === "para_enviar") {
+            setFilteredPendingSendData(filterByLocationAndDate(pendingSendData));
         } else if (selectedStatus === "en_camino") {
             setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
         } else {
             setFilteredEsperaData(filterByLocationAndDate(esperaData));
         }
-    }, [selectedStatus, esperaData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
+    }, [selectedStatus, esperaData, pendingSendData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -1144,7 +1160,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         </Button>
                     </Tooltip>
                 )}
-                {canManageExternal && selectedStatus === "en_camino" && (
+                {canManageExternal && selectedStatus === "para_enviar" && (
                     <Tooltip title="Marcar automaticamente todos los paquetes pendientes de tu sucursal como enviados">
                         <Button
                             className="shipping-filter-action"
@@ -1264,6 +1280,33 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         {filteredEsperaData.length > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "En Espera" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
                                 {filteredEsperaData.length}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedStatus('para_enviar')}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            borderRadius: 999,
+                            padding: "10px 16px",
+                            border: selectedStatus === "para_enviar" ? "1px solid #93c5fd" : "1px solid #d1d5db",
+                            background: selectedStatus === "para_enviar" ? "#eff6ff" : "#ffffff",
+                            color: selectedStatus === "para_enviar" ? "#1d4ed8" : "#111827",
+                            fontWeight: 700,
+                            boxShadow: selectedStatus === "para_enviar" ? "0 8px 22px rgba(59, 130, 246, 0.16)" : "none",
+                            transform: selectedStatus === "para_enviar" ? "translateY(-1px)" : "translateY(0)",
+                            transition: "all 220ms ease",
+                        }}
+                    >
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "para_enviar" ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
+                        <span>Para enviar a otra sucursal</span>
+                        {pendingSendCount > 0 && (
+                            <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "para_enviar" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
+                                {pendingSendCount}
                             </span>
                         )}
                     </button>
