@@ -6,6 +6,7 @@ import logoImg from "../../../public/logo.png";
 import { changePasswordAPI } from "../../api/user";
 import { UserContext } from "../../context/userContext";
 import { normalizeRole } from "../../utils/role";
+import { usePublicPageTitle } from "../../utils/publicPageTitle";
 
 const { Text, Title } = Typography;
 
@@ -35,6 +36,7 @@ const getDefaultRedirect = (role?: string) => {
 };
 
 export default function ChangePasswordPage() {
+  usePublicPageTitle();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [serverErrors, setServerErrors] = useState<string[]>([]);

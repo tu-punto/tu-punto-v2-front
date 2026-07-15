@@ -1,8 +1,11 @@
 import LoginForm from "../../components/LoginForm";
 import logoImg from "../../../public/logo.png";
 import AuthShell from "../../components/AuthShell";
+import { usePublicPageTitle } from "../../utils/publicPageTitle";
 
 export default function SellerLoginPage() {
+  usePublicPageTitle();
+
   return (
     <AuthShell
       title=""

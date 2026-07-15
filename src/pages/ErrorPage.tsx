@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+import { usePublicPageTitle } from "../utils/publicPageTitle";
 
 const ErrorPage = () => {
+  usePublicPageTitle();
+
   return (
     <div className="h-screen flex flex-col justify-center items-center bg-gray-100">
       <h1 className="text-6xl font-bold text-blue-600">404</h1>

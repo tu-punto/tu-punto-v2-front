@@ -7,6 +7,7 @@ import {
   registerBuyerPushSubscriptionAPI,
 } from "../../api/notification";
 import { ensurePushSubscription, getExistingPushSubscription, pushIsSupported } from "../../utils/push";
+import { usePublicPageTitle } from "../../utils/publicPageTitle";
 
 type TrackingData = {
   shippingId: string;
@@ -32,6 +33,7 @@ const formatDeliveryTime = (value?: string | null) => {
 };
 
 const TrackingPage = () => {
+  usePublicPageTitle();
   const { code = "" } = useParams();
   const [loading, setLoading] = useState(true);
   const [tracking, setTracking] = useState<TrackingData | null>(null);

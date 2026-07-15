@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import LoginForm from "../../components/LoginForm";
 import logoImg from "../../../public/logo.png";
 import AuthShell from "../../components/AuthShell";
+import { usePublicPageTitle } from "../../utils/publicPageTitle";
 
 export default function AdminLoginPage() {
+  usePublicPageTitle();
   const navigate = useNavigate();
 
   return (
