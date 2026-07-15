@@ -3,9 +3,10 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-const faviconPath = import.meta.env.VITE_FAVICON_PATH;
+const faviconPath = import.meta.env.VITE_FAVICON_PATH?.trim();
+const invalidFaviconPaths = new Set(['', '.', '/']);
 
-if (faviconPath) {
+if (faviconPath && !invalidFaviconPaths.has(faviconPath)) {
   const faviconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (faviconLink) {
     faviconLink.href = faviconPath;
