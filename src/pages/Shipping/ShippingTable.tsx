@@ -10,6 +10,7 @@ import ExternalShippingInfoModal from './ExternalShippingInfoModal';
 import SimplePackageManagerModal from './SimplePackageManagerModal';
 import { getSucursalsBasicAPI } from '../../api/sucursal';
 import { getSellersBasicAPI } from "../../api/seller";
+import { registerBranchTransferBoxCloseOperationAPI } from '../../api/boxClose';
 import { UserContext } from "../../context/userContext.tsx";
 import { isSuperadminUser } from "../../utils/role";
 import { READY_FOR_PICKUP_STATUS, resolvePickupStatus } from "./shippingStatus";
@@ -509,6 +510,26 @@ const ShippingTable = ({
                 setBranchTransferError(failureMessage);
                 message.error(failureMessage);
             } else {
+                if (totalDeliveryCost > 0 && currentSucursalId) {
+                    const sourceKey = [
+                        "branch-transfer",
+                        mode,
+                        currentSucursalId,
+                        branchTransferModal.paymentMethod === "1" ? "qr" : "efectivo",
+                        rows.map((row: any) => String(row?._id || row?.key || "")).sort().join(","),
+                    ].join(":");
+
+                    await registerBranchTransferBoxCloseOperationAPI({
+                        sourceKey,
+                        branchId: currentSucursalId,
+                        amount: totalDeliveryCost,
+                        method: branchTransferModal.paymentMethod === "1" ? "qr" : "efectivo",
+                        mode,
+                        occurredAt: nowIso,
+                        packageCount: rows.length,
+                    });
+                }
+
                 message.success(
                     mode === "send"
                         ? `Se marcaron ${rows.length} paquete(s) como enviados`
