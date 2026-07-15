@@ -1,14 +1,54 @@
 .shipping-filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
 }
 
 .shipping-filter-grid .ant-select,
 .shipping-filter-grid .ant-input,
 .shipping-filter-grid .ant-picker {
   width: 100%;
+}
+
+.shipping-filter-vendor {
+  order: 1;
+}
+
+.shipping-filter-search {
+  order: 2;
+}
+
+.shipping-filter-destination {
+  order: 3;
+}
+
+.shipping-filter-grid .ant-picker,
+.shipping-filter-start,
+.shipping-filter-end {
+  order: 4;
+}
+
+.shipping-filter-qr {
+  order: 8;
+  justify-self: start;
+  width: 46px;
+}
+
+.shipping-filter-create {
+  order: 5;
+}
+
+.shipping-filter-packages {
+  order: 6;
+}
+
+.shipping-filter-withdrawal {
+  order: 7;
+}
+
+.shipping-filter-other {
+  grid-column: 1 / -1;
 }
 
 .shipping-filter-action {
@@ -88,6 +128,18 @@
 
   .shipping-page-header {
     align-items: stretch;
+    gap: 10px;
+    flex-direction: column;
+  }
+
+  .shipping-page-actions {
+    width: 100%;
+    justify-content: stretch;
+    flex-wrap: wrap;
+  }
+
+  .shipping-page-actions .ant-btn {
+    flex: 1 1 100%;
   }
 
   .shipping-page-title {
@@ -106,45 +158,8 @@
   }
 
   .shipping-filter-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    grid-template-areas:
-      "search search search search search search"
-      "vendor vendor vendor destination destination destination"
-      "start start start end end end"
-      "create create packages packages qr qr";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-  }
-
-  .shipping-filter-search {
-    grid-area: search;
-  }
-
-  .shipping-filter-vendor {
-    grid-area: vendor;
-  }
-
-  .shipping-filter-destination {
-    grid-area: destination;
-  }
-
-  .shipping-filter-start {
-    grid-area: start;
-  }
-
-  .shipping-filter-end {
-    grid-area: end;
-  }
-
-  .shipping-filter-create {
-    grid-area: create;
-  }
-
-  .shipping-filter-packages {
-    grid-area: packages;
-  }
-
-  .shipping-filter-qr {
-    grid-area: qr;
   }
 
   .shipping-filter-other {
@@ -163,8 +178,14 @@
   }
 
   .shipping-filter-create,
-  .shipping-filter-packages {
+  .shipping-filter-packages,
+  .shipping-filter-withdrawal {
     font-size: 12px;
+  }
+
+  .shipping-filter-qr {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .shipping-mobile-pagination {

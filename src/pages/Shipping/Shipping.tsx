@@ -10,12 +10,22 @@ import TrackingFreezeControlModal from "./TrackingFreezeControlModal";
 import "./ShippingTable.css";
 import { isSuperadminUser } from "../../utils/role";
 
+type ShippingHeaderAction = {
+	label: string;
+	count: number;
+	visible: boolean;
+	disabled: boolean;
+	loading: boolean;
+	tone?: "orange" | "green";
+	onClick: () => void;
+};
 
 const Shipping = () => {
 	const refreshKey = 0;
 	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 	const [isEscalationControlVisible, setIsEscalationControlVisible] = useState(false);
 	const [isTrackingFreezeVisible, setIsTrackingFreezeVisible] = useState(false);
+	const [headerAction, setHeaderAction] = useState<ShippingHeaderAction | null>(null);
 
 	const { user }: any = useContext(UserContext);
 	const isSuperadmin = isSuperadminUser(user);
@@ -46,23 +56,48 @@ const Shipping = () => {
 						Pedidos
 					</h1>
 				</div>
-				{isSuperadmin && (
-					<Tooltip title="Control de Escalonamiento">
+				<div className="shipping-page-actions flex items-center gap-3">
+					{headerAction?.visible && (
 						<Button
-							type="default"
-							icon={<SettingOutlined />}
-							onClick={() => setIsEscalationControlVisible(true)}
-							style={{ height: 42, borderRadius: 10, fontWeight: 700 }}
+							type="primary"
+							onClick={headerAction.onClick}
+							loading={headerAction.loading}
+							disabled={headerAction.disabled}
+							style={{
+								height: 42,
+								borderRadius: 10,
+								fontWeight: 700,
+								background: headerAction.tone === "green" ? "#16a34a" : "#f97316",
+								borderColor: headerAction.tone === "green" ? "#16a34a" : "#f97316",
+								boxShadow:
+									headerAction.tone === "green"
+										? "0 10px 24px rgba(22, 163, 74, 0.18)"
+										: "0 10px 24px rgba(249, 115, 22, 0.18)",
+							}}
 						>
-							Escalonamiento
+							{headerAction.label}
+							{headerAction.count ? ` (${headerAction.count})` : ""}
 						</Button>
-					</Tooltip>
-				)}
+					)}
+					{isSuperadmin && (
+						<Tooltip title="Control de Escalonamiento">
+							<Button
+								type="default"
+								icon={<SettingOutlined />}
+								onClick={() => setIsEscalationControlVisible(true)}
+								style={{ height: 42, borderRadius: 10, fontWeight: 700 }}
+							>
+								Escalonamiento
+							</Button>
+						</Tooltip>
+					)}
+				</div>
 			</div>
 
 			<ShippingTable
 				refreshKey={refreshKey}
 				onOpenQR={canScanOrders ? () => setIsQRModalOpen(true) : undefined}
+				onHeaderActionChange={setHeaderAction}
 			/>
 			<ShippingQRScannerModal
 				open={isQRModalOpen}

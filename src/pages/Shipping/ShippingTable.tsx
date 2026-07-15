@@ -24,6 +24,16 @@ const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
 const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS]);
 const FILTER_PENDING_SEND = "para_enviar";
 
+type ShippingHeaderAction = {
+    label: string;
+    count: number;
+    visible: boolean;
+    disabled: boolean;
+    loading: boolean;
+    tone?: "orange" | "green";
+    onClick: () => void;
+} | null;
+
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
 const getOriginBranchName = (pedido: any) => {
@@ -76,7 +86,7 @@ const resolveBranchId = (value: any) => {
 
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     const estadoReal = normalizeStatus(pedido?.estado_pedido);
-    const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS || (estadoReal === "En Espera" && isInterbranchTransferOrder(pedido));
+    const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS;
 
     if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
         return {
@@ -124,10 +134,10 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         return {
             label: "Para enviar a otra sucursal",
             tone: {
-                text: "#1d4ed8",
-                border: "#93c5fd",
-                background: "#eff6ff",
-                dot: "#2563eb",
+                text: "#c2410c",
+                border: "#fdba74",
+                background: "#fff7ed",
+                dot: "#f97316",
             },
             tooltip: undefined,
             isVisualOnly: true,
@@ -158,7 +168,7 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
 
     return {
         label:
-            estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order || pedido?.is_external
+            estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order
                 ? "Listo para recoger"
                 : estadoReal || "En Espera",
         tone: {
@@ -172,7 +182,15 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     };
 };
 
-const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?: () => void }) => {
+const ShippingTable = ({
+    refreshKey,
+    onOpenQR,
+    onHeaderActionChange,
+}: {
+    refreshKey: number;
+    onOpenQR?: () => void;
+    onHeaderActionChange?: (action: ShippingHeaderAction) => void;
+}) => {
     const { user }: any = useContext(UserContext);
     const [shippingData, setShippingData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
@@ -253,7 +271,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     };
 
     const isPendingSend = (pedido: any) =>
-        (isSendToBranchStatus(pedido?.estado_pedido) || normalizeStatus(pedido?.estado_pedido) === "En Espera") &&
+        isSendToBranchStatus(pedido?.estado_pedido) &&
         isInterbranchTransfer(pedido) &&
         String(getOriginBranchId(pedido)) === String(currentSucursalId);
 
@@ -557,11 +575,20 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 ...pedido,
                 key: pedido.is_external ? `external-${pedido._id}` : pedido._id
             }));
+            const pendingSendRows = dataWithKey.filter((pedido: any) => isPendingSend(pedido));
+            const inTransitRows = dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino");
+            const deliveredRows = dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado");
+            const waitingRows = dataWithKey.filter((pedido: any) =>
+                !isPendingSend(pedido) &&
+                normalizeStatus(pedido.estado_pedido) !== "En camino" &&
+                normalizeStatus(pedido.estado_pedido) !== "Entregado"
+            );
+
             setShippingData(dataWithKey);
-            setEsperaData(dataWithKey.filter((pedido: any) => isWaitingStatus(pedido.estado_pedido) && !isPendingSend(pedido)));
-            setPendingSendData(dataWithKey.filter((pedido: any) => isPendingSend(pedido)));
-            setEnCaminoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino"));
-            setEntregadoData(dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado"));
+            setEsperaData(waitingRows);
+            setPendingSendData(pendingSendRows);
+            setEnCaminoData(inTransitRows);
+            setEntregadoData(deliveredRows);
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
@@ -992,6 +1019,50 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         };
         fetchVendedores();
     }, []);
+
+    useEffect(() => {
+        if (!onHeaderActionChange) return;
+
+        if (!canManageExternal) {
+            onHeaderActionChange(null);
+            return;
+        }
+
+        if (selectedStatus === "para_enviar") {
+            onHeaderActionChange({
+                label: "Enviar sucursal",
+                count: sendCount,
+                visible: true,
+                disabled: !sendCount,
+                loading: markingBranchTransfer,
+                tone: "orange",
+                onClick: () => handleBranchTransfer("send"),
+            });
+            return;
+        }
+
+        if (selectedStatus === "en_camino") {
+            onHeaderActionChange({
+                label: "Confirmar llegada",
+                count: receiveCount,
+                visible: true,
+                disabled: !receiveCount,
+                loading: markingBranchTransfer,
+                tone: "green",
+                onClick: () => handleBranchTransfer("receive"),
+            });
+            return;
+        }
+
+        onHeaderActionChange(null);
+    }, [
+        canManageExternal,
+        selectedStatus,
+        sendCount,
+        receiveCount,
+        markingBranchTransfer,
+        onHeaderActionChange,
+    ]);
     //console.log("Rol", user?.role?.toLowerCase());
     return (
         <div>
@@ -1005,6 +1076,37 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         opacity: 1;
                         transform: translateY(0) scale(1);
                     }
+                }
+
+                .branch-transfer-modal .ant-modal-content {
+                    border-radius: 18px;
+                }
+
+                .branch-transfer-modal .ant-modal-body {
+                    padding-top: 18px;
+                }
+
+                .branch-transfer-scroll {
+                    max-height: 260px;
+                    overflow: auto;
+                    padding-right: 6px;
+                    scrollbar-width: thin;
+                    scrollbar-color: #94a3b8 #eef2f7;
+                }
+
+                .branch-transfer-scroll::-webkit-scrollbar {
+                    width: 10px;
+                }
+
+                .branch-transfer-scroll::-webkit-scrollbar-track {
+                    background: #eef2f7;
+                    border-radius: 999px;
+                }
+
+                .branch-transfer-scroll::-webkit-scrollbar-thumb {
+                    background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
+                    border-radius: 999px;
+                    border: 2px solid #eef2f7;
                 }
             `}</style>
             <div className="shipping-filter-panel mb-4 bg-white rounded-xl border border-gray-200 p-3">
@@ -1158,7 +1260,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 {canManageExternal && selectedStatus !== "entregado" && (
                     <Tooltip title="Marcar entregas simples o externas como retiradas por el vendedor">
                         <Button
-                            className="shipping-filter-action"
+                            className="shipping-filter-action shipping-filter-withdrawal"
                             type="default"
                             onClick={handleMarkSellerWithdrawal}
                             loading={markingSellerWithdrawal}
@@ -1166,34 +1268,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                             style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
                         >
                             Retiro vendedor{selectedSellerWithdrawalCount ? ` (${selectedSellerWithdrawalCount})` : ""}
-                        </Button>
-                    </Tooltip>
-                )}
-                {canManageExternal && selectedStatus === "para_enviar" && (
-                    <Tooltip title="Marcar automaticamente todos los paquetes pendientes de tu sucursal como enviados">
-                        <Button
-                            className="shipping-filter-action"
-                            type="primary"
-                            loading={markingBranchTransfer}
-                            disabled={!sendCount}
-                            onClick={() => handleBranchTransfer("send")}
-                            style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
-                        >
-                            Enviar sucursal{sendCount ? ` (${sendCount})` : ""}
-                        </Button>
-                    </Tooltip>
-                )}
-                {canManageExternal && selectedStatus === "en_camino" && (
-                    <Tooltip title="Confirmar automaticamente los paquetes pendientes de llegada para tu sucursal">
-                        <Button
-                            className="shipping-filter-action"
-                            type="primary"
-                            loading={markingBranchTransfer}
-                            disabled={!receiveCount}
-                            onClick={() => handleBranchTransfer("receive")}
-                            style={{ height: 46, borderRadius: 10, fontWeight: 700, background: "#16a34a", borderColor: "#16a34a" }}
-                        >
-                            Confirmar llegada{receiveCount ? ` (${receiveCount})` : ""}
                         </Button>
                     </Tooltip>
                 )}
@@ -1475,6 +1549,8 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 dataSource={
                     selectedStatus === 'entregado'
                         ? filteredEntregadoData
+                        : selectedStatus === 'para_enviar'
+                            ? filteredPendingSendData
                         : selectedStatus === 'en_camino'
                             ? filteredEnCaminoData
                             : filteredEsperaData
@@ -1520,6 +1596,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
 
             <Modal
+                className="branch-transfer-modal"
                 open={branchTransferModal.open}
                 title={branchTransferModal.mode === "send" ? "Confirmar envio entre sucursales" : "Confirmar llegada a sucursal destino"}
                 onCancel={closeBranchTransferModal}
@@ -1528,6 +1605,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 cancelText="Cancelar"
                 confirmLoading={markingBranchTransfer}
                 destroyOnClose
+                width={960}
             >
                 <div className="space-y-4">
                     {branchTransferError ? (
@@ -1551,14 +1629,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
 
                     <div className="rounded-2xl border border-slate-200 p-3">
                         <div className="text-xs uppercase tracking-wide text-slate-500">Paquetes detectados</div>
-                        <div className="mt-2 max-h-56 overflow-auto text-sm text-slate-700">
+                        <div className="branch-transfer-scroll mt-2 text-sm text-slate-700">
                             {branchTransferModal.rows.map((row: any, index: number) => (
                                 <div key={String(row?._id || index)} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
                                     <div>
                                         <div className="font-medium">{row?.cliente || row?.comprador || "Sin cliente"}</div>
                                         <div className="text-xs text-slate-500">{row?.numero_guia || row?._id || "Sin guia"}</div>
                                     </div>
-                                    <div className="text-xs text-slate-500">{row?.lugar_entrega || "Sucursal"}</div>
+                                    <div className="text-xs font-medium text-orange-600">{row?.lugar_entrega || "Sucursal"}</div>
                                 </div>
                             ))}
                         </div>

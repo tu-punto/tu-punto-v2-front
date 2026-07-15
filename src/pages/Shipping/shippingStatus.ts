@@ -1,5 +1,6 @@
 export const READY_FOR_PICKUP_STATUS = "LISTO PARA RECOGER";
 export const IN_TRANSIT_STATUS = "En camino";
+export const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
 
 const normalizeText = (value: unknown) => String(value || "").trim();
 
@@ -22,7 +23,7 @@ export const resolvePickupStatus = (status: unknown, order?: any) => {
     resolveBranchId(order?.sucursal);
 
   if (originBranchId && destinationBranchId && originBranchId !== destinationBranchId) {
-    return IN_TRANSIT_STATUS;
+    return normalizedStatus ? SEND_TO_BRANCH_STATUS : SEND_TO_BRANCH_STATUS;
   }
 
   return READY_FOR_PICKUP_STATUS;
