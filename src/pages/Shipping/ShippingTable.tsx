@@ -477,6 +477,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                                     estado_pedido: READY_FOR_PICKUP_STATUS,
                                     public_tracking_ready_for_pickup_at: nowIso,
                                     delivered: false,
+                                    costo_delivery: costPerPackage,
                                 }
                         )
                         : updateShippingAPI(payload, String(row._id));
