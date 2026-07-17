@@ -42,6 +42,7 @@ const getShippingDashboardListAPI = async (params?: {
   page?: number;
   limit?: number;
   tab?: "todos" | "En Espera" | "para_enviar" | "en_camino" | "entregado";
+  category?: "all" | "externos" | "paquetes";
   from?: string;
   to?: string;
   currentBranchId?: string;

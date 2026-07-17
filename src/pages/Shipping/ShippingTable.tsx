@@ -31,6 +31,9 @@ const MOBILE_CARD_PAGE_SIZE = 12;
 const WAITING_STATUSES = new Set([WAITING_RAW_STATUS, READY_FOR_PICKUP_STATUS]);
 const FILTER_ALL = "todos";
 const FILTER_PENDING_SEND = "para_enviar";
+const CATEGORY_ALL = "all";
+const CATEGORY_EXTERNALS = "externos";
+const CATEGORY_PACKAGES = "paquetes";
 
 type ShippingHeaderAction = {
     label: string;
@@ -200,6 +203,7 @@ const ShippingTable = ({
         en_camino: 0,
         entregado: 0,
     });
+    const [selectedCategory, setSelectedCategory] = useState<"all" | "externos" | "paquetes">(CATEGORY_ALL);
     const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'entregado'>(FILTER_ALL);
     const [tablePage, setTablePage] = useState(1);
     const [tablePageSize, setTablePageSize] = useState(30);
@@ -517,6 +521,7 @@ const ShippingTable = ({
                 page: tablePage,
                 limit: tablePageSize,
                 tab: selectedStatus,
+                category: selectedCategory,
                 from,
                 to,
                 currentBranchId: currentSucursalId || undefined,
@@ -637,6 +642,15 @@ const ShippingTable = ({
     }, [isVendedor, user]);
 
     useEffect(() => {
+        if (canManageExternal) {
+            setSelectedCategory((current) => current === CATEGORY_ALL ? CATEGORY_EXTERNALS : current);
+            return;
+        }
+
+        setSelectedCategory(CATEGORY_ALL);
+    }, [canManageExternal]);
+
+    useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 640);
         handleResize();
         window.addEventListener('resize', handleResize);
@@ -655,7 +669,7 @@ const ShippingTable = ({
         setMobilePage(1);
         setTablePage(1);
         setSelectedRowKeys([]);
-    }, [selectedStatus, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente]);
+    }, [selectedStatus, selectedCategory, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente]);
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -897,6 +911,7 @@ const ShippingTable = ({
         canManageExternal,
         currentSucursalId,
         selectedStatus,
+        selectedCategory,
         tablePage,
         tablePageSize,
         selectedLocation,
@@ -1134,9 +1149,15 @@ const ShippingTable = ({
                     <Tooltip title="Registrar entrega externa">
                         <Button
                             className="shipping-filter-action shipping-filter-create"
-                            type="primary"
+                            type={selectedCategory === CATEGORY_EXTERNALS ? "primary" : "default"}
                             icon={<span className="inline-flex items-center gap-0.5"><InboxOutlined /><ArrowRightOutlined /></span>}
-                            onClick={() => setIsExternalCreateVisible(true)}
+                            onClick={() => {
+                                if (selectedCategory === CATEGORY_EXTERNALS) {
+                                    setIsExternalCreateVisible(true);
+                                    return;
+                                }
+                                setSelectedCategory(CATEGORY_EXTERNALS);
+                            }}
                             style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
                         >
                             Externos
@@ -1147,9 +1168,15 @@ const ShippingTable = ({
                     <Tooltip title="Gestionar paquetes del servicio">
                         <Button
                             className="shipping-filter-action shipping-filter-packages"
-                            type="default"
+                            type={selectedCategory === CATEGORY_PACKAGES ? "primary" : "default"}
                             icon={<InboxOutlined />}
-                            onClick={() => setIsSimplePackageManagerVisible(true)}
+                            onClick={() => {
+                                if (selectedCategory === CATEGORY_PACKAGES) {
+                                    setIsSimplePackageManagerVisible(true);
+                                    return;
+                                }
+                                setSelectedCategory(CATEGORY_PACKAGES);
+                            }}
                             style={{ height: 46, borderRadius: 10, fontWeight: 700 }}
                         >
                             Paquetes
