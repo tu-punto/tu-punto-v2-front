@@ -13,7 +13,14 @@ import { getSellersBasicAPI } from "../../api/seller";
 import { registerBranchTransferBoxCloseOperationAPI } from '../../api/boxClose';
 import { UserContext } from "../../context/userContext.tsx";
 import { isSuperadminUser } from "../../utils/role";
-import { READY_FOR_PICKUP_STATUS, resolvePickupStatus } from "./shippingStatus";
+import {
+    IN_TRANSIT_STATUS,
+    INTERNAL_SALE_STATUS,
+    READY_FOR_PICKUP_STATUS,
+    SEND_TO_BRANCH_STATUS,
+    WAITING_RAW_STATUS,
+    resolvePickupStatus,
+} from "./shippingStatus";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
@@ -21,8 +28,7 @@ const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 const MOBILE_CARD_PAGE_SIZE = 12;
-const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
-const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS]);
+const WAITING_STATUSES = new Set([WAITING_RAW_STATUS, READY_FOR_PICKUP_STATUS]);
 const FILTER_ALL = "todos";
 const FILTER_PENDING_SEND = "para_enviar";
 
@@ -38,38 +44,43 @@ type ShippingHeaderAction = {
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
-const getOriginBranchName = (pedido: any) => {
-    const lugar = pedido?.lugar_origen;
-    if (typeof lugar === "object" && lugar !== null) {
-        return String(lugar.nombre || "");
-    }
-
-    return "";
-};
-
-const isDeliveryOrder = (pedido: any) => {
-    if (pedido?.is_external) {
-        return Boolean(pedido?.delivery || pedido?.direccion_delivery);
-    }
-
-    const origin = normalizeText(getOriginBranchName(pedido));
-    const destination = normalizeText(pedido?.lugar_entrega);
-
-    if (origin && destination) {
-        return origin !== destination;
-    }
-
-    return Boolean(
-        pedido?.venta?.some((venta: any) => ["comprador", "vendedor"].includes(String(venta?.quien_paga_delivery || "").toLowerCase())) ||
-        pedido?.cargo_delivery ||
-        pedido?.costo_delivery
-    );
-};
-
 const normalizeStatus = (value: unknown) => String(value || "").trim();
 const isWaitingStatus = (value: unknown) => WAITING_STATUSES.has(normalizeStatus(value));
 const isReadyForPickupStatus = (value: unknown) => normalizeStatus(value) === READY_FOR_PICKUP_STATUS;
 const isSendToBranchStatus = (value: unknown) => normalizeStatus(value) === SEND_TO_BRANCH_STATUS;
+const isDeliveredStatus = (value: unknown) => normalizeStatus(value) === "Entregado";
+const isInternalSaleOrder = (pedido: any) =>
+    normalizeStatus(pedido?.estado_pedido).toLowerCase() === INTERNAL_SALE_STATUS;
+
+const isSimplePackageOrder = (pedido: any) =>
+    Boolean(
+        pedido?.simple_package_order ||
+        pedido?.simple_package_source_id ||
+        String(pedido?.service_origin || "").trim() === "simple_package"
+    );
+
+const isRegularOrder = (pedido: any) =>
+    !pedido?.is_external && !isSimplePackageOrder(pedido) && !isInternalSaleOrder(pedido);
+
+const getScheduledDeliveryMoment = (pedido: any) => {
+    const value = pedido?.hora_entrega_acordada;
+    if (!value) return null;
+
+    const scheduledAt = moment.parseZone(value);
+    return scheduledAt.isValid() ? scheduledAt : null;
+};
+
+const shouldDisplayInTransit = (pedido: any, now: moment.Moment) => {
+    const estadoReal = normalizeStatus(pedido?.estado_pedido);
+    if (estadoReal === IN_TRANSIT_STATUS) return true;
+    if (estadoReal !== WAITING_RAW_STATUS) return false;
+    if (!isRegularOrder(pedido)) return false;
+
+    const scheduledAt = getScheduledDeliveryMoment(pedido);
+    if (!scheduledAt) return false;
+
+    return now.isSameOrAfter(scheduledAt.clone().subtract(VISUAL_IN_TRANSIT_THRESHOLD_MINUTES, "minutes"));
+};
 
 const isInterbranchTransferOrder = (pedido: any) => {
     const originId = resolveBranchId(pedido?.lugar_origen) || resolveBranchId(pedido?.origen_sucursal) || resolveBranchId(pedido?.sucursal);
@@ -118,7 +129,7 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
-    if (estadoReal === "En camino") {
+    if (estadoReal === IN_TRANSIT_STATUS || shouldDisplayInTransit(pedido, now)) {
         return {
             label: "En camino",
             tone: {
@@ -128,7 +139,7 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
                 dot: "#fa8c16",
             },
             tooltip: undefined,
-            isVisualOnly: false,
+            isVisualOnly: estadoReal !== IN_TRANSIT_STATUS,
         };
     }
 
@@ -146,33 +157,8 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
-    const fechaObjetivo = pedido?.hora_entrega_rango_final || pedido?.hora_entrega_acordada;
-    const horaObjetivo = fechaObjetivo ? moment.parseZone(fechaObjetivo) : null;
-    const shouldLookInTransit =
-        isWaitingStatus(estadoReal) &&
-        isDeliveryOrder(pedido) &&
-        horaObjetivo?.isValid() &&
-        horaObjetivo.diff(now, "minutes", true) <= VISUAL_IN_TRANSIT_THRESHOLD_MINUTES;
-
-    if (shouldLookInTransit) {
-        return {
-            label: "En camino",
-            tone: {
-                text: "#ad6800",
-                border: "#ffd591",
-                background: "#fff7e6",
-                dot: "#fa8c16",
-            },
-            tooltip: undefined,
-            isVisualOnly: true,
-        };
-    }
-
     return {
-        label:
-            estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order
-                ? "Listo para recoger"
-                : estadoReal || "En Espera",
+        label: isWaitingStatus(estadoReal) ? "Listo para recoger" : estadoReal || "Listo para recoger",
         tone: {
             text: "#1d39c4",
             border: "#adc6ff",
@@ -275,13 +261,18 @@ const ShippingTable = ({
         return Boolean(originId && destinationId && String(originId) !== String(destinationId));
     };
 
+    const isBranchTransferManagedOrder = (pedido: any) =>
+        Boolean(pedido?.is_external || isSimplePackageOrder(pedido));
+
     const isPendingSend = (pedido: any) =>
         isSendToBranchStatus(pedido?.estado_pedido) &&
+        isBranchTransferManagedOrder(pedido) &&
         isInterbranchTransfer(pedido) &&
         String(getOriginBranchId(pedido)) === String(currentSucursalId);
 
     const isPendingReceive = (pedido: any) =>
-        normalizeStatus(pedido?.estado_pedido) === "En camino" &&
+        normalizeStatus(pedido?.estado_pedido) === IN_TRANSIT_STATUS &&
+        isBranchTransferManagedOrder(pedido) &&
         isInterbranchTransfer(pedido) &&
         String(getDestinationBranchId(pedido)) === String(currentSucursalId);
 
@@ -611,26 +602,7 @@ const ShippingTable = ({
                 ...pedido,
                 key: pedido.is_external ? `external-${pedido._id}` : pedido._id
             }));
-            const allRows = dataWithKey.filter((pedido: any) =>
-                normalizeStatus(pedido.estado_pedido) !== "Entregado" &&
-                isCurrentBranchRelatedOrder(pedido)
-            );
-            const pendingSendRows = dataWithKey.filter((pedido: any) => isPendingSend(pedido));
-            const inTransitRows = dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino");
-            const deliveredRows = dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado");
-            const waitingRows = dataWithKey.filter((pedido: any) =>
-                isCurrentBranchRelatedOrder(pedido) &&
-                !isPendingSend(pedido) &&
-                normalizeStatus(pedido.estado_pedido) !== "En camino" &&
-                normalizeStatus(pedido.estado_pedido) !== "Entregado"
-            );
-
             setShippingData(dataWithKey);
-            setAllData(allRows);
-            setEsperaData(waitingRows);
-            setPendingSendData(pendingSendRows);
-            setEnCaminoData(inTransitRows);
-            setEntregadoData(deliveredRows);
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
@@ -1037,6 +1009,29 @@ const ShippingTable = ({
         user?.id_vendedor,
         sucursal.length
     ]);
+
+    useEffect(() => {
+        const visibleRows = (shippingData as any[]).filter((pedido: any) =>
+            !isInternalSaleOrder(pedido) && isCurrentBranchRelatedOrder(pedido)
+        );
+        const deliveredRows = visibleRows.filter((pedido: any) => isDeliveredStatus(pedido?.estado_pedido));
+        const pendingSendRows = visibleRows.filter((pedido: any) => isPendingSend(pedido));
+        const inTransitRows = visibleRows.filter((pedido: any) =>
+            !isPendingSend(pedido) && shouldDisplayInTransit(pedido, statusNow)
+        );
+        const waitingRows = visibleRows.filter((pedido: any) =>
+            !isPendingSend(pedido) &&
+            !shouldDisplayInTransit(pedido, statusNow) &&
+            isWaitingStatus(pedido?.estado_pedido)
+        );
+        const allRows = visibleRows.filter((pedido: any) => !isDeliveredStatus(pedido?.estado_pedido));
+
+        setAllData(allRows as any);
+        setEsperaData(waitingRows as any);
+        setPendingSendData(pendingSendRows as any);
+        setEnCaminoData(inTransitRows as any);
+        setEntregadoData(deliveredRows as any);
+    }, [shippingData, statusNow, currentSucursalId]);
 
     useEffect(() => {
         setFilteredAllData(filterByLocationAndDate(allData));
