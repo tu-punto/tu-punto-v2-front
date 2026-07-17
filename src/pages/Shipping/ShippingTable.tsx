@@ -170,6 +170,18 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     };
 };
 
+const formatShippingDate = (value: unknown) => {
+    if (!value) return "-";
+    const parsed = moment.parseZone(String(value));
+    return parsed.isValid() ? parsed.format("DD/MM/YYYY") : "-";
+};
+
+const getShippingDateSortValue = (value: unknown) => {
+    if (!value) return 0;
+    const parsed = moment.parseZone(String(value));
+    return parsed.isValid() ? parsed.valueOf() : 0;
+};
+
 const ShippingTable = ({
     refreshKey,
     onOpenQR,
@@ -654,11 +666,10 @@ const ShippingTable = ({
             title: 'Fecha Pedido',
             dataIndex: 'hora_entrega_acordada',
             key: 'hora_entrega_acordada',
-            render: (text: string) =>
-                moment.parseZone(text).format("DD/MM/YYYY"),
+            render: (text: string) => formatShippingDate(text),
             sorter: (a: any, b: any) =>
-                moment.parseZone(a.hora_entrega_acordada).valueOf() -
-                moment.parseZone(b.hora_entrega_acordada).valueOf(),
+                getShippingDateSortValue(a.hora_entrega_acordada) -
+                getShippingDateSortValue(b.hora_entrega_acordada),
             sortOrder,
             onHeaderCell: () => ({
                 onClick: () => {
@@ -1433,7 +1444,7 @@ const ShippingTable = ({
                                 </div>
                                 <div className="shipping-mobile-grid">
                                     <span>Fecha</span>
-                                    <strong>{moment.parseZone(record.hora_entrega_acordada).format("DD/MM/YYYY")}</strong>
+                                    <strong>{formatShippingDate(record.hora_entrega_acordada)}</strong>
                                     <span>Guia</span>
                                     <strong>{record.numero_guia || "-"}</strong>
                                     <span>Destino</span>
