@@ -222,9 +222,10 @@ const ShippingTable = ({
     const [vendedores, setVendedores] = useState<any[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("");
     const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
-    const isAdmin = user?.role?.toLowerCase() === 'admin';
-    const isVendedor = user?.role?.toLowerCase() === 'vendedor';
-    const isOperator = user?.role.toLowerCase() === 'operator';
+    const normalizedUserRole = String(user?.role || "").toLowerCase();
+    const isAdmin = normalizedUserRole === 'admin';
+    const isVendedor = normalizedUserRole === 'seller' || normalizedUserRole === 'vendedor';
+    const isOperator = normalizedUserRole === 'operator';
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
@@ -262,6 +263,7 @@ const ShippingTable = ({
     const allCount = tabCounts.todos;
     const readyForPickupCount = tabCounts.listo_para_recoger;
     const deliveredCount = tabCounts.entregado;
+    const pendingSendLabel = isVendedor ? "En sucursal de origen" : "Para enviar a otra sucursal";
     const currentRows = shippingData;
 
     const getOriginBranchId = (pedido: any) =>
@@ -1339,7 +1341,7 @@ const ShippingTable = ({
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "para_enviar" ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
-                        <span>Para enviar a otra sucursal</span>
+                        <span>{pendingSendLabel}</span>
                         {pendingSendCount > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "para_enviar" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
                                 {pendingSendCount}
