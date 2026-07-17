@@ -527,7 +527,6 @@ const ShippingTable = ({
                         ? EXTERNAL_VENDOR_FILTER
                         : sellerIdToQuery,
                 client: searchCliente.trim() || undefined,
-                guide: searchCliente.trim() || undefined,
                 destinationMode: destinationMode as "any" | "branch" | "other",
                 destinationQuery,
             });
