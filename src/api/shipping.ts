@@ -38,6 +38,31 @@ const getShippingsListAPI = async (params?: {
   }
 };
 
+const getShippingDashboardListAPI = async (params?: {
+  page?: number;
+  limit?: number;
+  tab?: "todos" | "En Espera" | "para_enviar" | "en_camino" | "entregado";
+  from?: string;
+  to?: string;
+  currentBranchId?: string;
+  sellerId?: string;
+  client?: string;
+  guide?: string;
+  destinationMode?: "any" | "branch" | "other";
+  destinationQuery?: string;
+}) => {
+  try {
+    const res = await apiClient.get("/shipping/dashboard", { params });
+    return res.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    if (err && err.response && err.response.data) {
+      return { success: false, ...err.response.data };
+    }
+    return { success: false };
+  }
+};
+
 const getShipingByIdsAPI = async (ids: number[]) => {
   try {
     const idsString = ids.join(",");
@@ -225,6 +250,7 @@ const getSalesHistoryAPI = async (
 export {
   getShippingsAPI,
   getShippingsListAPI,
+  getShippingDashboardListAPI,
   registerShippingAPI,
   registerSalesToShippingAPI,
   updateShippingAPI,

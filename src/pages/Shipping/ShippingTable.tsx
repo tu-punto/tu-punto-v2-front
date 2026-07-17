@@ -1,8 +1,8 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { Alert, Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
-import { getExternalSaleByIdAPI, getExternalSalesListAPI, updateExternalSaleAPI } from '../../api/externalSale';
+import { getShippingDashboardListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
+import { getExternalSaleByIdAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
 import ExternalPackagesFormModal from './ExternalPackagesFormModal';
@@ -180,18 +180,18 @@ const ShippingTable = ({
     onHeaderActionChange?: (action: ShippingHeaderAction) => void;
 }) => {
     const { user }: any = useContext(UserContext);
-    const [shippingData, setShippingData] = useState([]);
-    const [allData, setAllData] = useState([]);
-    const [esperaData, setEsperaData] = useState([]);
-    const [pendingSendData, setPendingSendData] = useState([]);
-    const [enCaminoData, setEnCaminoData] = useState([]);
-    const [entregadoData, setEntregadoData] = useState([]);
-    const [filteredAllData, setFilteredAllData] = useState([]);
-    const [filteredEsperaData, setFilteredEsperaData] = useState([]);
-    const [filteredPendingSendData, setFilteredPendingSendData] = useState([]);
-    const [filteredEnCaminoData, setFilteredEnCaminoData] = useState([]);
-    const [filteredEntregadoData, setFilteredEntregadoData] = useState([]);
+    const [shippingData, setShippingData] = useState<any[]>([]);
+    const [tabCounts, setTabCounts] = useState({
+        todos: 0,
+        listo_para_recoger: 0,
+        para_enviar: 0,
+        en_camino: 0,
+        entregado: 0,
+    });
     const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'entregado'>(FILTER_ALL);
+    const [tablePage, setTablePage] = useState(1);
+    const [tablePageSize, setTablePageSize] = useState(30);
+    const [tableTotal, setTableTotal] = useState(0);
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isModaStatelVisible, setIsModalStateVisible] = useState(false);
@@ -241,9 +241,12 @@ const ShippingTable = ({
         String(s._id) === String(currentSucursalId) ||
         String(s.id_sucursal) === String(currentSucursalId)
     );
-    const pendingSendCount = filteredPendingSendData.length;
-    const inTransitCount = filteredEnCaminoData.length;
-    const allCount = filteredAllData.length;
+    const pendingSendCount = tabCounts.para_enviar;
+    const inTransitCount = tabCounts.en_camino;
+    const allCount = tabCounts.todos;
+    const readyForPickupCount = tabCounts.listo_para_recoger;
+    const deliveredCount = tabCounts.entregado;
+    const currentRows = shippingData;
 
     const getOriginBranchId = (pedido: any) =>
         resolveBranchId(pedido?.lugar_origen) ||
@@ -276,82 +279,13 @@ const ShippingTable = ({
         isInterbranchTransfer(pedido) &&
         String(getDestinationBranchId(pedido)) === String(currentSucursalId);
 
-    const isCurrentBranchRelatedOrder = (pedido: any) => {
-        if (!currentSucursalId) return false;
-
-        const originId = getOriginBranchId(pedido);
-        const destinationId = getDestinationBranchId(pedido);
-
-        return String(originId) === String(currentSucursalId) || String(destinationId) === String(currentSucursalId);
-    };
-
-    const mapExternalToShipping = (externalSale: any) => {
-        const estaPagado =
-            externalSale?.esta_pagado === "mixto"
-                ? "mixto"
-                : (externalSale?.esta_pagado === "si" ? "si" : "no");
-        const precioPaquete = Number(externalSale?.precio_paquete ?? externalSale?.precio_total ?? 0);
-        const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
-        const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
-        const sucursalOrigen =
-            typeof externalSale?.origen_sucursal === "object"
-                ? externalSale.origen_sucursal
-                : typeof externalSale?.sucursal === "object"
-                    ? externalSale.sucursal
-                    : null;
-        const estadoPedido = resolvePickupStatus(
-            externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : READY_FOR_PICKUP_STATUS),
-            externalSale
-        );
-        const destinationLabel =
-            externalSale?.lugar_entrega ||
-            externalSale?.destino_sucursal?.nombre ||
-            sucursalOrigen?.nombre ||
-            (externalSale?.service_origin === "simple_package" ? "Simple" : "Externo");
-
-        return {
-            ...externalSale,
-            key: `external-${externalSale._id}`,
-            is_external: true,
-            cliente: externalSale?.comprador || "Sin comprador",
-            telefono_cliente: externalSale?.telefono_comprador || "",
-            carnet_cliente: externalSale?.carnet_comprador || "",
-            hora_entrega_acordada: fechaBase,
-            hora_entrega_real: externalSale?.hora_entrega_real || fechaBase,
-            lugar_origen: sucursalOrigen,
-            lugar_entrega: destinationLabel,
-            id_sucursal: sucursalOrigen?._id || externalSale?.origen_sucursal || externalSale?.sucursal || externalSale?.id_sucursal,
-            sucursal: sucursalOrigen,
-            estado_pedido: estadoPedido,
-            esta_pagado: estaPagado,
-            saldo_cobrar: Number(
-                externalSale?.deuda_comprador ??
-                externalSale?.saldo_cobrar ??
-                (estaPagado === "si" ? 0 : estaPagado === "mixto" ? pagaComprador : precioPaquete)
-            ),
-            numero_guia: externalSale?.numero_guia || "",
-            observaciones: externalSale?.descripcion_paquete || "",
-            venta: [],
-            productos_temporales: [],
-        };
-    };
-
     const isSellerWithdrawalCandidate = (pedido: any) =>
         canManageExternal &&
         isWaitingStatus(pedido?.estado_pedido) &&
         !isSendToBranchStatus(pedido?.estado_pedido) &&
         (pedido?.is_external || pedido?.simple_package_order || pedido?.simple_package_source_id);
     const getCurrentSellerWithdrawalRows = () => {
-        const activeRows =
-            selectedStatus === FILTER_ALL
-                ? filteredAllData
-                : selectedStatus === 'entregado'
-                ? filteredEntregadoData
-                : selectedStatus === 'para_enviar'
-                    ? filteredPendingSendData
-                : selectedStatus === 'en_camino'
-                    ? filteredEnCaminoData
-                    : filteredEsperaData;
+        const activeRows = shippingData;
         const selectedKeys = new Set(selectedRowKeys.map(String));
         return (activeRows as any[]).filter((row: any) => {
             const rowKey = String(row?.key ?? row?._id ?? "");
@@ -360,11 +294,11 @@ const ShippingTable = ({
     };
     const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
     const getAutoBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = mode === "send" ? filteredPendingSendData : filteredEnCaminoData;
+        const activeRows = shippingData;
         return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
     };
     const getSelectedBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = mode === "send" ? filteredPendingSendData : filteredEnCaminoData;
+        const activeRows = shippingData;
         const selectedKeys = new Set(selectedRowKeys.map(String));
         return (activeRows as any[]).filter((row: any) => {
             const rowKey = String(row?.key ?? row?._id ?? "");
@@ -379,10 +313,6 @@ const ShippingTable = ({
     const autoReceiveCount = getAutoBranchTransferRows("receive").length;
     const sendCount = getBranchTransferRows("send").length;
     const receiveCount = getBranchTransferRows("receive").length;
-
-    const toggleStatus = () => {
-        setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
-    };
 
     const handleMarkSellerWithdrawal = () => {
         if (!selectedSellerWithdrawalCount) {
@@ -556,72 +486,56 @@ const ShippingTable = ({
         try {
             const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
             const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
-            const originBranchId = currentSucursalId || undefined;
             const sellerIdToQuery =
                 selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
                     ? selectedVendedor
                     : (!isAdmin && !isOperator ? user?.id_vendedor : undefined);
+            const destinationMode =
+                selectedLocation === "other"
+                    ? "other"
+                    : selectedLocation
+                        ? "branch"
+                        : "any";
+            const destinationQuery =
+                selectedLocation === "other"
+                    ? otherLocation.trim() || undefined
+                    : selectedLocation || undefined;
 
-            const [shippingApiData, externalApiData] = await Promise.all([
-                getShippingsListAPI({
-                    page: 1,
-                    limit: 300,
-                    from,
-                    to,
-                    sellerId: sellerIdToQuery,
-                    client: searchCliente.trim() || undefined
-                }),
-                canManageExternal
-                    ? getExternalSalesListAPI({
-                        page: 1,
-                        limit: 300,
-                        from,
-                        to,
-                        sucursalId: originBranchId,
-                        client: searchCliente.trim() || undefined
-                    })
-                    : Promise.resolve({ rows: [] }),
-            ]);
+            const dashboardData = await getShippingDashboardListAPI({
+                page: tablePage,
+                limit: tablePageSize,
+                tab: selectedStatus,
+                from,
+                to,
+                currentBranchId: currentSucursalId || undefined,
+                sellerId:
+                    selectedVendedor === EXTERNAL_VENDOR_FILTER
+                        ? EXTERNAL_VENDOR_FILTER
+                        : sellerIdToQuery,
+                client: searchCliente.trim() || undefined,
+                guide: searchCliente.trim() || undefined,
+                destinationMode: destinationMode as "any" | "branch" | "other",
+                destinationQuery,
+            });
 
-            const internalShippings = Array.isArray(shippingApiData?.rows)
-                ? shippingApiData.rows
-                : Array.isArray(shippingApiData)
-                    ? shippingApiData
-                    : [];
-            const externalRows = Array.isArray(externalApiData?.rows)
-                ? externalApiData.rows
-                : Array.isArray(externalApiData)
-                    ? externalApiData
-                    : [];
-            const externalShippings = externalRows.map((sale: any) => mapExternalToShipping(sale));
-
-            const sortedData = [...internalShippings, ...externalShippings].sort(
-                (a: any, b: any) => new Date(b.fecha_pedido).getTime() - new Date(a.fecha_pedido).getTime()
-            );
-            const dataWithKey = sortedData.map((pedido: any) => ({
-                ...pedido,
-                key: pedido.is_external ? `external-${pedido._id}` : pedido._id
-            }));
-            setShippingData(dataWithKey);
+            const rows = Array.isArray(dashboardData?.rows) ? dashboardData.rows : [];
+            setShippingData(rows);
+            setTabCounts({
+                todos: Number(dashboardData?.counts?.todos || 0),
+                listo_para_recoger: Number(dashboardData?.counts?.listo_para_recoger || 0),
+                para_enviar: Number(dashboardData?.counts?.para_enviar || 0),
+                en_camino: Number(dashboardData?.counts?.en_camino || 0),
+                entregado: Number(dashboardData?.counts?.entregado || 0),
+            });
+            setTableTotal(Number(dashboardData?.total || 0));
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
             setLoadingTable(false);
         }
     };
-    const toSimpleDate = (d: Date | null) =>
-        d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
-
     const getVendedoresConEntregas = () => {
-        const sourceData = selectedStatus === FILTER_ALL
-            ? allData
-            : selectedStatus === 'entregado'
-            ? entregadoData
-            : selectedStatus === 'para_enviar'
-                ? pendingSendData
-            : selectedStatus === 'en_camino'
-                ? enCaminoData
-                : esperaData;
+        const sourceData = shippingData;
         const vendedoresConEntregasSet = new Set<string>();
 
         sourceData.forEach((pedido: any) => {
@@ -649,21 +563,11 @@ const ShippingTable = ({
             vendedoresConEntregasSet.has(String(vendedor._id))
         );
     };
-    const hasExternalInCurrentStatus = () => {
-        const sourceData = selectedStatus === FILTER_ALL
-            ? allData
-            : selectedStatus === 'entregado'
-            ? entregadoData
-            : selectedStatus === 'para_enviar'
-                ? pendingSendData
-            : selectedStatus === 'en_camino'
-                ? enCaminoData
-                : esperaData;
-        return sourceData.some((pedido: any) => !!pedido.is_external);
-    };
+    const hasExternalInCurrentStatus = () => canManageExternal;
 
 
-    const filterByLocationAndDate = (data: any) => {
+    const filterByLocationAndDate = (data: any) => data;
+    /* Legacy local filter kept only as reference while dashboard pagination is server-side.
         return data.filter((pedido: any) => {
             const isOtherLocation = selectedLocation === 'other';
             const isExternal = !!pedido.is_external;
@@ -713,7 +617,7 @@ const ShippingTable = ({
 
             return matchesLocation && matchesDateRange && matchesVendedor && matchesCliente;
         });
-    };
+    */
     useEffect(() => {
         if (isVendedor && user?.id_vendedor) {
             setSelectedVendedor(user.id_vendedor);
@@ -737,23 +641,15 @@ const ShippingTable = ({
 
     useEffect(() => {
         setMobilePage(1);
+        setTablePage(1);
         setSelectedRowKeys([]);
-    }, [selectedStatus, selectedLocation, dateRange, selectedVendedor, searchCliente]);
+    }, [selectedStatus, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente]);
+
+    const toggleStatus = () => {
+        setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
+    };
 
     const columns = [
-        {/*{
-            title: '',
-            dataIndex: 'infoButton',
-            key: 'infoButton',
-            width: '5%',
-            render: (_: any, record: any) =>
-                record.estado_pedido !== "Entregado" && (
-                    <InfoCircleOutlined
-                        style={{ fontSize: '20px', color: '#1890ff', cursor: 'pointer' }}
-                        onClick={() => handleIconClick(record)}
-                    />
-                )
-        },*/},
         {
             title: 'Fecha Pedido',
             dataIndex: 'hora_entrega_acordada',
@@ -952,20 +848,6 @@ const ShippingTable = ({
         },
     ];
     const visibleColumns = columns.filter(Boolean);
-    const currentRows =
-            selectedStatus === FILTER_ALL
-                ? filteredAllData
-                : selectedStatus === 'entregado'
-                ? filteredEntregadoData
-                : selectedStatus === 'para_enviar'
-                    ? filteredPendingSendData
-                : selectedStatus === 'en_camino'
-                    ? filteredEnCaminoData
-                    : filteredEsperaData;
-    const mobileRows = (currentRows as any[]).slice(
-        (mobilePage - 1) * MOBILE_CARD_PAGE_SIZE,
-        mobilePage * MOBILE_CARD_PAGE_SIZE
-    );
 
     const openShippingDetail = async (record: any) => {
         if (record.is_external) {
@@ -1002,58 +884,18 @@ const ShippingTable = ({
     }, [
         refreshKey,
         canManageExternal,
+        currentSucursalId,
         selectedStatus,
+        tablePage,
+        tablePageSize,
+        selectedLocation,
+        otherLocation,
         dateRange,
         selectedVendedor,
         searchCliente,
         user?.id_vendedor,
         sucursal.length
     ]);
-
-    useEffect(() => {
-        const visibleRows = (shippingData as any[]).filter((pedido: any) =>
-            !isInternalSaleOrder(pedido) && isCurrentBranchRelatedOrder(pedido)
-        );
-        const deliveredRows = visibleRows.filter((pedido: any) => isDeliveredStatus(pedido?.estado_pedido));
-        const pendingSendRows = visibleRows.filter((pedido: any) => isPendingSend(pedido));
-        const inTransitRows = visibleRows.filter((pedido: any) =>
-            !isPendingSend(pedido) && shouldDisplayInTransit(pedido, statusNow)
-        );
-        const waitingRows = visibleRows.filter((pedido: any) =>
-            !isPendingSend(pedido) &&
-            !shouldDisplayInTransit(pedido, statusNow) &&
-            isWaitingStatus(pedido?.estado_pedido)
-        );
-        const allRows = visibleRows.filter((pedido: any) => !isDeliveredStatus(pedido?.estado_pedido));
-
-        setAllData(allRows as any);
-        setEsperaData(waitingRows as any);
-        setPendingSendData(pendingSendRows as any);
-        setEnCaminoData(inTransitRows as any);
-        setEntregadoData(deliveredRows as any);
-    }, [shippingData, statusNow, currentSucursalId]);
-
-    useEffect(() => {
-        setFilteredAllData(filterByLocationAndDate(allData));
-        setFilteredEsperaData(filterByLocationAndDate(esperaData));
-        setFilteredPendingSendData(filterByLocationAndDate(pendingSendData));
-        setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
-        setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [allData, esperaData, pendingSendData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
-
-    useEffect(() => {
-        if (selectedStatus === FILTER_ALL) {
-            setFilteredAllData(filterByLocationAndDate(allData));
-        } else if (selectedStatus === "entregado") {
-            setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-        } else if (selectedStatus === "para_enviar") {
-            setFilteredPendingSendData(filterByLocationAndDate(pendingSendData));
-        } else if (selectedStatus === "en_camino") {
-            setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
-        } else {
-            setFilteredEsperaData(filterByLocationAndDate(esperaData));
-        }
-    }, [selectedStatus, allData, esperaData, pendingSendData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -1433,9 +1275,9 @@ const ShippingTable = ({
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "En Espera" ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
                         <span>Listo para recoger</span>
-                        {filteredEsperaData.length > 0 && (
+                        {readyForPickupCount > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "En Espera" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
-                                {filteredEsperaData.length}
+                                {readyForPickupCount}
                             </span>
                         )}
                     </button>
@@ -1514,9 +1356,9 @@ const ShippingTable = ({
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "entregado" ? "#22c55e" : "#9ca3af", transition: "all 220ms ease" }} />
                         <span>Entregado</span>
-                        {filteredEntregadoData.length > 0 && (
+                        {deliveredCount > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "entregado" ? "#dcfce7" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
-                                {filteredEntregadoData.length}
+                                {deliveredCount}
                             </span>
                         )}
                     </button>
@@ -1568,7 +1410,7 @@ const ShippingTable = ({
             <div key={selectedStatus} style={{ animation: "shippingStatusPanelFade 220ms ease" }}>
             {isMobile && (
                 <div className="shipping-mobile-list">
-                    {mobileRows.map((record: any) => {
+                    {currentRows.map((record: any) => {
                         const statusMeta = getVisualStatusMeta(record, statusNow);
                         return (
                             <button
@@ -1606,11 +1448,11 @@ const ShippingTable = ({
                     })}
                     <Pagination
                         className="shipping-mobile-pagination"
-                        current={mobilePage}
-                        pageSize={MOBILE_CARD_PAGE_SIZE}
-                        total={(currentRows as any[]).length}
+                        current={tablePage}
+                        pageSize={tablePageSize}
+                        total={tableTotal}
                         showSizeChanger={false}
-                        onChange={setMobilePage}
+                        onChange={(page) => setTablePage(page)}
                         size="small"
                     />
                 </div>
@@ -1619,21 +1461,18 @@ const ShippingTable = ({
                 className="shipping-desktop-table"
                 loading={loadingTable}
                 columns={visibleColumns}
-                dataSource={
-                    selectedStatus === FILTER_ALL
-                        ? filteredAllData
-                        : selectedStatus === 'entregado'
-                        ? filteredEntregadoData
-                        : selectedStatus === 'para_enviar'
-                            ? filteredPendingSendData
-                        : selectedStatus === 'en_camino'
-                            ? filteredEnCaminoData
-                            : filteredEsperaData
-                }
+                rowKey={(record: any) => record.key || record._id}
+                dataSource={currentRows}
                 pagination={{
-                    pageSize: 30,
+                    current: tablePage,
+                    pageSize: tablePageSize,
+                    total: tableTotal,
                     showSizeChanger: true,
-                    pageSizeOptions: ["15", "30", "50", "100"]
+                    pageSizeOptions: ["15", "30", "50", "100"],
+                    onChange: (page, pageSize) => {
+                        setTablePage(page);
+                        setTablePageSize(pageSize);
+                    }
                 }}
                 rowSelection={
                     canManageExternal && selectedStatus !== "entregado"
