@@ -19,6 +19,7 @@ import PayDebtButton from "./components/PayDebtButton";
 import DebtModal from "./DebtModal";
 import SellerInfoModalTry from "./SellerInfoModal";
 import SucursalDrawer from "./components/SucursalDrawer";
+import DeclineServiceReasonModal from "../../components/DeclineServiceReasonModal";
 
 import {
   adminDeclineSellerServiceAPI,
@@ -98,6 +99,9 @@ export default function SellerTable({
   const [debtModal, setDebtModal] = useState(false);
   const [infoModal, setInfoModal] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [declineReasonOpen, setDeclineReasonOpen] = useState(false);
+  const [declineReasonTarget, setDeclineReasonTarget] = useState<SellerRow | null>(null);
+  const [declineLoading, setDeclineLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const sellersRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
@@ -159,28 +163,15 @@ export default function SellerTable({
 
   const canDeclineSeller = (row: SellerRow) => {
     if (row.declinacion_servicio_fecha) return false;
-    const vigencia = parseSellerDate(row.fecha_vigencia);
-    if (!vigencia.isValid()) return false;
-    return !dayjs().isAfter(vigencia.subtract(5, "day").endOf("day"));
+    return true;
   };
 
   const canRenewSeller = (row: SellerRow) =>
     getEstadoVendedor(row) !== "Ya no es cliente";
 
   const handleAdminDecline = (row: SellerRow) => {
-    Modal.confirm({
-      title: "Declinar servicio",
-      content: `Se registrara que ${row.nombre} declinara el servicio.`,
-      okText: "Declinar",
-      cancelText: "Cancelar",
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        const res = await adminDeclineSellerServiceAPI(row.key);
-        if (!res?.success) throw new Error("No se pudo declinar");
-        message.success("Declinacion registrada");
-        refresh();
-      },
-    });
+    setDeclineReasonTarget(row);
+    setDeclineReasonOpen(true);
   };
 
   const handleCancelDecline = (row: SellerRow) => {
@@ -230,7 +221,7 @@ export default function SellerTable({
           title={
             canDeclineSeller(row)
               ? "Declinar servicio"
-              : "La declinacion solo esta habilitada hasta 5 dias antes de la vigencia"
+              : "Ya existe una declinacion registrada"
           }
         >
           <Button
@@ -267,6 +258,30 @@ export default function SellerTable({
       </Tooltip>
     </div>
   );
+
+  const handleSubmitDeclineReason = async (payload: {
+    motivo_principal?: string;
+    motivo_principal_otro?: string;
+    probabilidad_retorno?: string;
+    omitir_motivo_principal?: boolean;
+    omitir_probabilidad_retorno?: boolean;
+  }) => {
+    if (!declineReasonTarget) return;
+    setDeclineLoading(true);
+    try {
+      const res = await adminDeclineSellerServiceAPI(declineReasonTarget.key, payload);
+      if (!res?.success) throw new Error("No se pudo declinar");
+      message.success("Declinacion registrada");
+      setDeclineReasonOpen(false);
+      setDeclineReasonTarget(null);
+      refresh();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo declinar");
+    } finally {
+      setDeclineLoading(false);
+    }
+  };
 
   const columns = useMemo(
     () => [
@@ -351,7 +366,7 @@ export default function SellerTable({
         fixed: "right" as const,
       },
     ],
-    [sellers, tableSort]
+    [tableSort]
   );
 
   useEffect(() => {
@@ -585,7 +600,9 @@ export default function SellerTable({
                 ? activeSorter.order
                 : undefined;
             const nextSortBy = String(activeSorter?.columnKey || "") as SellerSortBy;
-            setTableSort(nextOrder ? { sortBy: nextSortBy, order: nextOrder } : {});
+            if (nextOrder) {
+              setTableSort({ sortBy: nextSortBy, order: nextOrder });
+            }
             setPage(pagination.current || 1);
             setPageSize(pagination.pageSize || 10);
           }}
@@ -628,6 +645,20 @@ export default function SellerTable({
           />
         </>
       )}
+
+      <DeclineServiceReasonModal
+        open={declineReasonOpen}
+        loading={declineLoading}
+        title="Declinar servicio"
+        description={declineReasonTarget ? `Se registrará la baja de ${declineReasonTarget.nombre}.` : undefined}
+        okText="Declinar"
+        allowSkip
+        onCancel={() => {
+          setDeclineReasonOpen(false);
+          setDeclineReasonTarget(null);
+        }}
+        onConfirm={handleSubmitDeclineReason}
+      />
     </>
   );
 }

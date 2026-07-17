@@ -19,7 +19,8 @@ const BranchTable: React.FC<BranchTableProps> = ({
 }) => {
   const { user } = useContext(UserContext);
   const isAdmin = user?.role?.toLowerCase() === 'admin';
-  const isOperator = user?.role.toLowerCase() === 'operator';
+  const isOperator = user?.role?.toLowerCase() === 'operator';
+  const isSuperadmin = user?.role?.toLowerCase() === 'superadmin';
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<IBranch>();
   const [filteredBranches, setFilteredBranches] = useState<IBranch[]>(branches);
@@ -32,12 +33,12 @@ const BranchTable: React.FC<BranchTableProps> = ({
   }
 
   useEffect(() => {
-    if (isAdmin || isOperator) {
+    if (isAdmin || isOperator || isSuperadmin) {
       setFilteredBranches(branches);
-    } else if (user.role == "seller") {
+    } else if (user?.role == "seller") {
       filterSellerBranchs();
     }
-  }, [branches]);
+  }, [branches, user]);
 
   const filterSellerBranchs = async () => {
     const sellerData = await getSellerAPI(user.id_vendedor);
@@ -71,14 +72,16 @@ const BranchTable: React.FC<BranchTableProps> = ({
   }
 
   useEffect(() => {
-    if (isAdmin || isOperator) {
-      setTableColumns([...cols, ...adminCols]);
-    }else if (user.role == "seller") {
-      setTableColumns([...cols, ...sellerCols])
-    }else {
-      setTableColumns(cols)
+    if (isAdmin || isSuperadmin) {
+      setTableColumns([...cols, ...superadminCols]);
+    } else if (isOperator) {
+      setTableColumns([...cols, ...operatorCols]);
+    } else if (user?.role == "seller") {
+      setTableColumns([...cols, ...sellerCols]);
+    } else {
+      setTableColumns(cols);
     }
-  },[user]);
+  }, [user]);
 
 
   const cols = [
@@ -108,7 +111,29 @@ const BranchTable: React.FC<BranchTableProps> = ({
     }
   ];
 
-  const adminCols = [
+  const operatorCols = [
+    {
+      title: "Acciones",
+      key: "actions",
+      width: "10%",
+      className: "text-mobile-sm xl:text-desktop-sm",
+      render: (_: any, branch: IBranch) => (
+        <Tooltip title="Mostrar Guías de Envío">
+          <Button
+            type="default"
+            onClick={() => {
+              setSelectedBranch(branch);
+              setShowGuideModal(true);
+            }}
+            icon={<FileDoneOutlined />}
+            className="text-mobile-sm xl:text-desktop-sm"
+          />
+        </Tooltip>
+      )
+    }
+  ];
+
+  const superadminCols = [
     {
       title: "Acciones",
       key: "actions",

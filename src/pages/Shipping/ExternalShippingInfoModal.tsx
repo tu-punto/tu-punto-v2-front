@@ -4,6 +4,7 @@ import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Select,
 import moment from "moment-timezone";
 import { sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
 import {
   buildDirectShippingLabelImageData,
   DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS,
@@ -11,6 +12,7 @@ import {
   toBase64Png,
 } from "./shippingQrLabel";
 import QzPrinterSelector from "./QzPrinterSelector";
+import { resolvePickupStatus } from "./shippingStatus";
 
 interface ExternalShippingInfoModalProps {
   visible: boolean;
@@ -173,6 +175,9 @@ const ExternalShippingInfoModal = ({
   );
   const latePickupFee = useMemo(
     () => {
+      if (chargeSource?.estado_pedido === "En camino") {
+        return 0;
+      }
       if (chargeSource?.estado_pedido === "Entregado") {
         return roundCurrency(Number(chargeSource?.late_pickup_fee || 0));
       }
@@ -196,7 +201,8 @@ const ExternalShippingInfoModal = ({
     [baseBuyerDebt, latePickupFee, chargeSource]
   );
   const serviceLabel = isSimplePackage ? "Simple" : "Externo";
-  const canEditDelivery = isAdmin && externalShipping?.estado_pedido !== "Entregado" && externalShipping?.delivered !== true;
+  const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(externalShipping);
+  const canEditDelivery = isAdmin && !isDeliveryLocked;
   const canEditCreatedToday = canEditDelivery && isSameBusinessDay(externalShipping?.fecha_pedido);
   const canEditBuyerName = canEditCreatedToday && !isSimplePackage;
   const canEditChargeSummary = canEditCreatedToday;
@@ -536,7 +542,7 @@ const ExternalShippingInfoModal = ({
       esta_pagado: externalShipping.esta_pagado || "no",
       metodo_pago: externalShipping.metodo_pago || "",
       monto_paga_vendedor: roundCurrency(Number(externalShipping.monto_paga_vendedor || 0)),
-      estado_pedido: externalShipping.estado_pedido || "En Espera",
+      estado_pedido: resolvePickupStatus(externalShipping.estado_pedido || "LISTO PARA RECOGER", externalShipping),
       tipo_de_pago: nextDeliveryType,
       subtotal_qr: nextSubtotalQr,
       subtotal_efectivo: nextSubtotalEfectivo,
@@ -547,6 +553,10 @@ const ExternalShippingInfoModal = ({
 
   const handleSave = async (values: any) => {
     if (!externalShipping?._id) return;
+    if (isDeliveryLocked) {
+      message.warning("Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.");
+      return;
+    }
     setLoading(true);
     try {
       if (values.estado_pedido === "Entregado" && buyerDebt > 0) {
@@ -643,6 +653,11 @@ const ExternalShippingInfoModal = ({
         )}
         </Space>
       </div>
+      {isDeliveryLocked && (
+        <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: "#fff7e6", border: "1px solid #ffd591", color: "#ad6800" }}>
+          Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.
+        </div>
+      )}
       <Form form={form} layout="vertical" onFinish={handleSave}>
         <Card title="Informacion del Vendedor" bordered={false}>
           <Row gutter={16}>
@@ -841,7 +856,8 @@ const ExternalShippingInfoModal = ({
             <Col span={24}>
               <Form.Item name="estado_pedido" label="Estado del pedido" rules={[{ required: true }]}>
                 <Radio.Group disabled={!canEditDelivery}>
-                  <Radio.Button value="En Espera">En espera</Radio.Button>
+                  <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
+                  <Radio.Button value="En camino">En camino</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>
                 </Radio.Group>
               </Form.Item>

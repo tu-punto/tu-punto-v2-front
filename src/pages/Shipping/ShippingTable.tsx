@@ -1,8 +1,8 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Input, message, Modal, Pagination, Select, Table, Tooltip } from 'antd';
+import { Alert, Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useState } from 'react';
-import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI } from '../../api/shipping';
-import { getExternalSaleByIdAPI, getExternalSalesListAPI } from '../../api/externalSale';
+import { getShippingsListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
+import { getExternalSaleByIdAPI, getExternalSalesListAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
 import ShippingStateModal from './ShippingStateModal';
 import ExternalPackagesFormModal from './ExternalPackagesFormModal';
@@ -10,8 +10,10 @@ import ExternalShippingInfoModal from './ExternalShippingInfoModal';
 import SimplePackageManagerModal from './SimplePackageManagerModal';
 import { getSucursalsBasicAPI } from '../../api/sucursal';
 import { getSellersBasicAPI } from "../../api/seller";
+import { registerBranchTransferBoxCloseOperationAPI } from '../../api/boxClose';
 import { UserContext } from "../../context/userContext.tsx";
 import { isSuperadminUser } from "../../utils/role";
+import { READY_FOR_PICKUP_STATUS, resolvePickupStatus } from "./shippingStatus";
 import moment from "moment-timezone";
 
 const { RangePicker } = DatePicker;
@@ -19,6 +21,20 @@ const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
 const MOBILE_CARD_PAGE_SIZE = 12;
+const SEND_TO_BRANCH_STATUS = "PARA ENVIAR A OTRA SUCURSAL";
+const WAITING_STATUSES = new Set(["En Espera", READY_FOR_PICKUP_STATUS]);
+const FILTER_ALL = "todos";
+const FILTER_PENDING_SEND = "para_enviar";
+
+type ShippingHeaderAction = {
+    label: string;
+    count: number;
+    visible: boolean;
+    disabled: boolean;
+    loading: boolean;
+    tone?: "orange" | "green";
+    onClick: () => void;
+} | null;
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -50,8 +66,29 @@ const isDeliveryOrder = (pedido: any) => {
     );
 };
 
+const normalizeStatus = (value: unknown) => String(value || "").trim();
+const isWaitingStatus = (value: unknown) => WAITING_STATUSES.has(normalizeStatus(value));
+const isReadyForPickupStatus = (value: unknown) => normalizeStatus(value) === READY_FOR_PICKUP_STATUS;
+const isSendToBranchStatus = (value: unknown) => normalizeStatus(value) === SEND_TO_BRANCH_STATUS;
+
+const isInterbranchTransferOrder = (pedido: any) => {
+    const originId = resolveBranchId(pedido?.lugar_origen) || resolveBranchId(pedido?.origen_sucursal) || resolveBranchId(pedido?.sucursal);
+    const destinationId = resolveBranchId(pedido?.destino_sucursal) || resolveBranchId(pedido?.sucursal) || resolveBranchId(pedido?.lugar_entrega);
+    return Boolean(originId && destinationId && String(originId) !== String(destinationId));
+};
+
+const resolveBranchId = (value: any) => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "object") {
+        return String(value?._id || value?.id_sucursal || value?.id || "");
+    }
+    return "";
+};
+
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
-    const estadoReal = String(pedido?.estado_pedido || "").trim();
+    const estadoReal = normalizeStatus(pedido?.estado_pedido);
+    const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS;
 
     if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
         return {
@@ -81,10 +118,38 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
+    if (estadoReal === "En camino") {
+        return {
+            label: "En camino",
+            tone: {
+                text: "#ad6800",
+                border: "#ffd591",
+                background: "#fff7e6",
+                dot: "#fa8c16",
+            },
+            tooltip: undefined,
+            isVisualOnly: false,
+        };
+    }
+
+    if (isPendingBranchSend) {
+        return {
+            label: "Para enviar a otra sucursal",
+            tone: {
+                text: "#c2410c",
+                border: "#fdba74",
+                background: "#fff7ed",
+                dot: "#f97316",
+            },
+            tooltip: undefined,
+            isVisualOnly: true,
+        };
+    }
+
     const fechaObjetivo = pedido?.hora_entrega_rango_final || pedido?.hora_entrega_acordada;
     const horaObjetivo = fechaObjetivo ? moment.parseZone(fechaObjetivo) : null;
     const shouldLookInTransit =
-        estadoReal === "En Espera" &&
+        isWaitingStatus(estadoReal) &&
         isDeliveryOrder(pedido) &&
         horaObjetivo?.isValid() &&
         horaObjetivo.diff(now, "minutes", true) <= VISUAL_IN_TRANSIT_THRESHOLD_MINUTES;
@@ -104,7 +169,10 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     }
 
     return {
-        label: estadoReal || "En Espera",
+        label:
+            estadoReal === READY_FOR_PICKUP_STATUS || pedido?.simple_package_order
+                ? "Listo para recoger"
+                : estadoReal || "En Espera",
         tone: {
             text: "#1d39c4",
             border: "#adc6ff",
@@ -116,14 +184,28 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     };
 };
 
-const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?: () => void }) => {
+const ShippingTable = ({
+    refreshKey,
+    onOpenQR,
+    onHeaderActionChange,
+}: {
+    refreshKey: number;
+    onOpenQR?: () => void;
+    onHeaderActionChange?: (action: ShippingHeaderAction) => void;
+}) => {
     const { user }: any = useContext(UserContext);
     const [shippingData, setShippingData] = useState([]);
+    const [allData, setAllData] = useState([]);
     const [esperaData, setEsperaData] = useState([]);
+    const [pendingSendData, setPendingSendData] = useState([]);
+    const [enCaminoData, setEnCaminoData] = useState([]);
     const [entregadoData, setEntregadoData] = useState([]);
+    const [filteredAllData, setFilteredAllData] = useState([]);
     const [filteredEsperaData, setFilteredEsperaData] = useState([]);
+    const [filteredPendingSendData, setFilteredPendingSendData] = useState([]);
+    const [filteredEnCaminoData, setFilteredEnCaminoData] = useState([]);
     const [filteredEntregadoData, setFilteredEntregadoData] = useState([]);
-    const [selectedStatus, setSelectedStatus] = useState<'En Espera' | 'en_camino' | 'entregado'>('En Espera');
+    const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'entregado'>(FILTER_ALL);
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isModaStatelVisible, setIsModalStateVisible] = useState(false);
@@ -149,16 +231,68 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     const [mobilePage, setMobilePage] = useState(1);
     const [selectedRowKeys, setSelectedRowKeys] = useState<any[]>([]);
     const [markingSellerWithdrawal, setMarkingSellerWithdrawal] = useState(false);
+    const [markingBranchTransfer, setMarkingBranchTransfer] = useState(false);
     const [rejectingCatalogOrderId, setRejectingCatalogOrderId] = useState("");
+    const [branchTransferModal, setBranchTransferModal] = useState<{
+        open: boolean;
+        mode: "send" | "receive" | null;
+        rows: any[];
+        totalDeliveryCost: number;
+        paymentMethod: "1" | "2";
+    }>({
+        open: false,
+        mode: null,
+        rows: [],
+        totalDeliveryCost: 0,
+        paymentMethod: "2",
+    });
+    const [branchTransferError, setBranchTransferError] = useState("");
 
     const [isMobile, setIsMobile] = useState(false);
-    const canManageExternal = isAdmin || isOperator;
+    const canManageExternal = isAdmin || isOperator || isSuperadminUser(user);
     const currentSucursalId = localStorage.getItem("sucursalId") || "";
     const currentSucursal = sucursal.find((s: any) =>
         String(s._id) === String(currentSucursalId) ||
         String(s.id_sucursal) === String(currentSucursalId)
     );
-    const inTransitCount = filteredEsperaData.filter((pedido: any) => getVisualStatusMeta(pedido, statusNow).isVisualOnly).length;
+    const pendingSendCount = filteredPendingSendData.length;
+    const inTransitCount = filteredEnCaminoData.length;
+    const allCount = filteredAllData.length;
+
+    const getOriginBranchId = (pedido: any) =>
+        resolveBranchId(pedido?.lugar_origen) ||
+        resolveBranchId(pedido?.origen_sucursal) ||
+        resolveBranchId(pedido?.sucursal);
+
+    const getDestinationBranchId = (pedido: any) =>
+        resolveBranchId(pedido?.destino_sucursal) ||
+        resolveBranchId(pedido?.sucursal) ||
+        resolveBranchId(pedido?.lugar_entrega);
+
+    const isInterbranchTransfer = (pedido: any) => {
+        const originId = getOriginBranchId(pedido);
+        const destinationId = getDestinationBranchId(pedido);
+        return Boolean(originId && destinationId && String(originId) !== String(destinationId));
+    };
+
+    const isPendingSend = (pedido: any) =>
+        isSendToBranchStatus(pedido?.estado_pedido) &&
+        isInterbranchTransfer(pedido) &&
+        String(getOriginBranchId(pedido)) === String(currentSucursalId);
+
+    const isPendingReceive = (pedido: any) =>
+        normalizeStatus(pedido?.estado_pedido) === "En camino" &&
+        isInterbranchTransfer(pedido) &&
+        String(getDestinationBranchId(pedido)) === String(currentSucursalId);
+
+    const isCurrentBranchRelatedOrder = (pedido: any) => {
+        if (!currentSucursalId) return false;
+
+        const originId = getOriginBranchId(pedido);
+        const destinationId = getDestinationBranchId(pedido);
+
+        return String(originId) === String(currentSucursalId) || String(destinationId) === String(currentSucursalId);
+    };
 
     const mapExternalToShipping = (externalSale: any) => {
         const estaPagado =
@@ -167,7 +301,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 : (externalSale?.esta_pagado === "si" ? "si" : "no");
         const precioPaquete = Number(externalSale?.precio_paquete ?? externalSale?.precio_total ?? 0);
         const pagaComprador = Number(externalSale?.monto_paga_comprador ?? 0);
-        const estadoPedido = externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : "En Espera");
         const fechaBase = externalSale?.fecha_pedido || new Date().toISOString();
         const sucursalOrigen =
             typeof externalSale?.origen_sucursal === "object"
@@ -175,6 +308,10 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 : typeof externalSale?.sucursal === "object"
                     ? externalSale.sucursal
                     : null;
+        const estadoPedido = resolvePickupStatus(
+            externalSale?.estado_pedido || (externalSale?.delivered ? "Entregado" : READY_FOR_PICKUP_STATUS),
+            externalSale
+        );
         const destinationLabel =
             externalSale?.lugar_entrega ||
             externalSale?.destino_sucursal?.nombre ||
@@ -208,17 +345,21 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         };
     };
 
-    const filteredInTransitData = filteredEsperaData.filter((pedido: any) => getVisualStatusMeta(pedido, statusNow).isVisualOnly);
     const isSellerWithdrawalCandidate = (pedido: any) =>
         canManageExternal &&
-        String(pedido?.estado_pedido || "") === "En Espera" &&
+        isWaitingStatus(pedido?.estado_pedido) &&
+        !isSendToBranchStatus(pedido?.estado_pedido) &&
         (pedido?.is_external || pedido?.simple_package_order || pedido?.simple_package_source_id);
     const getCurrentSellerWithdrawalRows = () => {
         const activeRows =
-            selectedStatus === 'entregado'
+            selectedStatus === FILTER_ALL
+                ? filteredAllData
+                : selectedStatus === 'entregado'
                 ? filteredEntregadoData
+                : selectedStatus === 'para_enviar'
+                    ? filteredPendingSendData
                 : selectedStatus === 'en_camino'
-                    ? filteredInTransitData
+                    ? filteredEnCaminoData
                     : filteredEsperaData;
         const selectedKeys = new Set(selectedRowKeys.map(String));
         return (activeRows as any[]).filter((row: any) => {
@@ -227,6 +368,26 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         });
     };
     const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
+    const getAutoBranchTransferRows = (mode: "send" | "receive") => {
+        const activeRows = mode === "send" ? filteredPendingSendData : filteredEnCaminoData;
+        return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
+    };
+    const getSelectedBranchTransferRows = (mode: "send" | "receive") => {
+        const activeRows = mode === "send" ? filteredPendingSendData : filteredEnCaminoData;
+        const selectedKeys = new Set(selectedRowKeys.map(String));
+        return (activeRows as any[]).filter((row: any) => {
+            const rowKey = String(row?.key ?? row?._id ?? "");
+            return selectedKeys.has(rowKey) && (mode === "send" ? isPendingSend(row) : isPendingReceive(row));
+        });
+    };
+    const getBranchTransferRows = (mode: "send" | "receive") => {
+        const selectedRows = getSelectedBranchTransferRows(mode);
+        return selectedRows.length ? selectedRows : getAutoBranchTransferRows(mode);
+    };
+    const autoSendCount = getAutoBranchTransferRows("send").length;
+    const autoReceiveCount = getAutoBranchTransferRows("receive").length;
+    const sendCount = getBranchTransferRows("send").length;
+    const receiveCount = getBranchTransferRows("receive").length;
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -283,12 +444,127 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         });
     };
 
+    const handleBranchTransfer = (mode: "send" | "receive") => {
+        const rowsToUpdate = getBranchTransferRows(mode);
+
+        if (!rowsToUpdate.length) {
+            message.warning(
+                mode === "send"
+                    ? "No hay paquetes pendientes por enviar para tu sucursal"
+                    : "No hay paquetes pendientes por recibir para tu sucursal"
+            );
+            return;
+        }
+
+        setBranchTransferModal({
+            open: true,
+            mode,
+            rows: rowsToUpdate,
+            totalDeliveryCost: 0,
+            paymentMethod: "2",
+        });
+        setBranchTransferError("");
+    };
+
+    const closeBranchTransferModal = () => {
+        if (markingBranchTransfer) return;
+        setBranchTransferError("");
+        setBranchTransferModal({ open: false, mode: null, rows: [], totalDeliveryCost: 0, paymentMethod: "2" });
+    };
+
+    const submitBranchTransfer = async () => {
+        const { mode, rows } = branchTransferModal;
+        if (!mode || !rows.length) return;
+
+        const totalDeliveryCost = Number(branchTransferModal.totalDeliveryCost || 0);
+        const costPerPackage = rows.length > 0 ? Number((totalDeliveryCost / rows.length).toFixed(2)) : 0;
+        const nowIso = moment().tz("America/La_Paz").toISOString();
+
+        setMarkingBranchTransfer(true);
+        setBranchTransferError("");
+        try {
+            const updates = await Promise.all(
+                rows.map((row: any) => {
+                    const payload =
+                        mode === "send"
+                            ? {
+                                estado_pedido: "En camino",
+                                costo_delivery: costPerPackage,
+                                tipo_de_pago: branchTransferModal.paymentMethod,
+                            }
+                            : {
+                                estado_pedido: READY_FOR_PICKUP_STATUS,
+                                public_tracking_ready_for_pickup_at: nowIso,
+                                costo_delivery: costPerPackage,
+                                tipo_de_pago: branchTransferModal.paymentMethod,
+                            };
+
+                    return row.is_external
+                        ? updateExternalSaleAPI(String(row._id),
+                            mode === "send"
+                                ? {
+                                    ...payload,
+                                    delivered: false,
+                                    public_tracking_ready_for_pickup_at: undefined,
+                                }
+                                : {
+                                    estado_pedido: READY_FOR_PICKUP_STATUS,
+                                    public_tracking_ready_for_pickup_at: nowIso,
+                                    delivered: false,
+                                    costo_delivery: costPerPackage,
+                                }
+                        )
+                        : updateShippingAPI(payload, String(row._id));
+                })
+            );
+
+            const failedRows = updates.filter((item: any) => !item?.success);
+            if (failedRows.length > 0) {
+                const firstFailure = failedRows[0];
+                const failureMessage = String(firstFailure?.message || firstFailure?.msg || "No se pudo actualizar el envio");
+                setBranchTransferError(failureMessage);
+                message.error(failureMessage);
+            } else {
+                if (totalDeliveryCost > 0 && currentSucursalId) {
+                    const sourceKey = [
+                        "branch-transfer",
+                        mode,
+                        currentSucursalId,
+                        branchTransferModal.paymentMethod === "1" ? "qr" : "efectivo",
+                        rows.map((row: any) => String(row?._id || row?.key || "")).sort().join(","),
+                    ].join(":");
+
+                    await registerBranchTransferBoxCloseOperationAPI({
+                        sourceKey,
+                        branchId: currentSucursalId,
+                        amount: totalDeliveryCost,
+                        method: branchTransferModal.paymentMethod === "1" ? "qr" : "efectivo",
+                        mode,
+                        occurredAt: nowIso,
+                        packageCount: rows.length,
+                    });
+                }
+
+                message.success(
+                    mode === "send"
+                        ? `Se marcaron ${rows.length} paquete(s) como enviados`
+                        : `Se confirmaron ${rows.length} llegada(s)`
+                );
+                setBranchTransferError("");
+                setBranchTransferModal({ open: false, mode: null, rows: [], totalDeliveryCost: 0, paymentMethod: "2" });
+                fetchShippings();
+            }
+            setSelectedRowKeys([]);
+        } finally {
+            setMarkingBranchTransfer(false);
+        }
+    };
+
     const fetchShippings = async () => {
         setLoadingTable(true);
         try {
             const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
             const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
-            const status = selectedStatus === "entregado" ? "Entregado" : "En Espera";
             const originBranchId = currentSucursalId || undefined;
             const sellerIdToQuery =
                 selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
@@ -299,7 +575,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 getShippingsListAPI({
                     page: 1,
                     limit: 300,
-                    status,
                     from,
                     to,
                     sellerId: sellerIdToQuery,
@@ -309,7 +584,6 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                     ? getExternalSalesListAPI({
                         page: 1,
                         limit: 300,
-                        status,
                         from,
                         to,
                         sucursalId: originBranchId,
@@ -337,7 +611,26 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 ...pedido,
                 key: pedido.is_external ? `external-${pedido._id}` : pedido._id
             }));
+            const allRows = dataWithKey.filter((pedido: any) =>
+                normalizeStatus(pedido.estado_pedido) !== "Entregado" &&
+                isCurrentBranchRelatedOrder(pedido)
+            );
+            const pendingSendRows = dataWithKey.filter((pedido: any) => isPendingSend(pedido));
+            const inTransitRows = dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "En camino");
+            const deliveredRows = dataWithKey.filter((pedido: any) => normalizeStatus(pedido.estado_pedido) === "Entregado");
+            const waitingRows = dataWithKey.filter((pedido: any) =>
+                isCurrentBranchRelatedOrder(pedido) &&
+                !isPendingSend(pedido) &&
+                normalizeStatus(pedido.estado_pedido) !== "En camino" &&
+                normalizeStatus(pedido.estado_pedido) !== "Entregado"
+            );
+
             setShippingData(dataWithKey);
+            setAllData(allRows);
+            setEsperaData(waitingRows);
+            setPendingSendData(pendingSendRows);
+            setEnCaminoData(inTransitRows);
+            setEntregadoData(deliveredRows);
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
@@ -348,7 +641,15 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
 
     const getVendedoresConEntregas = () => {
-        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        const sourceData = selectedStatus === FILTER_ALL
+            ? allData
+            : selectedStatus === 'entregado'
+            ? entregadoData
+            : selectedStatus === 'para_enviar'
+                ? pendingSendData
+            : selectedStatus === 'en_camino'
+                ? enCaminoData
+                : esperaData;
         const vendedoresConEntregasSet = new Set<string>();
 
         sourceData.forEach((pedido: any) => {
@@ -377,7 +678,15 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         );
     };
     const hasExternalInCurrentStatus = () => {
-        const sourceData = selectedStatus === 'En Espera' ? esperaData : entregadoData;
+        const sourceData = selectedStatus === FILTER_ALL
+            ? allData
+            : selectedStatus === 'entregado'
+            ? entregadoData
+            : selectedStatus === 'para_enviar'
+                ? pendingSendData
+            : selectedStatus === 'en_camino'
+                ? enCaminoData
+                : esperaData;
         return sourceData.some((pedido: any) => !!pedido.is_external);
     };
 
@@ -631,7 +940,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             title: 'Acciones',
             key: 'catalog_actions',
             render: (_: any, record: any) =>
-                record?.origen_pedido === "catalogo" && record?.estado_pedido === "En Espera" && canManageExternal ? (
+                record?.origen_pedido === "catalogo" && isWaitingStatus(record?.estado_pedido) && canManageExternal ? (
                     <Button
                         danger
                         loading={rejectingCatalogOrderId === String(record._id)}
@@ -672,11 +981,15 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     ];
     const visibleColumns = columns.filter(Boolean);
     const currentRows =
-        selectedStatus === 'entregado'
-            ? filteredEntregadoData
-            : selectedStatus === 'en_camino'
-                ? filteredInTransitData
-                : filteredEsperaData;
+            selectedStatus === FILTER_ALL
+                ? filteredAllData
+                : selectedStatus === 'entregado'
+                ? filteredEntregadoData
+                : selectedStatus === 'para_enviar'
+                    ? filteredPendingSendData
+                : selectedStatus === 'en_camino'
+                    ? filteredEnCaminoData
+                    : filteredEsperaData;
     const mobileRows = (currentRows as any[]).slice(
         (mobilePage - 1) * MOBILE_CARD_PAGE_SIZE,
         mobilePage * MOBILE_CARD_PAGE_SIZE
@@ -726,14 +1039,26 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
     ]);
 
     useEffect(() => {
-        setEsperaData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'En Espera'));
-        setEntregadoData(shippingData.filter((pedido: any) => pedido.estado_pedido === 'Entregado'));
-    }, [shippingData]);
+        setFilteredAllData(filterByLocationAndDate(allData));
+        setFilteredEsperaData(filterByLocationAndDate(esperaData));
+        setFilteredPendingSendData(filterByLocationAndDate(pendingSendData));
+        setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
+        setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
+    }, [allData, esperaData, pendingSendData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
 
     useEffect(() => {
-        setFilteredEsperaData(filterByLocationAndDate(esperaData));
-        setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
-    }, [esperaData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
+        if (selectedStatus === FILTER_ALL) {
+            setFilteredAllData(filterByLocationAndDate(allData));
+        } else if (selectedStatus === "entregado") {
+            setFilteredEntregadoData(filterByLocationAndDate(entregadoData));
+        } else if (selectedStatus === "para_enviar") {
+            setFilteredPendingSendData(filterByLocationAndDate(pendingSendData));
+        } else if (selectedStatus === "en_camino") {
+            setFilteredEnCaminoData(filterByLocationAndDate(enCaminoData));
+        } else {
+            setFilteredEsperaData(filterByLocationAndDate(esperaData));
+        }
+    }, [selectedStatus, allData, esperaData, pendingSendData, enCaminoData, entregadoData, selectedLocation, dateRange, selectedVendedor, searchCliente]);
     useEffect(() => {
         const fetchVendedores = async () => {
             try {
@@ -745,6 +1070,50 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
         };
         fetchVendedores();
     }, []);
+
+    useEffect(() => {
+        if (!onHeaderActionChange) return;
+
+        if (!canManageExternal) {
+            onHeaderActionChange(null);
+            return;
+        }
+
+        if (selectedStatus === "para_enviar") {
+            onHeaderActionChange({
+                label: "Enviar sucursal",
+                count: sendCount,
+                visible: true,
+                disabled: !sendCount,
+                loading: markingBranchTransfer,
+                tone: "orange",
+                onClick: () => handleBranchTransfer("send"),
+            });
+            return;
+        }
+
+        if (selectedStatus === "en_camino") {
+            onHeaderActionChange({
+                label: "Confirmar llegada",
+                count: receiveCount,
+                visible: true,
+                disabled: !receiveCount,
+                loading: markingBranchTransfer,
+                tone: "green",
+                onClick: () => handleBranchTransfer("receive"),
+            });
+            return;
+        }
+
+        onHeaderActionChange(null);
+    }, [
+        canManageExternal,
+        selectedStatus,
+        sendCount,
+        receiveCount,
+        markingBranchTransfer,
+        onHeaderActionChange,
+    ]);
     //console.log("Rol", user?.role?.toLowerCase());
     return (
         <div>
@@ -758,6 +1127,37 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         opacity: 1;
                         transform: translateY(0) scale(1);
                     }
+                }
+
+                .branch-transfer-modal .ant-modal-content {
+                    border-radius: 18px;
+                }
+
+                .branch-transfer-modal .ant-modal-body {
+                    padding-top: 18px;
+                }
+
+                .branch-transfer-scroll {
+                    max-height: 260px;
+                    overflow: auto;
+                    padding-right: 6px;
+                    scrollbar-width: thin;
+                    scrollbar-color: #94a3b8 #eef2f7;
+                }
+
+                .branch-transfer-scroll::-webkit-scrollbar {
+                    width: 10px;
+                }
+
+                .branch-transfer-scroll::-webkit-scrollbar-track {
+                    background: #eef2f7;
+                    border-radius: 999px;
+                }
+
+                .branch-transfer-scroll::-webkit-scrollbar-thumb {
+                    background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
+                    border-radius: 999px;
+                    border: 2px solid #eef2f7;
                 }
             `}</style>
             <div className="shipping-filter-panel mb-4 bg-white rounded-xl border border-gray-200 p-3">
@@ -911,7 +1311,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 {canManageExternal && selectedStatus !== "entregado" && (
                     <Tooltip title="Marcar entregas simples o externas como retiradas por el vendedor">
                         <Button
-                            className="shipping-filter-action"
+                            className="shipping-filter-action shipping-filter-withdrawal"
                             type="default"
                             onClick={handleMarkSellerWithdrawal}
                             loading={markingSellerWithdrawal}
@@ -993,6 +1393,33 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 >
                     <button
                         type="button"
+                        onClick={() => setSelectedStatus(FILTER_ALL)}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            borderRadius: 999,
+                            padding: "10px 16px",
+                            border: selectedStatus === FILTER_ALL ? "1px solid #93c5fd" : "1px solid #d1d5db",
+                            background: selectedStatus === FILTER_ALL ? "#eff6ff" : "#ffffff",
+                            color: selectedStatus === FILTER_ALL ? "#1d4ed8" : "#111827",
+                            fontWeight: 700,
+                            boxShadow: selectedStatus === FILTER_ALL ? "0 8px 22px rgba(59, 130, 246, 0.16)" : "none",
+                            transform: selectedStatus === FILTER_ALL ? "translateY(-1px)" : "translateY(0)",
+                            transition: "all 220ms ease",
+                        }}
+                    >
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === FILTER_ALL ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
+                        <span>Todos</span>
+                        {allCount > 0 && (
+                            <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === FILTER_ALL ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
+                                {allCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => setSelectedStatus('En Espera')}
                         style={{
                             display: "inline-flex",
@@ -1010,10 +1437,37 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "En Espera" ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
-                        <span>En Espera</span>
+                        <span>Listo para recoger</span>
                         {filteredEsperaData.length > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "En Espera" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
                                 {filteredEsperaData.length}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedStatus('para_enviar')}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            borderRadius: 999,
+                            padding: "10px 16px",
+                            border: selectedStatus === "para_enviar" ? "1px solid #93c5fd" : "1px solid #d1d5db",
+                            background: selectedStatus === "para_enviar" ? "#eff6ff" : "#ffffff",
+                            color: selectedStatus === "para_enviar" ? "#1d4ed8" : "#111827",
+                            fontWeight: 700,
+                            boxShadow: selectedStatus === "para_enviar" ? "0 8px 22px rgba(59, 130, 246, 0.16)" : "none",
+                            transform: selectedStatus === "para_enviar" ? "translateY(-1px)" : "translateY(0)",
+                            transition: "all 220ms ease",
+                        }}
+                    >
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "para_enviar" ? "#2563eb" : "#9ca3af", transition: "all 220ms ease" }} />
+                        <span>Para enviar a otra sucursal</span>
+                        {pendingSendCount > 0 && (
+                            <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "para_enviar" ? "#dbeafe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
+                                {pendingSendCount}
                             </span>
                         )}
                     </button>
@@ -1082,7 +1536,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             ${selectedStatus === 'En Espera' ? 'text-blue-700' : 'text-green-700'}
         `}
                 >
-                    {selectedStatus === 'En Espera' ? 'En Espera' : 'Entregado'}
+                    {selectedStatus === 'En Espera' ? 'Listo para recoger' : 'Entregado'}
                 </h2>
 
                 <button
@@ -1111,7 +1565,7 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
             ⇆
         </span>
                     <span>
-            {selectedStatus === 'En Espera' ? 'Ver entregados' : 'Ver en espera'}
+            {selectedStatus === 'En Espera' ? 'Ver entregados' : 'Ver listos para recoger'}
         </span>
                 </button>
             </div>
@@ -1171,10 +1625,14 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 loading={loadingTable}
                 columns={visibleColumns}
                 dataSource={
-                    selectedStatus === 'entregado'
+                    selectedStatus === FILTER_ALL
+                        ? filteredAllData
+                        : selectedStatus === 'entregado'
                         ? filteredEntregadoData
+                        : selectedStatus === 'para_enviar'
+                            ? filteredPendingSendData
                         : selectedStatus === 'en_camino'
-                            ? filteredInTransitData
+                            ? filteredEnCaminoData
                             : filteredEsperaData
                 }
                 pagination={{
@@ -1216,6 +1674,103 @@ const ShippingTable = ({ refreshKey, onOpenQR }: { refreshKey: number; onOpenQR?
                 })}
             />
 
+
+            <Modal
+                className="branch-transfer-modal"
+                open={branchTransferModal.open}
+                title={branchTransferModal.mode === "send" ? "Confirmar envio entre sucursales" : "Confirmar llegada a sucursal destino"}
+                onCancel={closeBranchTransferModal}
+                onOk={submitBranchTransfer}
+                okText={branchTransferModal.mode === "send" ? "Marcar enviado" : "Confirmar llegada"}
+                cancelText="Cancelar"
+                confirmLoading={markingBranchTransfer}
+                destroyOnClose
+                width={960}
+            >
+                <div className="space-y-4">
+                    {branchTransferError ? (
+                        <Alert
+                            type="error"
+                            showIcon
+                            message="No se pudo completar la operación"
+                            description={branchTransferError}
+                        />
+                    ) : null}
+
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                        <div className="text-sm text-slate-500">Paquetes seleccionados</div>
+                        <div className="text-2xl font-bold text-slate-900">{branchTransferModal.rows.length}</div>
+                        <div className="mt-1 text-sm text-slate-600">
+                            {branchTransferModal.mode === "send"
+                                ? "Se marcarán como saliendo hacia la sucursal destino."
+                                : "Se confirmará su llegada y el cliente podrá retirarlo."}
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 p-3">
+                        <div className="text-xs uppercase tracking-wide text-slate-500">Paquetes detectados</div>
+                        <div className="branch-transfer-scroll mt-2 text-sm text-slate-700">
+                            {branchTransferModal.rows.map((row: any, index: number) => (
+                                <div key={String(row?._id || index)} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
+                                    <div>
+                                        <div className="font-medium">{row?.cliente || row?.comprador || "Sin cliente"}</div>
+                                        <div className="text-xs text-slate-500">{row?.numero_guia || row?._id || "Sin guia"}</div>
+                                    </div>
+                                    <div className="text-xs font-medium text-orange-600">{row?.lugar_entrega || "Sucursal"}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-slate-200 p-3">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo total</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {Number(branchTransferModal.totalDeliveryCost || 0).toFixed(2)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 p-3">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Costo por paquete</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {branchTransferModal.rows.length > 0 ? (Number(branchTransferModal.totalDeliveryCost || 0) / branchTransferModal.rows.length).toFixed(2) : "0.00"}</div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 p-3">
+                            <div className="text-xs uppercase tracking-wide text-slate-500">Impacto</div>
+                            <div className="mt-1 text-sm font-medium text-slate-700">Se registrará en <code className="rounded bg-slate-100 px-1 py-0.5">costo_delivery</code> y alimentará los reportes.</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="mb-1 text-sm font-medium text-neutral-700">Costo total del delivery</div>
+                        <InputNumber
+                            min={0}
+                            precision={2}
+                            prefix="Bs."
+                            style={{ width: "100%" }}
+                            value={branchTransferModal.totalDeliveryCost}
+                            onChange={(value) =>
+                                setBranchTransferModal((current) => ({
+                                    ...current,
+                                    totalDeliveryCost: Number(value || 0),
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div>
+                        <div className="mb-1 text-sm font-medium text-neutral-700">Método de pago</div>
+                        <Radio.Group
+                            value={branchTransferModal.paymentMethod}
+                            onChange={(event) =>
+                                setBranchTransferModal((current) => ({
+                                    ...current,
+                                    paymentMethod: event.target.value,
+                                }))
+                            }
+                        >
+                            <Radio.Button value="2">Efectivo</Radio.Button>
+                            <Radio.Button value="1">Transferencia o QR</Radio.Button>
+                        </Radio.Group>
+                    </div>
+                </div>
+            </Modal>
 
             <ShippingInfoModal
                 visible={isModalVisible && !isModaStatelVisible}

@@ -12,6 +12,7 @@ import ErrorPage from "../pages/ErrorPage";
 import StatsPage from "../pages/Stats/StatsPage";
 import SellerInfoPageWrapper from "../pages/Seller/SellerInfo";
 import CashReconciliationPage from "../pages/BoxClose/BoxClosePage";
+import BoxCloseSummaryPage from "../pages/BoxClose/BoxCloseSummaryPage";
 import CierreCajaPage from "../pages/BoxClose/DailyBoxClose";
 import BranchPage from "../pages/Branch/BranchPage";
 import SalesHistoryPage from "../pages/SalesHistory/SalesHistoryPage";
@@ -22,6 +23,7 @@ import ShippingGuide from "../pages/ShippingGuide/ShippinGuide";
 import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoPage";
 import SuperadminVariantsPage from "../pages/SuperadminVariants/SuperadminVariantsPage";
 import SimplePackagesPage from "../pages/SimplePackages/SimplePackagesPage";
+import AttendancePage from "../pages/Attendance/AttendancePage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -86,6 +88,26 @@ const SuperadminVariantsRoute = () => {
   return <SuperadminVariantsPage />;
 };
 
+const BoxCloseSummaryRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!isSuperadminUser(user)) {
+    return <Navigate to="/stats" replace />;
+  }
+
+  return <BoxCloseSummaryPage />;
+};
+
+const AttendanceRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!isSuperadminUser(user)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return <AttendancePage />;
+};
+
 const protectedRoutes = [
   {
     path: "/",
@@ -128,6 +150,10 @@ const protectedRoutes = [
         element: guard("/stats", <StatsPage />),
       },
       {
+        path: "/box-close-summary",
+        element: guard("/box-close-summary", <BoxCloseSummaryRoute />),
+      },
+      {
         path: "/sellerFactura",
         element: guard("/sellerFactura", <Seller isFactura={true} />),
       },
@@ -166,6 +192,10 @@ const protectedRoutes = [
       {
         path: "/user",
         element: guard("/user", <UsersPage />),
+      },
+      {
+        path: "/attendance",
+        element: guard("/attendance", <AttendanceRoute />),
       },
       {
         path: "/shipping-guide",

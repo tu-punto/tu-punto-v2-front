@@ -23,7 +23,11 @@ import {
   IDailySummary,
   toLocalNaiveISOString,
 } from "../../helpers/shippingHelpers";
-import { registerBoxCloseAPI, updateBoxCloseAPI } from "../../api/boxClose";
+import {
+  getPendingBoxCloseOperationsAPI,
+  registerBoxCloseAPI,
+  updateBoxCloseAPI,
+} from "../../api/boxClose";
 import { getAdminsAPI } from "../../api/user";
 import { UserContext } from "../../context/userContext";
 const { Title } = Typography;
@@ -191,6 +195,24 @@ const BoxCloseForm = ({
     if (mode !== "create" || !currentUserOption || form.getFieldValue("responsable")) return;
     form.setFieldValue("responsable", currentUserOption);
   }, [mode, currentUserOption?.value, currentUserOption?.label, form]);
+
+  useEffect(() => {
+    if (mode !== "create" || !currentSucursalId) return;
+
+    const loadPendingOperations = async () => {
+      const businessDate = (selectedDate || dayjs()).format("YYYY-MM-DD");
+      const response = await getPendingBoxCloseOperationsAPI({
+        branchId: currentSucursalId,
+        businessDate,
+      });
+
+      const pendingOperations = Array.isArray(response?.operations) ? response.operations : [];
+      setOperations(pendingOperations);
+      recalcExpectedAndDiffs(pendingOperations);
+    };
+
+    void loadPendingOperations();
+  }, [mode, currentSucursalId, selectedDate?.valueOf()]);
 
   const buildClosingAtISO = () => {
     const now = new Date();

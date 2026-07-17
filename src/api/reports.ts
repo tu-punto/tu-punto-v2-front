@@ -237,6 +237,23 @@ export async function getRiesgoClientesVentasAPI(params: { mes?: string; meses?:
   return data;
 }
 
+export async function downloadRiesgoClientesVentasXlsx(params: { mes?: string; meses?: string[]; mesFin?: string }) {
+  const nombreMeses =
+    params.meses && params.meses.length > 1
+      ? `${params.meses[0]}_a_${params.meses[params.meses.length - 1]}`
+      : params.mes || params.meses?.[0] || params.mesFin || "sin_mes";
+
+  await downloadXlsxFromGet(
+    "/reports/riesgo-clientes-ventas/xlsx",
+    {
+      mes: params.mes,
+      meses: params.meses?.join(","),
+      mesFin: params.mesFin,
+    },
+    `riesgo_clientes_ventas_${nombreMeses}.xlsx`,
+  );
+}
+
 export async function getVentasQrAPI(params: { mes?: string; meses?: string[]; sucursales?: string[] }) {
   const { data } = await apiClient.post("/reports/ventas-qr", params, {
     withCredentials: true,

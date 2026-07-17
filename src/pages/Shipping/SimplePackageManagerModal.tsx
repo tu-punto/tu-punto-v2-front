@@ -32,6 +32,7 @@ import {
 } from "./shippingQrLabel";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 import QzPrinterSelector from "./QzPrinterSelector";
+import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
 
 interface SimplePackageManagerModalProps {
   visible: boolean;
@@ -264,7 +265,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
   const generalPaymentMethod = useMemo(() => {
     if (!rows.length) return "";
-    const editableRows = rows.filter((row) => !isQrPrintedRow(row));
+    const editableRows = rows.filter((row) => !isQrPrintedRow(row) && !isDeliveryEditLockedAfterFiveDays(row));
     const targetRows = editableRows.length ? editableRows : rows;
     const rowsWithMethod = targetRows.filter((row) => String(row.metodo_pago || ""));
     if (!rowsWithMethod.length) return "efectivo";
@@ -274,7 +275,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   }, [rows]);
 
   const pendingRows = useMemo(() => rows.filter((row) => !row?.is_external), [rows]);
-  const unlockedRows = useMemo(() => rows.filter((row) => !isQrPrintedRow(row)), [rows]);
+  const unlockedRows = useMemo(
+    () => rows.filter((row) => !isQrPrintedRow(row) && !isDeliveryEditLockedAfterFiveDays(row)),
+    [rows]
+  );
 
   const originSummary = useMemo(() => {
     const names = Array.from(
@@ -864,6 +868,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       message.warning("Este paquete ya tiene etiqueta impresa y no puede borrarse");
       return;
     }
+    if (isDeliveryEditLockedAfterFiveDays(targetRow)) {
+      message.warning("Este paquete ya supero los 5 dias como entregado y solo se puede ver");
+      return;
+    }
     Modal.confirm({
       title: "Eliminar paquete",
       content: "Esta accion quitara el paquete de la lista del vendedor.",
@@ -902,7 +910,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   };
 
   const applyGeneralPaymentMethod = async (method: "" | "efectivo" | "qr") => {
-    const targetRows = rows.filter((row) => !isQrPrintedRow(row));
+    const targetRows = rows.filter((row) => !isQrPrintedRow(row) && !isDeliveryEditLockedAfterFiveDays(row));
     if (!targetRows.length) {
       message.info("No hay paquetes editables para actualizar");
       return;
@@ -1790,6 +1798,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                             const rowId = String(row._id);
                             const isSaving = savingRowIds.includes(rowId);
                             const isPrinted = isQrPrintedRow(row);
+                            const isLocked = isDeliveryEditLockedAfterFiveDays(row);
+                            const isRowLocked = isPrinted || isLocked;
                             const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
                             const currentOriginName = String(
                               row?.origen_sucursal?.nombre || row?.sucursal?.nombre || "Sucursal origen"
@@ -1801,7 +1811,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                             );
 
                             return (
-                              <tr key={rowId} style={isPrinted ? { background: "#f3f4f6", opacity: 0.72 } : undefined}>
+                              <tr key={rowId} style={isRowLocked ? { background: "#f3f4f6", opacity: 0.72 } : undefined}>
                                 <td style={tableCellStyle}>
                                   <Input value={row.comprador || ""} readOnly style={readonlyBuyerStyle} />
                                 </td>
@@ -1820,7 +1830,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Select
                                     value={getBranchId(row?.destino_sucursal) || undefined}
                                     style={{ width: "100%" }}
-                                    disabled={isSaving || isPrinted}
+                                    disabled={isSaving || isRowLocked}
                                     options={destinationOptions}
                                     onChange={(value) => commitRowPatch(rowId, { destino_sucursal: value })}
                                   />
@@ -1840,7 +1850,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <InputNumber
                                     min={1}
                                     style={{ width: "100%" }}
-                                    disabled={isSaving || isPrinted}
+                                    disabled={isSaving || isRowLocked}
                                     value={Number(row.delivery_spaces || 1)}
                                     onChange={(value) => {
                                       const destinationId = getBranchId(row?.destino_sucursal);
@@ -1871,7 +1881,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                     min={0}
                                     style={{ width: "100%" }}
                                     addonBefore="Bs."
-                                    disabled={isSaving || isPrinted}
+                                    disabled={isSaving || isRowLocked}
                                     value={Number(row.precio_entre_sucursal || 0)}
                                     onChange={(value) =>
                                       setRows((current) =>
@@ -1910,13 +1920,17 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Input value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
                                 </td>
                                 <td style={tableCellStyle}>
-                                  {isPrinted ? (
-                                    <Typography.Text type="secondary">
-                                      Etiqueta impresa<br />{row.numero_guia || ""}
-                                    </Typography.Text>
-                                  ) : (
-                                    <Button danger icon={<DeleteOutlined />} disabled={isSaving} onClick={() => handleDelete(rowId)} />
-                                  )}
+                                  {isRowLocked ? (
+                                      <Typography.Text type="secondary">
+                                        {isPrinted ? (
+                                          <>Etiqueta impresa<br />{row.numero_guia || ""}</>
+                                        ) : (
+                                          <>Solo lectura<br />Entregado hace mas de 5 dias</>
+                                        )}
+                                      </Typography.Text>
+                                    ) : (
+                                      <Button danger icon={<DeleteOutlined />} disabled={isSaving} onClick={() => handleDelete(rowId)} />
+                                    )}
                                 </td>
                               </tr>
                             );
@@ -1926,10 +1940,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                     </div>
                     <div className="md:hidden space-y-3">
                       {rows.map((row) => {
-                        const rowId = String(row._id);
-                        const isSaving = savingRowIds.includes(rowId);
-                        const isPrinted = isQrPrintedRow(row);
-                        const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
+                          const rowId = String(row._id);
+                          const isSaving = savingRowIds.includes(rowId);
+                          const isPrinted = isQrPrintedRow(row);
+                          const isLocked = isDeliveryEditLockedAfterFiveDays(row);
+                          const isRowLocked = isPrinted || isLocked;
+                          const originId = getBranchId(row?.origen_sucursal || row?.sucursal);
                         const currentOriginName = String(
                           row?.origen_sucursal?.nombre || row?.sucursal?.nombre || "Sucursal origen"
                         );
@@ -1943,13 +1959,17 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                           <div
                             key={rowId}
                             className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
-                            style={isPrinted ? { background: "#f3f4f6", opacity: 0.72 } : undefined}
+                              style={isRowLocked ? { background: "#f3f4f6", opacity: 0.72 } : undefined}
                           >
                             <div className="mb-3 flex items-center justify-between gap-3">
                               <Typography.Text strong>{row.comprador || "Sin comprador"}</Typography.Text>
-                              <Typography.Text type="secondary">
-                                {isPrinted ? `Etiqueta impresa ${row.numero_guia || ""}` : `Total: Bs. ${Number(row.precio_total || 0).toFixed(2)}`}
-                              </Typography.Text>
+                                <Typography.Text type="secondary">
+                                {isPrinted
+                                  ? `Etiqueta impresa ${row.numero_guia || ""}`
+                                  : isLocked
+                                    ? "Solo lectura: entregado hace mas de 5 dias"
+                                    : `Total: Bs. ${Number(row.precio_total || 0).toFixed(2)}`}
+                               </Typography.Text>
                             </div>
                             <div className="space-y-3">
                               <div>
@@ -1966,7 +1986,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   className="mt-1"
                                   value={getBranchId(row?.destino_sucursal) || undefined}
                                   style={{ width: "100%" }}
-                                  disabled={isSaving || isPrinted}
+                                  disabled={isSaving || isRowLocked}
                                   options={destinationOptions}
                                   onChange={(value) => commitRowPatch(rowId, { destino_sucursal: value })}
                                 />
@@ -1990,7 +2010,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   className="mt-1"
                                   min={1}
                                   style={{ width: "100%" }}
-                                  disabled={isSaving || isPrinted}
+                                  disabled={isSaving || isRowLocked}
                                   value={Number(row.delivery_spaces || 1)}
                                   onChange={(value) => {
                                     const destinationId = getBranchId(row?.destino_sucursal);
@@ -2024,7 +2044,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                     min={0}
                                     style={{ width: "100%" }}
                                     addonBefore="Bs."
-                                    disabled={isSaving || isPrinted}
+                                    disabled={isSaving || isRowLocked}
                                     value={Number(row.precio_entre_sucursal || 0)}
                                     onChange={(value) =>
                                       setRows((current) =>
@@ -2064,9 +2084,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Input className="mt-1" value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
                                 </div>
                               </div>
-                              {!isPrinted && (
+                                {!isRowLocked && (
                                 <Button danger block icon={<DeleteOutlined />} disabled={isSaving} onClick={() => handleDelete(rowId)} />
-                              )}
+                                )}
                             </div>
                           </div>
                         );

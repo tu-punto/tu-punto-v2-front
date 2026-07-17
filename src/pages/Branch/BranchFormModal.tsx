@@ -1,12 +1,51 @@
 import { UploadOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Upload, message } from "antd";
+import { Button, Form, Input, Modal, Switch, TimePicker, Upload, message } from "antd";
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
 import {
   registerSucursalAPI,
   updateSucursalAPI,
   uploadSucursalHeaderImageAPI,
 } from "../../api/sucursal";
 import { IBranch } from "../../models/branchModel";
+
+const deliveryCutoffSections = [
+  {
+    key: "weekdays",
+    label: "Lunes a viernes",
+    registrationField: "delivery_cutoff_weekdays_registration_time",
+    closingField: "delivery_cutoff_weekdays_closing_time",
+  },
+  {
+    key: "saturday",
+    label: "Sábado",
+    registrationField: "delivery_cutoff_saturday_registration_time",
+    closingField: "delivery_cutoff_saturday_closing_time",
+  },
+  {
+    key: "sunday",
+    label: "Domingo",
+    registrationField: "delivery_cutoff_sunday_registration_time",
+    closingField: "delivery_cutoff_sunday_closing_time",
+  },
+] as const;
+
+const pickupScheduleSections = [
+  {
+    key: "weekdays",
+    label: "Lunes a viernes",
+    openField: "pickup_schedule_weekdays_open_time",
+    closeField: "pickup_schedule_weekdays_close_time",
+  },
+  {
+    key: "saturday",
+    label: "Sábado",
+    openField: "pickup_schedule_saturday_open_time",
+    closeField: "pickup_schedule_saturday_close_time",
+  },
+] as const;
+
+const toTimePickerValue = (value?: string | null) => (value ? dayjs(value, "HH:mm") : undefined);
 
 const BranchFormModal: React.FC<{
   visible: boolean;
@@ -41,6 +80,49 @@ const BranchFormModal: React.FC<{
     return uploadRes?.imageUrl || uploadRes?.updatedSucursal?.imagen_header || "";
   };
 
+  const normalizeBranchPayload = (
+    values: IBranch & {
+      pickup_schedule_weekdays_open_time?: any;
+      pickup_schedule_weekdays_close_time?: any;
+      pickup_schedule_saturday_open_time?: any;
+      pickup_schedule_saturday_close_time?: any;
+      delivery_cutoff_weekdays_registration_time?: any;
+      delivery_cutoff_weekdays_closing_time?: any;
+      delivery_cutoff_saturday_registration_time?: any;
+      delivery_cutoff_saturday_closing_time?: any;
+      delivery_cutoff_sunday_registration_time?: any;
+      delivery_cutoff_sunday_closing_time?: any;
+      delivery_cutoff_start_time?: any;
+      delivery_cutoff_end_time?: any;
+      delivery_cutoff_time?: any;
+    }
+  ) => {
+    const {
+      delivery_cutoff_start_time: _legacyStart,
+      delivery_cutoff_end_time: _legacyEnd,
+      delivery_cutoff_time: _legacyTime,
+      ...rest
+    } = values as any;
+
+    const formatPickupTime = (fieldValue: any) => (fieldValue?.format ? fieldValue.format("HH:mm") : "");
+    const formatCutoffTime = (fieldValue: any) =>
+      values.delivery_cutoff_enabled && fieldValue?.format ? fieldValue.format("HH:mm") : "";
+
+    return {
+      ...rest,
+      pickup_schedule_weekdays_open_time: formatPickupTime(values.pickup_schedule_weekdays_open_time),
+      pickup_schedule_weekdays_close_time: formatPickupTime(values.pickup_schedule_weekdays_close_time),
+      pickup_schedule_saturday_open_time: formatPickupTime(values.pickup_schedule_saturday_open_time),
+      pickup_schedule_saturday_close_time: formatPickupTime(values.pickup_schedule_saturday_close_time),
+      delivery_cutoff_weekdays_registration_time: formatCutoffTime(values.delivery_cutoff_weekdays_registration_time),
+      delivery_cutoff_weekdays_closing_time: formatCutoffTime(values.delivery_cutoff_weekdays_closing_time),
+      delivery_cutoff_saturday_registration_time: formatCutoffTime(values.delivery_cutoff_saturday_registration_time),
+      delivery_cutoff_saturday_closing_time: formatCutoffTime(values.delivery_cutoff_saturday_closing_time),
+      delivery_cutoff_sunday_registration_time: formatCutoffTime(values.delivery_cutoff_sunday_registration_time),
+      delivery_cutoff_sunday_closing_time: formatCutoffTime(values.delivery_cutoff_sunday_closing_time),
+    };
+  };
+
   const handleEdit = async (values: IBranch) => {
     if (!branch || !branch._id) {
       message.error("Error al actualizar la informacion");
@@ -51,7 +133,7 @@ const BranchFormModal: React.FC<{
       setSaving(true);
       message.loading({ content: "Actualizando...", key: "branch-save" });
 
-      const updateRes = await updateSucursalAPI(branch._id, values);
+      const updateRes = await updateSucursalAPI(branch._id, normalizeBranchPayload(values as any));
       if (!updateRes?.status && !updateRes?.success) {
         throw new Error(updateRes?.msg || "No se pudo actualizar la sucursal");
       }
@@ -78,7 +160,7 @@ const BranchFormModal: React.FC<{
       setSaving(true);
       message.loading({ content: "Creando sucursal...", key: "branch-save" });
 
-      const createRes = await registerSucursalAPI(values);
+      const createRes = await registerSucursalAPI(normalizeBranchPayload(values as any));
       if (!createRes?.status && !createRes?.success) {
         throw new Error(createRes?.msg || "No se pudo crear la sucursal");
       }
@@ -116,7 +198,41 @@ const BranchFormModal: React.FC<{
     if (!visible) return;
 
     if (branch) {
-      form.setFieldsValue(branch);
+      const legacyRegistration = branch.delivery_cutoff_start_time || branch.delivery_cutoff_time || "";
+      const legacyClosing = branch.delivery_cutoff_end_time || branch.delivery_cutoff_time || legacyRegistration;
+      form.setFieldsValue({
+        ...branch,
+        pickup_schedule_weekdays_open_time: toTimePickerValue(
+          branch.pickup_schedule_weekdays_open_time || branch.delivery_cutoff_weekdays_registration_time || legacyRegistration
+        ),
+        pickup_schedule_weekdays_close_time: toTimePickerValue(
+          branch.pickup_schedule_weekdays_close_time || branch.delivery_cutoff_weekdays_closing_time || legacyClosing
+        ),
+        pickup_schedule_saturday_open_time: toTimePickerValue(
+          branch.pickup_schedule_saturday_open_time || branch.delivery_cutoff_saturday_registration_time || legacyRegistration
+        ),
+        pickup_schedule_saturday_close_time: toTimePickerValue(
+          branch.pickup_schedule_saturday_close_time || branch.delivery_cutoff_saturday_closing_time || legacyClosing
+        ),
+        delivery_cutoff_weekdays_registration_time: toTimePickerValue(
+          branch.delivery_cutoff_weekdays_registration_time || legacyRegistration
+        ),
+        delivery_cutoff_weekdays_closing_time: toTimePickerValue(
+          branch.delivery_cutoff_weekdays_closing_time || legacyClosing
+        ),
+        delivery_cutoff_saturday_registration_time: toTimePickerValue(
+          branch.delivery_cutoff_saturday_registration_time || legacyRegistration
+        ),
+        delivery_cutoff_saturday_closing_time: toTimePickerValue(
+          branch.delivery_cutoff_saturday_closing_time || legacyClosing
+        ),
+        delivery_cutoff_sunday_registration_time: toTimePickerValue(
+          branch.delivery_cutoff_sunday_registration_time || legacyRegistration
+        ),
+        delivery_cutoff_sunday_closing_time: toTimePickerValue(
+          branch.delivery_cutoff_sunday_closing_time || legacyClosing
+        ),
+      });
       setPreviewUrl(branch.imagen_header || "");
     } else {
       form.resetFields();
@@ -168,6 +284,103 @@ const BranchFormModal: React.FC<{
           ]}
         >
           <Input className="w-full" type="tel" maxLength={13} />
+        </Form.Item>
+
+        <div className="mb-2 mt-2 font-medium text-gray-800">Horario para recojo</div>
+        <div className="space-y-4 rounded-lg border border-gray-200 p-4">
+          {pickupScheduleSections.map((section) => (
+            <div key={section.key} className="rounded-lg border border-gray-100 p-3">
+              <div className="mb-3 font-medium text-gray-800">{section.label}</div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Form.Item
+                  className="text-mobile-sm xl:text-desktop-sm"
+                  name={section.openField}
+                  label="Hora de apertura"
+                  rules={[{ required: true, message: "Selecciona la hora de apertura" }]}
+                >
+                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item
+                  className="text-mobile-sm xl:text-desktop-sm"
+                  name={section.closeField}
+                  label="Hora de cierre"
+                  rules={[{ required: true, message: "Selecciona la hora de cierre" }]}
+                >
+                  <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                </Form.Item>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Form.Item
+          className="text-mobile-sm xl:text-desktop-sm"
+          name="delivery_cutoff_enabled"
+          label="Bloqueo horario delivery"
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item
+          shouldUpdate={(prev, current) => prev.delivery_cutoff_enabled !== current.delivery_cutoff_enabled}
+          noStyle
+        >
+          {({ getFieldValue }) =>
+            getFieldValue("delivery_cutoff_enabled") ? (
+              <div className="space-y-4">
+                {deliveryCutoffSections.map((section) => (
+                  <div key={section.key} className="rounded-lg border border-gray-200 p-4">
+                    <div className="mb-3 font-medium text-gray-800">{section.label}</div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <Form.Item
+                        className="text-mobile-sm xl:text-desktop-sm"
+                        name={section.registrationField}
+                        label="Hora límite de registro"
+                        dependencies={[section.closingField]}
+                        rules={[
+                          { required: true, message: "Selecciona la hora límite de registro" },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              const closing = getFieldValue(section.closingField);
+                              if (!value || !closing) return Promise.resolve();
+                              if (value.isAfter(closing)) {
+                                return Promise.reject(new Error("La hora límite de registro debe ser menor o igual a la de cierre operativo"));
+                              }
+                              return Promise.resolve();
+                            },
+                          }),
+                        ]}
+                      >
+                        <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                      </Form.Item>
+                      <Form.Item
+                        className="text-mobile-sm xl:text-desktop-sm"
+                        name={section.closingField}
+                        label="Hora de cierre operativo"
+                        dependencies={[section.registrationField]}
+                        rules={[
+                          { required: true, message: "Selecciona la hora de cierre operativo" },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              const registration = getFieldValue(section.registrationField);
+                              if (!value || !registration) return Promise.resolve();
+                              if (value.isBefore(registration)) {
+                                return Promise.reject(new Error("La hora de cierre operativo debe ser mayor o igual a la hora límite de registro"));
+                              }
+                              return Promise.resolve();
+                            },
+                          }),
+                        ]}
+                      >
+                        <TimePicker format="HH:mm" style={{ width: "100%" }} />
+                      </Form.Item>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null
+          }
         </Form.Item>
 
         <Form.Item className="text-mobile-sm xl:text-desktop-sm" label="Imagen de header (AWS)">

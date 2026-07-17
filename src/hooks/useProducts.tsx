@@ -28,6 +28,22 @@ const useProducts = (externalSucursalId?: string) => {
 
             const categoriaNombre = await getCategoryName(item.id_categoria);
 
+            if (!Array.isArray(sucursal.combinaciones) || sucursal.combinaciones.length === 0) {
+                productData.push({
+                    key: `${item._id}-base`,
+                    producto: item.nombre_producto,
+                    precio: 0,
+                    stockActual: 0,
+                    categoria: categoriaNombre,
+                    id_vendedor: item.id_vendedor,
+                    id_producto: item._id,
+                    sucursalId: sucursal.id_sucursal,
+                    variantes: {},
+                    isBaseProduct: true,
+                });
+                continue;
+            }
+
             sucursal.combinaciones.forEach((combo: any, index: number) => {
                 const nombreVariante = Object.values(combo.variantes).join(" / ");
                 productData.push({
@@ -39,7 +55,8 @@ const useProducts = (externalSucursalId?: string) => {
                     id_vendedor: item.id_vendedor,
                     id_producto: item._id,
                     sucursalId: sucursal.id_sucursal,
-                    variantes: combo.variantes
+                    variantes: combo.variantes,
+                    isBaseProduct: false,
                 });
             });
         }

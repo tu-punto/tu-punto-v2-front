@@ -21,6 +21,47 @@ const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
 const buildGoogleMapsSearchUrl = (query: string) =>
     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 
+const getDeliveryCutoffDayGroup = (value?: any): "weekdays" | "saturday" | "sunday" => {
+    const date = value && dayjs.isDayjs(value) ? value : dayjs(value || undefined);
+    const day = date.day();
+
+    if (day >= 1 && day <= 5) return "weekdays";
+    if (day === 6) return "saturday";
+    return "sunday";
+};
+
+const getDeliveryCutoffLabel = (dayGroup: "weekdays" | "saturday" | "sunday") => {
+    if (dayGroup === "weekdays") return "Lunes a viernes";
+    if (dayGroup === "saturday") return "Sábado";
+    return "Domingo";
+};
+
+const getBranchDeliveryCutoffConfig = (branch: any, dateValue?: any) => {
+    const dayGroup = getDeliveryCutoffDayGroup(dateValue);
+    const legacyRegistration = String(branch?.delivery_cutoff_start_time || branch?.delivery_cutoff_time || "").trim();
+    const legacyClosing = String(branch?.delivery_cutoff_end_time || branch?.delivery_cutoff_time || "").trim();
+
+    const registrationTimeByGroup = {
+        weekdays: String(branch?.delivery_cutoff_weekdays_registration_time || legacyRegistration || "").trim(),
+        saturday: String(branch?.delivery_cutoff_saturday_registration_time || legacyRegistration || "").trim(),
+        sunday: String(branch?.delivery_cutoff_sunday_registration_time || legacyRegistration || "").trim(),
+    };
+
+    const closingTimeByGroup = {
+        weekdays: String(branch?.delivery_cutoff_weekdays_closing_time || legacyClosing || "").trim(),
+        saturday: String(branch?.delivery_cutoff_saturday_closing_time || legacyClosing || "").trim(),
+        sunday: String(branch?.delivery_cutoff_sunday_closing_time || legacyClosing || "").trim(),
+    };
+
+    return {
+        enabled: Boolean(branch?.delivery_cutoff_enabled),
+        dayGroup,
+        dayLabel: getDeliveryCutoffLabel(dayGroup),
+        registrationTime: registrationTimeByGroup[dayGroup],
+        closingTime: closingTimeByGroup[dayGroup],
+    };
+};
+
 
 function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
@@ -52,6 +93,10 @@ function ShippingFormModal({
             ? s._id === localStorage.getItem("sucursalId")
             : s._id === branchIdFromProps
     );
+    const fechaPedidoInput = useWatch('fecha_pedido', form);
+    const deliveryCutoffConfig = useMemo(() => (
+        getBranchDeliveryCutoffConfig(sucursalSeleccionada, fechaPedidoInput)
+    ), [sucursalSeleccionada, fechaPedidoInput]);
     const nombreSucursal = sucursalSeleccionada?.nombre || '';
 
     useEffect(() => {
@@ -203,6 +248,36 @@ function ShippingFormModal({
             const fechaPedido = moment.tz("America/La_Paz").toDate();
             const horaEntregaAcordada = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "America/La_Paz").toDate();
             const horaEntregaReal = moment.tz("America/La_Paz").toDate(); // si querés registrar el momento actual
+
+            const isDeliveryToCustomer = effectiveDestinationType === "otro_lugar";
+            if (isDeliveryToCustomer && deliveryCutoffConfig.enabled && (deliveryCutoffConfig.registrationTime || deliveryCutoffConfig.closingTime)) {
+                const now = moment().tz("America/La_Paz");
+                const selectedDeliveryDate = moment.tz(fechaSeleccionada, "YYYY-MM-DD", "America/La_Paz");
+                const scheduledDelivery = moment.tz(`${fechaSeleccionada} ${horaSeleccionada}`, "YYYY-MM-DD HH:mm:ss", "America/La_Paz");
+                const registrationLimit = moment.tz(
+                    `${selectedDeliveryDate.format("YYYY-MM-DD")} ${deliveryCutoffConfig.registrationTime || deliveryCutoffConfig.closingTime || "00:00"}`,
+                    "YYYY-MM-DD HH:mm",
+                    "America/La_Paz"
+                );
+                const closingLimit = moment.tz(
+                    `${selectedDeliveryDate.format("YYYY-MM-DD")} ${deliveryCutoffConfig.closingTime || deliveryCutoffConfig.registrationTime || "00:00"}`,
+                    "YYYY-MM-DD HH:mm",
+                    "America/La_Paz"
+                );
+                const selectedDateIsToday = selectedDeliveryDate.format("YYYY-MM-DD") === now.format("YYYY-MM-DD");
+
+                if (selectedDateIsToday && now.isAfter(registrationLimit)) {
+                    message.error(`La sucursal ${nombreSucursal || "esta sucursal"} ya cerró el registro para hoy. Solo puedes programar entregas para fechas futuras.`);
+                    setLoading(false);
+                    return;
+                }
+
+                if (scheduledDelivery.isValid() && scheduledDelivery.isAfter(closingLimit)) {
+                    message.error(`La entrega programada no puede superar la hora de cierre operativo (${closingLimit.format("HH:mm")}) en ${nombreSucursal || "esta sucursal"}.`);
+                    setLoading(false);
+                    return;
+                }
+            }
 
             const response = await registerShippingAPI({
                 ...values,
@@ -392,9 +467,14 @@ function ShippingFormModal({
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}>
+                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}> 
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
+                            {deliveryCutoffConfig.enabled && (deliveryCutoffConfig.registrationTime || deliveryCutoffConfig.closingTime) && (
+                                <div style={{ marginTop: -8, marginBottom: 12, color: "#7c3aed", fontSize: 12 }}>
+                                    {deliveryCutoffConfig.dayLabel}: registro hasta {deliveryCutoffConfig.registrationTime || deliveryCutoffConfig.closingTime} y cierre operativo hasta {deliveryCutoffConfig.closingTime || deliveryCutoffConfig.registrationTime}.
+                                </div>
+                            )}
                         </Col>
                     </Row>
                     <Row gutter={16}>

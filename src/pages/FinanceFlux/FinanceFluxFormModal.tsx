@@ -10,8 +10,9 @@ import {
   Radio,
   Row,
   Select,
+  Upload,
 } from "antd";
-import { CommentOutlined } from "@ant-design/icons";
+import { CommentOutlined, UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useContext, useEffect, useState } from "react";
 import {
@@ -36,6 +37,7 @@ function FinanceFluxFormModal({
   const [sucursals, setSucursals] = useState([]);
   const [newSeller, setNewSeller] = useState("");
   const [newFluxCategory, setNewFluxCategory] = useState("");
+  const [attachmentFileList, setAttachmentFileList] = useState<any[]>([]);
   const [form] = Form.useForm();
   const { user } = useContext(UserContext) || {};
   const currentUserId = user?._id || user?.id;
@@ -64,16 +66,19 @@ function FinanceFluxFormModal({
   const handleFinish = async (financeFluxData: any) => {
     setLoading(true);
 
-    const payload = {
+    const payload = new FormData();
+    Object.entries({
       ...financeFluxData,
       fecha: financeFluxData.fecha?.toDate()?.toISOString(),
       ...(!editingFlux && { founder: currentResponsible }),
-    };
-    if (payload.id_vendedor === "") {
-      delete payload.id_vendedor;
-    }
-    if (payload.id_sucursal === "") {
-      delete payload.id_sucursal;
+    }).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      payload.append(key, value instanceof Date ? value.toISOString() : String(value));
+    });
+
+    const attachmentFile = attachmentFileList?.[0]?.originFileObj;
+    if (attachmentFile) {
+      payload.append("attachment", attachmentFile);
     }
 
     try {
@@ -96,6 +101,7 @@ function FinanceFluxFormModal({
     } finally {
       if (!editingFlux) {
         form.resetFields();
+        setAttachmentFileList([]);
       }
       setLoading(false);
     }
@@ -164,6 +170,7 @@ function FinanceFluxFormModal({
         id_sucursal: sucursalId ? sucursalId._id : "",
         esDeuda: editingFlux.esDeuda == "SI" ? true : false,
       });
+      setAttachmentFileList([]);
     } else {
       form.resetFields();
       form.setFieldValue("founder", currentResponsible);
@@ -171,6 +178,7 @@ function FinanceFluxFormModal({
       if (currentSucursal) {
         form.setFieldValue("id_sucursal", currentSucursal);
       }
+      setAttachmentFileList([]);
     }
   }, [editingFlux, form, currentResponsible]);
 
@@ -257,6 +265,23 @@ function FinanceFluxFormModal({
               rules={[{ required: true, message: "Este campo es obligatorio" }]}
             >
               <Input prefix={<CommentOutlined />} />
+            </Form.Item>
+
+            <Form.Item label="Comprobante">
+              <Upload
+                beforeUpload={() => false}
+                maxCount={1}
+                fileList={attachmentFileList}
+                onChange={({ fileList }) => setAttachmentFileList(fileList)}
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+              >
+                <Button icon={<UploadOutlined />}>Adjuntar archivo</Button>
+              </Upload>
+              {editingFlux?.attachment_url ? (
+                <div className="mt-2 text-xs text-gray-500">
+                  Actual: <a href={editingFlux.attachment_url} target="_blank" rel="noreferrer">{editingFlux.attachment_name || "ver comprobante"}</a>
+                </div>
+              ) : null}
             </Form.Item>
           </Col>
 

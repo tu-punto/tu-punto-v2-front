@@ -65,13 +65,13 @@ export default function LoginForm({
   };
 
   return (
-    <Form form={form} layout="vertical" onFinish={onFinish} className="space-y-6">
+    <Form form={form} layout="vertical" onFinish={onFinish} className="space-y-5">
       {showBranchSelect && (
-        <Form.Item
-          name="sucursalId"
-          rules={[{ required: true, message: "Selecciona una sucursal" }]}
-        >
-          <Select placeholder="Sucursal" size="large">
+      <Form.Item
+        name="sucursalId"
+        rules={[{ required: true, message: "Selecciona una sucursal" }]}
+      >
+        <Select placeholder="Sucursal" size="large" className="w-full h-11 rounded-xl">
             {(Array.isArray(branches) ? branches : []).map((b) => (
               <Select.Option key={b._id} value={b._id}>
                 {b.nombre}
@@ -85,18 +85,18 @@ export default function LoginForm({
         name="email"
         rules={[{ required: true, message: "Ingresa tu email" }]}
       >
-        <Input prefix={<UserOutlined />} placeholder="Email" size="large" />
+        <Input prefix={<UserOutlined />} placeholder="Email" size="large" className="w-full h-11 rounded-xl" />
       </Form.Item>
 
       <Form.Item
         name="password"
         rules={[{ required: true, message: "Ingresa tu contraseña" }]}
       >
-        <Input.Password prefix={<LockOutlined />} placeholder="Contraseña" size="large" />
+        <Input.Password prefix={<LockOutlined />} placeholder="Contraseña" size="large" className="w-full h-11 rounded-xl" />
       </Form.Item>
 
       <Form.Item>
-        <Button type="primary" htmlType="submit" block loading={loading}>
+        <Button type="primary" htmlType="submit" block loading={loading} className="h-11 rounded-xl font-semibold shadow-sm">
           Iniciar sesión
         </Button>
       </Form.Item>

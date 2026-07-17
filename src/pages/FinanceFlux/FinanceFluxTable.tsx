@@ -36,19 +36,21 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
             }))
           : [];
 
-        return {
-          ...financeFlux,
-          detalle_servicios: detalleServicios,
-          key: financeFlux._id,
-          id_flujo_financiero: financeFlux._id,
+          return {
+            ...financeFlux,
+            detalle_servicios: detalleServicios,
+            key: financeFlux._id,
+            id_flujo_financiero: financeFlux._id,
           vendedor: financeFlux.id_vendedor
             ? `${financeFlux.id_vendedor.nombre} ${financeFlux.id_vendedor.apellido}`
             : "N/A",
-          encargado: financeFlux.id_trabajador?.nombre || "N/A",
-          sucursal: financeFlux.id_sucursal?.nombre || "N/A",
-          esDeuda: financeFlux.esDeuda ? "SI" : "NO",
-        };
-      });
+            encargado: financeFlux.id_trabajador?.nombre || "N/A",
+            sucursal: financeFlux.id_sucursal?.nombre || "N/A",
+            esDeuda: financeFlux.esDeuda ? "SI" : "NO",
+            attachment_url: financeFlux.attachment_url,
+            attachment_name: financeFlux.attachment_name,
+          };
+        });
 
       setDataWithKey(dataWithKeys);
       setFilteredData(dataWithKeys);
@@ -171,6 +173,19 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       key: "finance_flux_concept",
       className: "text-mobile-sm xl:text-desktop-sm",
       sorter: (a: any, b: any) => a.concepto.localeCompare(b.concepto),
+    },
+    {
+      title: "Comprobante",
+      key: "finance_flux_attachment",
+      className: "text-mobile-sm xl:text-desktop-sm",
+      render: (_: any, record: any) =>
+        record.attachment_url ? (
+          <Button type="link" href={record.attachment_url} target="_blank" rel="noreferrer" style={{ padding: 0 }}>
+            {record.attachment_name || "Ver archivo"}
+          </Button>
+        ) : (
+          "-"
+        ),
     },
     {
       title: "Vendedor",

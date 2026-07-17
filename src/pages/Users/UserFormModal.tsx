@@ -1,6 +1,70 @@
-import { Modal, Form, Input, Select, Checkbox } from "antd";
+import { Modal, Form, Input, Select, Checkbox, Switch, TimePicker, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { getSucursalsAPI } from "../../api/sucursal";
+import dayjs from "dayjs";
+
+const DEFAULT_SYSTEM_ACCESS_HOURS = {
+  weekdays: { enabled: true, start: "08:00", end: "18:00" },
+  saturday: { enabled: true, start: "08:00", end: "12:00" },
+  sunday: { enabled: false, start: "00:00", end: "00:00" },
+};
+
+const toTimeValue = (value?: string) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+
+  return dayjs(`1970-01-01T${normalized.slice(0, 5)}:00`);
+};
+
+const toTimeString = (value: any) => {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 5);
+  if (typeof value?.format === "function") return value.format("HH:mm");
+  return "";
+};
+
+const buildInitialAccessHours = (accessHours?: any) => ({
+  weekdays: {
+    ...DEFAULT_SYSTEM_ACCESS_HOURS.weekdays,
+    ...(accessHours?.weekdays || {}),
+    start: accessHours?.weekdays?.start || DEFAULT_SYSTEM_ACCESS_HOURS.weekdays.start,
+    end: accessHours?.weekdays?.end || DEFAULT_SYSTEM_ACCESS_HOURS.weekdays.end,
+  },
+  saturday: {
+    ...DEFAULT_SYSTEM_ACCESS_HOURS.saturday,
+    ...(accessHours?.saturday || {}),
+    start: accessHours?.saturday?.start || DEFAULT_SYSTEM_ACCESS_HOURS.saturday.start,
+    end: accessHours?.saturday?.end || DEFAULT_SYSTEM_ACCESS_HOURS.saturday.end,
+  },
+  sunday: {
+    ...DEFAULT_SYSTEM_ACCESS_HOURS.sunday,
+    ...(accessHours?.sunday || {}),
+    start: accessHours?.sunday?.start || DEFAULT_SYSTEM_ACCESS_HOURS.sunday.start,
+    end: accessHours?.sunday?.end || DEFAULT_SYSTEM_ACCESS_HOURS.sunday.end,
+  },
+});
+
+const normalizeAccessHours = (accessHours: any) => {
+  if (!accessHours) return undefined;
+
+  return {
+    weekdays: {
+      enabled: Boolean(accessHours?.weekdays?.enabled),
+      start: toTimeString(accessHours?.weekdays?.start),
+      end: toTimeString(accessHours?.weekdays?.end),
+    },
+    saturday: {
+      enabled: Boolean(accessHours?.saturday?.enabled),
+      start: toTimeString(accessHours?.saturday?.start),
+      end: toTimeString(accessHours?.saturday?.end),
+    },
+    sunday: {
+      enabled: Boolean(accessHours?.sunday?.enabled),
+      start: toTimeString(accessHours?.sunday?.start),
+      end: toTimeString(accessHours?.sunday?.end),
+    },
+  };
+};
 
 interface UserFormModalProps {
   visible: boolean;
@@ -21,6 +85,9 @@ const UserFormModal = ({
   const [changePassword, setChangePassword] = useState(false);
   const [sucursales, setSucursales] = useState<any[]>([]);
   const selectedRole = Form.useWatch("role", form);
+  const weekdaysEnabled = Form.useWatch(["system_access_hours", "weekdays", "enabled"], form);
+  const saturdayEnabled = Form.useWatch(["system_access_hours", "saturday", "enabled"], form);
+  const sundayEnabled = Form.useWatch(["system_access_hours", "sunday", "enabled"], form);
 
   useEffect(() => {
     if (!visible) return;
@@ -33,14 +100,51 @@ const UserFormModal = ({
   useEffect(() => {
     if (visible) {
       if (editingUser) {
+        const initialAccessHours = buildInitialAccessHours(editingUser.system_access_hours);
         form.setFieldsValue({
           email: editingUser.email,
           role: editingUser.role,
           sucursal: editingUser.sucursal?._id || editingUser.sucursal || editingUser.sucursalId,
+          system_access_hours: {
+            weekdays: {
+              ...initialAccessHours.weekdays,
+              start: toTimeValue(editingUser.system_access_hours?.weekdays?.start),
+              end: toTimeValue(editingUser.system_access_hours?.weekdays?.end),
+            },
+            saturday: {
+              ...initialAccessHours.saturday,
+              start: toTimeValue(editingUser.system_access_hours?.saturday?.start),
+              end: toTimeValue(editingUser.system_access_hours?.saturday?.end),
+            },
+            sunday: {
+              ...initialAccessHours.sunday,
+              start: toTimeValue(editingUser.system_access_hours?.sunday?.start),
+              end: toTimeValue(editingUser.system_access_hours?.sunday?.end),
+            },
+          },
         });
         setChangePassword(false);
       } else {
         form.resetFields();
+        form.setFieldsValue({
+          system_access_hours: {
+            weekdays: {
+              ...DEFAULT_SYSTEM_ACCESS_HOURS.weekdays,
+              start: toTimeValue(DEFAULT_SYSTEM_ACCESS_HOURS.weekdays.start),
+              end: toTimeValue(DEFAULT_SYSTEM_ACCESS_HOURS.weekdays.end),
+            },
+            saturday: {
+              ...DEFAULT_SYSTEM_ACCESS_HOURS.saturday,
+              start: toTimeValue(DEFAULT_SYSTEM_ACCESS_HOURS.saturday.start),
+              end: toTimeValue(DEFAULT_SYSTEM_ACCESS_HOURS.saturday.end),
+            },
+            sunday: {
+              ...DEFAULT_SYSTEM_ACCESS_HOURS.sunday,
+              start: toTimeValue(DEFAULT_SYSTEM_ACCESS_HOURS.sunday.start),
+              end: toTimeValue(DEFAULT_SYSTEM_ACCESS_HOURS.sunday.end),
+            },
+          },
+        });
         setChangePassword(false);
       }
     }
@@ -50,6 +154,9 @@ const UserFormModal = ({
     const submitData = { ...values };
     if (submitData.role !== "operator") {
       submitData.sucursal = null;
+      delete submitData.system_access_hours;
+    } else {
+      submitData.system_access_hours = normalizeAccessHours(submitData.system_access_hours);
     }
 
     if (editingUser && !changePassword) {
@@ -86,7 +193,7 @@ const UserFormModal = ({
       onOk={form.submit}
       okText="Guardar"
       cancelText="Cancelar"
-      width={500}
+      width={760}
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item
@@ -128,6 +235,61 @@ const UserFormModal = ({
               }))}
             />
           </Form.Item>
+        )}
+
+        {canAssignRoles && selectedRole === "operator" && (
+          <div style={{ marginBottom: 16, padding: 16, border: "1px solid #f0f0f0", borderRadius: 8 }}>
+            <Typography.Title level={5} style={{ marginTop: 0 }}>
+              Horarios de acceso al sistema
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              El domingo queda desactivado por defecto, pero puedes habilitarlo si hace falta.
+            </Typography.Text>
+
+            <div style={{ marginTop: 16, display: "grid", gap: 16 }}>
+              <div>
+                <Form.Item name={["system_access_hours", "weekdays", "enabled"]} valuePropName="checked" style={{ marginBottom: 8 }}>
+                  <Switch checkedChildren="L-V habilitado" unCheckedChildren="L-V deshabilitado" />
+                </Form.Item>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Form.Item name={["system_access_hours", "weekdays", "start"]} label="Inicio L-V" rules={[{ required: weekdaysEnabled !== false, message: "Indica la hora de inicio" }]}>
+                    <TimePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} disabled={weekdaysEnabled === false} />
+                  </Form.Item>
+                  <Form.Item name={["system_access_hours", "weekdays", "end"]} label="Fin L-V" rules={[{ required: weekdaysEnabled !== false, message: "Indica la hora de fin" }]}>
+                    <TimePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} disabled={weekdaysEnabled === false} />
+                  </Form.Item>
+                </div>
+              </div>
+
+              <div>
+                <Form.Item name={["system_access_hours", "saturday", "enabled"]} valuePropName="checked" style={{ marginBottom: 8 }}>
+                  <Switch checkedChildren="Sábado habilitado" unCheckedChildren="Sábado deshabilitado" />
+                </Form.Item>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Form.Item name={["system_access_hours", "saturday", "start"]} label="Inicio sábado" rules={[{ required: saturdayEnabled !== false, message: "Indica la hora de inicio" }]}>
+                    <TimePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} disabled={saturdayEnabled === false} />
+                  </Form.Item>
+                  <Form.Item name={["system_access_hours", "saturday", "end"]} label="Fin sábado" rules={[{ required: saturdayEnabled !== false, message: "Indica la hora de fin" }]}>
+                    <TimePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} disabled={saturdayEnabled === false} />
+                  </Form.Item>
+                </div>
+              </div>
+
+              <div>
+                <Form.Item name={["system_access_hours", "sunday", "enabled"]} valuePropName="checked" style={{ marginBottom: 8 }}>
+                  <Switch checkedChildren="Domingo habilitado" unCheckedChildren="Domingo deshabilitado" />
+                </Form.Item>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Form.Item name={["system_access_hours", "sunday", "start"]} label="Inicio domingo" rules={[{ required: sundayEnabled !== false, message: "Indica la hora de inicio" }]}>
+                    <TimePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} disabled={sundayEnabled === false} />
+                  </Form.Item>
+                  <Form.Item name={["system_access_hours", "sunday", "end"]} label="Fin domingo" rules={[{ required: sundayEnabled !== false, message: "Indica la hora de fin" }]}>
+                    <TimePicker format="HH:mm" minuteStep={15} style={{ width: "100%" }} disabled={sundayEnabled === false} />
+                  </Form.Item>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {editingUser && (

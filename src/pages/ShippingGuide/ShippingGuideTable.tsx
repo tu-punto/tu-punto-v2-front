@@ -17,6 +17,7 @@ const ShippingGuideTable = (
     const normalizedRole = String(user?.role || "").toLowerCase();
     const isAdmin = normalizedRole === "admin";
     const isOperator = normalizedRole === "operator";
+    const isSuperadmin = normalizedRole === "superadmin";
 
     useEffect(() => {
         if (!isFilterBySeller && !isFilterByBranch) {
@@ -59,7 +60,7 @@ const ShippingGuideTable = (
             const sortedData = apiData.sort(
                 (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
             );
-            setGuidesList(sortedData)
+            setGuidesList(sortedData.filter((guide: any) => !guide.isRecogido))
         } catch (error) {
             console.error("Error al obtener Guías de Envío por vendedor: ", error)
             message.error("Error al cargar Guías de Envío")
@@ -84,6 +85,7 @@ const ShippingGuideTable = (
             const res = await markAsDelivered(record._id);
             if (res.success) {
                 message.success("El estado de la guía se ha actualizado correctamente")
+                setGuidesList((current: any[]) => current.filter((item) => String(item._id) !== String(record._id)));
             } else {
                 message.error("Error al actualizar el estado de la guía")
             }
@@ -161,7 +163,7 @@ const ShippingGuideTable = (
                                 />
                             </Tooltip>
                         )}
-                        {(isAdmin || isOperator) && (
+                        {(isAdmin || isOperator || isSuperadmin) && (
                             <Tooltip title="Confirmar entrega">
                                 <Button
                                     size="small"

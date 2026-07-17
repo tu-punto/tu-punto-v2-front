@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+import { usePublicPageTitle } from "../utils/publicPageTitle";
 
 const UnauthorizedPage = () => {
+  usePublicPageTitle();
+
   return (
     <div className="h-screen flex flex-col justify-center items-center bg-gray-100">
       <h1 className="text-5xl font-bold text-red-600">403</h1>

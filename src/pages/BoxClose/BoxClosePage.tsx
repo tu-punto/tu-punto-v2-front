@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
 import {
   Table,
   Card,
@@ -18,11 +18,15 @@ import {
   PlusOutlined,
   CheckCircleOutlined,
   WarningOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import { getBoxClosesAPI } from "../../api/boxClose";
 import { IBoxClose } from "../../models/boxClose";
 import BoxCloseForm from "./BoxCloseForm";
 import BoxCloseView from "./BoxCloseView";
+import BoxCloseSummaryPanel from "./BoxCloseSummaryPanel";
+import { UserContext } from "../../context/userContext";
+import { isSuperadminUser } from "../../utils/role";
 
 function round(num: number) {
   return Math.round(num * 100) / 100;
@@ -35,12 +39,15 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
 const BoxClosePage = () => {
+  const { user } = useContext(UserContext);
+  const canSeeSummary = isSuperadminUser(user);
   const [boxClosings, setBoxClosings] = useState<IBoxClose[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [selectedReconciliation, setSelectedReconciliation] = useState<IBoxClose | null>(null);
   const [formMode, setFormMode] = useState<"create" | "view" | "edit">("create");
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(dayjs());
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const fetchBoxClosings = async () => {
     setLoading(true);
@@ -205,13 +212,23 @@ const BoxClosePage = () => {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/cierre-caja-icon.png" alt="Cierre de Caja" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
             Cierre de Caja
           </h1>
         </div>
+        {canSeeSummary && (
+          <Button
+            type="primary"
+            icon={<BarChartOutlined />}
+            onClick={() => setSummaryOpen(true)}
+            className="h-11 rounded-xl bg-slate-900 px-5 font-semibold shadow-md hover:!bg-slate-800"
+          >
+            Resumen de cierre
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -299,6 +316,19 @@ const BoxClosePage = () => {
               initialData={selectedReconciliation || undefined}
             />
           )}
+        </Modal>
+
+        <Modal
+          open={summaryOpen}
+          onCancel={() => setSummaryOpen(false)}
+          footer={null}
+          width="92vw"
+          centered
+          destroyOnClose
+          title={null}
+          styles={{ body: { padding: 0, background: "transparent" } }}
+        >
+          <BoxCloseSummaryPanel compact />
         </Modal>
 
         <Table

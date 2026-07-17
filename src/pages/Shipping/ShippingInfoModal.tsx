@@ -26,6 +26,8 @@ import {
     toBase64Png
 } from "./shippingQrLabel";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
+import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
+import { resolvePickupStatus } from "./shippingStatus";
 
 const TZ = "America/La_Paz";
 const LATE_PICKUP_GRACE_DAYS = 200;
@@ -112,6 +114,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [confirmDeleteAdelanto, setConfirmDeleteAdelanto] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [clickedOnce, setClickedOnce] = useState(false);
+    const isPaidToSeller = Boolean(shipping?.pagado_al_vendedor);
+    const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(shipping);
+    const canEditShipping = isAdmin && !isDeliveryLocked;
     const cargoDelivery = useWatch('cargo_delivery', internalForm);
     const estadoPedidoForm = useWatch("estado_pedido", internalForm);
     const normalizarTipoPago = (valor: string): string | null => {
@@ -213,6 +218,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     );
     const simplePackageLatePickupFee = useMemo(() => {
         if (!isSimplePackageOrder) return 0;
+        if (shipping?.estado_pedido === "En camino") return 0;
         if (shipping?.estado_pedido === "Entregado") {
             return Number(shipping?.late_pickup_fee || 0);
         }
@@ -251,6 +257,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         return parseFloat((totalAmount + buyerDebt - adelanto + deliveryAdicional).toFixed(2));
     }, [totalAmount, simplePackageBuyerDebt, isSimplePackageOrder, adelantoCliente, cargoDelivery, quienPagaDelivery, estaPagado]);
     const handleDeleteProduct = (key: any) => {
+        if (isDeliveryLocked) {
+            message.warning("Esta entrega ya supero los 5 dias como entregada y solo se puede ver");
+            return;
+        }
         setProducts((prev: any) => {
             const toDelete = prev.find((p: any) => p.key === key);
             if (toDelete?.id_venta) setDeletedProducts((prevDels) => [...prevDels, toDelete.id_venta]);
@@ -405,8 +415,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
-        setEstadoPedido(shipping.estado_pedido || "En Espera");
-        setEstadoInicialPedido(shipping.estado_pedido || "En Espera");
+        const normalizedStatus = resolvePickupStatus(shipping.estado_pedido || "LISTO PARA RECOGER", shipping);
+        setEstadoPedido(normalizedStatus || "LISTO PARA RECOGER");
+        setEstadoInicialPedido(normalizedStatus || "LISTO PARA RECOGER");
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
             ...p,
             id_venta: p._id ?? null,
@@ -581,6 +592,14 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         onClose();
     };
     const handleSave = async (values: any) => {
+        if (isDeliveryLocked) {
+            message.warning("Esta entrega ya supero los 5 dias como entregada y solo se puede ver");
+            return;
+        }
+        if (isPaidToSeller) {
+            message.warning("No se puede editar una entrega ya pagada al vendedor");
+            return;
+        }
         setLoading(true);
         const newProducts = products.filter((p: any) => !p.id_venta);
         const existingProducts = products.filter((p: any) => p.id_venta);
@@ -772,7 +791,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             width={800}
             closable={false}
         >
-            {isAdmin && (
+            {canEditShipping && (
                 <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
                     <Button
                         danger
@@ -828,11 +847,16 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     </Button>
                 </div>
             )}
+            {isDeliveryLocked && (
+                <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: "#fff7e6", border: "1px solid #ffd591", color: "#ad6800" }}>
+                    Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.
+                </div>
+            )}
             <Form
                 form={internalForm}
                 layout="vertical"
                 onFinish={handleSave}
-                disabled={!isAdmin}
+                disabled={!canEditShipping}
             >
                 {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false}>
@@ -923,14 +947,14 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         </Col>
                     </Row>
                     <Row gutter={16}>
-                        {shipping?.estado_pedido !== "Entregado" && (
+                        {!isDeliveryLocked && (
                             <div style={{ margin:8 }}>
                             <span style={{ marginRight:8 }}>
                                 - ¿Acordar entrega en un rango de horas?
                             </span>
                             <Switch
                                 checked={isRangeHour}
-                                disabled={shipping?.estado_pedido === "Entregado"}
+                                disabled={isDeliveryLocked}
                                 onChange={(checked) => { setIsRangeHour(checked); }}
                                 unCheckedChildren="Hora específica"
                                 checkedChildren="Rango de horas"
@@ -941,14 +965,14 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             <Form.Item 
                                 name="hora_entrega_acordada" 
                                 label={
-                                    isRangeHour && shipping?.estado_pedido !== "Entregado" 
+                                    isRangeHour && !isDeliveryLocked 
                                     ? "Inicio del Rango Horario"
                                     : "Hora de Entrega"}
                             >
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
-                        {isRangeHour && shipping?.estado_pedido !== "Entregado" && (
+                        {isRangeHour && !isDeliveryLocked && (
                             <Col span={12}>
                                 <Form.Item name="hora_entrega_rango_final" label="Fin del Rango Horario">
                                     <TimePicker format='HH:mm' style={{ width: '100%' }} />
@@ -964,7 +988,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 rules={[{ required: true }]}
                             >
                                 <Radio.Group
-                                    disabled={!isAdmin}
+                                    disabled={!canEditShipping}
                                     onChange={(e) => {
                                         const nextType = e.target.value;
                                         if (nextType === "otro_lugar") {
@@ -1001,7 +1025,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
                                 >
                                     <Select
-                                        disabled={!isAdmin}
+                                        disabled={!canEditShipping}
                                         placeholder="Seleccione la sucursal destino"
                                         allowClear
                                         style={{ width: '100%' }}
@@ -1078,9 +1102,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 {/* PRODUCTOS */}
                 <Card title="Productos del Pedido" bordered={false} style={{ marginTop: 16 }}
                     extra={
-                        isAdmin && (
+                        canEditShipping && (
                             <Button
                                 icon={<EditOutlined />}
+                                disabled={isPaidToSeller || isDeliveryLocked}
                                 onClick={() => {
                                     setOriginalProducts(JSON.parse(JSON.stringify(products))); // ⚠️ deep clone, para evitar que se compartan referencias
                                     setEditProductsModalVisible(true);
@@ -1094,11 +1119,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 >
                     <EmptySalesTable
                         products={products}
-                        onDeleteProduct={isAdmin ? handleDeleteProduct : undefined}
+                        onDeleteProduct={canEditShipping ? handleDeleteProduct : undefined}
                         onUpdateTotalAmount={setTotalAmount}
                         handleValueChange={handleValueChange}
                         sellers={[]}
-                        isAdmin={isAdmin}
+                        isAdmin={canEditShipping}
                         readonly={true}
                     />
                 </Card>
@@ -1165,8 +1190,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "En Espera"}>
-                                    <Radio.Button value="En Espera">En espera</Radio.Button>
+                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "LISTO PARA RECOGER"}>
+                                    <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
+                                    <Radio.Button value="En camino">En camino</Radio.Button>
                                     <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
@@ -1191,7 +1217,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                         <Radio.Group
                                             value={quienPagaDelivery} //  esto lo hace controlado
                                             onChange={e => internalForm.setFieldValue("quien_paga_delivery", normalizeDeliveryPayer(e.target.value))}
-                                            disabled={!isAdmin}
+                                            disabled={!canEditShipping}
                                         >
                                             <Radio.Button value="comprador">COMPRADOR</Radio.Button>
                                             <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
@@ -1208,7 +1234,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                             name="cargo_delivery"
                                             label="Monto cobrado por el Delivery"
                                             rules={
-                                                (!isAdmin && (quienPagaDelivery === 'vendedor' || quienPagaDelivery === 'comprador'))
+                                                (!canEditShipping && (quienPagaDelivery === 'vendedor' || quienPagaDelivery === 'comprador'))
                                                     ? []
                                                     : [{ required: true, message: "Este campo es obligatorio" }]
                                             }
@@ -1225,7 +1251,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 )}
 
                                 <Col span={12}>
-                                    {isAdmin && (
+                                    {canEditShipping && (
                                         <Form.Item
                                             name="costo_delivery"
                                             label="Costo de realizar el Delivery"
@@ -1286,7 +1312,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                                     setTipoPago(value);
                                                     internalForm.setFieldValue("tipo_de_pago", value);
                                                 }}
-                                                disabled={!isAdmin || estaPagado === "si"}
+                                                disabled={!canEditShipping || estaPagado === "si"}
                                             >
                                                 <Radio.Button value="1">Transferencia o QR</Radio.Button>
                                                 <Radio.Button value="2">Efectivo</Radio.Button>
@@ -1370,12 +1396,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 </Card>
 
             </Form>
-            {isAdmin && (
+            {canEditShipping && (
                 <div style={{ marginTop: 24, textAlign: 'right' }}>
                     <Button style={{ marginRight: 8 }} onClick={handleCancelChanges}>
                         Cancelar
                     </Button>
-                    <Button type="primary" loading={loading} onClick={() => internalForm.submit()}>
+                    <Button type="primary" loading={loading} disabled={isPaidToSeller || isDeliveryLocked} onClick={() => internalForm.submit()}>
                         Guardar Cambios
                     </Button>
                 </div>
@@ -1388,7 +1414,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 setProducts={setProducts}
                 allProducts={enrichedProducts}
                 sellers={sellers}
-                isAdmin={isAdmin}
+                isAdmin={canEditShipping}
                 shippingId={id_shipping}
                 sucursalId={origenBranchId || localStorage.getItem("sucursalId")}
                 allowAddProducts={true} // Explícitamente permitir agregar productos

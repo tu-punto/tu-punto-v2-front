@@ -1,33 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Button, Form, Row, Col, TimePicker, Radio, InputNumber, message } from 'antd';
+import { Alert, Modal, Button, Form, Row, Col, TimePicker, Radio, InputNumber, message } from 'antd';
 import { PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { updateShippingAPI } from '../../api/shipping';
+import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
+import { resolvePickupStatus } from './shippingStatus';
 
 dayjs.extend(utc);
+
+const READY_FOR_PICKUP_STATUS = 'LISTO PARA RECOGER';
 
 const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     const [estadoPedido, setEstadoPedido] = useState(null);
     const [montoCobradoDelivery, setMontoCobradoDelivery] = useState<number>(0);
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
     const [loading, setLoading] = useState(false);
+    const [submitError, setSubmitError] = useState('');
     const [form] = Form.useForm();
-
-    const tipoPagoMap: any = {
-        1: 'Transferencia o QR',
-        2: 'Efectivo',
-        3: 'Pagado al dueño'
-    };
-
-    const estadoPedidoMap: any = {
-        1: 'En Espera',
-        2: 'Entregado'
-    };
+    const isPaidToSeller = Boolean(shipping?.pagado_al_vendedor);
+    const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(shipping);
 
     useEffect(() => {
         if (shipping) {
-            setEstadoPedido(shipping.estado_pedido?.toString());
+            setEstadoPedido(resolvePickupStatus(shipping.estado_pedido?.toString(), shipping));
+            setSubmitError('');
             form.setFieldsValue({
                 ...shipping,
                 fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
@@ -42,46 +39,56 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     }, [shipping, form]);
 
     const handleFinish = async (shippingStateData: any) => {
+        if (isDeliveryLocked) {
+            message.warning('Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.');
+            return;
+        }
+        if (isPaidToSeller) {
+            message.warning('No se puede editar una entrega ya pagada al vendedor');
+            return;
+        }
         setLoading(true);
-        const intTipoPago = parseInt(shippingStateData.tipo_de_pago);
-        const intEstadoPedido = parseInt(shippingStateData.estado_pedido);
+        setSubmitError('');
+        const selectedStatus = resolvePickupStatus(shippingStateData.estado_pedido || estadoPedido, shipping);
 
         let updateShippingInfo: any = {
             sucursal_id: localStorage.getItem("sucursalId")
         };
 
-        if (intEstadoPedido === 1) {
+        if (selectedStatus === READY_FOR_PICKUP_STATUS) {
             updateShippingInfo = {
                 ...updateShippingInfo,
-                estado_pedido: estadoPedidoMap[intEstadoPedido]
+                estado_pedido: READY_FOR_PICKUP_STATUS
             };
         }
 
-        if (intEstadoPedido === 2) {
+        if (selectedStatus === 'En camino') {
+            updateShippingInfo = {
+                ...updateShippingInfo,
+                estado_pedido: 'En camino'
+            };
+        }
+
+        if (selectedStatus === 'Entregado') {
             updateShippingInfo = {
                 ...updateShippingInfo,
                 hora_entrega_acordada: shippingStateData.hora_entrega_acordada,
-                estado_pedido: estadoPedidoMap[intEstadoPedido]
-            };
-        }
-
-        if (intEstadoPedido === 3) {
-            updateShippingInfo = {
-                ...updateShippingInfo,
+                hora_entrega_real: dayjs().utc().subtract(4, 'hours').format('YYYY-MM-DD HH:mm:ss'),
                 cargo_delivery: parseFloat(shippingStateData.cargo_delivery),
                 costo_delivery: parseFloat(shippingStateData.costo_delivery),
-                estado_pedido: estadoPedidoMap[intEstadoPedido],
-                tipo_de_pago: tipoPagoMap[intTipoPago],
-                hora_entrega_real: dayjs().utc().subtract(4, 'hours').format('YYYY-MM-DD HH:mm:ss')
+                estado_pedido: 'Entregado',
+                tipo_de_pago: shippingStateData.tipo_de_pago,
             };
         }
 
         const res = await updateShippingAPI(updateShippingInfo, shipping.id_pedido);
-        if (res) {
+        if (res?.success) {
             message.success('Pedido actualizado');
             onSave();
         } else {
-            message.error('Error al actualizar el pedido, inténtelo de nuevo');
+            const errorMessage = String(res?.message || res?.msg || 'Error al actualizar el pedido, inténtelo de nuevo');
+            setSubmitError(errorMessage);
+            message.error(errorMessage);
         }
         setLoading(false);
     };
@@ -100,13 +107,10 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
 
     const renderEstadoOptions = () => {
         const opciones = [
-            { value: '1', label: 'En Espera' },
-            { value: '3', label: 'Entregado' }
+            { value: READY_FOR_PICKUP_STATUS, label: 'Listo para recoger' },
+            { value: 'En camino', label: 'En camino' },
+            { value: 'Entregado', label: 'Entregado' }
         ];
-        // Si ya está en estado 3, ocultar "Por entregar"
-        if (shipping?.estado_pedido === 3) {
-            return opciones.filter(op => op.value !== '2');
-        }
         return opciones;
     };
 
@@ -114,22 +118,44 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
         <Modal
             title={`Estado del pedido ${shipping ? shipping.id_pedido : ''}`}
             open={visible}
-            onCancel={onClose}
+            onCancel={() => {
+                setSubmitError('');
+                onClose();
+            }}
             footer={[
                 <Button key="back" onClick={onClose}>Cancelar</Button>,
-                <Button key="submit" type="primary" loading={loading} onClick={() => form.submit()}>
+                <Button key="submit" type="primary" loading={loading} disabled={isPaidToSeller || isDeliveryLocked} onClick={() => form.submit()}>
                     Guardar
                 </Button>
             ]}
             centered
             width={500}
-        >
+            >
             <Form
                 form={form}
                 layout="vertical"
                 name="shipping_info_form"
                 onFinish={handleFinish}
+                disabled={isPaidToSeller || isDeliveryLocked}
             >
+                {isDeliveryLocked && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        message="Esta entrega ya supero los 5 dias como entregada. Solo se puede ver."
+                        style={{ marginBottom: 16 }}
+                    />
+                )}
+                {submitError ? (
+                    <Alert
+                        type="error"
+                        showIcon
+                        message="No se pudo actualizar el pedido"
+                        description={submitError}
+                        style={{ marginBottom: 16 }}
+                    />
+                ) : null}
+
                 <Row gutter={16}>
                     <Col span={24}>
                         <Form.Item
@@ -148,7 +174,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
                     </Col>
                 </Row>
 
-                {estadoPedido === '2' && (
+                {estadoPedido === READY_FOR_PICKUP_STATUS && (
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item
@@ -161,7 +187,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
                     </Row>
                 )}
 
-                {estadoPedido === '3' && (
+                {estadoPedido === 'Entregado' && (
                     <>
                         <Row gutter={16}>
                             <Col span={12}>

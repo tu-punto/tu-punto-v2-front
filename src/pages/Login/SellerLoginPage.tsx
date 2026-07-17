@@ -1,36 +1,35 @@
-import { useNavigate } from "react-router-dom";
-import { Button } from "antd";
-
 import LoginForm from "../../components/LoginForm";
 import logoImg from "../../../public/logo.png";
+import AuthShell from "../../components/AuthShell";
+import { usePublicPageTitle } from "../../utils/publicPageTitle";
 
 export default function SellerLoginPage() {
-  const navigate = useNavigate();
+  usePublicPageTitle();
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 bg-[url('/background-login.png')] bg-cover bg-center">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <img
-            alt="logo"
-            src={logoImg}
-            className="mx-auto h-20 w-auto rounded-full"
-          />
-          <h2 className="mt-6 text-mobile-2xl xl:text-desktop-3xl font-bold text-gray-900">
-            Tu Punto (Vendedor)
-          </h2>
-        </div>
-        <LoginForm showBranchSelect={false} redirectTo="/seller-info" />
-        <div className="text-center">
-          <Button
-            type="default"
-            onClick={() => navigate("/login-admin")}
-            className="w-full"
-          >
-            Iniciar sesión como Admin
-          </Button>
+    <AuthShell
+      title=""
+      subtitle=""
+      badge="Tu Punto · Vendedor"
+      accentClassName="bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.28),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_28%)]"
+      highlights={[
+        { title: "vendedores activos", value: "120+" },
+        { title: "sucursales físicas", value: "5" },
+        { title: "ciudades principales", value: "4" },
+      ]}
+      heroImage="/login-seller-hero.png"
+      heroImageAlt="Acceso de vendedor"
+      heroImageClassName="object-cover object-center"
+      highlightsPlacement="hero"
+    >
+      <div className="mb-8 flex items-center gap-4">
+        <img alt="logo" src={logoImg} className="h-14 w-14 rounded-2xl object-contain shadow-sm" />
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Tu Punto</div>
+          <h2 className="text-2xl font-black text-slate-900">Ingreso de vendedor</h2>
         </div>
       </div>
-    </div>
+      <LoginForm showBranchSelect={false} redirectTo="/seller-info" />
+    </AuthShell>
   );
 }

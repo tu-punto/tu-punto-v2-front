@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSellersBasicAPI, getSellerAPI } from "../../api/seller";
 import { getSimplePackageBranchPricesAPI, registerSimplePackagesAPI } from "../../api/simplePackage";
 import { branchesEnableSimplePackageService } from "../../utils/sellerServiceAccess";
-import { createDraftRow, resizeDraftRows, SimplePackageDraftRow } from "../SimplePackages/simplePackageHelpers";
+import { calculateSimplePackageTotals, createDraftRow, resizeDraftRows, SimplePackageDraftRow } from "../SimplePackages/simplePackageHelpers";
 
 interface SimplePackageCreateModalProps {
   visible: boolean;
@@ -46,6 +46,25 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
   const [rows, setRows] = useState<SimplePackageDraftRow[]>([
     createDraftRow(0, { precio_paquete: 0, amortizacion: 0, saldo_por_paquete: 0 }),
   ]);
+
+  const pricingSummary = useMemo(() => calculateSimplePackageTotals(rows), [rows]);
+  const quoteSummary = useMemo(() => {
+    const packageBase = Number(sellerConfig.precio_paquete || 0);
+    const routePrice = selectedOriginId && selectedDestinationId ? getBranchRoutePrice(selectedOriginId, selectedDestinationId) : 0;
+    const sellerDebtTotal = Number(pricingSummary.amortizacion_vendedor || 0);
+    const buyerDebtTotal = Number(pricingSummary.deuda_comprador || 0);
+    const totalService = Number(pricingSummary.precio_total || 0);
+    return {
+      packageBase,
+      routePrice,
+      packageTotal: Number(pricingSummary.precio_paquete || 0),
+      interBranchTotal: Number(pricingSummary.precio_entre_sucursal || 0),
+      totalService,
+      sellerDebtTotal,
+      buyerDebtTotal,
+      averagePerPackage: rows.length ? Number((totalService / rows.length).toFixed(2)) : 0,
+    };
+  }, [getBranchRoutePrice, pricingSummary.amortizacion_vendedor, pricingSummary.deuda_comprador, pricingSummary.precio_entre_sucursal, pricingSummary.precio_paquete, pricingSummary.precio_total, rows.length, selectedDestinationId, selectedOriginId, sellerConfig.precio_paquete]);
 
   const routePriceMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -349,6 +368,24 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                 Usar destino en todos
               </Button>
             </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Typography.Text type="secondary">Precio base por paquete</Typography.Text>
+                <div className="text-lg font-semibold">Bs. {quoteSummary.packageBase.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Typography.Text type="secondary">Envio entre sucursales</Typography.Text>
+                <div className="text-lg font-semibold">Bs. {quoteSummary.routePrice.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Typography.Text type="secondary">Total estimado</Typography.Text>
+                <div className="text-lg font-semibold text-emerald-600">Bs. {quoteSummary.totalService.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Typography.Text type="secondary">Paquetes en cotizacion</Typography.Text>
+                <div className="text-lg font-semibold">{rows.length}</div>
+              </div>
+            </div>
           </Card>
 
           <Card>
@@ -446,6 +483,27 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                   ))}
                 </tbody>
               </table>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3">
+                <Typography.Text type="secondary">Saldo vendedor / amortizacion</Typography.Text>
+                <div className="text-lg font-semibold">Bs. {quoteSummary.sellerDebtTotal.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3">
+                <Typography.Text type="secondary">Saldo comprador</Typography.Text>
+                <div className="text-lg font-semibold">Bs. {quoteSummary.buyerDebtTotal.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3">
+                <Typography.Text type="secondary">Total servicio</Typography.Text>
+                <div className="text-lg font-semibold text-sky-700">Bs. {quoteSummary.totalService.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3">
+                <Typography.Text type="secondary">Promedio por paquete</Typography.Text>
+                <div className="text-lg font-semibold">Bs. {quoteSummary.averagePerPackage.toFixed(2)}</div>
+              </div>
             </div>
           </Card>
 
