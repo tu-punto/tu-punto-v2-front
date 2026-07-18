@@ -216,6 +216,7 @@ const ShippingTable = ({
     const [otherLocation, setOtherLocation] = useState('');
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
+    const [availableVendorIds, setAvailableVendorIds] = useState<string[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("");
     const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
     const normalizedUserRole = String(user?.role || "").toLowerCase();
@@ -540,6 +541,11 @@ const ShippingTable = ({
                 en_camino: Number(dashboardData?.counts?.en_camino || 0),
                 entregado: Number(dashboardData?.counts?.entregado || 0),
             });
+            setAvailableVendorIds(
+                Array.isArray(dashboardData?.vendorIds)
+                    ? dashboardData.vendorIds.map((value: any) => String(value))
+                    : []
+            );
             setTableTotal(Number(dashboardData?.total || 0));
         } catch (error) {
             console.error("Error fetching shipping data:", error);
@@ -548,33 +554,8 @@ const ShippingTable = ({
         }
     };
     const getVendedoresConEntregas = () => {
-        const sourceData = shippingData;
-        const vendedoresConEntregasSet = new Set<string>();
-
-        sourceData.forEach((pedido: any) => {
-            (pedido.venta || []).forEach((venta: any) => {
-                if (venta.vendedor) {
-                    const vendedorId =
-                        typeof venta.vendedor === 'object'
-                            ? venta.vendedor._id
-                            : venta.vendedor;
-                    if (vendedorId) vendedoresConEntregasSet.add(String(vendedorId));
-                }
-                if (venta.id_vendedor) {
-                    vendedoresConEntregasSet.add(String(venta.id_vendedor));
-                }
-            });
-
-            (pedido.productos_temporales || []).forEach((producto: any) => {
-                if (producto.id_vendedor) {
-                    vendedoresConEntregasSet.add(String(producto.id_vendedor));
-                }
-            });
-        });
-
-        return vendedores.filter((vendedor: any) =>
-            vendedoresConEntregasSet.has(String(vendedor._id))
-        );
+        const vendedoresConEntregasSet = new Set(availableVendorIds.map(String));
+        return vendedores.filter((vendedor: any) => vendedoresConEntregasSet.has(String(vendedor._id)));
     };
     const hasExternalInCurrentStatus = () => canManageExternal;
 
