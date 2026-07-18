@@ -63,18 +63,30 @@ function FinanceFluxFormModal({
     (state) => state.createFluxCategory
   );
 
+  const appendIfPresent = (payload: FormData, key: string, value: unknown) => {
+    if (value === undefined || value === null || value === "") return;
+    payload.append(key, String(value));
+  };
+
   const handleFinish = async (financeFluxData: any) => {
     setLoading(true);
 
     const payload = new FormData();
-    Object.entries({
-      ...financeFluxData,
-      fecha: financeFluxData.fecha?.toDate()?.toISOString(),
-      ...(!editingFlux && { founder: currentResponsible }),
-    }).forEach(([key, value]) => {
-      if (value === undefined || value === null || value === "") return;
-      payload.append(key, value instanceof Date ? value.toISOString() : String(value));
-    });
+    appendIfPresent(payload, "tipo", financeFluxData.tipo);
+    appendIfPresent(payload, "categoria", financeFluxData.categoria);
+    appendIfPresent(payload, "concepto", financeFluxData.concepto);
+    appendIfPresent(payload, "monto", financeFluxData.monto);
+    appendIfPresent(payload, "fecha", financeFluxData.fecha?.toDate?.()?.toISOString());
+    appendIfPresent(payload, "id_vendedor", financeFluxData.id_vendedor);
+    appendIfPresent(payload, "id_trabajador", financeFluxData.id_trabajador);
+    appendIfPresent(payload, "id_sucursal", financeFluxData.id_sucursal);
+    payload.append("esDeuda", financeFluxData.esDeuda ? "true" : "false");
+
+    if (editingFlux) {
+      appendIfPresent(payload, "founder", financeFluxData.founder);
+    } else {
+      appendIfPresent(payload, "founder", currentResponsible);
+    }
 
     const attachmentFile = attachmentFileList?.[0]?.originFileObj;
     if (attachmentFile) {
@@ -86,7 +98,7 @@ function FinanceFluxFormModal({
         ? await updateFinanceFluxAPI(editingFlux.id_flujo_financiero, payload)
         : await registerFinanceFluxAPI(payload);
 
-      if (response.status || response.ok) {
+      if (response?.status || response?.ok) {
         message.success(
           editingFlux
             ? "Flujo actualizado con éxito"
@@ -94,10 +106,12 @@ function FinanceFluxFormModal({
         );
         onSuccess();
       } else {
-        throw new Error();
+        throw new Error(
+          response?.error || response?.msg || "No se pudo guardar el flujo financiero"
+        );
       }
-    } catch (error) {
-      message.error("Error al guardar el flujo financiero");
+    } catch (error: any) {
+      message.error(error?.message || "Error al guardar el flujo financiero");
     } finally {
       if (!editingFlux) {
         form.resetFields();
@@ -184,7 +198,7 @@ function FinanceFluxFormModal({
 
   return (
     <Modal
-      title="Agregar Gasto o Ingreso"
+      title={editingFlux ? "Editar Gasto o Ingreso" : "Agregar Gasto o Ingreso"}
       open={visible}
       onCancel={onCancel}
       footer={null}
@@ -380,7 +394,7 @@ function FinanceFluxFormModal({
             loading={loading}
             size="large"
           >
-            Registrar Gasto o ingreso
+            {editingFlux ? "Guardar cambios" : "Registrar Gasto o ingreso"}
           </Button>
         </Form.Item>
       </Form>

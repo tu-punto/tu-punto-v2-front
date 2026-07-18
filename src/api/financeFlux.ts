@@ -1,5 +1,5 @@
 import { AxiosError } from "axios"
-import { apiClient } from "./apiClient"
+import { apiClient, apiClientNoJSON } from "./apiClient"
 import { parseError } from "./util"
 
 export const getFinancesFluxAPI = async () => {
@@ -7,7 +7,7 @@ export const getFinancesFluxAPI = async () => {
         const res = await apiClient.get(`/financeFlux`)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -16,7 +16,7 @@ export const registerFinanceFluxAPI = async (financeFluxData: any) => {
         const res = await apiClientNoJSON.post(`/financeFlux/register`, financeFluxData)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -25,7 +25,7 @@ export const updateFinanceFluxAPI = async (id: string, data: any) => {
         const res = await apiClientNoJSON.put(`/financeFlux/${id}`, data);
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -34,7 +34,7 @@ export const getSellerByShippingAPI = async (sellerId: any) => {
         const res = await apiClient.get(`/financeFlux/seller/${sellerId}`)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -43,7 +43,7 @@ export const getWorkerByShippingAPI = async (workerId: any) => {
         const res = await apiClient.get(`/financeFlux/worker/${workerId}`)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -52,7 +52,7 @@ export const getSellerInfoAPI = async (sellerId: any) => {
         const res = await apiClient.get(`/financeFlux/sellerInf/${sellerId}`)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -61,7 +61,7 @@ export const getStatsAPI = async () => {
         const res = await apiClient.get(`/financeFlux/stats`)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -75,7 +75,7 @@ export const getFinanceFluxCategoriesAPI = async () => {
         console.log("Categorias de flujo financiero:", res.data)
         return Array.isArray(res.data?.categories) ? res.data.categories : []
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
         return []
     }
 }
@@ -85,7 +85,7 @@ export const registerFinanceFluxCategoryAPI = async (categoryData: any) => {
         const res = await apiClient.post(`/financeFlux/category`, categoryData)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -94,7 +94,7 @@ export const deleteFinanceFluxCategoryAPI = async (id: string) => {
         const res = await apiClient.delete(`/financeFlux/category/${id}`)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
@@ -144,7 +144,7 @@ export const getCommissionAPI = async (options?: {
         const res = await apiClient.get(url);
         return res.data;
     } catch (error) {
-        parseError(error as AxiosError);
+        return parseError(error as AxiosError);
     }
 };
 
@@ -165,7 +165,7 @@ export const getMerchandiseSoldAPI = async (options?: {
         const res = await apiClient.get(url);
         return res.data;
     } catch (error) {
-        parseError(error as AxiosError);
+        return parseError(error as AxiosError);
     }
 };
 
@@ -184,7 +184,7 @@ export const getDailyServiceIncomeAPI = async (
         });
         return res.data;
     } catch (error) {
-        parseError(error as AxiosError);
+        return parseError(error as AxiosError);
         return [];
     }
 };
