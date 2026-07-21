@@ -2,10 +2,11 @@ import { Badge, Button, message, Modal } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
 import { useEffect, useState } from "react";
-import { autoRenewSellersAPI } from "../../api/seller";
+import { autoRenewSellersAPI, getSellersAPI } from "../../api/seller";
 import "./SellerTable.css";
 import LandingLeadsModal from "./LandingLeadsModal";
 import { getLandingLeadsAPI } from "../../api/landingLeads";
+import DeclineResponsesModal from "./DeclineResponsesModal";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -16,6 +17,8 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [leadNewCount, setLeadNewCount] = useState(0);
   const [leadCounterLoading, setLeadCounterLoading] = useState(false);
+  const [declineResponsesOpen, setDeclineResponsesOpen] = useState(false);
+  const [declineResponsesCount, setDeclineResponsesCount] = useState(0);
 
   const refreshLeadCounter = async () => {
     setLeadCounterLoading(true);
@@ -30,8 +33,21 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     }
   };
 
+  const refreshDeclineResponsesCounter = async () => {
+    try {
+      const response = await getSellersAPI();
+      const rows = Array.isArray(response) ? response : Array.isArray((response as any)?.data) ? (response as any).data : [];
+      setDeclineResponsesCount(
+        rows.filter((row: any) => Boolean(row?.declinacion_servicio_fecha)).length
+      );
+    } catch {
+      setDeclineResponsesCount(0);
+    }
+  };
+
   useEffect(() => {
     void refreshLeadCounter();
+    void refreshDeclineResponsesCounter();
   }, []);
 
   const showModal = () => {
@@ -86,6 +102,14 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         </div>
 
         <div className="seller-page-actions flex gap-2">
+          <Badge count={declineResponsesCount} offset={[-8, 8]} color="#0D66A0">
+            <Button
+              onClick={() => setDeclineResponsesOpen(true)}
+              className="text-mobile-sm xl:text-desktop-sm"
+            >
+              Respuestas declinación
+            </Button>
+          </Badge>
           <Badge count={leadNewCount} offset={[-8, 8]} color="#f97316">
             <Button
               onClick={() => setLeadModalOpen(true)}
@@ -127,6 +151,11 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         open={leadModalOpen}
         onClose={() => setLeadModalOpen(false)}
         onCounterChange={setLeadNewCount}
+      />
+      <DeclineResponsesModal
+        open={declineResponsesOpen}
+        onClose={() => setDeclineResponsesOpen(false)}
+        onCountChange={setDeclineResponsesCount}
       />
     </div>
   );
