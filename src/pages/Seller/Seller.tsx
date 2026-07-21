@@ -1,9 +1,11 @@
-import { Button, message, Modal } from "antd";
+import { Badge, Button, message, Modal } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { autoRenewSellersAPI } from "../../api/seller";
 import "./SellerTable.css";
+import LandingLeadsModal from "./LandingLeadsModal";
+import { getLandingLeadsAPI } from "../../api/landingLeads";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -11,6 +13,26 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [autoRenewing, setAutoRenewing] = useState(false);
+  const [leadModalOpen, setLeadModalOpen] = useState(false);
+  const [leadNewCount, setLeadNewCount] = useState(0);
+  const [leadCounterLoading, setLeadCounterLoading] = useState(false);
+
+  const refreshLeadCounter = async () => {
+    setLeadCounterLoading(true);
+    try {
+      const response = await getLandingLeadsAPI();
+      const rows = Array.isArray(response?.leads) ? response.leads : [];
+      setLeadNewCount(rows.filter((row: any) => row?.contactado !== true).length);
+    } catch {
+      setLeadNewCount(0);
+    } finally {
+      setLeadCounterLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshLeadCounter();
+  }, []);
 
   const showModal = () => {
     setIsModalVisible(true);
@@ -64,6 +86,15 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         </div>
 
         <div className="seller-page-actions flex gap-2">
+          <Badge count={leadNewCount} offset={[-8, 8]} color="#f97316">
+            <Button
+              onClick={() => setLeadModalOpen(true)}
+              loading={leadCounterLoading}
+              className="text-mobile-sm xl:text-desktop-sm"
+            >
+              Leads registrados
+            </Button>
+          </Badge>
           <Button
               onClick={handleAutoRenew}
               loading={autoRenewing}
@@ -91,6 +122,11 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         onCancel={handleCancel}
         onFinish={onFinish}
         onSuccess={handleSuccess}
+      />
+      <LandingLeadsModal
+        open={leadModalOpen}
+        onClose={() => setLeadModalOpen(false)}
+        onCounterChange={setLeadNewCount}
       />
     </div>
   );
