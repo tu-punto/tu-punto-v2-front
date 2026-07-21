@@ -102,14 +102,12 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         </div>
 
         <div className="seller-page-actions flex gap-2">
-          <Badge count={declineResponsesCount} offset={[-8, 8]} color="#0D66A0">
-            <Button
-              onClick={() => setDeclineResponsesOpen(true)}
-              className="text-mobile-sm xl:text-desktop-sm"
-            >
-              Respuestas declinación
-            </Button>
-          </Badge>
+          <Button
+            onClick={() => setDeclineResponsesOpen(true)}
+            className="text-mobile-sm xl:text-desktop-sm"
+          >
+            Respuestas declinación
+          </Button>
           <Badge count={leadNewCount} offset={[-8, 8]} color="#f97316">
             <Button
               onClick={() => setLeadModalOpen(true)}
