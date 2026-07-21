@@ -21,6 +21,7 @@ interface ExternalShippingInfoModalProps {
   externalShipping: any;
   isAdmin: boolean;
   canSendGuideWhatsapp: boolean;
+  sucursals?: any[];
 }
 
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
@@ -122,6 +123,7 @@ const ExternalShippingInfoModal = ({
   externalShipping,
   isAdmin,
   canSendGuideWhatsapp,
+  sucursals = [],
 }: ExternalShippingInfoModalProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -206,6 +208,7 @@ const ExternalShippingInfoModal = ({
   const canEditCreatedToday = canEditDelivery && isSameBusinessDay(externalShipping?.fecha_pedido);
   const canEditBuyerName = canEditCreatedToday && !isSimplePackage;
   const canEditChargeSummary = canEditCreatedToday;
+  const canEditDestination = canEditCreatedToday;
   const shouldAskBuyerPayment = estadoPedido === "Entregado" && buyerDebt > 0;
 
   const externalPaidStatus = String(chargeSource?.esta_pagado || "no").trim().toLowerCase();
@@ -537,6 +540,10 @@ const ExternalShippingInfoModal = ({
       telefono_vendedor: externalShipping.telefono_vendedor || "",
       comprador: externalShipping.comprador || "",
       telefono_comprador: externalShipping.telefono_comprador || "",
+      destino_sucursal_id:
+        getBranchId(externalShipping?.destino_sucursal) ||
+        getBranchId(externalShipping?.sucursal) ||
+        undefined,
       descripcion_paquete: externalShipping.descripcion_paquete || "",
       precio_paquete: packagePrice,
       esta_pagado: externalShipping.esta_pagado || "no",
@@ -588,8 +595,10 @@ const ExternalShippingInfoModal = ({
       }
 
       const normalizedType = normalizeDeliveryPaymentCode(values.tipo_de_pago);
+      const nextDestinationBranchId = String(values.destino_sucursal_id || "").trim();
       const payload = {
         ...(canEditBuyerName ? { comprador: String(values.comprador || "").trim() } : {}),
+        ...(canEditDestination && nextDestinationBranchId ? { destino_sucursal_id: nextDestinationBranchId } : {}),
         estado_pedido: values.estado_pedido,
         delivered: values.estado_pedido === "Entregado",
         tipo_de_pago:
@@ -730,6 +739,34 @@ const ExternalShippingInfoModal = ({
             </Col>
           </Row>
         </Card>
+
+        {canEditDestination && (
+          <Card title="Sucursal destino" bordered={false} style={{ marginTop: 16 }}>
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item
+                  label="Sucursal destino"
+                  name="destino_sucursal_id"
+                  rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
+                >
+                  <Select
+                    disabled={!canEditDestination}
+                    placeholder="Selecciona la sucursal destino"
+                    options={sucursals.map((branch: any) => ({
+                      value: String(branch?._id || ""),
+                      label: String(branch?.nombre || ""),
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                  Solo se puede cambiar la sucursal destino el mismo dia en que se creo el pedido.
+                </div>
+              </Col>
+            </Row>
+          </Card>
+        )}
 
         <Card
           title="Resumen del Cobro"

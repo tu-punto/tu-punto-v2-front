@@ -1,5 +1,16 @@
 import { DeleteOutlined, SaveOutlined } from "@ant-design/icons";
-import { Button, DatePicker, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, message } from "antd";
+import {
+  Button,
+  DatePicker,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  message,
+} from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 
@@ -11,6 +22,7 @@ import {
   updateRecurringExpenseAPI,
 } from "../../api/recurringExpense";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
 
 type RecurringExpensesModalProps = {
   open: boolean;
@@ -51,7 +63,7 @@ const buildPayload = (row: RecurringRow) => {
   const paidUntil = row.hasta_cuando_se_pago ? dayjs(row.hasta_cuando_se_pago) : null;
 
   if (!tipo) {
-    throw new Error("El tipo es obligatorio.");
+    throw new Error("La categoria es obligatoria.");
   }
   if (!Number.isFinite(monto) || monto < 0) {
     throw new Error("El monto es invalido.");
@@ -76,6 +88,12 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
   const [savingRowKey, setSavingRowKey] = useState<string | null>(null);
   const [payingRowKey, setPayingRowKey] = useState<string | null>(null);
   const [deletingRowKey, setDeletingRowKey] = useState<string | null>(null);
+  const [newFluxCategory, setNewFluxCategory] = useState("");
+
+  const fluxCategories = useFinanceFluxCategoryStore((state) => state.fluxCategories);
+  const fluxCategoryLoading = useFinanceFluxCategoryStore((state) => state.loading);
+  const fetchFluxCategory = useFinanceFluxCategoryStore((state) => state.fetchFluxCategory);
+  const createFluxCategory = useFinanceFluxCategoryStore((state) => state.createFluxCategory);
 
   const branchOptions = useMemo(
     () => [
@@ -86,6 +104,15 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
       })),
     ],
     [branches]
+  );
+
+  const categoryOptions = useMemo(
+    () =>
+      fluxCategories.map((fluxCategory) => ({
+        value: fluxCategory.nombre,
+        label: fluxCategory.nombre,
+      })),
+    [fluxCategories]
   );
 
   useEffect(() => {
@@ -99,6 +126,7 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
         const [recurringExpenses, sucursales] = await Promise.all([
           getRecurringExpensesAPI(),
           getSucursalsAPI(),
+          fetchFluxCategory(),
         ]);
 
         if (cancelled) return;
@@ -120,7 +148,7 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, fetchFluxCategory]);
 
   const updateRow = (key: string, patch: Partial<RecurringRow>) => {
     setRows((current) =>
@@ -197,10 +225,7 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
   const handlePay = async (row: RecurringRow) => {
     setPayingRowKey(row.key);
     try {
-      const savedRow = await persistRow({
-        ...row,
-        detalle: normalizeText(row.detalle) || normalizeText(row.tipo),
-      });
+      const savedRow = await persistRow(row);
 
       if (!savedRow._id) {
         throw new Error("No se pudo guardar el gasto recurrente antes de pagar.");
@@ -226,17 +251,59 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
     }
   };
 
+  const handleCreateCategory = async (record: RecurringRow) => {
+    const categoryName = normalizeText(newFluxCategory);
+    if (!categoryName) return;
+
+    const created = await createFluxCategory({ nombre: categoryName });
+    if (!created) return;
+
+    updateRow(record.key, { tipo: categoryName });
+    setNewFluxCategory("");
+  };
+
   const columns = [
     {
       title: "TIPO",
       dataIndex: "tipo",
       key: "tipo",
-      width: 180,
+      width: 220,
       render: (_: any, record: RecurringRow) => (
-        <Input
-          value={record.tipo}
-          onChange={(event) => updateRow(record.key, { tipo: event.target.value })}
-          placeholder="Ej. Internet"
+        <Select
+          value={record.tipo || undefined}
+          onChange={(value) => updateRow(record.key, { tipo: value })}
+          placeholder="Selecciona una categoria"
+          options={categoryOptions}
+          showSearch
+          allowClear
+          style={{ width: "100%" }}
+          filterOption={(input, option) =>
+            String(option?.label || "")
+              .toLowerCase()
+              .includes(input.toLowerCase())
+          }
+          dropdownRender={(menu) => (
+            <>
+              {menu}
+              <div style={{ display: "flex", gap: 8, padding: 8 }}>
+                <Input
+                  value={newFluxCategory}
+                  onChange={(event) => setNewFluxCategory(event.target.value)}
+                  placeholder="Nueva categoria"
+                  onKeyDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                />
+                <Button
+                  type="link"
+                  onClick={() => void handleCreateCategory(record)}
+                  loading={fluxCategoryLoading}
+                >
+                  Crear
+                </Button>
+              </div>
+            </>
+          )}
         />
       ),
     },
@@ -281,7 +348,7 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
         <Input
           value={record.detalle}
           onChange={(event) => updateRow(record.key, { detalle: event.target.value })}
-          placeholder="Opcional"
+          placeholder="Se usara para el concepto"
         />
       ),
     },
@@ -343,9 +410,18 @@ const RecurringExpensesModal = ({ open, onClose, onPaid }: RecurringExpensesModa
       footer={null}
       destroyOnClose
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div style={{ color: "#595959" }}>
-          Configura filas recurrentes y usa <b>Pagar</b> para registrar el gasto en <b>Gastos e Ingresos</b>.
+          Configura filas recurrentes y usa <b>Pagar</b> para registrar el gasto en{" "}
+          <b>Gastos e Ingresos</b>.
         </div>
         <Button type="primary" onClick={addRow}>
           Agregar fila
