@@ -46,7 +46,9 @@ export default function DeclineResponsesModal({
   const [rows, setRows] = useState<DeclineRow[]>([]);
   const [searchText, setSearchText] = useState("");
   const [originFilter, setOriginFilter] = useState<"todos" | "seller" | "admin">("todos");
+  const [reasonFilter, setReasonFilter] = useState("todos");
   const [returnFilter, setReturnFilter] = useState("todos");
+  const [branchFilter, setBranchFilter] = useState("todas");
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
 
   const loadRows = async () => {
@@ -83,11 +85,28 @@ export default function DeclineResponsesModal({
         return false;
       }
 
+      if (reasonFilter !== "todos") {
+        const rowReason =
+          row?.declinacion_servicio_motivo_principal_otro
+            ? "otro"
+            : String(row?.declinacion_servicio_motivo_principal || "");
+        if (rowReason !== reasonFilter) return false;
+      }
+
       if (
         returnFilter !== "todos" &&
         String(row?.declinacion_servicio_probabilidad_retorno || "") !== returnFilter
       ) {
         return false;
+      }
+
+      if (branchFilter !== "todas") {
+        const branchNames = Array.isArray(row?.pago_sucursales)
+          ? row.pago_sucursales
+              .map((branch: any) => String(branch?.sucursalName || "").trim())
+              .filter(Boolean)
+          : [];
+        if (!branchNames.includes(branchFilter)) return false;
       }
 
       if (dateRange?.[0] || dateRange?.[1]) {
@@ -115,7 +134,7 @@ export default function DeclineResponsesModal({
 
       return haystack.includes(query);
     });
-  }, [dateRange, originFilter, returnFilter, rows, searchText]);
+  }, [branchFilter, dateRange, originFilter, reasonFilter, returnFilter, rows, searchText]);
 
   const buildReasonLabel = (row: DeclineRow) =>
     row?.declinacion_servicio_motivo_principal_otro ||
@@ -129,6 +148,36 @@ export default function DeclineResponsesModal({
     }
     return DECLINE_RETURN_LABELS[value || ""] || value || "-";
   };
+
+  const branchOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(
+        rows.flatMap((row) =>
+          Array.isArray(row?.pago_sucursales)
+            ? row.pago_sucursales
+                .map((branch: any) => String(branch?.sucursalName || "").trim())
+                .filter(Boolean)
+            : []
+        )
+      )
+    ).sort((a, b) => a.localeCompare(b));
+
+    return [
+      { label: "Todas las sucursales", value: "todas" },
+      ...names.map((name) => ({ label: name, value: name })),
+    ];
+  }, [rows]);
+
+  const reasonOptions = useMemo(
+    () => [
+      { label: "Todos los motivos", value: "todos" },
+      ...Object.entries(DECLINE_REASON_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+    []
+  );
 
   const exportToExcel = () => {
     if (!filteredRows.length) {
@@ -306,6 +355,12 @@ export default function DeclineResponsesModal({
             ]}
           />
           <Select
+            value={reasonFilter}
+            onChange={setReasonFilter}
+            style={{ width: 260 }}
+            options={reasonOptions}
+          />
+          <Select
             value={returnFilter}
             onChange={setReturnFilter}
             style={{ width: 220 }}
@@ -317,6 +372,12 @@ export default function DeclineResponsesModal({
               { label: "Poco probable", value: "poco_probable" },
               { label: "Nunca", value: "nunca" },
             ]}
+          />
+          <Select
+            value={branchFilter}
+            onChange={setBranchFilter}
+            style={{ width: 220 }}
+            options={branchOptions}
           />
           <RangePicker
             value={dateRange}
