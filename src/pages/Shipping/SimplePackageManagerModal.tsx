@@ -130,6 +130,42 @@ const formatSellerDisplayName = (seller: any) => {
   return fullName || brand || seller?.vendedor || "Vendedor";
 };
 
+const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+
+const getSimplePackageFixedTotal = (row: any) =>
+  roundCurrency(
+    Number(
+      row?.precio_total ??
+      Number(row?.precio_paquete || 0) + Number(row?.precio_entre_sucursal || row?.cargo_delivery || 0)
+    )
+  );
+
+const applySimpleDebtPairPatch = (
+  row: any,
+  patch: { amortizacion_vendedor?: number; deuda_comprador?: number }
+) => {
+  const total = Math.max(0, getSimplePackageFixedTotal(row));
+  const currentSellerDebt = roundCurrency(Number(row?.amortizacion_vendedor || 0));
+  const currentBuyerDebt = roundCurrency(Number(row?.deuda_comprador || 0));
+  const hasBuyerDebt = patch.deuda_comprador !== undefined;
+  const nextBuyerDebt = hasBuyerDebt
+    ? roundCurrency(Math.max(0, Math.min(total, Number(patch.deuda_comprador || 0))))
+    : roundCurrency(Math.max(0, total - Number(patch.amortizacion_vendedor ?? currentSellerDebt)));
+  const nextSellerDebt = hasBuyerDebt
+    ? roundCurrency(Math.max(0, total - nextBuyerDebt))
+    : roundCurrency(Math.max(0, Math.min(total, Number(patch.amortizacion_vendedor ?? currentSellerDebt))));
+  const saldoPorPaquete = roundCurrency(Number(row?.saldo_por_paquete || 0));
+
+  return {
+    ...row,
+    amortizacion_vendedor: nextSellerDebt,
+    deuda_comprador: nextBuyerDebt,
+    monto_paga_vendedor: nextSellerDebt,
+    monto_paga_comprador: nextBuyerDebt,
+    saldo_cobrar: roundCurrency(nextBuyerDebt + saldoPorPaquete),
+  };
+};
+
 const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackageManagerModalProps) => {
   const { user }: any = useContext(UserContext);
   const currentSucursalId = String(localStorage.getItem("sucursalId") || "").trim();
@@ -1929,12 +1965,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                         setRows((current) =>
                                           current.map((currentRow) =>
                                             String(currentRow._id) === rowId
-                                              ? applyPackagePatch(
-                                                  currentRow,
-                                                  {
-                                                    amortizacion_vendedor: Math.max(0, Number(value || 0)),
-                                                  }
-                                                )
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  amortizacion_vendedor: Math.max(0, Number(value || 0)),
+                                                })
                                               : currentRow
                                           )
                                         )
@@ -1945,6 +1978,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                           amortizacion_vendedor: Math.max(
                                             0,
                                             Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
                                           ),
                                         });
                                       }}
@@ -1962,18 +1999,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                       disabled={isSaving}
                                       value={Number(row.deuda_comprador || 0)}
                                       onChange={(value) => {
-                                        const buyerDebt = Math.max(0, Number(value || 0));
-                                        const total = Number(row.precio_total || 0);
-                                        const nextSellerDebt = Math.max(0, total - buyerDebt);
                                         setRows((current) =>
                                           current.map((currentRow) =>
                                             String(currentRow._id) === rowId
-                                              ? applyPackagePatch(
-                                                  currentRow,
-                                                  {
-                                                    amortizacion_vendedor: nextSellerDebt,
-                                                  }
-                                                )
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  deuda_comprador: Math.max(0, Number(value || 0)),
+                                                })
                                               : currentRow
                                           )
                                         );
@@ -1984,6 +2015,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                           amortizacion_vendedor: Math.max(
                                             0,
                                             Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
                                           ),
                                         });
                                       }}
@@ -2162,12 +2197,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                         setRows((current) =>
                                           current.map((currentRow) =>
                                             String(currentRow._id) === rowId
-                                              ? applyPackagePatch(
-                                                  currentRow,
-                                                  {
-                                                    amortizacion_vendedor: Math.max(0, Number(value || 0)),
-                                                  }
-                                                )
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  amortizacion_vendedor: Math.max(0, Number(value || 0)),
+                                                })
                                               : currentRow
                                           )
                                         )
@@ -2178,6 +2210,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                           amortizacion_vendedor: Math.max(
                                             0,
                                             Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
                                           ),
                                         });
                                       }}
@@ -2197,18 +2233,12 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                       disabled={isSaving}
                                       value={Number(row.deuda_comprador || 0)}
                                       onChange={(value) => {
-                                        const buyerDebt = Math.max(0, Number(value || 0));
-                                        const total = Number(row.precio_total || 0);
-                                        const nextSellerDebt = Math.max(0, total - buyerDebt);
                                         setRows((current) =>
                                           current.map((currentRow) =>
                                             String(currentRow._id) === rowId
-                                              ? applyPackagePatch(
-                                                  currentRow,
-                                                  {
-                                                    amortizacion_vendedor: nextSellerDebt,
-                                                  }
-                                                )
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  deuda_comprador: Math.max(0, Number(value || 0)),
+                                                })
                                               : currentRow
                                           )
                                         );
@@ -2219,6 +2249,10 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                           amortizacion_vendedor: Math.max(
                                             0,
                                             Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
                                           ),
                                         });
                                       }}
