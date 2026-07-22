@@ -52,6 +52,10 @@ const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()
     if (!start.isValid() || !pickedUp.isValid()) return 0;
     return Math.max(0, pickedUp.startOf("day").diff(start.startOf("day"), "days") - LATE_PICKUP_GRACE_DAYS);
 };
+const isSameBusinessDay = (value?: unknown) => {
+    const date = moment.tz(value as any, TZ);
+    return date.isValid() && date.isSame(moment.tz(TZ), "day");
+};
 
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
@@ -243,6 +247,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryPermissionBranchId || String(deliveryPermissionBranchId) === String(currentSucursalId);
     }, [deliveryPermissionBranchId, currentSucursalId]);
+    const canEditDestinationCreatedToday = canEditShipping && isSameBusinessDay(shipping?.fecha_pedido);
 
 
     const saldoACobrar = useMemo(() => {
@@ -658,9 +663,18 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     ? "3"
                     : values.tipo_de_pago;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
-            const effectiveDestinationType = values.tipo_destino === "otro_lugar" ? "otro_lugar" : "sucursal";
-            const effectiveDestinationBranchId =
-                values.tipo_destino === "esta_sucursal" ? origenBranchId : values.destino_sucursal_id;
+            const simplePackageDestinationId =
+                values.destino_sucursal_id || paymentBranchId || origenBranchId;
+            const effectiveDestinationType = isSimplePackageOrder
+                ? "sucursal"
+                : values.tipo_destino === "otro_lugar"
+                    ? "otro_lugar"
+                    : "sucursal";
+            const effectiveDestinationBranchId = isSimplePackageOrder
+                ? simplePackageDestinationId
+                : values.tipo_destino === "esta_sucursal"
+                    ? origenBranchId
+                    : values.destino_sucursal_id;
             const destinationBranch = sucursals.find((s: any) => String(s._id) === String(effectiveDestinationBranchId));
             const lugarEntregaFinal = effectiveDestinationType === "sucursal"
                 ? destinationBranch?.nombre || origenSucursal?.nombre || shipping?.lugar_entrega
@@ -684,6 +698,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 sucursal: paymentBranchIdForUpdate,
                 lugar_entrega: lugarEntregaFinal,
                 ubicacion_link: ubicacionLinkFinal,
+                destino_sucursal_id: effectiveDestinationBranchId,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,
                 pagado_al_vendedor: effectivePaymentType === '3',
@@ -932,6 +947,35 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 <Form.Item label="Deuda del comprador">
                                     <Input value={`Bs. ${simplePackageBuyerDebt.toFixed(2)}`} readOnly />
                                 </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
+                )}
+                {isSimplePackageOrder && canEditDestinationCreatedToday && (
+                    <Card title="Sucursal destino" bordered={false} style={{ marginTop: 16 }}>
+                        <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item
+                                    name="destino_sucursal_id"
+                                    label="Sucursal destino"
+                                    rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
+                                >
+                                    <Select
+                                        disabled={!canEditDestinationCreatedToday}
+                                        placeholder="Seleccione la sucursal destino"
+                                        allowClear
+                                        style={{ width: '100%' }}
+                                        options={sucursals.map((s: any) => ({
+                                            value: s._id,
+                                            label: s.nombre,
+                                        }))}
+                                    />
+                                </Form.Item>
+                            </Col>
+                            <Col span={24}>
+                                <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                                    Solo se puede cambiar la sucursal destino el mismo dia en que se creo el pedido.
+                                </div>
                             </Col>
                         </Row>
                     </Card>

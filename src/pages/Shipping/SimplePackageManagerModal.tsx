@@ -23,7 +23,7 @@ import {
   createDraftRow,
   SimplePackageDraftRow,
 } from "../SimplePackages/simplePackageHelpers";
-import { isSuperadminUser } from "../../utils/role";
+import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import {
   buildDirectShippingLabelImageData,
   DEFAULT_SHIPPING_LABEL_PRINT_OPTIONS,
@@ -130,6 +130,42 @@ const formatSellerDisplayName = (seller: any) => {
   return fullName || brand || seller?.vendedor || "Vendedor";
 };
 
+const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
+
+const getSimplePackageFixedTotal = (row: any) =>
+  roundCurrency(
+    Number(
+      row?.precio_total ??
+      Number(row?.precio_paquete || 0) + Number(row?.precio_entre_sucursal || row?.cargo_delivery || 0)
+    )
+  );
+
+const applySimpleDebtPairPatch = (
+  row: any,
+  patch: { amortizacion_vendedor?: number; deuda_comprador?: number }
+) => {
+  const total = Math.max(0, getSimplePackageFixedTotal(row));
+  const currentSellerDebt = roundCurrency(Number(row?.amortizacion_vendedor || 0));
+  const currentBuyerDebt = roundCurrency(Number(row?.deuda_comprador || 0));
+  const hasBuyerDebt = patch.deuda_comprador !== undefined;
+  const nextBuyerDebt = hasBuyerDebt
+    ? roundCurrency(Math.max(0, Math.min(total, Number(patch.deuda_comprador || 0))))
+    : roundCurrency(Math.max(0, total - Number(patch.amortizacion_vendedor ?? currentSellerDebt)));
+  const nextSellerDebt = hasBuyerDebt
+    ? roundCurrency(Math.max(0, total - nextBuyerDebt))
+    : roundCurrency(Math.max(0, Math.min(total, Number(patch.amortizacion_vendedor ?? currentSellerDebt))));
+  const saldoPorPaquete = roundCurrency(Number(row?.saldo_por_paquete || 0));
+
+  return {
+    ...row,
+    amortizacion_vendedor: nextSellerDebt,
+    deuda_comprador: nextBuyerDebt,
+    monto_paga_vendedor: nextSellerDebt,
+    monto_paga_comprador: nextBuyerDebt,
+    saldo_cobrar: roundCurrency(nextBuyerDebt + saldoPorPaquete),
+  };
+};
+
 const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackageManagerModalProps) => {
   const { user }: any = useContext(UserContext);
   const currentSucursalId = String(localStorage.getItem("sucursalId") || "").trim();
@@ -178,6 +214,9 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
   const createTotals = useMemo(() => calculateSimplePackageTotals(createRows), [createRows]);
   const selectedSeller = sellerRows.find((seller) => String(seller._id) === String(selectedSellerId));
   const canCreateWithoutPrinting = isSuperadminUser(user);
+  const normalizedRole = normalizeRole(user?.role);
+  const canEditDebtFields =
+    normalizedRole === "admin" || normalizedRole === "operator" || isSuperadminUser(user);
 
   const getSimpleEscalatedPrice = (position: number, packageSize = "estandar") => {
     if (!createUseEscalation) {
@@ -794,6 +833,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
       targetDestinationId,
       Number(patch.delivery_spaces !== undefined ? patch.delivery_spaces || 1 : targetRow?.delivery_spaces || 1)
     );
+    const pricingConfig = affectsDeliveryPricing ? sellerConfig : undefined;
     const patchedRows = rows.map((row) =>
       String(row._id) === String(rowId)
         ? applyPackagePatch(
@@ -808,7 +848,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                   }
                 : {}),
             },
-            sellerConfig
+            pricingConfig
           )
         : row
     );
@@ -1914,10 +1954,78 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                   <Input value={`Bs. ${Number(row.saldo_por_paquete || 0).toFixed(2)}`} readOnly />
                                 </td>
                                 <td style={tableCellStyle}>
-                                  <Input value={`Bs. ${Number(row.amortizacion_vendedor || 0).toFixed(2)}`} readOnly />
+                                  {canEditDebtFields && !isRowLocked ? (
+                                    <InputNumber
+                                      min={0}
+                                      style={{ width: "100%" }}
+                                      addonBefore="Bs."
+                                      disabled={isSaving}
+                                      value={Number(row.amortizacion_vendedor || 0)}
+                                      onChange={(value) =>
+                                        setRows((current) =>
+                                          current.map((currentRow) =>
+                                            String(currentRow._id) === rowId
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  amortizacion_vendedor: Math.max(0, Number(value || 0)),
+                                                })
+                                              : currentRow
+                                          )
+                                        )
+                                      }
+                                      onBlur={() => {
+                                        const currentRow = rows.find((item) => String(item._id) === rowId);
+                                        void commitRowPatch(rowId, {
+                                          amortizacion_vendedor: Math.max(
+                                            0,
+                                            Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
+                                          ),
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <Input value={`Bs. ${Number(row.amortizacion_vendedor || 0).toFixed(2)}`} readOnly />
+                                  )}
                                 </td>
                                 <td style={tableCellStyle}>
-                                  <Input value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
+                                  {canEditDebtFields && !isRowLocked ? (
+                                    <InputNumber
+                                      min={0}
+                                      style={{ width: "100%" }}
+                                      addonBefore="Bs."
+                                      disabled={isSaving}
+                                      value={Number(row.deuda_comprador || 0)}
+                                      onChange={(value) => {
+                                        setRows((current) =>
+                                          current.map((currentRow) =>
+                                            String(currentRow._id) === rowId
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  deuda_comprador: Math.max(0, Number(value || 0)),
+                                                })
+                                              : currentRow
+                                          )
+                                        );
+                                      }}
+                                      onBlur={() => {
+                                        const currentRow = rows.find((item) => String(item._id) === rowId);
+                                        void commitRowPatch(rowId, {
+                                          amortizacion_vendedor: Math.max(
+                                            0,
+                                            Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
+                                          ),
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <Input value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
+                                  )}
                                 </td>
                                 <td style={tableCellStyle}>
                                   {isRowLocked ? (
@@ -2077,11 +2185,81 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                                 </div>
                                 <div>
                                   <Typography.Text strong>Deuda vendedor</Typography.Text>
-                                  <Input className="mt-1" value={`Bs. ${Number(row.amortizacion_vendedor || 0).toFixed(2)}`} readOnly />
+                                  {canEditDebtFields && !isRowLocked ? (
+                                    <InputNumber
+                                      className="mt-1"
+                                      min={0}
+                                      style={{ width: "100%" }}
+                                      addonBefore="Bs."
+                                      disabled={isSaving}
+                                      value={Number(row.amortizacion_vendedor || 0)}
+                                      onChange={(value) =>
+                                        setRows((current) =>
+                                          current.map((currentRow) =>
+                                            String(currentRow._id) === rowId
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  amortizacion_vendedor: Math.max(0, Number(value || 0)),
+                                                })
+                                              : currentRow
+                                          )
+                                        )
+                                      }
+                                      onBlur={() => {
+                                        const currentRow = rows.find((item) => String(item._id) === rowId);
+                                        void commitRowPatch(rowId, {
+                                          amortizacion_vendedor: Math.max(
+                                            0,
+                                            Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
+                                          ),
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <Input className="mt-1" value={`Bs. ${Number(row.amortizacion_vendedor || 0).toFixed(2)}`} readOnly />
+                                  )}
                                 </div>
                                 <div>
                                   <Typography.Text strong>Deuda comprador</Typography.Text>
-                                  <Input className="mt-1" value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
+                                  {canEditDebtFields && !isRowLocked ? (
+                                    <InputNumber
+                                      className="mt-1"
+                                      min={0}
+                                      style={{ width: "100%" }}
+                                      addonBefore="Bs."
+                                      disabled={isSaving}
+                                      value={Number(row.deuda_comprador || 0)}
+                                      onChange={(value) => {
+                                        setRows((current) =>
+                                          current.map((currentRow) =>
+                                            String(currentRow._id) === rowId
+                                              ? applySimpleDebtPairPatch(currentRow, {
+                                                  deuda_comprador: Math.max(0, Number(value || 0)),
+                                                })
+                                              : currentRow
+                                          )
+                                        );
+                                      }}
+                                      onBlur={() => {
+                                        const currentRow = rows.find((item) => String(item._id) === rowId);
+                                        void commitRowPatch(rowId, {
+                                          amortizacion_vendedor: Math.max(
+                                            0,
+                                            Number(currentRow?.amortizacion_vendedor || 0)
+                                          ),
+                                          deuda_comprador: Math.max(
+                                            0,
+                                            Number(currentRow?.deuda_comprador || 0)
+                                          ),
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <Input className="mt-1" value={`Bs. ${Number(row.deuda_comprador || 0).toFixed(2)}`} readOnly />
+                                  )}
                                 </div>
                               </div>
                                 {!isRowLocked && (

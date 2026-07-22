@@ -1,6 +1,6 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { Alert, Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Table, Tooltip } from 'antd';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { getShippingDashboardListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
@@ -31,6 +31,12 @@ const MOBILE_CARD_PAGE_SIZE = 12;
 const WAITING_STATUSES = new Set([WAITING_RAW_STATUS, READY_FOR_PICKUP_STATUS]);
 const FILTER_ALL = "todos";
 const FILTER_PENDING_SEND = "para_enviar";
+const GENERAL_VENDOR_SCOPE_TABS: Array<"todos" | "En Espera" | "para_enviar" | "en_camino"> = [
+    "todos",
+    "En Espera",
+    "para_enviar",
+    "en_camino",
+];
 
 type ShippingHeaderAction = {
     label: string;
@@ -43,6 +49,24 @@ type ShippingHeaderAction = {
 } | null;
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
+const collectSellerIdsFromShippingRow = (row: any) => {
+    const sellerIds = new Set<string>();
+
+    (row?.venta || []).forEach((sale: any) => {
+        const sellerId = String(sale?.vendedor?._id || sale?.vendedor || sale?.id_vendedor || "").trim();
+        if (sellerId) sellerIds.add(sellerId);
+    });
+
+    (row?.productos_temporales || []).forEach((product: any) => {
+        const sellerId = String(product?.id_vendedor || "").trim();
+        if (sellerId) sellerIds.add(sellerId);
+    });
+
+    const directSellerId = String(row?.id_vendedor || row?.sellerId || row?.vendedor?._id || "").trim();
+    if (directSellerId) sellerIds.add(directSellerId);
+
+    return Array.from(sellerIds);
+};
 
 const normalizeStatus = (value: unknown) => String(value || "").trim();
 const isWaitingStatus = (value: unknown) => WAITING_STATUSES.has(normalizeStatus(value));
@@ -100,6 +124,20 @@ const resolveBranchId = (value: any) => {
 const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     const estadoReal = normalizeStatus(pedido?.estado_pedido);
     const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS;
+
+    if (estadoReal === "Anulado" || pedido?.anulado === true) {
+        return {
+            label: "Anulado",
+            tone: {
+                text: "#a8071a",
+                border: "#ffccc7",
+                background: "#fff1f0",
+                dot: "#f5222d",
+            },
+            tooltip: undefined,
+            isVisualOnly: false,
+        };
+    }
 
     if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
         return {
@@ -216,7 +254,8 @@ const ShippingTable = ({
     const [otherLocation, setOtherLocation] = useState('');
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
-    const [availableVendorIds, setAvailableVendorIds] = useState<string[]>([]);
+    const [generalVendorIds, setGeneralVendorIds] = useState<string[]>([]);
+    const [deliveredVendorIds, setDeliveredVendorIds] = useState<string[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("");
     const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
     const normalizedUserRole = String(user?.role || "").toLowerCase();
@@ -541,11 +580,6 @@ const ShippingTable = ({
                 en_camino: Number(dashboardData?.counts?.en_camino || 0),
                 entregado: Number(dashboardData?.counts?.entregado || 0),
             });
-            setAvailableVendorIds(
-                Array.isArray(dashboardData?.vendorIds)
-                    ? dashboardData.vendorIds.map((value: any) => String(value))
-                    : []
-            );
             setTableTotal(Number(dashboardData?.total || 0));
         } catch (error) {
             console.error("Error fetching shipping data:", error);
@@ -553,9 +587,13 @@ const ShippingTable = ({
             setLoadingTable(false);
         }
     };
-    const getVendedoresConEntregas = () => {
-        const vendedoresConEntregasSet = new Set(availableVendorIds.map(String));
-        return vendedores.filter((vendedor: any) => vendedoresConEntregasSet.has(String(vendedor._id)));
+    const activeVendorIds = useMemo(
+        () => (selectedStatus === "entregado" ? deliveredVendorIds : generalVendorIds),
+        [deliveredVendorIds, generalVendorIds, selectedStatus]
+    );
+    const getFilteredVendedores = () => {
+        const vendedoresDisponiblesSet = new Set(activeVendorIds.map(String));
+        return vendedores.filter((vendedor: any) => vendedoresDisponiblesSet.has(String(vendedor._id)));
     };
     const hasExternalInCurrentStatus = () => canManageExternal;
 
@@ -902,6 +940,112 @@ const ShippingTable = ({
     }, []);
 
     useEffect(() => {
+        if (!(isAdmin || isOperator)) return;
+
+        let cancelled = false;
+
+        const fetchVendorScopes = async () => {
+            try {
+                const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
+                const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
+                const destinationMode =
+                    selectedLocation === "other"
+                        ? "other"
+                        : selectedLocation
+                            ? "branch"
+                            : "any";
+                const destinationQuery =
+                    selectedLocation === "other"
+                        ? otherLocation.trim() || undefined
+                        : selectedLocation || undefined;
+                const baseParams = {
+                    page: 1,
+                    limit: 3000,
+                    from,
+                    to,
+                    currentBranchId: currentSucursalId || undefined,
+                    client: searchCliente.trim() || undefined,
+                    destinationMode: destinationMode as "any" | "branch" | "other",
+                    destinationQuery,
+                };
+
+                const scopeResponses = await Promise.all([
+                    ...GENERAL_VENDOR_SCOPE_TABS.map((tab) =>
+                        getShippingDashboardListAPI({
+                            ...baseParams,
+                            tab,
+                        })
+                    ),
+                    getShippingDashboardListAPI({
+                        ...baseParams,
+                        tab: "entregado",
+                    }),
+                ]);
+
+                if (cancelled) return;
+
+                const nextGeneralVendorIds = Array.from(
+                    new Set(
+                        scopeResponses
+                            .slice(0, GENERAL_VENDOR_SCOPE_TABS.length)
+                            .flatMap((response: any) => {
+                                const vendorIdsFromResponse = Array.isArray(response?.vendorIds)
+                                    ? response.vendorIds.map((value: any) => String(value))
+                                    : [];
+                                const vendorIdsFromRows = Array.isArray(response?.rows)
+                                    ? response.rows.flatMap((row: any) => collectSellerIdsFromShippingRow(row))
+                                    : [];
+                                return [...vendorIdsFromResponse, ...vendorIdsFromRows];
+                            })
+                    )
+                );
+                const nextDeliveredVendorIds = Array.from(
+                    new Set(
+                        [
+                            ...(Array.isArray(scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length]?.vendorIds)
+                                ? scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length].vendorIds.map((value: any) =>
+                                    String(value)
+                                )
+                                : []),
+                            ...(Array.isArray(scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length]?.rows)
+                                ? scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length].rows.flatMap((row: any) =>
+                                    collectSellerIdsFromShippingRow(row)
+                                )
+                                : []),
+                        ]
+                    )
+                );
+
+                setGeneralVendorIds(nextGeneralVendorIds);
+                setDeliveredVendorIds(nextDeliveredVendorIds);
+            } catch (error) {
+                console.error("Error al obtener vendedores filtrados:", error);
+            }
+        };
+
+        void fetchVendorScopes();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        isAdmin,
+        isOperator,
+        dateRange,
+        selectedLocation,
+        otherLocation,
+        currentSucursalId,
+        searchCliente,
+        refreshKey,
+    ]);
+
+    useEffect(() => {
+        if (!selectedVendedor || selectedVendedor === EXTERNAL_VENDOR_FILTER) return;
+        if (activeVendorIds.includes(String(selectedVendedor))) return;
+        setSelectedVendedor("");
+    }, [activeVendorIds, selectedVendedor]);
+
+    useEffect(() => {
         if (!onHeaderActionChange) return;
 
         if (!canManageExternal) {
@@ -1015,7 +1159,7 @@ const ShippingTable = ({
                         {hasExternalInCurrentStatus() && (
                             <Option value={EXTERNAL_VENDOR_FILTER}>Externo</Option>
                         )}
-                        {getVendedoresConEntregas().map((vendedor: any) => (
+                        {getFilteredVendedores().map((vendedor: any) => (
                             <Option key={vendedor._id} value={vendedor._id}>
                                 {vendedor.nombre} {vendedor.apellido}
                             </Option>
@@ -1640,7 +1784,9 @@ const ShippingTable = ({
             <ExternalShippingInfoModal
                 visible={isExternalInfoVisible}
                 externalShipping={selectedExternalShipping}
+                sucursals={sucursal}
                 isAdmin={canManageExternal}
+                canViewAnnulledBy={isSuperadminUser(user)}
                 canSendGuideWhatsapp={isSuperadminUser(user)}
                 onClose={() => {
                     setIsExternalInfoVisible(false);

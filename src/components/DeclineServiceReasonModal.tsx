@@ -176,13 +176,16 @@ export default function DeclineServiceReasonModal({
       <Steps
         current={step}
         size="small"
-        items={[{ title: "Motivo" }, { title: "Probabilidad de retorno" }]}
+        items={[{ title: "Motivo" }, { title: "Retorno en 6 meses" }]}
         className="mb-6"
       />
 
       <div>
         {step === 0 && (
           <div className="space-y-5">
+            <div className="text-sm font-medium text-slate-700">
+              Cual es el motivo principal por el que dejas el servicio?
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {PRIMARY_REASONS.map((option) => (
                 <OptionCard
@@ -212,6 +215,9 @@ export default function DeclineServiceReasonModal({
 
         {step === 1 && (
           <div className="space-y-5">
+            <div className="text-sm font-medium text-slate-700">
+              Que tan probable es que retorne al servicio en los siguientes 6 meses?
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {RETURN_OPTIONS.map((option) => (
                 <OptionCard

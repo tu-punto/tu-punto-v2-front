@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { EditOutlined, PrinterOutlined, SaveOutlined, WhatsAppOutlined } from "@ant-design/icons";
 import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, message } from "antd";
 import moment from "moment-timezone";
-import { sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
+import { annulExternalSaleAPI, sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
 import {
@@ -20,7 +20,9 @@ interface ExternalShippingInfoModalProps {
   onSaved: () => void;
   externalShipping: any;
   isAdmin: boolean;
+  canViewAnnulledBy?: boolean;
   canSendGuideWhatsapp: boolean;
+  sucursals?: any[];
 }
 
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
@@ -121,7 +123,9 @@ const ExternalShippingInfoModal = ({
   onSaved,
   externalShipping,
   isAdmin,
+  canViewAnnulledBy = false,
   canSendGuideWhatsapp,
+  sucursals = [],
 }: ExternalShippingInfoModalProps) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -130,6 +134,9 @@ const ExternalShippingInfoModal = ({
   const [chargeOverride, setChargeOverride] = useState<any>(null);
   const [printingQr, setPrintingQr] = useState(false);
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
+  const [annulling, setAnnulling] = useState(false);
+  const [annulModalVisible, setAnnulModalVisible] = useState(false);
+  const [annulReason, setAnnulReason] = useState("");
   const chargeSource = chargeOverride ? { ...externalShipping, ...chargeOverride } : externalShipping;
 
   const packagePrice = useMemo(
@@ -201,11 +208,21 @@ const ExternalShippingInfoModal = ({
     [baseBuyerDebt, latePickupFee, chargeSource]
   );
   const serviceLabel = isSimplePackage ? "Simple" : "Externo";
+  const isAnnulled = Boolean(externalShipping?.anulado);
+  const isDeliveredExternal =
+    String(externalShipping?.estado_pedido || "").trim() === "Entregado" || externalShipping?.delivered === true;
   const isDeliveryLocked = isDeliveryEditLockedAfterFiveDays(externalShipping);
-  const canEditDelivery = isAdmin && !isDeliveryLocked;
+  const canEditDelivery = isAdmin && !isDeliveryLocked && !isAnnulled;
   const canEditCreatedToday = canEditDelivery && isSameBusinessDay(externalShipping?.fecha_pedido);
   const canEditBuyerName = canEditCreatedToday && !isSimplePackage;
   const canEditChargeSummary = canEditCreatedToday;
+  const canEditDestination = canEditCreatedToday;
+  const canAnnulExternal =
+    isAdmin &&
+    !isSimplePackage &&
+    !isAnnulled &&
+    !isDeliveredExternal &&
+    isSameBusinessDay(externalShipping?.fecha_pedido);
   const shouldAskBuyerPayment = estadoPedido === "Entregado" && buyerDebt > 0;
 
   const externalPaidStatus = String(chargeSource?.esta_pagado || "no").trim().toLowerCase();
@@ -393,6 +410,35 @@ const ExternalShippingInfoModal = ({
     form.setFieldValue("subtotal_efectivo", roundCurrency(Math.max(0, buyerDebt - nextQr)));
   };
 
+  const handleAnnulExternalSale = async () => {
+    if (!externalShipping?._id || !canAnnulExternal) return;
+
+    const trimmedReason = String(annulReason || "").trim();
+    if (!trimmedReason) {
+      message.error("Debes indicar el motivo de la anulacion");
+      return;
+    }
+
+    setAnnulling(true);
+    try {
+      const response = await annulExternalSaleAPI(String(externalShipping._id), trimmedReason);
+      if (!response.success) {
+        message.error(response.message || "No se pudo anular el pedido externo");
+        return;
+      }
+
+      message.success("Pedido externo anulado");
+      setAnnulModalVisible(false);
+      setAnnulReason("");
+      onSaved();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo anular el pedido externo");
+    } finally {
+      setAnnulling(false);
+    }
+  };
+
   const handlePrintExternalQRDirect = async (options: ShippingLabelPrintOptions) => {
     if (!externalShipping?.numero_guia) {
       message.warning("Esta entrega no tiene numero de guia para imprimir");
@@ -537,6 +583,10 @@ const ExternalShippingInfoModal = ({
       telefono_vendedor: externalShipping.telefono_vendedor || "",
       comprador: externalShipping.comprador || "",
       telefono_comprador: externalShipping.telefono_comprador || "",
+      destino_sucursal_id:
+        getBranchId(externalShipping?.destino_sucursal) ||
+        getBranchId(externalShipping?.sucursal) ||
+        undefined,
       descripcion_paquete: externalShipping.descripcion_paquete || "",
       precio_paquete: packagePrice,
       esta_pagado: externalShipping.esta_pagado || "no",
@@ -549,6 +599,8 @@ const ExternalShippingInfoModal = ({
     });
     setChargeOverride(null);
     setChargeEditing(false);
+    setAnnulModalVisible(false);
+    setAnnulReason("");
   }, [externalShipping?._id, form, packagePrice, visible]);
 
   const handleSave = async (values: any) => {
@@ -588,8 +640,10 @@ const ExternalShippingInfoModal = ({
       }
 
       const normalizedType = normalizeDeliveryPaymentCode(values.tipo_de_pago);
+      const nextDestinationBranchId = String(values.destino_sucursal_id || "").trim();
       const payload = {
         ...(canEditBuyerName ? { comprador: String(values.comprador || "").trim() } : {}),
+        ...(canEditDestination && nextDestinationBranchId ? { destino_sucursal_id: nextDestinationBranchId } : {}),
         estado_pedido: values.estado_pedido,
         delivered: values.estado_pedido === "Entregado",
         tipo_de_pago:
@@ -623,42 +677,63 @@ const ExternalShippingInfoModal = ({
   };
 
   return (
-    <Modal
-      title={`Detalle ${serviceLabel} ${externalShipping?.numero_guia || externalShipping?._id || ""}`}
-      open={visible}
-      onCancel={onClose}
-      footer={null}
-      width={860}
-      destroyOnClose
-    >
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <Space wrap>
-        <Button
-          icon={<PrinterOutlined />}
-          loading={printingQr}
-          disabled={!externalShipping?.numero_guia || sendingWhatsapp}
-          onClick={handleOpenPrintOptions}
-        >
-          Imprimir etiqueta
-        </Button>
-        {canSendGuideWhatsapp && (
+    <>
+      <Modal
+        title={`Detalle ${serviceLabel} ${externalShipping?.numero_guia || externalShipping?._id || ""}`}
+        open={visible}
+        onCancel={onClose}
+        footer={null}
+        width={860}
+        destroyOnClose
+      >
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <Space wrap>
+          {canAnnulExternal && (
+            <Button danger disabled={printingQr || sendingWhatsapp || loading} onClick={() => setAnnulModalVisible(true)}>
+              Anular pedido
+            </Button>
+          )}
           <Button
-            icon={<WhatsAppOutlined />}
-            loading={sendingWhatsapp}
-            disabled={!externalShipping?.numero_guia || printingQr}
-            onClick={() => void handleSendGuideWhatsapp()}
+            icon={<PrinterOutlined />}
+            loading={printingQr}
+            disabled={!externalShipping?.numero_guia || sendingWhatsapp}
+            onClick={handleOpenPrintOptions}
           >
-            WhatsApp guia
+            Imprimir etiqueta
           </Button>
-        )}
-        </Space>
-      </div>
-      {isDeliveryLocked && (
-        <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: "#fff7e6", border: "1px solid #ffd591", color: "#ad6800" }}>
-          Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.
+          {canSendGuideWhatsapp && (
+            <Button
+              icon={<WhatsAppOutlined />}
+              loading={sendingWhatsapp}
+              disabled={!externalShipping?.numero_guia || printingQr}
+              onClick={() => void handleSendGuideWhatsapp()}
+            >
+              WhatsApp guia
+            </Button>
+          )}
+          </Space>
         </div>
-      )}
-      <Form form={form} layout="vertical" onFinish={handleSave}>
+        {isAnnulled && (
+          <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: "#fff1f0", border: "1px solid #ffccc7", color: "#a8071a" }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              Este pedido fue anulado y ya no genera impacto economico ni operativo.
+            </div>
+            <div style={{ color: "#5c0011" }}>
+              <strong>Motivo:</strong> {String(externalShipping?.motivo_anulacion || "Sin motivo registrado")}
+            </div>
+            {canViewAnnulledBy && externalShipping?.anulado_por && (
+              <div style={{ marginTop: 4, color: "#5c0011" }}>
+                <strong>Anulado por:</strong> {String(externalShipping.anulado_por)}
+              </div>
+            )}
+          </div>
+        )}
+        {isDeliveryLocked && (
+          <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: "#fff7e6", border: "1px solid #ffd591", color: "#ad6800" }}>
+            Esta entrega ya supero los 5 dias como entregada. Solo se puede ver.
+          </div>
+        )}
+        <Form form={form} layout="vertical" onFinish={handleSave}>
         <Card title="Informacion del Vendedor" bordered={false}>
           <Row gutter={16}>
             <Col span={12}>
@@ -730,6 +805,34 @@ const ExternalShippingInfoModal = ({
             </Col>
           </Row>
         </Card>
+
+        {canEditDestination && (
+          <Card title="Sucursal destino" bordered={false} style={{ marginTop: 16 }}>
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item
+                  label="Sucursal destino"
+                  name="destino_sucursal_id"
+                  rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
+    >
+                  <Select
+                    disabled={!canEditDestination}
+                    placeholder="Selecciona la sucursal destino"
+                    options={sucursals.map((branch: any) => ({
+                      value: String(branch?._id || ""),
+                      label: String(branch?.nombre || ""),
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                  Solo se puede cambiar la sucursal destino el mismo dia en que se creo el pedido.
+                </div>
+              </Col>
+            </Row>
+          </Card>
+        )}
 
         <Card
           title="Resumen del Cobro"
@@ -960,8 +1063,33 @@ const ExternalShippingInfoModal = ({
             </Button>
           )}
         </div>
-      </Form>
-    </Modal>
+        </Form>
+      </Modal>
+      <Modal
+        title="Anular pedido externo"
+        open={annulModalVisible}
+        onCancel={() => {
+          if (annulling) return;
+          setAnnulModalVisible(false);
+        }}
+        onOk={() => void handleAnnulExternalSale()}
+        okText="Anular"
+        okButtonProps={{ danger: true, loading: annulling }}
+        cancelText="Cancelar"
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 12, color: "#595959" }}>
+          Esta accion no borra el pedido, pero lo dejara anulado y sin impacto en caja ni reportes.
+        </div>
+        <Input.TextArea
+          rows={4}
+          maxLength={500}
+          placeholder="Motivo de la anulacion"
+          value={annulReason}
+          onChange={(event) => setAnnulReason(event.target.value)}
+        />
+      </Modal>
+    </>
   );
 };
 

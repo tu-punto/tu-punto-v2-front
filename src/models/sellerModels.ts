@@ -48,6 +48,12 @@ export interface ISeller {
   fecha_pago_asignada?: Date | string;
   declinacion_servicio_fecha?: Date | string;
   declinacion_servicio_fecha_limite_retiro?: Date | string;
+  declinacion_servicio_origen?: "seller" | "admin" | string;
+  declinacion_servicio_motivo_principal?: string;
+  declinacion_servicio_motivo_principal_otro?: string;
+  declinacion_servicio_probabilidad_retorno?: string;
+  declinacion_servicio_omitir_motivo_principal?: boolean;
+  declinacion_servicio_omitir_probabilidad_retorno?: boolean;
   deuda: number;
   id_trabajador: number;
 

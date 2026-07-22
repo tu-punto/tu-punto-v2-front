@@ -1,9 +1,12 @@
-import { Button, message, Modal } from "antd";
+import { Badge, Button, message, Modal } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
-import { useState } from "react";
-import { autoRenewSellersAPI } from "../../api/seller";
+import { useEffect, useState } from "react";
+import { autoRenewSellersAPI, getSellersAPI } from "../../api/seller";
 import "./SellerTable.css";
+import LandingLeadsModal from "./LandingLeadsModal";
+import { getLandingLeadsAPI } from "../../api/landingLeads";
+import DeclineResponsesModal from "./DeclineResponsesModal";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -11,6 +14,41 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [autoRenewing, setAutoRenewing] = useState(false);
+  const [leadModalOpen, setLeadModalOpen] = useState(false);
+  const [leadNewCount, setLeadNewCount] = useState(0);
+  const [leadCounterLoading, setLeadCounterLoading] = useState(false);
+  const [declineResponsesOpen, setDeclineResponsesOpen] = useState(false);
+  const [declineResponsesCount, setDeclineResponsesCount] = useState(0);
+
+  const refreshLeadCounter = async () => {
+    setLeadCounterLoading(true);
+    try {
+      const response = await getLandingLeadsAPI();
+      const rows = Array.isArray(response?.leads) ? response.leads : [];
+      setLeadNewCount(rows.filter((row: any) => row?.contactado !== true).length);
+    } catch {
+      setLeadNewCount(0);
+    } finally {
+      setLeadCounterLoading(false);
+    }
+  };
+
+  const refreshDeclineResponsesCounter = async () => {
+    try {
+      const response = await getSellersAPI();
+      const rows = Array.isArray(response) ? response : Array.isArray((response as any)?.data) ? (response as any).data : [];
+      setDeclineResponsesCount(
+        rows.filter((row: any) => Boolean(row?.declinacion_servicio_fecha)).length
+      );
+    } catch {
+      setDeclineResponsesCount(0);
+    }
+  };
+
+  useEffect(() => {
+    void refreshLeadCounter();
+    void refreshDeclineResponsesCounter();
+  }, []);
 
   const showModal = () => {
     setIsModalVisible(true);
@@ -65,6 +103,21 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
 
         <div className="seller-page-actions flex gap-2">
           <Button
+            onClick={() => setDeclineResponsesOpen(true)}
+            className="text-mobile-sm xl:text-desktop-sm"
+          >
+            Respuestas declinación
+          </Button>
+          <Badge count={leadNewCount} offset={[-8, 8]} color="#f97316">
+            <Button
+              onClick={() => setLeadModalOpen(true)}
+              loading={leadCounterLoading}
+              className="text-mobile-sm xl:text-desktop-sm"
+            >
+              Leads registrados
+            </Button>
+          </Badge>
+          <Button
               onClick={handleAutoRenew}
               loading={autoRenewing}
               className="text-mobile-sm xl:text-desktop-sm"
@@ -91,6 +144,16 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         onCancel={handleCancel}
         onFinish={onFinish}
         onSuccess={handleSuccess}
+      />
+      <LandingLeadsModal
+        open={leadModalOpen}
+        onClose={() => setLeadModalOpen(false)}
+        onCounterChange={setLeadNewCount}
+      />
+      <DeclineResponsesModal
+        open={declineResponsesOpen}
+        onClose={() => setDeclineResponsesOpen(false)}
+        onCountChange={setDeclineResponsesCount}
       />
     </div>
   );
