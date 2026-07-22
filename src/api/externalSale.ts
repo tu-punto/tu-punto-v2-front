@@ -114,6 +114,19 @@ const updateExternalSaleAPI = async (saleId: any, saleData: any) => {
 
 }
 
+const annulExternalSaleAPI = async (saleId: string, reason: string) => {
+    try {
+        const res = await apiClient.post(`/external/${saleId}/anular`, { reason });
+        return {success: true, ...res.data};
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return {success: false, ...err.response.data};
+        }
+        return {success: false}
+    }
+}
+
 const sendExternalGuideWhatsappAPI = async (id: string) => {
     try {
         const res = await apiClient.post(`/external/${id}/send-guide-whatsapp`);
@@ -141,6 +154,7 @@ export {
     getExternalSaleByIdAPI,
     registerExternalSaleAPI,
     registerExternalPackagesAPI,
+    annulExternalSaleAPI,
     sendExternalGuideWhatsappAPI,
     updateExternalSaleAPI,
 }

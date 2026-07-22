@@ -125,6 +125,20 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
     const estadoReal = normalizeStatus(pedido?.estado_pedido);
     const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS;
 
+    if (estadoReal === "Anulado" || pedido?.anulado === true) {
+        return {
+            label: "Anulado",
+            tone: {
+                text: "#a8071a",
+                border: "#ffccc7",
+                background: "#fff1f0",
+                dot: "#f5222d",
+            },
+            tooltip: undefined,
+            isVisualOnly: false,
+        };
+    }
+
     if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
         return {
             label: "Vendedor retiro el paquete",
@@ -1772,6 +1786,7 @@ const ShippingTable = ({
                 externalShipping={selectedExternalShipping}
                 sucursals={sucursal}
                 isAdmin={canManageExternal}
+                canViewAnnulledBy={isSuperadminUser(user)}
                 canSendGuideWhatsapp={isSuperadminUser(user)}
                 onClose={() => {
                     setIsExternalInfoVisible(false);
