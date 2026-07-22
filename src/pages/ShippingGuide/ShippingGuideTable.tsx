@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
-import { Button, Card, Col, message, Modal, Row, Table, Tooltip } from "antd";
+import { Button, Card, Col, message, Modal, Row, Select, Table, Tooltip } from "antd";
 import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { getSignedURL } from "../../helpers/s3Helper";
 import moment from "moment-timezone";
 
+type PickupFilter = "all" | "picked_up" | "pending";
+
 const ShippingGuideTable = (
     { refreshKey, user, isFilterBySeller, isFilterByBranch, search_id }:
         { refreshKey: number, user: any, isFilterBySeller?: boolean, isFilterByBranch?: boolean, search_id: string }) => {
-    const [guidesList, setGuidesList] = useState([]);
+    const [guidesList, setGuidesList] = useState<any[]>([]);
     const [imageUrl, setImageUrl] = useState<string | null>();
     const [imageDesc, setImageDesc] = useState<string | null>();
     const [isImageVisible, setIsImageVisible] = useState(false);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
+    const [pickupFilter, setPickupFilter] = useState<PickupFilter>("all");
 
     const normalizedRole = String(user?.role || "").toLowerCase();
     const isAdmin = normalizedRole === "admin";
@@ -37,8 +40,8 @@ const ShippingGuideTable = (
             );
             setGuidesList(sortedData)
         } catch (error) {
-            console.error("Error al obtener Guías de Envío: ", error)
-            message.error("Error al cargar Guías de Envío")
+            console.error("Error al obtener GuÃ­as de EnvÃ­o: ", error)
+            message.error("Error al cargar GuÃ­as de EnvÃ­o")
         }
     }
     const fetchGuidesBySeller = async () => {
@@ -49,8 +52,8 @@ const ShippingGuideTable = (
             );
             setGuidesList(sortedData)
         } catch (error) {
-            console.error("Error al obtener Guías de Envío por vendedor: ", error)
-            message.error("Error al cargar Guías de Envío")
+            console.error("Error al obtener GuÃ­as de EnvÃ­o por vendedor: ", error)
+            message.error("Error al cargar GuÃ­as de EnvÃ­o")
         }
     };
 
@@ -60,12 +63,23 @@ const ShippingGuideTable = (
             const sortedData = apiData.sort(
                 (a: any, b: any) => new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
             );
-            setGuidesList(sortedData.filter((guide: any) => !guide.isRecogido))
+            setGuidesList(sortedData)
+            setPickupFilter("all")
         } catch (error) {
-            console.error("Error al obtener Guías de Envío por vendedor: ", error)
-            message.error("Error al cargar Guías de Envío")
+            console.error("Error al obtener GuÃ­as de EnvÃ­o por vendedor: ", error)
+            message.error("Error al cargar GuÃ­as de EnvÃ­o")
         }
     }
+
+    const filteredGuidesList = useMemo(() => {
+        if (pickupFilter === "picked_up") {
+            return guidesList.filter((guide: any) => guide.isRecogido);
+        }
+        if (pickupFilter === "pending") {
+            return guidesList.filter((guide: any) => !guide.isRecogido);
+        }
+        return guidesList;
+    }, [guidesList, pickupFilter]);
 
     const handleShowImage = async (record: any) => {
         if (record.imagen_key) {
@@ -78,26 +92,32 @@ const ShippingGuideTable = (
 
     const handleCheckShipping = async (record: any) => {
         if (record.isRecogido) {
-            message.info("Esta guía ya fue marcada como recogida")
+            message.info("Esta guÃ­a ya fue marcada como recogida")
             return
         }
         try {
             const res = await markAsDelivered(record._id);
             if (res.success) {
-                message.success("El estado de la guía se ha actualizado correctamente")
-                setGuidesList((current: any[]) => current.filter((item) => String(item._id) !== String(record._id)));
+                message.success("El estado de la guÃ­a se ha actualizado correctamente")
+                setGuidesList((current: any[]) =>
+                    current.map((item) =>
+                        String(item._id) === String(record._id)
+                            ? { ...item, isRecogido: true }
+                            : item
+                    )
+                );
             } else {
-                message.error("Error al actualizar el estado de la guía")
+                message.error("Error al actualizar el estado de la guÃ­a")
             }
         } catch (error) {
-            console.error("Erorr al actualizar el estado entregado de Guía de Envío: ", error)
-            message.error("Error al actualizar el estado de la guía")
+            console.error("Erorr al actualizar el estado entregado de GuÃ­a de EnvÃ­o: ", error)
+            message.error("Error al actualizar el estado de la guÃ­a")
         }
     }
 
     const columns = [
         {
-            title: '¿Recogido?',
+            title: 'Â¿Recogido?',
             dataIndex: 'isRecogido',
             key: 'isRecogido',
             width: 100,
@@ -120,7 +140,7 @@ const ShippingGuideTable = (
             }
         },
         {
-            title: 'Fecha de creación',
+            title: 'Fecha de creaciÃ³n',
             dataIndex: 'fecha_subida',
             key: 'fecha_subida',
             width: 180,
@@ -136,12 +156,12 @@ const ShippingGuideTable = (
             }),
         },
         {
-            title: 'Descripción',
+            title: 'DescripciÃ³n',
             dataIndex: 'descripcion',
             key: 'descripcion',
             render: (_: any, record: any) => {
                 if (record.descripcion == "undefined") {
-                    return "Sin descripción"
+                    return "Sin descripciÃ³n"
                 } else {
                     return record.descripcion
                 }
@@ -179,9 +199,24 @@ const ShippingGuideTable = (
 
     return (
         <>
+            {isFilterByBranch && (
+                <div className="mb-4 flex justify-end">
+                    <Select
+                        value={pickupFilter}
+                        onChange={(value: PickupFilter) => setPickupFilter(value)}
+                        style={{ width: 180 }}
+                        options={[
+                            { value: "all", label: "Todos" },
+                            { value: "picked_up", label: "Ya recogido" },
+                            { value: "pending", label: "No recogido" },
+                        ]}
+                    />
+                </div>
+            )}
+
             <Table
                 columns={columns}
-                dataSource={guidesList}
+                dataSource={filteredGuidesList}
                 scroll={{ x: "max-content" }}
             />
 
@@ -194,7 +229,7 @@ const ShippingGuideTable = (
                 }}
                 footer={null}
             >
-                <Card title="Foto - Guía de Envío" bordered={false}>
+                <Card title="Foto - GuÃ­a de EnvÃ­o" bordered={false}>
                     <Row gutter={16}>
                         {imageUrl && <img src={imageUrl} alt="Imagen" style={{ width: '100%' }} />}
                     </Row>
