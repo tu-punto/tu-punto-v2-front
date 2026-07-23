@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Checkbox, Image, Popover, Tooltip, message } from "antd";
+import { Button, Checkbox, Image, Popover, Radio, Space, Tooltip, Typography, message } from "antd";
 import { DollarOutlined } from "@ant-design/icons";
 
 import { paySellerDebtAPI } from "../../../api/seller";
@@ -12,12 +12,17 @@ interface Props {
 const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   const [visible, setVisible] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "qr" | null>(null);
   const [loading, setLoading] = useState(false);
 
   /** click “Pagar” */
   const handleConfirm = async () => {
     if (!checked) {
       message.warning("Marca la casilla para confirmar el pago.");
+      return;
+    }
+    if (!paymentMethod) {
+      message.warning("Selecciona como se pago al vendedor.");
       return;
     }
 
@@ -37,7 +42,10 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
 
     setLoading(true);
     try {
-      const res = await paySellerDebtAPI(seller._id, { payAll: true });
+      const res = await paySellerDebtAPI(seller._id, {
+        payAll: true,
+        paymentMethod
+      });
       if (!res?.success) throw new Error("fail");
 
       const pdfBlob = new Blob([res.data], { type: "application/pdf" });
@@ -78,6 +86,7 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       setLoading(false);
       setVisible(false);
       setChecked(false);
+      setPaymentMethod(null);
     }
   };
 
@@ -85,6 +94,7 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   const handleCancel = () => {
     setVisible(false);
     setChecked(false);
+    setPaymentMethod(null);
     message.info("Pago cancelado");
   };
 
@@ -115,6 +125,20 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       >
         ¿Desea pagar las deudas existentes?
       </Checkbox>
+
+      <div className="mt-3">
+        <Typography.Text strong>Metodo de pago</Typography.Text>
+        <Radio.Group
+          className="mt-2"
+          value={paymentMethod}
+          onChange={(event) => setPaymentMethod(event.target.value)}
+        >
+          <Space direction="vertical">
+            <Radio value="efectivo">Efectivo</Radio>
+            <Radio value="qr">QR</Radio>
+          </Space>
+        </Radio.Group>
+      </div>
 
       <div className="mt-2 text-right">
         <Button

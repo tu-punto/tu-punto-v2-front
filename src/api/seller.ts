@@ -68,7 +68,7 @@ export const updateSellerAPI = async (sellerId: string, updateData: any) => {
 }
 
 export const paySellerDebtAPI = async (sellerId: string,
-    payload: { payAll: boolean }) => {
+    payload: { payAll: boolean; paymentMethod: "efectivo" | "qr" }) => {
     try {
         const res = await apiClient.post(`/seller/${sellerId}/pay`, payload, {responseType: 'blob'});
         return { success: true, data: res.data }
