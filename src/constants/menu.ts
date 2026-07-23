@@ -118,6 +118,18 @@ export const menu = [
     roles: getAllowedRoles("/seller-product-info"),
   },
   {
+    path: "/seller-promotions",
+    label: "Promociones",
+    icon: infoProductIcon,
+    roles: getAllowedRoles("/seller-promotions"),
+  },
+  {
+    path: "/seller-dashboard",
+    label: "Mi Dashboard",
+    icon: statsIcon,
+    roles: getAllowedRoles("/seller-dashboard"),
+  },
+  {
     path: "/admin-seller-product-info",
     label: "Productos Clientes",
     icon: infoProductIcon,

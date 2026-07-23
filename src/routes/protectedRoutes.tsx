@@ -24,6 +24,8 @@ import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoP
 import SuperadminVariantsPage from "../pages/SuperadminVariants/SuperadminVariantsPage";
 import SimplePackagesPage from "../pages/SimplePackages/SimplePackagesPage";
 import AttendancePage from "../pages/Attendance/AttendancePage";
+import SellerPromotionsPage from "../pages/SellerPromotions/SellerPromotionsPage";
+import SellerDashboardPage from "../pages/SellerDashboard/SellerDashboardPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -204,6 +206,14 @@ const protectedRoutes = [
       {
         path: "/seller-product-info",
         element: guard("/seller-product-info", <SellerProductInfoRoute />),
+      },
+      {
+        path: "/seller-promotions",
+        element: guard("/seller-promotions", <SellerPromotionsPage />),
+      },
+      {
+        path: "/seller-dashboard",
+        element: guard("/seller-dashboard", <SellerDashboardPage />),
       },
       {
         path: "/admin-seller-product-info",

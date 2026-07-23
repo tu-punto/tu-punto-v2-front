@@ -140,6 +140,15 @@ export const getSellerDebtsAPI  = async (sellerId: string) => {
     }
 }
 
+export const getSellerDashboardAPI = async (sellerId: string, params?: { months?: number }) => {
+    try {
+        const res = await apiClient.get(`/seller/${sellerId}/dashboard`, { params })
+        return res.data
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
 export const createSellerRecoveryChargeAPI = async (
     sellerId: string,
     payload: { monto: number; concepto: string; fecha?: string }
