@@ -269,7 +269,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         getSellerAccountingSimplePackagesAPI({ sellerId: String(seller.key) }),
       ]);
       const regularSales: any[] = Array.isArray(res)
-        ? res.filter((sale) => sale.id_pedido.estado_pedido !== "En Espera")
+        ? res.filter(
+            (sale) =>
+              sale.id_pedido.estado_pedido !== "En Espera" &&
+              sale.id_pedido.simple_package_order !== true
+          )
         : [];
       const regularPedidoIds = new Set(
         regularSales
@@ -286,7 +290,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               key: `simple-${row._id}`,
               producto: "Entrega simple",
               nombre_variante: row.descripcion_paquete || "Paquete simple",
-              precio_unitario: Number(row.saldo_por_paquete ?? 0),
+              precio_unitario: Number(
+                row.seller_balance_applied_amount ?? row.amortizacion_vendedor ?? 0
+              ),
               cantidad: 1,
               utilidad: 0,
               id_venta: `simple-${row._id}`,
