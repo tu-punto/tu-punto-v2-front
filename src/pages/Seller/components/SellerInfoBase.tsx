@@ -291,7 +291,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               producto: "Entrega simple",
               nombre_variante: row.descripcion_paquete || "Paquete simple",
               precio_unitario: Number(
-                row.seller_balance_applied_amount ?? row.amortizacion_vendedor ?? 0
+                row.saldo_cobrar ??
+                row.accounting_amount ??
+                (
+                  Number(row.saldo_por_paquete ?? 0) +
+                  Number(row.amortizacion_vendedor ?? 0)
+                )
               ),
               cantidad: 1,
               utilidad: 0,
