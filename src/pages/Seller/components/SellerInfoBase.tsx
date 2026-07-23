@@ -214,6 +214,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         const saldoPendiente = Number(detail.saldo_pendiente ?? 0);
         const deuda = Number(detail.deuda ?? 0);
         const pagoPendiente = Number(detail.pago_pendiente ?? saldoPendiente - deuda);
+        const breakdown = (detail as any)?.metrics_breakdown;
+
+        if (breakdown) {
+          console.groupCollapsed(
+            `[SellerMetrics] ${seller.nombre || ""} ${seller.apellido || ""}`.trim()
+          );
+          console.log("Totales", breakdown.totals);
+          console.table(breakdown.regularSales || []);
+          console.table(breakdown.simplePackages || []);
+          console.table(breakdown.debts || []);
+          console.groupEnd();
+        }
 
         setSellerMetrics({
           saldo_pendiente: Number.isFinite(saldoPendiente) ? saldoPendiente : 0,
@@ -268,24 +280,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         getSalesBySellerIdAPI(seller.key),
         getSellerAccountingSimplePackagesAPI({ sellerId: String(seller.key) }),
       ]);
+      const simplePackagePedidoIds = new Set(
+        (Array.isArray(simpleRes?.rows) ? simpleRes.rows : [])
+          .map((row: any) => String(row?.pedido_ref?._id || row?.pedido_ref || row?._id || "").trim())
+          .filter(Boolean)
+      );
       const regularSales: any[] = Array.isArray(res)
         ? res.filter(
             (sale) =>
               sale.id_pedido.estado_pedido !== "En Espera" &&
-              sale.id_pedido.simple_package_order !== true
+              sale.id_pedido.simple_package_order !== true &&
+              !simplePackagePedidoIds.has(String(sale?.id_pedido?._id || sale?.id_pedido || "").trim())
           )
         : [];
-      const regularPedidoIds = new Set(
-        regularSales
-          .map((sale) => String(sale?.id_pedido?._id || sale?.id_pedido || "").trim())
-          .filter(Boolean)
-      );
       const simpleSales: any[] = Array.isArray(simpleRes?.rows)
         ? simpleRes.rows
-            .filter((row: any) => {
-              const pedidoRef = String(row?.pedido_ref?._id || row?.pedido_ref || "").trim();
-              return !pedidoRef || !regularPedidoIds.has(pedidoRef);
-            })
             .map((row: any) => ({
               key: `simple-${row._id}`,
               producto: "Entrega simple",
