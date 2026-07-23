@@ -248,6 +248,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         return !deliveryPermissionBranchId || String(deliveryPermissionBranchId) === String(currentSucursalId);
     }, [deliveryPermissionBranchId, currentSucursalId]);
     const canEditDestinationCreatedToday = canEditShipping && isSameBusinessDay(shipping?.fecha_pedido);
+    const originalSimplePackageDestinationBranchId = useMemo(
+        () => resolveBranchId(shipping?.destino_sucursal) || paymentBranchId || origenBranchId,
+        [shipping, paymentBranchId, origenBranchId]
+    );
 
 
     const saldoACobrar = useMemo(() => {
@@ -698,7 +702,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 sucursal: paymentBranchIdForUpdate,
                 lugar_entrega: lugarEntregaFinal,
                 ubicacion_link: ubicacionLinkFinal,
-                destino_sucursal_id: effectiveDestinationBranchId,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,
                 pagado_al_vendedor: effectivePaymentType === '3',
@@ -708,6 +711,15 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 tipo_de_pago: effectivePaymentType,
                 quien_paga_delivery: normalizeDeliveryPayer(values.quien_paga_delivery),
             };
+
+            if (!isSimplePackageOrder) {
+                updateShippingInfo.destino_sucursal_id = effectiveDestinationBranchId;
+            } else if (
+                String(effectiveDestinationBranchId || "") !==
+                String(originalSimplePackageDestinationBranchId || "")
+            ) {
+                updateShippingInfo.destino_sucursal_id = effectiveDestinationBranchId;
+            }
 
             // Forzar subtotales según el tipo de pago
             switch (effectivePaymentType) {
