@@ -1,6 +1,7 @@
 import { Button, InputNumber, Table } from "antd";
 import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
+import PromotionPrice from "../../components/PromotionPrice";
 
 const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin,readonly = false, }: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
@@ -73,13 +74,28 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             key: 'precio_unitario',
             render: (_: any, record: any) =>
                 readonly ? (
-                    <span>{record.precio_unitario}</span>
-                ) : (
-                    <InputNumber
-                        min={0}
-                        value={record.precio_unitario}
-                        onChange={value => handleValueChange(record.key, 'precio_unitario', value)}
+                    <PromotionPrice
+                        price={record.precio_unitario}
+                        basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                        promotion={record.pricingPromotion}
+                        quantity={record.cantidad}
+                        compact
                     />
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <PromotionPrice
+                            price={record.precio_unitario}
+                            basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                            promotion={record.pricingPromotion}
+                            quantity={record.cantidad}
+                            compact
+                        />
+                        <InputNumber
+                            min={0}
+                            value={record.precio_unitario}
+                            onChange={value => handleValueChange(record.key, 'precio_unitario', value)}
+                        />
+                    </div>
                 ),
             className: "text-mobile-sm xl:text-desktop-sm",
         },

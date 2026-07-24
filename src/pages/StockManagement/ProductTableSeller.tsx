@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Table, Select, Input, Switch } from "antd";
 import VariantInfoModal from "./VariantInfoModal.tsx";
+import PromotionPrice from "../../components/PromotionPrice";
 
 type BranchOption = {
     _id: string;
@@ -143,7 +144,14 @@ const ProductTableSeller = ({
             title: "Precio Unitario",
             key: "precio",
             render: (_: any, record: any) =>
-                record.esCabecera ? { children: null, props: { colSpan: 0 } } : <span>{record.precio}</span>
+                record.esCabecera ? { children: null, props: { colSpan: 0 } } : (
+                    <PromotionPrice
+                        price={record.precio}
+                        basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                        promotion={record.pricingPromotion}
+                        compact
+                    />
+                )
         },
         {
             title: "Categoria",

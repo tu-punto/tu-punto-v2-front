@@ -140,9 +140,14 @@ export const getSellerDebtsAPI  = async (sellerId: string) => {
     }
 }
 
-export const getSellerDashboardAPI = async (sellerId: string, params?: { months?: number }) => {
+export const getSellerDashboardAPI = async (sellerId: string, params?: { months?: number; sucursalIds?: string[] }) => {
     try {
-        const res = await apiClient.get(`/seller/${sellerId}/dashboard`, { params })
+        const res = await apiClient.get(`/seller/${sellerId}/dashboard`, {
+            params: {
+                months: params?.months,
+                sucursalIds: params?.sucursalIds?.length ? params.sucursalIds.join(",") : undefined,
+            }
+        })
         return res.data
     } catch (error) {
         parseError(error as AxiosError)

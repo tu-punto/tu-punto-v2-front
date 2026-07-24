@@ -1,6 +1,7 @@
 import { Table , message} from 'antd';
 import { useContext } from 'react';
 import { UserContext } from '../../context/userContext';
+import PromotionPrice from '../../components/PromotionPrice';
 
 const ProductTable = ({ data, onSelectProduct }: any) => {
     const { user }: any = useContext(UserContext);
@@ -20,6 +21,14 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Precio</span>,
             dataIndex: 'precio',
             key: 'precio',
+            render: (_: any, record: any) => (
+                <PromotionPrice
+                    price={record.precio}
+                    basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                    promotion={record.pricingPromotion}
+                    compact
+                />
+            ),
         },
         {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Vendedor</span>,

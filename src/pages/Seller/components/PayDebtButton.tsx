@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Checkbox, Image, Popover, Radio, Space, Tooltip, Typography, message } from "antd";
-import { DollarOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Image, Popover, Tooltip, Typography, message } from "antd";
+import { DollarOutlined, QrcodeOutlined } from "@ant-design/icons";
 
 import { paySellerDebtAPI } from "../../../api/seller";
 
@@ -8,6 +8,24 @@ interface Props {
   seller: any; // SellerRow
   onSuccess: () => void; // para refrescar la tabla
 }
+
+const paymentOptionCardStyle = (
+  selected: boolean,
+  disabled = false
+): React.CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  minHeight: 52,
+  borderRadius: 14,
+  border: selected ? "1.5px solid #1677ff" : "1px solid #d9d9d9",
+  background: disabled ? "#f5f5f5" : selected ? "#eff6ff" : "#ffffff",
+  color: disabled ? "#bfbfbf" : selected ? "#1677ff" : "#262626",
+  fontWeight: selected ? 700 : 600,
+  cursor: disabled ? "not-allowed" : "pointer",
+  transition: "all 0.18s ease"
+});
 
 const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   const [visible, setVisible] = useState(false);
@@ -128,16 +146,32 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
 
       <div className="mt-3">
         <Typography.Text strong>Metodo de pago</Typography.Text>
-        <Radio.Group
-          className="mt-2"
-          value={paymentMethod}
-          onChange={(event) => setPaymentMethod(event.target.value)}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+            marginTop: 10
+          }}
         >
-          <Space direction="vertical">
-            <Radio value="efectivo">Efectivo</Radio>
-            <Radio value="qr">QR</Radio>
-          </Space>
-        </Radio.Group>
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("efectivo")}
+            style={paymentOptionCardStyle(paymentMethod === "efectivo")}
+          >
+            <DollarOutlined />
+            <span>Efectivo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => seller?.qr_pago_url && setPaymentMethod("qr")}
+            disabled={!seller?.qr_pago_url}
+            style={paymentOptionCardStyle(paymentMethod === "qr", !seller?.qr_pago_url)}
+          >
+            <QrcodeOutlined />
+            <span>QR</span>
+          </button>
+        </div>
       </div>
 
       <div className="mt-2 text-right">

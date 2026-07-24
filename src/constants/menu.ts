@@ -8,12 +8,19 @@ import statsIcon from "../assets/statsIcon.svg";
 import branchIcon from "../assets/branchIcon.svg";
 import salesHistoryIcon from "../assets/historyIcono.png";
 import infoProductIcon from "../assets/infoProductIcon.svg";
+import tagIcon from "../assets/tagIcon.svg";
 import superadminVariantsIcon from "../assets/superadminVariantsIcon.svg";
 import servicesIcon from "../assets/services.png";
 import attendanceClockIcon from "../assets/attendanceClockIcon.svg";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
+  {
+    path: "/seller-dashboard",
+    label: "Mi Dashboard",
+    icon: statsIcon,
+    roles: getAllowedRoles("/seller-dashboard"),
+  },
   {
     path: "/seller",
     label: "Vendedores",
@@ -120,14 +127,8 @@ export const menu = [
   {
     path: "/seller-promotions",
     label: "Promociones",
-    icon: infoProductIcon,
+    icon: tagIcon,
     roles: getAllowedRoles("/seller-promotions"),
-  },
-  {
-    path: "/seller-dashboard",
-    label: "Mi Dashboard",
-    icon: statsIcon,
-    roles: getAllowedRoles("/seller-dashboard"),
   },
   {
     path: "/admin-seller-product-info",

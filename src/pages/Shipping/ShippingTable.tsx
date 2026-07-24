@@ -31,6 +31,7 @@ const MOBILE_CARD_PAGE_SIZE = 12;
 const WAITING_STATUSES = new Set([WAITING_RAW_STATUS, READY_FOR_PICKUP_STATUS]);
 const FILTER_ALL = "todos";
 const FILTER_PENDING_SEND = "para_enviar";
+const FILTER_DELIVERIES = "deliverys";
 const GENERAL_VENDOR_SCOPE_TABS: Array<"todos" | "En Espera" | "para_enviar" | "en_camino"> = [
     "todos",
     "En Espera",
@@ -236,9 +237,10 @@ const ShippingTable = ({
         listo_para_recoger: 0,
         para_enviar: 0,
         en_camino: 0,
+        deliverys: 0,
         entregado: 0,
     });
-    const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'entregado'>(FILTER_ALL);
+    const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'deliverys' | 'entregado'>(FILTER_ALL);
     const [tablePage, setTablePage] = useState(1);
     const [tablePageSize, setTablePageSize] = useState(30);
     const [tableTotal, setTableTotal] = useState(0);
@@ -296,6 +298,7 @@ const ShippingTable = ({
     );
     const pendingSendCount = tabCounts.para_enviar;
     const inTransitCount = tabCounts.en_camino;
+    const deliveriesCount = tabCounts.deliverys;
     const allCount = tabCounts.todos;
     const readyForPickupCount = tabCounts.listo_para_recoger;
     const deliveredCount = tabCounts.entregado;
@@ -544,21 +547,22 @@ const ShippingTable = ({
                 selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
                     ? selectedVendedor
                     : (!isAdmin && !isOperator ? user?.id_vendedor : undefined);
+            const isDeliveryTab = selectedStatus === FILTER_DELIVERIES;
             const destinationMode =
-                selectedLocation === "other"
+                isDeliveryTab
                     ? "other"
-                    : selectedLocation
-                        ? "branch"
-                        : "any";
+                    : selectedLocation === "other"
+                        ? "other"
+                        : selectedLocation
+                            ? "branch"
+                            : "any";
             const destinationQuery =
-                selectedLocation === "other"
-                    ? otherLocation.trim() || undefined
-                    : selectedLocation || undefined;
-
-            const dashboardData = await getShippingDashboardListAPI({
-                page: tablePage,
-                limit: tablePageSize,
-                tab: selectedStatus,
+                isDeliveryTab
+                    ? undefined
+                    : selectedLocation === "other"
+                        ? otherLocation.trim() || undefined
+                        : selectedLocation || undefined;
+            const commonParams = {
                 from,
                 to,
                 currentBranchId: currentSucursalId || undefined,
@@ -567,9 +571,26 @@ const ShippingTable = ({
                         ? EXTERNAL_VENDOR_FILTER
                         : sellerIdToQuery,
                 client: searchCliente.trim() || undefined,
-                destinationMode: destinationMode as "any" | "branch" | "other",
-                destinationQuery,
-            });
+            };
+
+            const [dashboardData, deliveryDashboardData] = await Promise.all([
+                getShippingDashboardListAPI({
+                    page: tablePage,
+                    limit: tablePageSize,
+                    tab: isDeliveryTab ? FILTER_ALL : selectedStatus,
+                    ...commonParams,
+                    destinationMode: destinationMode as "any" | "branch" | "other",
+                    destinationQuery,
+                }),
+                getShippingDashboardListAPI({
+                    page: 1,
+                    limit: 1,
+                    tab: FILTER_ALL,
+                    ...commonParams,
+                    destinationMode: "other",
+                    destinationQuery: undefined,
+                })
+            ]);
 
             const rows = Array.isArray(dashboardData?.rows) ? dashboardData.rows : [];
             setShippingData(rows);
@@ -578,6 +599,7 @@ const ShippingTable = ({
                 listo_para_recoger: Number(dashboardData?.counts?.listo_para_recoger || 0),
                 para_enviar: Number(dashboardData?.counts?.para_enviar || 0),
                 en_camino: Number(dashboardData?.counts?.en_camino || 0),
+                deliverys: Number(deliveryDashboardData?.total || deliveryDashboardData?.counts?.todos || 0),
                 entregado: Number(dashboardData?.counts?.entregado || 0),
             });
             setTableTotal(Number(dashboardData?.total || 0));
@@ -1354,11 +1376,13 @@ const ShippingTable = ({
                 <div
                     style={{
                         display: "flex",
-                        flexWrap: "wrap",
+                        flexWrap: isMobile ? "nowrap" : "wrap",
+                        overflowX: isMobile ? "auto" : "visible",
                         alignItems: "center",
-                        justifyContent: "center",
+                        justifyContent: isMobile ? "flex-start" : "center",
                         gap: 10,
                         padding: "10px 14px",
+                        paddingBottom: isMobile ? 14 : 10,
                         borderRadius: 999,
                         background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
                         border: "1px solid #e5e7eb",
@@ -1462,6 +1486,7 @@ const ShippingTable = ({
                             boxShadow: selectedStatus === "en_camino" ? "0 8px 22px rgba(249, 115, 22, 0.16)" : "none",
                             transform: selectedStatus === "en_camino" ? "translateY(-1px)" : "translateY(0)",
                             transition: "all 220ms ease",
+                            flex: "0 0 auto",
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "en_camino" ? "#f97316" : "#9ca3af", transition: "all 220ms ease" }} />
@@ -1469,6 +1494,34 @@ const ShippingTable = ({
                         {inTransitCount > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "en_camino" ? "#ffedd5" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
                                 {inTransitCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedStatus(FILTER_DELIVERIES)}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            borderRadius: 999,
+                            padding: "10px 16px",
+                            border: selectedStatus === FILTER_DELIVERIES ? "1px solid #c4b5fd" : "1px solid #d1d5db",
+                            background: selectedStatus === FILTER_DELIVERIES ? "#f5f3ff" : "#ffffff",
+                            color: selectedStatus === FILTER_DELIVERIES ? "#6d28d9" : "#111827",
+                            fontWeight: 700,
+                            boxShadow: selectedStatus === FILTER_DELIVERIES ? "0 8px 22px rgba(124, 58, 237, 0.16)" : "none",
+                            transform: selectedStatus === FILTER_DELIVERIES ? "translateY(-1px)" : "translateY(0)",
+                            transition: "all 220ms ease",
+                            flex: "0 0 auto",
+                        }}
+                    >
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === FILTER_DELIVERIES ? "#7c3aed" : "#9ca3af", transition: "all 220ms ease" }} />
+                        <span>Deliverys</span>
+                        {deliveriesCount > 0 && (
+                            <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === FILTER_DELIVERIES ? "#ede9fe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
+                                {deliveriesCount}
                             </span>
                         )}
                     </button>
@@ -1489,6 +1542,7 @@ const ShippingTable = ({
                             boxShadow: selectedStatus === "entregado" ? "0 8px 22px rgba(34, 197, 94, 0.16)" : "none",
                             transform: selectedStatus === "entregado" ? "translateY(-1px)" : "translateY(0)",
                             transition: "all 220ms ease",
+                            flex: "0 0 auto",
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "entregado" ? "#22c55e" : "#9ca3af", transition: "all 220ms ease" }} />

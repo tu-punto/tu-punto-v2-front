@@ -6,6 +6,8 @@ interface FlatProduct {
     key: string;
     producto: string;
     precio: number;
+    precio_original?: number;
+    pricingPromotion?: any;
     stockActual: number;
     categoria: string;
     id_vendedor: string;
@@ -31,7 +33,9 @@ const useProductsFlat = (externalSucursalId?: string) => {
             const mapped = withStock.map((item: any, index: number) => ({
                 key: `${item._id}-${index}`,
                 producto: `${item.nombre_producto} - ${item.variante}`,
-                precio: item.precio,
+                precio: Number(item.precio ?? 0),
+                precio_original: Number(item.precio_original ?? item.originalPrice ?? item.precio ?? 0),
+                pricingPromotion: item.pricingPromotion || item.promotionPricing || null,
                 stockActual: item.stock,
                 categoria: item.categoria || "Sin categoría",
                 id_vendedor: item.id_vendedor,

@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Card,
   Col,
+  DatePicker,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
   Progress,
+  Radio,
   Row,
   Select,
   Space,
   Table,
   Tag,
   Typography,
+  TimePicker,
   message
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -26,6 +29,7 @@ import {
   PlusOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
+import dayjs, { type Dayjs } from "dayjs";
 import {
   createSellerPromotionAPI,
   deleteSellerPromotionAPI,
@@ -34,6 +38,8 @@ import {
   previewSellerPromotionAPI,
   updateSellerPromotionAPI
 } from "../../api/sellerPromotions";
+import { UserContext } from "../../context/userContext";
+import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
 
 type PromotionTier = {
   minQuantity: number;
@@ -74,11 +80,14 @@ type PromotionFormValues = {
   productId?: string;
   variantKey?: string;
   scope: "interno" | "catalogo" | "ambos";
+  pricingMode: "simple" | "tiers" | "both";
   title?: string;
   simplePrice?: number | null;
   tiers?: PromotionTier[];
-  startsAt: string;
-  endsAt: string;
+  startsDate?: Dayjs | null;
+  startsTime?: Dayjs | null;
+  endsDate?: Dayjs | null;
+  endsTime?: Dayjs | null;
   state: "draft" | "active" | "disabled";
 };
 
@@ -89,19 +98,16 @@ const formatMoney = (value?: number | null) =>
     minimumFractionDigits: 2
   }).format(Number(value || 0));
 
-const datetimeLocalValue = (value?: string) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60000);
-  return localDate.toISOString().slice(0, 16);
-};
-
-const toIsoString = (value?: string) => {
-  if (!value) return undefined;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+const combineDateTime = (date?: Dayjs | null, time?: Dayjs | null) => {
+  if (!date) return undefined;
+  const baseDate = dayjs(date);
+  const baseTime = time ? dayjs(time) : dayjs().startOf("day");
+  return baseDate
+    .hour(baseTime.hour())
+    .minute(baseTime.minute())
+    .second(0)
+    .millisecond(0)
+    .toISOString();
 };
 
 const scopeMeta: Record<string, { color: string; label: string }> = {
@@ -121,6 +127,7 @@ const stateMeta: Record<string, { color: string; label: string }> = {
 const SellerPromotionsPage = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [form] = Form.useForm<PromotionFormValues>();
+  const { user } = useContext(UserContext);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<PromotionRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -137,6 +144,22 @@ const SellerPromotionsPage = () => {
   const [previewData, setPreviewData] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<PromotionRow | null>(null);
+  const canUseCatalogScopes = canAccessSellerProductInfo(user);
+
+  const scopeOptions = useMemo(
+    () =>
+      !canUseCatalogScopes
+        ? [{ value: "interno", label: "Solo interno" }]
+        : [
+            { value: "all", label: "Todos los canales" },
+            { value: "interno", label: "Solo interno" },
+            { value: "catalogo", label: "Solo catálogo" },
+            { value: "ambos", label: "Ambos" }
+          ],
+    [canUseCatalogScopes]
+  );
+
+  const pricingMode = Form.useWatch("pricingMode", form) || "both";
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -147,7 +170,7 @@ const SellerPromotionsPage = () => {
     setLoading(true);
     const response = await getSellerPromotionsAPI({
       q: debouncedSearch || undefined,
-      scope,
+      scope: canUseCatalogScopes ? scope : "interno",
       state,
       page,
       limit
@@ -165,8 +188,14 @@ const SellerPromotionsPage = () => {
   };
 
   useEffect(() => {
+    if (!canUseCatalogScopes) {
+      setScope("interno");
+    }
+  }, [canUseCatalogScopes]);
+
+  useEffect(() => {
     void loadPromotions();
-  }, [debouncedSearch, scope, state, page, limit]);
+  }, [debouncedSearch, scope, state, page, limit, canUseCatalogScopes]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -208,8 +237,12 @@ const SellerPromotionsPage = () => {
     resetForm();
     setModalOpen(true);
     form.setFieldsValue({
-      scope: "ambos",
+      scope: canUseCatalogScopes ? "ambos" : "interno",
       state: "active",
+      pricingMode: "both",
+      startsDate: dayjs().startOf("day"),
+      startsTime: dayjs().startOf("day"),
+      endsTime: dayjs().startOf("day"),
       tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }]
     });
   };
@@ -222,12 +255,20 @@ const SellerPromotionsPage = () => {
       selection: `${row.productId}::${row.variantKey}`,
       productId: row.productId,
       variantKey: row.variantKey,
-      scope: row.scope,
+      scope: canUseCatalogScopes ? row.scope : "interno",
+      pricingMode:
+        row.simplePrice !== null && row.simplePrice !== undefined && row.tiers?.length
+          ? "both"
+          : row.simplePrice !== null && row.simplePrice !== undefined
+            ? "simple"
+            : "tiers",
       title: row.title,
       simplePrice: row.simplePrice ?? undefined,
       tiers: row.tiers?.length ? row.tiers : undefined,
-      startsAt: datetimeLocalValue(row.startsAt),
-      endsAt: datetimeLocalValue(row.endsAt),
+      startsDate: row.startsAt ? dayjs(row.startsAt) : dayjs().startOf("day"),
+      startsTime: row.startsAt ? dayjs(row.startsAt) : dayjs().startOf("day"),
+      endsDate: row.endsAt ? dayjs(row.endsAt) : undefined,
+      endsTime: row.endsAt ? dayjs(row.endsAt) : dayjs().startOf("day"),
       state: row.state
     });
   };
@@ -253,16 +294,39 @@ const SellerPromotionsPage = () => {
     setPreviewData(null);
   };
 
+  const handlePricingModeChange = (value: "simple" | "tiers" | "both") => {
+    form.setFieldValue("pricingMode", value);
+  };
+
   const handlePreview = async () => {
     const values = await form.validateFields();
+    const startsAt = combineDateTime(values.startsDate, values.startsTime);
+    const endsAt = combineDateTime(values.endsDate, values.endsTime);
+    const simplePrice = values.pricingMode === "tiers" ? null : values.simplePrice;
+    const tiers = values.pricingMode === "simple" ? [] : (values.tiers || []);
+
+    if (values.pricingMode === "simple" && (simplePrice === undefined || simplePrice === null)) {
+      messageApi.error("Define un precio fijo promocional");
+      return;
+    }
+    if (values.pricingMode === "tiers" && tiers.length === 0) {
+      messageApi.error("Agrega al menos un tramo por cantidad");
+      return;
+    }
+    if (values.pricingMode === "both" && (simplePrice === undefined || simplePrice === null) && tiers.length === 0) {
+      messageApi.error("Define un precio fijo o al menos un tramo por cantidad");
+      return;
+    }
     setPreviewLoading(true);
     const result = await previewSellerPromotionAPI({
       productId: values.productId,
       variantKey: values.variantKey,
-      scope: values.scope,
-      quantity: values.tiers?.[0]?.minQuantity || 1,
-      simplePrice: values.simplePrice,
-      tiers: values.tiers || []
+      scope: canUseCatalogScopes ? values.scope : "interno",
+      quantity: tiers?.[0]?.minQuantity || 1,
+      simplePrice,
+      tiers,
+      startsAt,
+      endsAt
     });
     setPreviewLoading(false);
     if (result?.success === false) {
@@ -274,15 +338,32 @@ const SellerPromotionsPage = () => {
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
+    const startsAt = combineDateTime(values.startsDate, values.startsTime);
+    const endsAt = combineDateTime(values.endsDate, values.endsTime);
+    const simplePrice = values.pricingMode === "tiers" ? null : values.simplePrice;
+    const tiers = values.pricingMode === "simple" ? [] : (values.tiers || []);
+
+    if (values.pricingMode === "simple" && (simplePrice === undefined || simplePrice === null)) {
+      messageApi.error("Define un precio fijo promocional");
+      return;
+    }
+    if (values.pricingMode === "tiers" && tiers.length === 0) {
+      messageApi.error("Agrega al menos un tramo por cantidad");
+      return;
+    }
+    if (values.pricingMode === "both" && (simplePrice === undefined || simplePrice === null) && tiers.length === 0) {
+      messageApi.error("Define un precio fijo o al menos un tramo por cantidad");
+      return;
+    }
     const payload = {
       productId: values.productId,
       variantKey: values.variantKey,
-      scope: values.scope,
+      scope: canUseCatalogScopes ? values.scope : "interno",
       title: values.title,
-      simplePrice: values.simplePrice,
-      tiers: values.tiers || [],
-      startsAt: toIsoString(values.startsAt),
-      endsAt: toIsoString(values.endsAt),
+      simplePrice,
+      tiers,
+      startsAt,
+      endsAt,
       state: values.state
     };
 
@@ -474,20 +555,21 @@ const SellerPromotionsPage = () => {
             />
           </Col>
           <Col xs={12} md={7}>
-            <Select
-              value={scope}
-              onChange={(value) => {
-                setScope(value);
-                setPage(1);
-              }}
-              style={{ width: "100%" }}
-              options={[
-                { value: "all", label: "Todos los canales" },
-                { value: "interno", label: "Solo interno" },
-                { value: "catalogo", label: "Solo catálogo" },
-                { value: "ambos", label: "Ambos" }
-              ]}
-            />
+            {!canUseCatalogScopes ? (
+              <Tag color="blue" bordered={false} style={{ width: "100%", textAlign: "center", padding: "6px 12px" }}>
+                Solo interno
+              </Tag>
+            ) : (
+              <Select
+                value={scope}
+                onChange={(value) => {
+                  setScope(value);
+                  setPage(1);
+                }}
+                style={{ width: "100%" }}
+                options={scopeOptions}
+              />
+            )}
           </Col>
           <Col xs={12} md={7}>
             <Select
@@ -539,7 +621,19 @@ const SellerPromotionsPage = () => {
       >
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={15}>
-            <Form form={form} layout="vertical" initialValues={{ scope: "ambos", state: "active" }}>
+            <Form
+              form={form}
+              layout="vertical"
+              initialValues={{
+                scope: canUseCatalogScopes ? "ambos" : "interno",
+                state: "active",
+                pricingMode: "both",
+                startsDate: dayjs().startOf("day"),
+                startsTime: dayjs().startOf("day"),
+                endsTime: dayjs().startOf("day"),
+                tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }]
+              }}
+            >
               <Form.Item
                 name="selection"
                 label="Variante"
@@ -568,18 +662,18 @@ const SellerPromotionsPage = () => {
 
               <Row gutter={12}>
                 <Col span={12}>
-                  <Form.Item name="scope" label="Aplica a" rules={[{ required: true }]}>
-                    <Select
-                      options={[
-                        { value: "interno", label: "Interno" },
-                        { value: "catalogo", label: "Catálogo" },
-                        { value: "ambos", label: "Ambos" }
-                      ]}
-                    />
-                  </Form.Item>
+                  {!canUseCatalogScopes ? (
+                    <Form.Item name="scope" hidden>
+                      <Input />
+                    </Form.Item>
+                  ) : (
+                    <Form.Item name="scope" label="Aplica a" rules={[{ required: true }]}> 
+                      <Select options={scopeOptions.filter((option) => option.value !== "all")} />
+                    </Form.Item>
+                  )}
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="state" label="Estado" rules={[{ required: true }]}>
+                  <Form.Item name="state" label="Estado" rules={[{ required: true }]}> 
                     <Select
                       options={[
                         { value: "active", label: "Activa" },
@@ -591,78 +685,100 @@ const SellerPromotionsPage = () => {
                 </Col>
               </Row>
 
+              <Form.Item name="pricingMode" label="Tipo de promoción" rules={[{ required: true }]}>
+                <Radio.Group optionType="button" buttonStyle="solid" onChange={(event) => handlePricingModeChange(event.target.value)}>
+                  <Radio.Button value="simple">Precio fijo</Radio.Button>
+                  <Radio.Button value="tiers">Por cantidad</Radio.Button>
+                  <Radio.Button value="both">Ambos</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+
               <Form.Item name="title" label="Título interno">
                 <Input placeholder="Ej. Rebaja de fin de mes" maxLength={90} />
               </Form.Item>
 
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name="simplePrice" label="Precio fijo promocional">
-                    <InputNumber min={0} style={{ width: "100%" }} controls={false} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Button style={{ marginTop: 29 }} icon={<GiftOutlined />} onClick={() => void handlePreview()} loading={previewLoading}>
-                    Vista previa
-                  </Button>
-                </Col>
-              </Row>
+              {(pricingMode === "simple" || pricingMode === "both") && (
+                <Row gutter={12}>
+                  <Col span={16}>
+                    <Form.Item name="simplePrice" label="Precio fijo promocional">
+                      <InputNumber min={0} style={{ width: "100%" }} controls={false} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Button style={{ marginTop: 29, width: "100%" }} icon={<GiftOutlined />} onClick={() => void handlePreview()} loading={previewLoading}>
+                      Vista previa
+                    </Button>
+                  </Col>
+                </Row>
+              )}
 
-              <Form.List name="tiers">
-                {(fields, { add, remove }) => (
-                  <Card
-                    size="small"
-                    title="Escalas por cantidad"
-                    extra={
-                      <Button type="link" onClick={() => add({ minQuantity: 3 })}>
-                        Agregar tramo
-                      </Button>
-                    }
-                  >
-                    <Space direction="vertical" style={{ width: "100%" }} size={12}>
-                      {fields.map((field) => (
-                        <Row gutter={12} key={field.key} align="middle">
-                          <Col span={10}>
-                            <Form.Item
-                              {...field}
-                              name={[field.name, "minQuantity"]}
-                              label="Desde"
-                              rules={[{ required: true, message: "Cantidad mínima" }]}
-                            >
-                              <InputNumber min={2} style={{ width: "100%" }} />
-                            </Form.Item>
-                          </Col>
-                          <Col span={10}>
-                            <Form.Item
-                              {...field}
-                              name={[field.name, "unitPrice"]}
-                              label="Precio unitario"
-                              rules={[{ required: true, message: "Precio unitario" }]}
-                            >
-                              <InputNumber min={0} style={{ width: "100%" }} controls={false} />
-                            </Form.Item>
-                          </Col>
-                          <Col span={4}>
-                            <Button danger onClick={() => remove(field.name)}>
-                              Quitar
-                            </Button>
-                          </Col>
-                        </Row>
-                      ))}
-                    </Space>
-                  </Card>
-                )}
-              </Form.List>
+              {(pricingMode === "tiers" || pricingMode === "both") && (
+                <Form.List name="tiers">
+                  {(fields, { add, remove }) => (
+                    <Card
+                      size="small"
+                      title="Escalas por cantidad"
+                      extra={
+                        <Button type="link" onClick={() => add({ minQuantity: 3 })}>
+                          Agregar tramo
+                        </Button>
+                      }
+                    >
+                      <Space direction="vertical" style={{ width: "100%" }} size={12}>
+                        {fields.map((field) => (
+                          <Row gutter={12} key={field.key} align="middle">
+                            <Col span={10}>
+                              <Form.Item
+                                {...field}
+                                name={[field.name, "minQuantity"]}
+                                label="Desde"
+                                rules={[{ required: true, message: "Cantidad mínima" }]}
+                              >
+                                <InputNumber min={2} style={{ width: "100%" }} />
+                              </Form.Item>
+                            </Col>
+                            <Col span={10}>
+                              <Form.Item
+                                {...field}
+                                name={[field.name, "unitPrice"]}
+                                label="Precio unitario"
+                                rules={[{ required: true, message: "Precio unitario" }]}
+                              >
+                                <InputNumber min={0} style={{ width: "100%" }} controls={false} />
+                              </Form.Item>
+                            </Col>
+                            <Col span={4}>
+                              <Button danger onClick={() => remove(field.name)}>
+                                Quitar
+                              </Button>
+                            </Col>
+                          </Row>
+                        ))}
+                      </Space>
+                    </Card>
+                  )}
+                </Form.List>
+              )}
 
               <Row gutter={12} style={{ marginTop: 16 }}>
-                <Col span={12}>
-                  <Form.Item name="startsAt" label="Inicio" rules={[{ required: true }]}>
-                    <Input type="datetime-local" />
+                <Col span={6}>
+                  <Form.Item name="startsDate" label="Inicio fecha" rules={[{ required: true }]}>
+                    <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item name="endsAt" label="Fin" rules={[{ required: true }]}>
-                    <Input type="datetime-local" />
+                <Col span={6}>
+                  <Form.Item name="startsTime" label="Inicio hora" rules={[{ required: true }]}>
+                    <TimePicker style={{ width: "100%" }} format="HH:mm" minuteStep={5} />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="endsDate" label="Fin fecha" rules={[{ required: true }]}>
+                    <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="Elegir fecha" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="endsTime" label="Fin hora" rules={[{ required: true }]}>
+                    <TimePicker style={{ width: "100%" }} format="HH:mm" minuteStep={5} />
                   </Form.Item>
                 </Col>
               </Row>
