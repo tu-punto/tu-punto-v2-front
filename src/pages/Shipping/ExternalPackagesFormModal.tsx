@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AutoComplete, Button, Form, Input, InputNumber, Modal, Segmented, Select, Space, message } from "antd";
+import { AutoComplete, Button, Collapse, Form, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Upload, message } from "antd";
 import {
   ExternalContactSuggestion,
   getExternalContactSuggestionsAPI,
@@ -20,6 +20,12 @@ import {
   ShippingLabelPrintOptions,
   toBase64Png,
 } from "./shippingQrLabel";
+import { DownloadOutlined, InboxOutlined, UploadOutlined } from "@ant-design/icons";
+import {
+  downloadExternalPackagesTemplate,
+  parseExternalPackagesFile,
+  type ImportedExternalPackageRow,
+} from "./externalPackagesImport";
 
 interface ExternalPackagesFormModalProps {
   visible: boolean;
@@ -135,6 +141,9 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const [escalationRanges] = useState<PackageEscalationRange[]>(DEFAULT_EXTERNAL_RANGES);
   const [escalationConfigs, setEscalationConfigs] = useState<any[]>([]);
   const [labelPrintOptions, setLabelPrintOptions] = useState<ShippingLabelPrintOptions>(getStoredLabelPrintOptions);
+  const [importedFileName, setImportedFileName] = useState<string>("");
+  const [importedRowsCount, setImportedRowsCount] = useState(0);
+  const [importingFile, setImportingFile] = useState(false);
   const suggestionRequestIds = useRef<Record<string, number>>({});
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
@@ -522,6 +531,100 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const resetModal = () => {
     setPackageCount(MIN_PACKAGES);
     form.resetFields();
+    setImportedFileName("");
+    setImportedRowsCount(0);
+  };
+
+  const applyImportedRows = (rows: ImportedExternalPackageRow[], sourceName: string) => {
+    const sellerCarnet = String(rows[0]?.carnet_vendedor || "").trim();
+    const sellerName = String(rows[0]?.vendedor || "").trim();
+    const sellerPhone = String(rows[0]?.telefono_vendedor || "").trim();
+    if (!sellerCarnet || !sellerName || !sellerPhone) {
+      throw new Error("La primera fila debe incluir los datos del vendedor");
+    }
+
+    const inconsistentRow = rows.slice(1).find((row) => {
+      const rowCarnet = String(row.carnet_vendedor || "").trim();
+      const rowName = String(row.vendedor || "").trim();
+      const rowPhone = String(row.telefono_vendedor || "").trim();
+      return (
+        (rowCarnet && rowCarnet !== sellerCarnet) ||
+        (rowName && rowName !== sellerName) ||
+        (rowPhone && rowPhone !== sellerPhone)
+      );
+    });
+
+    if (inconsistentRow) {
+      throw new Error("Todas las filas del archivo deben tener el mismo vendedor");
+    }
+
+    const resolveDestinationId = (destinationName: string) => {
+      const normalized = String(destinationName || "").trim().toLowerCase();
+      const directMatch = branchOptions.find((option) => String(option.label || "").trim().toLowerCase() === normalized);
+      return directMatch?.value || "";
+    };
+
+    const invalidDestination = rows.find((row) => {
+      const destinationId = resolveDestinationId(row.destino_sucursal);
+      return !destinationId;
+    });
+    if (invalidDestination) {
+      throw new Error(`Fila ${invalidDestination.rowNumber}: debes elegir una sucursal valida de la lista desplegable`);
+    }
+
+    const paidMethods = Array.from(new Set(rows.map((row) => row.metodo_pago).filter(Boolean)));
+    if (paidMethods.length > 1) {
+      throw new Error("Usa un solo metodo de pago vendedor por archivo");
+    }
+
+    const topLevelMethod = paidMethods[0] || "";
+      const basePackages = rows.map((row) => ({
+        comprador: row.comprador,
+        descripcion_paquete: row.descripcion_paquete,
+        telefono_comprador: row.telefono_comprador,
+        package_size: "estandar",
+        precio_paquete: undefined,
+        esta_pagado: row.esta_pagado || "no",
+        monto_paga_vendedor: 0,
+        monto_paga_comprador: 0,
+        destino_sucursal_id: resolveDestinationId(row.destino_sucursal),
+      precio_entre_sucursal: 0,
+      delivery_spaces: row.delivery_spaces || 1,
+    }));
+
+    const nextRows = recalculateRowsByDeliverySpaces(basePackages, rows.length);
+    setPackageCount(rows.length);
+    form.setFieldsValue({
+      carnet_vendedor: sellerCarnet,
+      vendedor: sellerName,
+      telefono_vendedor: sellerPhone,
+      destino_sucursal_id: resolveDestinationId(rows[0]?.destino_sucursal) || currentSucursalId,
+      numero_paquetes: rows.length,
+      metodo_pago: topLevelMethod,
+      paquetes: nextRows,
+    });
+    setCalculatedPackageRows(nextRows);
+    setImportedFileName(sourceName);
+    setImportedRowsCount(rows.length);
+  };
+
+  const handleImportFile = async (file: File) => {
+    if (loadingBranches || branchOptions.length === 0) {
+      message.warning("Espera a que carguen las sucursales antes de importar");
+      return;
+    }
+
+    setImportingFile(true);
+    try {
+      const rows = await parseExternalPackagesFile(file);
+      applyImportedRows(rows, file.name);
+      message.success(`Archivo importado con ${rows.length} paquete(s)`);
+    } catch (error) {
+      console.error(error);
+      message.error(error instanceof Error ? error.message : "No se pudo importar el archivo");
+    } finally {
+      setImportingFile(false);
+    }
   };
 
   const buildPrintOptionsContent = (draftOptions: ShippingLabelPrintOptions) => (
@@ -832,6 +935,61 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     });
   };
 
+  const importPanel = (
+    <div style={{ padding: 12, borderRadius: 14, background: "#fafafa" }}>
+      <Space direction="vertical" size={10} style={{ width: "100%" }}>
+        <Space wrap align="center" style={{ width: "100%", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 700 }}>Plantilla e importación</div>
+            <div style={{ color: "#6b7280", fontSize: 12 }}>
+              Descarga la plantilla, llena una fila por paquete y sube el archivo o un CSV.
+            </div>
+            {importedFileName && (
+              <Tag color="green" style={{ marginTop: 8 }}>
+                {importedFileName} · {importedRowsCount} paquete(s)
+              </Tag>
+            )}
+          </div>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() =>
+              void downloadExternalPackagesTemplate(
+                branchOptions.map((branch) => ({ id: branch.value, name: branch.label }))
+              )
+            }
+            disabled={loadingBranches}
+          >
+            Descargar plantilla
+          </Button>
+        </Space>
+
+          <Upload.Dragger
+            accept=".xlsx,.csv"
+            multiple={false}
+          showUploadList={false}
+          beforeUpload={(file) => {
+            void handleImportFile(file as File);
+            return false;
+          }}
+          disabled={importingFile || loadingBranches}
+          style={{ padding: "12px 0" }}
+        >
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined />
+          </p>
+          <p className="ant-upload-text">Arrastra el archivo aqui o haz clic para examinar</p>
+          <p className="ant-upload-hint">
+            La primera hoja debe usar la plantilla descargada. La sucursal destino se elige por nombre.
+            Los campos Espacios delivery, Estado pago y Metodo de pago pueden dejarse en blanco.
+          </p>
+          <Button icon={<UploadOutlined />} loading={importingFile} type="primary" ghost>
+            Examinar archivo
+          </Button>
+        </Upload.Dragger>
+      </Space>
+    </div>
+  );
+
   return (
     <Modal
       title="Registrar Entregas Externas"
@@ -846,6 +1004,19 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       destroyOnClose
     >
       <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Collapse
+          style={{ marginBottom: 16 }}
+          ghost
+          defaultActiveKey={[]}
+          items={[
+            {
+              key: "import",
+              label: "Importar desde archivo",
+              children: importPanel
+            }
+          ]}
+        />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Form.Item
             name="carnet_vendedor"
