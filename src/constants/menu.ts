@@ -12,6 +12,7 @@ import tagIcon from "../assets/tagIcon.svg";
 import superadminVariantsIcon from "../assets/superadminVariantsIcon.svg";
 import servicesIcon from "../assets/services.png";
 import attendanceClockIcon from "../assets/attendanceClockIcon.svg";
+import historyIcon from "../assets/historyIcono.png";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
@@ -141,6 +142,13 @@ export const menu = [
     label: "Control Variantes",
     icon: superadminVariantsIcon,
     roles: getAllowedRoles("/superadmin-variants"),
+    requiresSuperadmin: true,
+  },
+  {
+    path: "/inventory-audit",
+    label: "Auditoria Stock",
+    icon: historyIcon,
+    roles: getAllowedRoles("/inventory-audit"),
     requiresSuperadmin: true,
   },
 ];

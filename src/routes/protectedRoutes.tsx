@@ -26,6 +26,7 @@ import SimplePackagesPage from "../pages/SimplePackages/SimplePackagesPage";
 import AttendancePage from "../pages/Attendance/AttendancePage";
 import SellerPromotionsPage from "../pages/SellerPromotions/SellerPromotionsPage";
 import SellerDashboardPage from "../pages/SellerDashboard/SellerDashboardPage";
+import InventoryAuditPage from "../pages/InventoryAudit/InventoryAuditPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -108,6 +109,16 @@ const AttendanceRoute = () => {
   }
 
   return <AttendancePage />;
+};
+
+const InventoryAuditRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!isSuperadminUser(user)) {
+    return <Navigate to="/stock" replace />;
+  }
+
+  return <InventoryAuditPage />;
 };
 
 const protectedRoutes = [
@@ -222,6 +233,10 @@ const protectedRoutes = [
       {
         path: "/superadmin-variants",
         element: guard("/superadmin-variants", <SuperadminVariantsRoute />),
+      },
+      {
+        path: "/inventory-audit",
+        element: guard("/inventory-audit", <InventoryAuditRoute />),
       },
       {
         path: "*",
