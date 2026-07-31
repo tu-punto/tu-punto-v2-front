@@ -16,6 +16,7 @@ export const getInventoryAuditMovementsAPI = async (params?: {
   eventType?: string;
   actorUserId?: string;
   direction?: string;
+  viewMode?: "operativa" | "control";
   q?: string;
   page?: number;
   limit?: number;
@@ -64,6 +65,7 @@ export const downloadInventoryAuditXlsxAPI = async (params?: {
   eventType?: string;
   actorUserId?: string;
   direction?: string;
+  viewMode?: "operativa" | "control";
   q?: string;
   order?: "asc" | "desc";
 }) => {

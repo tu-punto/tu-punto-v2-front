@@ -37,9 +37,15 @@ export const normalizePromotionTiers = (tiers: PromotionTier[] = []) =>
 
 export const resolvePromotionPricing = (
   basePrice?: number | null,
-  promotion?: PromotionPricingLike,
+  promotionOrPrice?: PromotionPricingLike | number | null,
   quantity = 1
 ) => {
+  const promotion =
+    typeof promotionOrPrice === "number"
+      ? ({ effectivePrice: promotionOrPrice } as PromotionPricingLike)
+      : promotionOrPrice;
+  const explicitPrice =
+    typeof promotionOrPrice === "number" ? Number(toNumber(promotionOrPrice).toFixed(2)) : null;
   const normalizedBase = Number(toNumber(basePrice || 0).toFixed(2));
   const normalizedTiers = normalizePromotionTiers((promotion?.tiers || []) as PromotionTier[]);
   const simplePrice =
@@ -51,10 +57,18 @@ export const resolvePromotionPricing = (
     .sort((left, right) => right.minQuantity - left.minQuantity)
     .find((tier) => safeQuantity >= tier.minQuantity);
   const effectivePrice = Number(
-    (promotion?.effectivePrice ?? matchedTier?.unitPrice ?? simplePrice ?? normalizedBase).toFixed(2)
+    (
+      explicitPrice ??
+      promotion?.effectivePrice ??
+      matchedTier?.unitPrice ??
+      simplePrice ??
+      normalizedBase
+    ).toFixed(2)
   );
   const discountPercent =
     normalizedBase > 0 ? Number((((normalizedBase - effectivePrice) / normalizedBase) * 100).toFixed(2)) : 0;
+  const inferredPromotionFromPriceOnly =
+    explicitPrice !== null && normalizedBase > 0 && explicitPrice < normalizedBase;
 
   return {
     basePrice: normalizedBase,
@@ -64,6 +78,8 @@ export const resolvePromotionPricing = (
     tiers: normalizedTiers,
     matchedTier,
     title: String(promotion?.label || promotion?.title || "").trim() || null,
-    hasPromotion: Boolean(promotion) && (normalizedTiers.length > 0 || simplePrice !== null || effectivePrice < normalizedBase)
+    hasPromotion:
+      inferredPromotionFromPriceOnly ||
+      (Boolean(promotion) && (normalizedTiers.length > 0 || simplePrice !== null || effectivePrice < normalizedBase))
   };
 };

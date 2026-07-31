@@ -10,21 +10,21 @@ type Props = {
 };
 
 const PromotionPrice = ({ basePrice, price, promotion, quantity = 1, compact = false }: Props) => {
-  const pricing = resolvePromotionPricing(basePrice ?? price ?? 0, promotion, quantity);
+  const pricing = resolvePromotionPricing(basePrice ?? price ?? 0, promotion ?? price ?? null, quantity);
   const showBase = pricing.hasPromotion && pricing.basePrice > pricing.effectivePrice;
 
   return (
     <div>
-      <Typography.Text strong style={{ color: showBase ? "#0f766e" : undefined }}>
-        {formatMoney(pricing.effectivePrice)}
-      </Typography.Text>
-      {showBase && (
-        <div style={{ lineHeight: 1.15 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <Typography.Text strong style={{ color: showBase ? "#0f766e" : undefined }}>
+          {formatMoney(pricing.effectivePrice)}
+        </Typography.Text>
+        {showBase && (
           <Typography.Text delete type="secondary" style={{ fontSize: compact ? 11 : 12 }}>
             {formatMoney(pricing.basePrice)}
           </Typography.Text>
-        </div>
-      )}
+        )}
+      </div>
       {pricing.matchedTier && (
         <Tag color={pricing.matchedTier ? "cyan" : "green"} bordered={false} style={{ marginTop: 4 }}>
           Desde {pricing.matchedTier.minQuantity}

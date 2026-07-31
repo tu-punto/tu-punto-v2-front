@@ -153,6 +153,7 @@ const InventoryAuditPage = () => {
   const [selectedEventType, setSelectedEventType] = useState<string>("all");
   const [selectedDirection, setSelectedDirection] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<"desc" | "asc">("desc");
+  const [activeTab, setActiveTab] = useState<"operativa" | "control">("operativa");
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -224,6 +225,7 @@ const InventoryAuditPage = () => {
           branchId: selectedBranchId !== "all" ? selectedBranchId : undefined,
           eventType: selectedEventType !== "all" ? selectedEventType : undefined,
           direction: selectedDirection !== "all" ? selectedDirection : undefined,
+          viewMode: activeTab,
           order: selectedOrder,
           q: debouncedSearch || undefined,
           page,
@@ -252,7 +254,7 @@ const InventoryAuditPage = () => {
     };
 
     void loadAudit();
-  }, [dateRange, selectedSellerId, selectedBranchId, selectedEventType, selectedDirection, selectedOrder, debouncedSearch, page, limit, refreshTick]);
+  }, [dateRange, selectedSellerId, selectedBranchId, selectedEventType, selectedDirection, selectedOrder, activeTab, debouncedSearch, page, limit, refreshTick]);
 
   const handleResetFilters = () => {
     setDateRange(null);
@@ -300,6 +302,7 @@ const InventoryAuditPage = () => {
       branchId: selectedBranchId !== "all" ? selectedBranchId : undefined,
       eventType: selectedEventType !== "all" ? selectedEventType : undefined,
       direction: selectedDirection !== "all" ? selectedDirection : undefined,
+      viewMode: activeTab,
       order: selectedOrder,
       q: debouncedSearch || undefined,
     });
@@ -644,7 +647,11 @@ const InventoryAuditPage = () => {
       </Card>
 
       <Tabs
-        defaultActiveKey="operativa"
+        activeKey={activeTab}
+        onChange={(nextKey) => {
+          setActiveTab(nextKey === "control" ? "control" : "operativa");
+          setPage(1);
+        }}
         items={[
           {
             key: "operativa",
@@ -671,7 +678,7 @@ const InventoryAuditPage = () => {
                   locale={{
                     emptyText: loading ? "Cargando..." : <Empty description="No hay movimientos para los filtros seleccionados." />,
                   }}
-                />
+                  />
               </Card>
             ),
           },
@@ -704,7 +711,17 @@ const InventoryAuditPage = () => {
                     dataSource={rows}
                     loading={loading}
                     scroll={{ x: 1280 }}
-                    pagination={false}
+                    pagination={{
+                      current: page,
+                      pageSize: limit,
+                      total,
+                      showSizeChanger: true,
+                      pageSizeOptions: ["20", "50", "100"],
+                      onChange: (nextPage, nextLimit) => {
+                        setPage(nextPage);
+                        setLimit(nextLimit);
+                      },
+                    }}
                     rowClassName={(record) => (record.resolved ? "inventory-audit-row-resolved" : "")}
                     locale={{
                       emptyText: loading ? "Cargando..." : <Empty description="No hay movimientos para los filtros seleccionados." />,
