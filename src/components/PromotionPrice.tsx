@@ -12,13 +12,6 @@ type Props = {
 const PromotionPrice = ({ basePrice, price, promotion, quantity = 1, compact = false }: Props) => {
   const pricing = resolvePromotionPricing(basePrice ?? price ?? 0, promotion, quantity);
   const showBase = pricing.hasPromotion && pricing.basePrice > pricing.effectivePrice;
-  const tierLabel = pricing.matchedTier
-    ? `Desde ${pricing.matchedTier.minQuantity}`
-    : pricing.tiers.length > 0
-      ? `Por cantidad`
-      : pricing.title
-        ? "Promoción"
-        : null;
 
   return (
     <div>
@@ -32,9 +25,9 @@ const PromotionPrice = ({ basePrice, price, promotion, quantity = 1, compact = f
           </Typography.Text>
         </div>
       )}
-      {tierLabel && (
+      {pricing.matchedTier && (
         <Tag color={pricing.matchedTier ? "cyan" : "green"} bordered={false} style={{ marginTop: 4 }}>
-          {tierLabel}
+          Desde {pricing.matchedTier.minQuantity}
         </Tag>
       )}
       {!compact && pricing.tiers.length > 0 && (

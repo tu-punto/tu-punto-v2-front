@@ -384,6 +384,12 @@ const SellerPromotionsPage = () => {
 
   const columns: ColumnsType<PromotionRow> = [
     {
+      title: "Título",
+      dataIndex: "title",
+      key: "title",
+      render: (value?: string) => value || "Sin título"
+    },
+    {
       title: "Producto",
       dataIndex: "productName",
       key: "productName",
@@ -549,7 +555,7 @@ const SellerPromotionsPage = () => {
                 setSearchText(event.target.value);
                 setPage(1);
               }}
-              placeholder="Buscar por producto o variante"
+              placeholder="Buscar por título, producto o variante"
               prefix={<EyeOutlined />}
               allowClear
             />

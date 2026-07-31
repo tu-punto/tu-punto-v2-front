@@ -8,6 +8,7 @@ import { deleteProductsByShippingAPI, updateProductsByShippingAPI } from '../../
 import { getSellersAPI } from '../../api/seller.ts';
 import dayjs from "dayjs";
 import { applySellerCommissionCap } from '../../utils/commissionCap';
+import PromotionPrice from "../../components/PromotionPrice";
 
 const resolveBranchId = (value: any): string => {
   if (!value) return "";
@@ -82,7 +83,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       ...p,
       id_venta: p._id ?? null,
       key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
-      producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
+      producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre",
+      precio_original: p.precio_original ?? p.precio_unitario,
     }));
 
     setProducts(ventasNormales);
@@ -161,6 +163,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           producto: `${p.nombre_producto} - ${varianteNombre}`,
           nombre_variante: `${p.nombre_producto} - ${varianteNombre}`,
           precio: combo.precio,
+          precio_original: combo.precio,
           stockActual: combo.stock,
           variantes: combo.variantes,
           sucursalId,
@@ -334,16 +337,33 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         render: (value: any, record: any) => {
           if (isAdmin) {
             return (
-              <InputNumber
-                prefix="Bs."
-                min={0}
-                value={value}
-                onChange={(newValue) => handleValueChange(record.key, 'precio_unitario', newValue)}
-                style={{ width: '100%' }}
-              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <PromotionPrice
+                  price={record.precio_unitario}
+                  basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                  promotion={record.pricingPromotion}
+                  quantity={record.cantidad}
+                  compact
+                />
+                <InputNumber
+                  prefix="Bs."
+                  min={0}
+                  value={value}
+                  onChange={(newValue) => handleValueChange(record.key, 'precio_unitario', newValue)}
+                  style={{ width: '100%' }}
+                />
+              </div>
             );
           }
-          return `Bs ${value}`;
+          return (
+            <PromotionPrice
+              price={record.precio_unitario}
+              basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+              promotion={record.pricingPromotion}
+              quantity={record.cantidad}
+              compact
+            />
+          );
         }
       },
       {

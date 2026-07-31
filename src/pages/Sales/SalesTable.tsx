@@ -1,6 +1,7 @@
 import { Table } from 'antd';
 import { useEffect, useState } from 'react';
 import { getSalesAPI } from '../../api/sales';
+import PromotionPrice from '../../components/PromotionPrice';
 
 const SalesTable = (refreshKey: any) => {
     const [pendingPaymentData, setPendingPaymentData] = useState([]);
@@ -21,11 +22,12 @@ const SalesTable = (refreshKey: any) => {
             const formattedData: any = salesData.map((sales: any) => {
                 return {
                     key: sales.id_venta.toString(),
-                    nombre: `${sales.producto}`,
-                    cantidad: `${sales.cantidad}`,
-                    precio_unitario: `Bs. ${sales.precio_unitario}`,
-                    utilidad: `Bs. ${sales.utilidad}`,
-                    utilidad_extra: `Bs. ${sales.utilidad_extra}`,
+                    producto: `${sales.producto}`,
+                    cantidad: Number(sales.cantidad || 0),
+                    precio_unitario: Number(sales.precio_unitario || 0),
+                    precio_original: Number(sales.precio_original || sales.precio_unitario || 0),
+                    utilidad: Number(sales.utilidad || 0),
+                    utilidad_extra: Number(sales.utilidad_extra || 0),
                 };
             })
             // Actualiza el estado con los datos formateados
@@ -58,19 +60,29 @@ const SalesTable = (refreshKey: any) => {
             title: 'Precio Unitario',
             dataIndex: 'precio_unitario',
             key: 'precio_unitario',
-            className: "text-mobile-sm xl:text-desktop-sm"
+            className: "text-mobile-sm xl:text-desktop-sm",
+            render: (_: any, record: any) => (
+              <PromotionPrice
+                price={record.precio_unitario}
+                basePrice={record.precio_original}
+                quantity={record.cantidad}
+                compact
+              />
+            )
         },
         {
             title: 'Utilidad',
             dataIndex: 'utilidad',
             key: 'utilidad',
-            className: "text-mobile-sm xl:text-desktop-sm"
+            className: "text-mobile-sm xl:text-desktop-sm",
+            render: (value: number) => `Bs. ${Number(value || 0).toFixed(2)}`
         },
         {
             title: 'Utilidad Extra',
             dataIndex: 'utilidad_extra',
             key: 'utilidad_extra',
-            className: "text-mobile-sm xl:text-desktop-sm"
+            className: "text-mobile-sm xl:text-desktop-sm",
+            render: (value: number) => `Bs. ${Number(value || 0).toFixed(2)}`
         },
     ];
 
