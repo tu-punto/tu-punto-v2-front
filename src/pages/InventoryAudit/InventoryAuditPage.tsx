@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import {
   Button,
   Card,
+  Checkbox,
   DatePicker,
   Descriptions,
   Drawer,
@@ -25,6 +26,7 @@ import {
   downloadInventoryAuditXlsxAPI,
   getInventoryAuditEventDetailAPI,
   getInventoryAuditMovementsAPI,
+  updateInventoryAuditMovementResolvedAPI,
 } from "../../api/inventoryAudit";
 import { getSellersBasicAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
@@ -47,6 +49,7 @@ type AuditRow = {
   stock_delta: number;
   stock_after: number;
   movement_direction: "in" | "out" | "neutral";
+  resolved?: boolean;
   created_at: string;
   event_actor_name?: string;
   event_actor_role?: string;
@@ -149,6 +152,7 @@ const InventoryAuditPage = () => {
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   const [selectedEventType, setSelectedEventType] = useState<string>("all");
   const [selectedDirection, setSelectedDirection] = useState<string>("all");
+  const [selectedOrder, setSelectedOrder] = useState<"desc" | "asc">("desc");
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -220,6 +224,7 @@ const InventoryAuditPage = () => {
           branchId: selectedBranchId !== "all" ? selectedBranchId : undefined,
           eventType: selectedEventType !== "all" ? selectedEventType : undefined,
           direction: selectedDirection !== "all" ? selectedDirection : undefined,
+          order: selectedOrder,
           q: debouncedSearch || undefined,
           page,
           limit,
@@ -247,7 +252,7 @@ const InventoryAuditPage = () => {
     };
 
     void loadAudit();
-  }, [dateRange, selectedSellerId, selectedBranchId, selectedEventType, selectedDirection, debouncedSearch, page, limit, refreshTick]);
+  }, [dateRange, selectedSellerId, selectedBranchId, selectedEventType, selectedDirection, selectedOrder, debouncedSearch, page, limit, refreshTick]);
 
   const handleResetFilters = () => {
     setDateRange(null);
@@ -255,6 +260,7 @@ const InventoryAuditPage = () => {
     setSelectedBranchId("all");
     setSelectedEventType("all");
     setSelectedDirection("all");
+    setSelectedOrder("desc");
     setSearchText("");
     setDebouncedSearch("");
     setPage(1);
@@ -294,6 +300,7 @@ const InventoryAuditPage = () => {
       branchId: selectedBranchId !== "all" ? selectedBranchId : undefined,
       eventType: selectedEventType !== "all" ? selectedEventType : undefined,
       direction: selectedDirection !== "all" ? selectedDirection : undefined,
+      order: selectedOrder,
       q: debouncedSearch || undefined,
     });
     setExportLoading(false);
@@ -302,6 +309,22 @@ const InventoryAuditPage = () => {
       return;
     }
     message.success("Reporte de auditoría generado.");
+  };
+
+  const handleToggleResolved = async (movementId: string, resolved: boolean) => {
+    if (!movementId) return;
+
+    const previousRows = rows;
+    setRows((current) => current.map((row) => (row._id === movementId ? { ...row, resolved } : row)));
+
+    const response = await updateInventoryAuditMovementResolvedAPI(movementId, resolved);
+    if (response?.success === false) {
+      setRows(previousRows);
+      message.error((response as any)?.message || "No se pudo actualizar el estado.");
+      return;
+    }
+
+    message.success(resolved ? "Marcado como resuelto." : "Marcado como pendiente.");
   };
 
   const columns: ColumnsType<AuditRow> = useMemo(
@@ -388,6 +411,90 @@ const InventoryAuditPage = () => {
       },
     ],
     []
+  );
+
+  const controlColumns: ColumnsType<AuditRow> = useMemo(
+    () => [
+      {
+        title: "Fecha",
+        dataIndex: "created_at",
+        key: "created_at",
+        width: 170,
+        render: (value: string) => formatDateTime(value),
+      },
+      {
+        title: "Producto",
+        key: "product",
+        render: (_: unknown, record) => (
+          <div className="inventory-audit-product-cell">
+            <div className="inventory-audit-product-title">{record.product_name_snapshot || "Producto"}</div>
+            <div className="inventory-audit-product-meta">{record.variant_label_snapshot || "Sin variante"}</div>
+          </div>
+        ),
+      },
+      {
+        title: "Antes",
+        dataIndex: "stock_before",
+        key: "stock_before",
+        width: 90,
+      },
+      {
+        title: "Cambio",
+        dataIndex: "stock_delta",
+        key: "stock_delta",
+        width: 120,
+        render: (value: number) => (
+          <Tag bordered={false} color={getDeltaTagColor(Number(value || 0))}>
+            {Number(value || 0) > 0 ? `+${value}` : value}
+          </Tag>
+        ),
+      },
+      {
+        title: "Después",
+        dataIndex: "stock_after",
+        key: "stock_after",
+        width: 90,
+      },
+      {
+        title: "Tipo",
+        dataIndex: "event_type",
+        key: "event_type",
+        width: 200,
+        render: (value?: string) => {
+          const meta = getEventTypeMeta(value);
+          return <Tag color={meta.color}>{meta.label}</Tag>;
+        },
+      },
+      {
+        title: "Usuario",
+        key: "user",
+        width: 220,
+        render: (_: unknown, record) => (
+          <div>
+            <div>{record.event_actor_name || "Sistema"}</div>
+            <div className="inventory-audit-muted">{record.event_actor_role || "-"}</div>
+          </div>
+        ),
+      },
+      {
+        title: "Resuelto",
+        key: "resolved",
+        width: 120,
+        align: "center",
+        render: (_: unknown, record) => (
+          <div className="inventory-audit-resolved-cell">
+            <Checkbox
+              checked={Boolean(record.resolved)}
+              onChange={(event) => void handleToggleResolved(record._id, event.target.checked)}
+            />
+            <Tag color={record.resolved ? "green" : "gold"} bordered={false}>
+              {record.resolved ? "Resuelto" : "Pendiente"}
+            </Tag>
+          </div>
+        ),
+      },
+    ],
+    [rows]
   );
 
   const detailColumns: ColumnsType<any> = useMemo(
@@ -572,68 +679,102 @@ const InventoryAuditPage = () => {
             key: "control",
             label: "Control interno",
             children: (
-              <div className="inventory-audit-control-grid">
-                <Card>
-                  <Statistic title="Movimientos" value={summary.movementCount} />
-                </Card>
-                <Card>
-                  <Statistic title="Ingresos de stock" value={summary.totalIn} />
-                </Card>
-                <Card>
-                  <Statistic title="Salidas de stock" value={summary.totalOut} />
-                </Card>
-                <Card>
-                  <Statistic title="Productos únicos" value={summary.uniqueProducts} />
-                </Card>
-                <Card title="Movimientos por tipo">
-                  <List
-                    dataSource={summary.byType}
-                    locale={{ emptyText: "Sin datos" }}
-                    renderItem={(item) => (
-                      <List.Item>
-                        <div>
-                          <div>{getEventTypeMeta(item.eventType).label}</div>
-                          <div className="inventory-audit-muted">Delta total: {item.totalDelta}</div>
-                        </div>
-                        <Tag>{item.count}</Tag>
-                      </List.Item>
-                    )}
+              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                <Card
+                  title="Historial de cambios de stock"
+                  extra={
+                    <Select
+                      value={selectedOrder}
+                      onChange={(value) => {
+                        setSelectedOrder(value);
+                        setPage(1);
+                      }}
+                      style={{ width: 210 }}
+                      options={[
+                        { value: "desc", label: "Más recientes primero" },
+                        { value: "asc", label: "Más antiguos primero" },
+                      ]}
+                    />
+                  }
+                  className="inventory-audit-table-card"
+                >
+                  <Table
+                    rowKey="_id"
+                    columns={controlColumns}
+                    dataSource={rows}
+                    loading={loading}
+                    scroll={{ x: 1280 }}
+                    pagination={false}
+                    rowClassName={(record) => (record.resolved ? "inventory-audit-row-resolved" : "")}
+                    locale={{
+                      emptyText: loading ? "Cargando..." : <Empty description="No hay movimientos para los filtros seleccionados." />,
+                    }}
                   />
                 </Card>
-                <Card title="Usuarios con más movimientos">
-                  <List
-                    dataSource={summary.byActor}
-                    locale={{ emptyText: "Sin datos" }}
-                    renderItem={(item) => (
-                      <List.Item>
-                        <div>
-                          <div>{item.actorName}</div>
-                          <div className="inventory-audit-muted">Salidas: {item.outUnits}</div>
-                        </div>
-                        <Tag>{item.count}</Tag>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-                <Card title="Productos con más correcciones" className="inventory-audit-card-span-2">
-                  <List
-                    dataSource={summary.topProducts}
-                    locale={{ emptyText: "Sin datos" }}
-                    renderItem={(item) => (
-                      <List.Item>
-                        <div>
-                          <div>{item.productName || "Producto"}</div>
-                          <div className="inventory-audit-muted">{item.variantLabel || "Sin variante"}</div>
-                        </div>
-                        <Space>
-                          <Tag>{item.count} mov.</Tag>
-                          <Tag color="blue">Ajuste {item.totalAdjustment}</Tag>
-                        </Space>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              </div>
+
+                <div className="inventory-audit-control-grid">
+                  <Card>
+                    <Statistic title="Movimientos" value={summary.movementCount} />
+                  </Card>
+                  <Card>
+                    <Statistic title="Ingresos de stock" value={summary.totalIn} />
+                  </Card>
+                  <Card>
+                    <Statistic title="Salidas de stock" value={summary.totalOut} />
+                  </Card>
+                  <Card>
+                    <Statistic title="Productos únicos" value={summary.uniqueProducts} />
+                  </Card>
+                  <Card title="Movimientos por tipo">
+                    <List
+                      dataSource={summary.byType}
+                      locale={{ emptyText: "Sin datos" }}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <div>
+                            <div>{getEventTypeMeta(item.eventType).label}</div>
+                            <div className="inventory-audit-muted">Delta total: {item.totalDelta}</div>
+                          </div>
+                          <Tag>{item.count}</Tag>
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                  <Card title="Usuarios con más movimientos">
+                    <List
+                      dataSource={summary.byActor}
+                      locale={{ emptyText: "Sin datos" }}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <div>
+                            <div>{item.actorName}</div>
+                            <div className="inventory-audit-muted">Salidas: {item.outUnits}</div>
+                          </div>
+                          <Tag>{item.count}</Tag>
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                  <Card title="Productos con más correcciones" className="inventory-audit-card-span-2">
+                    <List
+                      dataSource={summary.topProducts}
+                      locale={{ emptyText: "Sin datos" }}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <div>
+                            <div>{item.productName || "Producto"}</div>
+                            <div className="inventory-audit-muted">{item.variantLabel || "Sin variante"}</div>
+                          </div>
+                          <Space>
+                            <Tag>{item.count} mov.</Tag>
+                            <Tag color="blue">Ajuste {item.totalAdjustment}</Tag>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  </Card>
+                </div>
+              </Space>
             ),
           },
         ]}

@@ -19,6 +19,7 @@ export const getInventoryAuditMovementsAPI = async (params?: {
   q?: string;
   page?: number;
   limit?: number;
+  order?: "asc" | "desc";
 }) => {
   try {
     const res = await apiClient.get("/inventory-audit/movements", { params });
@@ -64,6 +65,7 @@ export const downloadInventoryAuditXlsxAPI = async (params?: {
   actorUserId?: string;
   direction?: string;
   q?: string;
+  order?: "asc" | "desc";
 }) => {
   try {
     const res = await apiClient.get("/inventory-audit/export/xlsx", {
@@ -86,6 +88,15 @@ export const downloadInventoryAuditXlsxAPI = async (params?: {
     return { success: true };
   } catch (error) {
     console.error("Error al exportar auditoria de stock:", error);
+    return handleError(error);
+  }
+};
+
+export const updateInventoryAuditMovementResolvedAPI = async (movementId: string, resolved: boolean) => {
+  try {
+    const res = await apiClient.patch(`/inventory-audit/movements/${movementId}/resolved`, { resolved });
+    return res.data;
+  } catch (error) {
     return handleError(error);
   }
 };
