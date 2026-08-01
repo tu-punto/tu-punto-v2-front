@@ -58,6 +58,8 @@ type PromotionRow = {
   title?: string;
   simplePrice?: number | null;
   tiers: PromotionTier[];
+  pricingMode?: "simple" | "tiers" | "invalid";
+  isInvalid?: boolean;
   startsAt: string;
   endsAt: string;
   state: "draft" | "active" | "disabled";
@@ -80,7 +82,7 @@ type PromotionFormValues = {
   productId?: string;
   variantKey?: string;
   scope: "interno" | "catalogo" | "ambos";
-  pricingMode: "simple" | "tiers" | "both";
+  pricingMode: "simple" | "tiers";
   title?: string;
   simplePrice?: number | null;
   tiers?: PromotionTier[];
@@ -159,7 +161,7 @@ const SellerPromotionsPage = () => {
     [canUseCatalogScopes]
   );
 
-  const pricingMode = Form.useWatch("pricingMode", form) || "both";
+  const pricingMode = Form.useWatch("pricingMode", form) || "simple";
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -239,7 +241,7 @@ const SellerPromotionsPage = () => {
     form.setFieldsValue({
       scope: canUseCatalogScopes ? "ambos" : "interno",
       state: "active",
-      pricingMode: "both",
+      pricingMode: "simple",
       startsDate: dayjs().startOf("day"),
       startsTime: dayjs().startOf("day"),
       endsTime: dayjs().startOf("day"),
@@ -248,6 +250,10 @@ const SellerPromotionsPage = () => {
   };
 
   const handleOpenEdit = (row: PromotionRow) => {
+    if (row.isInvalid) {
+      messageApi.error("Esta promocion es invalida porque mezcla precio fijo y escalas. Debe rehacerse.");
+      return;
+    }
     setEditingRow(row);
     setPreviewData(null);
     setModalOpen(true);
@@ -256,12 +262,7 @@ const SellerPromotionsPage = () => {
       productId: row.productId,
       variantKey: row.variantKey,
       scope: canUseCatalogScopes ? row.scope : "interno",
-      pricingMode:
-        row.simplePrice !== null && row.simplePrice !== undefined && row.tiers?.length
-          ? "both"
-          : row.simplePrice !== null && row.simplePrice !== undefined
-            ? "simple"
-            : "tiers",
+      pricingMode: row.pricingMode === "tiers" ? "tiers" : "simple",
       title: row.title,
       simplePrice: row.simplePrice ?? undefined,
       tiers: row.tiers?.length ? row.tiers : undefined,
@@ -294,7 +295,7 @@ const SellerPromotionsPage = () => {
     setPreviewData(null);
   };
 
-  const handlePricingModeChange = (value: "simple" | "tiers" | "both") => {
+  const handlePricingModeChange = (value: "simple" | "tiers") => {
     form.setFieldValue("pricingMode", value);
   };
 
@@ -313,15 +314,12 @@ const SellerPromotionsPage = () => {
       messageApi.error("Agrega al menos un tramo por cantidad");
       return;
     }
-    if (values.pricingMode === "both" && (simplePrice === undefined || simplePrice === null) && tiers.length === 0) {
-      messageApi.error("Define un precio fijo o al menos un tramo por cantidad");
-      return;
-    }
     setPreviewLoading(true);
     const result = await previewSellerPromotionAPI({
       productId: values.productId,
       variantKey: values.variantKey,
       scope: canUseCatalogScopes ? values.scope : "interno",
+      pricingMode: values.pricingMode,
       quantity: tiers?.[0]?.minQuantity || 1,
       simplePrice,
       tiers,
@@ -351,14 +349,11 @@ const SellerPromotionsPage = () => {
       messageApi.error("Agrega al menos un tramo por cantidad");
       return;
     }
-    if (values.pricingMode === "both" && (simplePrice === undefined || simplePrice === null) && tiers.length === 0) {
-      messageApi.error("Define un precio fijo o al menos un tramo por cantidad");
-      return;
-    }
     const payload = {
       productId: values.productId,
       variantKey: values.variantKey,
       scope: canUseCatalogScopes ? values.scope : "interno",
+      pricingMode: values.pricingMode,
       title: values.title,
       simplePrice,
       tiers,
@@ -412,6 +407,11 @@ const SellerPromotionsPage = () => {
       render: (_, row) => (
         <div>
           <Typography.Text>{row.simplePrice ? formatMoney(row.simplePrice) : "Por escalas"}</Typography.Text>
+          {row.isInvalid && (
+            <div style={{ marginTop: 6 }}>
+              <Tag color="red">Invalida: mezcla precio fijo y escalas</Tag>
+            </div>
+          )}
           <div style={{ color: "#64748b", fontSize: 12 }}>
             Base {formatMoney(row.basePrice)} · Stock {row.totalStock}
           </div>
@@ -444,9 +444,11 @@ const SellerPromotionsPage = () => {
       key: "effectiveState",
       render: (_, row) => (
         <Space direction="vertical" size={4}>
-          <Tag color={stateMeta[row.effectiveState]?.color}>{stateMeta[row.effectiveState]?.label}</Tag>
+          <Tag color={row.isInvalid ? "red" : stateMeta[row.effectiveState]?.color}>
+            {row.isInvalid ? "Invalida" : stateMeta[row.effectiveState]?.label}
+          </Tag>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Config: {stateMeta[row.state]?.label}
+            {row.isInvalid ? "Debe eliminarse y crearse de nuevo." : `Config: ${stateMeta[row.state]?.label}`}
           </Typography.Text>
         </Space>
       )
@@ -457,7 +459,7 @@ const SellerPromotionsPage = () => {
       width: 140,
       render: (_, row) => (
         <Space>
-          <Button icon={<EditOutlined />} onClick={() => handleOpenEdit(row)} />
+          <Button icon={<EditOutlined />} onClick={() => handleOpenEdit(row)} disabled={Boolean(row.isInvalid)} />
           <Popconfirm
             title="Eliminar promoción"
             description="Esta acción no se puede deshacer."
@@ -633,7 +635,7 @@ const SellerPromotionsPage = () => {
               initialValues={{
                 scope: canUseCatalogScopes ? "ambos" : "interno",
                 state: "active",
-                pricingMode: "both",
+                pricingMode: "simple",
                 startsDate: dayjs().startOf("day"),
                 startsTime: dayjs().startOf("day"),
                 endsTime: dayjs().startOf("day"),
@@ -695,7 +697,6 @@ const SellerPromotionsPage = () => {
                 <Radio.Group optionType="button" buttonStyle="solid" onChange={(event) => handlePricingModeChange(event.target.value)}>
                   <Radio.Button value="simple">Precio fijo</Radio.Button>
                   <Radio.Button value="tiers">Por cantidad</Radio.Button>
-                  <Radio.Button value="both">Ambos</Radio.Button>
                 </Radio.Group>
               </Form.Item>
 
@@ -703,7 +704,7 @@ const SellerPromotionsPage = () => {
                 <Input placeholder="Ej. Rebaja de fin de mes" maxLength={90} />
               </Form.Item>
 
-              {(pricingMode === "simple" || pricingMode === "both") && (
+              {pricingMode === "simple" && (
                 <Row gutter={12}>
                   <Col span={16}>
                     <Form.Item name="simplePrice" label="Precio fijo promocional">
@@ -718,7 +719,7 @@ const SellerPromotionsPage = () => {
                 </Row>
               )}
 
-              {(pricingMode === "tiers" || pricingMode === "both") && (
+              {pricingMode === "tiers" && (
                 <Form.List name="tiers">
                   {(fields, { add, remove }) => (
                     <Card

@@ -9,6 +9,7 @@ export type PromotionPricingLike = {
   simplePrice?: number | null;
   tiers?: PromotionTier[] | null;
   effectivePrice?: number | null;
+  basePrice?: number | null;
   discountPercent?: number | null;
   matchedTier?: PromotionTier | null;
   scope?: string | null;
@@ -59,9 +60,9 @@ export const resolvePromotionPricing = (
   const effectivePrice = Number(
     (
       explicitPrice ??
-      promotion?.effectivePrice ??
       matchedTier?.unitPrice ??
       simplePrice ??
+      promotion?.effectivePrice ??
       normalizedBase
     ).toFixed(2)
   );
