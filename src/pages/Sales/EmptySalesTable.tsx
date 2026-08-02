@@ -80,6 +80,7 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                         promotion={record.pricingPromotion}
                         quantity={record.cantidad}
                         compact
+                        showTierBadge
                     />
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -89,6 +90,7 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
                             promotion={record.pricingPromotion}
                             quantity={record.cantidad}
                             compact
+                            showTierBadge
                         />
                         <InputNumber
                             min={0}
