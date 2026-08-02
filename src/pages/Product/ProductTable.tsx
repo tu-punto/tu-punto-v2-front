@@ -27,6 +27,7 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                     basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
                     promotion={record.pricingPromotion}
                     compact
+                    showTierBadge
                 />
             ),
         },
