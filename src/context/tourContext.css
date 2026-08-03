@@ -1,5 +1,7 @@
+.tp-tour-root .ant-tour,
 .tp-tour-overlay.ant-tour {
-  max-width: 390px;
+  max-width: 390px !important;
+  width: min(390px, calc(100vw - 28px)) !important;
 }
 
 .tp-tour-overlay .ant-tour-inner {
@@ -177,10 +179,20 @@
   bottom: 22px;
 }
 
-.tp-tour-floating-nav-mobile {
+.tp-tour-floating-nav-mobile-top,
+.tp-tour-floating-nav-mobile-bottom {
   left: 50%;
-  bottom: calc(18px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
+}
+
+.tp-tour-floating-nav-mobile-top {
+  top: calc(86px + env(safe-area-inset-top));
+  bottom: auto;
+}
+
+.tp-tour-floating-nav-mobile-bottom {
+  top: auto;
+  bottom: calc(92px + env(safe-area-inset-bottom));
 }
 
 .tp-tour-floating-btn {
@@ -238,4 +250,70 @@
 .tp-tour-floating-progress-separator {
   margin: 0 6px;
   color: #96a8bc;
+}
+
+@media (max-width: 768px) {
+  .tp-tour-root .ant-tour,
+  .tp-tour-overlay.ant-tour {
+    width: min(320px, calc(100vw - 92px)) !important;
+    max-width: min(320px, calc(100vw - 92px)) !important;
+  }
+
+  .tp-tour-root .ant-tour-content,
+  .tp-tour-overlay .ant-tour-content {
+    max-width: min(320px, calc(100vw - 92px)) !important;
+  }
+
+  .tp-tour-overlay .ant-tour-inner {
+    border-radius: 18px;
+  }
+
+  .tp-tour-overlay .ant-tour-header {
+    padding-left: 66px;
+    margin-bottom: 10px;
+  }
+
+  .tp-tour-overlay .ant-tour-title {
+    font-size: 17px;
+  }
+
+  .tp-tour-overlay .ant-tour-description {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .tp-tour-overlay .ant-tour-inner::before {
+    top: 14px;
+    left: 14px;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .tp-tour-overlay .ant-tour-content {
+    padding: 16px 14px 14px;
+  }
+
+  .tp-tour-floating-nav-mobile-top,
+  .tp-tour-floating-nav-mobile-bottom {
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 16px;
+  }
+
+  .tp-tour-floating-progress {
+    min-width: 64px;
+    font-size: 14px;
+  }
+
+  .tp-tour-floating-btn {
+    width: 52px;
+    min-width: 52px;
+    height: 48px;
+    font-size: 22px;
+  }
+
+  .tp-tour-floating-btn .anticon {
+    font-size: 22px;
+  }
 }

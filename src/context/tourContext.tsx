@@ -134,7 +134,6 @@ const buildSellerNavigationSteps = ({
           text:
             sellerMenuDescriptions[item.path] || `Desde aquí ingresas al módulo de ${item.label.toLowerCase()}.`,
           dismiss,
-          hint: "Estas opciones cambian según los servicios habilitados para tu cuenta.",
         }),
         onEnter: () => dispatchWindowEvent("tp-tour-close-mobile-plus"),
       });
@@ -358,6 +357,7 @@ export const TourProvider = ({
     (definition: TourDefinition) => {
       const device: TourDevice = isMobile ? "mobile" : "desktop";
       const baseSteps = definition.buildSteps({ device, dismiss: dismissActiveTour, user });
+      const mobilePanelWidth = "min(320px, calc(100vw - 92px))";
 
       return baseSteps
         .map((step) => {
@@ -370,6 +370,12 @@ export const TourProvider = ({
             placement: step.placement,
             target: step.targetId ? (() => targetNode as HTMLElement) : null,
             onEnter: step.onEnter,
+            style: isMobile
+              ? {
+                  width: mobilePanelWidth,
+                  maxWidth: mobilePanelWidth,
+                }
+              : undefined,
           } as ResolvedTourStep;
         })
         .filter(Boolean) as ResolvedTourStep[];
@@ -505,6 +511,8 @@ export const TourProvider = ({
     }));
   }, [activeTour, completeActiveTour]);
 
+  const shouldShowMobileNavTop = isMobile && currentStep >= 4 && currentStep <= 7;
+
   const contextValue = useMemo<TourContextValue>(
     () => ({
       tours,
@@ -521,6 +529,7 @@ export const TourProvider = ({
       {children}
       <Tour
         className="tp-tour-overlay"
+        rootClassName="tp-tour-root"
         open={Boolean(activeTour)}
         onClose={dismissActiveTour}
         steps={renderedSteps}
@@ -532,7 +541,15 @@ export const TourProvider = ({
         scrollIntoViewOptions={{ behavior: "smooth", block: "center" }}
       />
       {activeTour ? (
-        <div className={`tp-tour-floating-nav ${isMobile ? "tp-tour-floating-nav-mobile" : "tp-tour-floating-nav-desktop"}`}>
+        <div
+          className={`tp-tour-floating-nav ${
+            isMobile
+              ? shouldShowMobileNavTop
+                ? "tp-tour-floating-nav-mobile-top"
+                : "tp-tour-floating-nav-mobile-bottom"
+              : "tp-tour-floating-nav-desktop"
+          }`}
+        >
           <Button
             className="tp-tour-floating-btn tp-tour-floating-btn-secondary"
             onClick={() => setCurrentStep((current) => Math.max(0, current - 1))}
