@@ -136,7 +136,7 @@ export const menu = [
     label: "Promociones",
     icon: tagIcon,
     roles: getAllowedRoles("/seller-promotions"),
-    hiddenInMenuForRoles: ["seller"],
+    hiddenInMenuForRoles: ["seller", "admin", "operator"],
   },
   {
     path: "/admin-seller-product-info",

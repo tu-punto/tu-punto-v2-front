@@ -18,7 +18,7 @@ import {
   Tag,
   Typography,
   TimePicker,
-  message
+  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -27,17 +27,19 @@ import {
   EyeOutlined,
   GiftOutlined,
   PlusOutlined,
-  ReloadOutlined
+  ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
+import { useSearchParams } from "react-router-dom";
 import {
   createSellerPromotionAPI,
   deleteSellerPromotionAPI,
   getSellerPromotionVariantOptionsAPI,
   getSellerPromotionsAPI,
   previewSellerPromotionAPI,
-  updateSellerPromotionAPI
+  updateSellerPromotionAPI,
 } from "../../api/sellerPromotions";
+import { getSellersBasicAPI } from "../../api/seller";
 import { UserContext } from "../../context/userContext";
 import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
 
@@ -48,6 +50,8 @@ type PromotionTier = {
 
 type PromotionRow = {
   id: string;
+  sellerId: string;
+  sellerName?: string;
   productId: string;
   productName: string;
   variantKey: string;
@@ -93,11 +97,18 @@ type PromotionFormValues = {
   state: "draft" | "active" | "disabled";
 };
 
+type SellerOption = {
+  value: string;
+  label: string;
+};
+
+const ALL_SELLERS = "__all__";
+
 const formatMoney = (value?: number | null) =>
   new Intl.NumberFormat("es-BO", {
     style: "currency",
     currency: "BOB",
-    minimumFractionDigits: 2
+    minimumFractionDigits: 2,
   }).format(Number(value || 0));
 
 const combineDateTime = (date?: Dayjs | null, time?: Dayjs | null) => {
@@ -114,8 +125,8 @@ const combineDateTime = (date?: Dayjs | null, time?: Dayjs | null) => {
 
 const scopeMeta: Record<string, { color: string; label: string }> = {
   interno: { color: "blue", label: "Interno" },
-  catalogo: { color: "green", label: "Catálogo" },
-  ambos: { color: "purple", label: "Ambos" }
+  catalogo: { color: "green", label: "Catalogo" },
+  ambos: { color: "purple", label: "Ambos" },
 };
 
 const stateMeta: Record<string, { color: string; label: string }> = {
@@ -123,13 +134,18 @@ const stateMeta: Record<string, { color: string; label: string }> = {
   active: { color: "success", label: "Activa" },
   disabled: { color: "warning", label: "Deshabilitada" },
   scheduled: { color: "processing", label: "Programada" },
-  expired: { color: "error", label: "Expirada" }
+  expired: { color: "error", label: "Expirada" },
 };
 
 const SellerPromotionsPage = () => {
+  const [searchParams] = useSearchParams();
   const [messageApi, contextHolder] = message.useMessage();
   const [form] = Form.useForm<PromotionFormValues>();
   const { user } = useContext(UserContext);
+  const role = String(user?.role || "").trim().toLowerCase();
+  const isManager = role === "admin" || role === "operator";
+  const initialSellerParam = String(searchParams.get("sellerId") || "").trim();
+
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<PromotionRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -138,7 +154,11 @@ const SellerPromotionsPage = () => {
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [scope, setScope] = useState<"all" | "interno" | "catalogo" | "ambos">("all");
-  const [state, setState] = useState<string | undefined>(undefined);
+  const [state, setState] = useState<string | undefined>(isManager ? "active" : undefined);
+  const [sellerOptions, setSellerOptions] = useState<SellerOption[]>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState<string>(
+    isManager ? initialSellerParam || ALL_SELLERS : ""
+  );
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [variantOptionsLoading, setVariantOptionsLoading] = useState(false);
   const [variantSearch, setVariantSearch] = useState("");
@@ -146,7 +166,10 @@ const SellerPromotionsPage = () => {
   const [previewData, setPreviewData] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<PromotionRow | null>(null);
-  const canUseCatalogScopes = canAccessSellerProductInfo(user);
+
+  const canUseCatalogScopes = isManager || canAccessSellerProductInfo(user);
+  const effectiveSellerId = isManager ? (selectedSellerId === ALL_SELLERS ? undefined : selectedSellerId) : undefined;
+  const canCreatePromotion = !isManager || Boolean(effectiveSellerId);
 
   const scopeOptions = useMemo(
     () =>
@@ -155,8 +178,8 @@ const SellerPromotionsPage = () => {
         : [
             { value: "all", label: "Todos los canales" },
             { value: "interno", label: "Solo interno" },
-            { value: "catalogo", label: "Solo catálogo" },
-            { value: "ambos", label: "Ambos" }
+            { value: "catalogo", label: "Solo catalogo" },
+            { value: "ambos", label: "Ambos" },
           ],
     [canUseCatalogScopes]
   );
@@ -168,14 +191,32 @@ const SellerPromotionsPage = () => {
     return () => window.clearTimeout(timer);
   }, [searchText]);
 
+  useEffect(() => {
+    if (!isManager) return;
+    void (async () => {
+      const response = await getSellersBasicAPI({ onlyActiveOrRenewal: true });
+      const items = Array.isArray(response) ? response : [];
+      setSellerOptions([
+        { value: ALL_SELLERS, label: "Todos los vendedores" },
+        ...items
+          .map((seller: any) => ({
+            value: String(seller?._id || "").trim(),
+            label: `${String(seller?.nombre || "").trim()} ${String(seller?.apellido || "").trim()}`.trim(),
+          }))
+          .filter((seller: SellerOption) => seller.value && seller.label),
+      ]);
+    })();
+  }, [isManager]);
+
   const loadPromotions = async () => {
     setLoading(true);
     const response = await getSellerPromotionsAPI({
+      sellerId: effectiveSellerId,
       q: debouncedSearch || undefined,
       scope: canUseCatalogScopes ? scope : "interno",
       state,
       page,
-      limit
+      limit,
     });
     setRows(Array.isArray(response?.rows) ? response.rows : []);
     setTotal(Number(response?.total || 0));
@@ -183,8 +224,15 @@ const SellerPromotionsPage = () => {
   };
 
   const loadVariantOptions = async (query?: string) => {
+    if (isManager && !effectiveSellerId) {
+      setVariantOptions([]);
+      return;
+    }
     setVariantOptionsLoading(true);
-    const response = await getSellerPromotionVariantOptionsAPI({ q: query || undefined });
+    const response = await getSellerPromotionVariantOptionsAPI({
+      q: query || undefined,
+      sellerId: effectiveSellerId,
+    });
     setVariantOptions(Array.isArray(response?.rows) ? response.rows : []);
     setVariantOptionsLoading(false);
   };
@@ -196,19 +244,23 @@ const SellerPromotionsPage = () => {
   }, [canUseCatalogScopes]);
 
   useEffect(() => {
+    setPage(1);
+  }, [selectedSellerId, state, scope, debouncedSearch]);
+
+  useEffect(() => {
     void loadPromotions();
-  }, [debouncedSearch, scope, state, page, limit, canUseCatalogScopes]);
+  }, [debouncedSearch, scope, state, page, limit, canUseCatalogScopes, effectiveSellerId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadVariantOptions(variantSearch.trim());
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [variantSearch]);
+  }, [variantSearch, effectiveSellerId, isManager]);
 
   useEffect(() => {
     void loadVariantOptions();
-  }, []);
+  }, [effectiveSellerId, isManager]);
 
   const summary = useMemo(() => {
     return rows.reduce(
@@ -224,7 +276,7 @@ const SellerPromotionsPage = () => {
         catalogo: 0,
         ambos: 0,
         active: 0,
-        scheduled: 0
+        scheduled: 0,
       } as Record<string, number>
     );
   }, [rows]);
@@ -236,6 +288,10 @@ const SellerPromotionsPage = () => {
   };
 
   const handleOpenCreate = () => {
+    if (!canCreatePromotion) {
+      messageApi.warning("Selecciona un vendedor para crear una promocion");
+      return;
+    }
     resetForm();
     setModalOpen(true);
     form.setFieldsValue({
@@ -245,7 +301,7 @@ const SellerPromotionsPage = () => {
       startsDate: dayjs().startOf("day"),
       startsTime: dayjs().startOf("day"),
       endsTime: dayjs().startOf("day"),
-      tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }]
+      tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }],
     });
   };
 
@@ -270,17 +326,17 @@ const SellerPromotionsPage = () => {
       startsTime: row.startsAt ? dayjs(row.startsAt) : dayjs().startOf("day"),
       endsDate: row.endsAt ? dayjs(row.endsAt) : undefined,
       endsTime: row.endsAt ? dayjs(row.endsAt) : dayjs().startOf("day"),
-      state: row.state
+      state: row.state,
     });
   };
 
   const handleDelete = async (id: string) => {
     const result = await deleteSellerPromotionAPI(id);
     if (result?.success === false) {
-      messageApi.error(String(result?.message || "No se pudo eliminar la promoción"));
+      messageApi.error(String(result?.message || "No se pudo eliminar la promocion"));
       return;
     }
-    messageApi.success("Promoción eliminada");
+    messageApi.success("Promocion eliminada");
     void loadPromotions();
   };
 
@@ -290,7 +346,7 @@ const SellerPromotionsPage = () => {
       selection: value,
       productId: selected?.productId,
       variantKey: selected?.variantKey,
-      simplePrice: undefined
+      simplePrice: undefined,
     });
     setPreviewData(null);
   };
@@ -304,7 +360,7 @@ const SellerPromotionsPage = () => {
     const startsAt = combineDateTime(values.startsDate, values.startsTime);
     const endsAt = combineDateTime(values.endsDate, values.endsTime);
     const simplePrice = values.pricingMode === "tiers" ? null : values.simplePrice;
-    const tiers = values.pricingMode === "simple" ? [] : (values.tiers || []);
+    const tiers = values.pricingMode === "simple" ? [] : values.tiers || [];
 
     if (values.pricingMode === "simple" && (simplePrice === undefined || simplePrice === null)) {
       messageApi.error("Define un precio fijo promocional");
@@ -316,6 +372,7 @@ const SellerPromotionsPage = () => {
     }
     setPreviewLoading(true);
     const result = await previewSellerPromotionAPI({
+      sellerId: isManager ? (editingRow?.sellerId || effectiveSellerId) : undefined,
       productId: values.productId,
       variantKey: values.variantKey,
       scope: canUseCatalogScopes ? values.scope : "interno",
@@ -324,7 +381,7 @@ const SellerPromotionsPage = () => {
       simplePrice,
       tiers,
       startsAt,
-      endsAt
+      endsAt,
     });
     setPreviewLoading(false);
     if (result?.success === false) {
@@ -339,7 +396,7 @@ const SellerPromotionsPage = () => {
     const startsAt = combineDateTime(values.startsDate, values.startsTime);
     const endsAt = combineDateTime(values.endsDate, values.endsTime);
     const simplePrice = values.pricingMode === "tiers" ? null : values.simplePrice;
-    const tiers = values.pricingMode === "simple" ? [] : (values.tiers || []);
+    const tiers = values.pricingMode === "simple" ? [] : values.tiers || [];
 
     if (values.pricingMode === "simple" && (simplePrice === undefined || simplePrice === null)) {
       messageApi.error("Define un precio fijo promocional");
@@ -349,7 +406,9 @@ const SellerPromotionsPage = () => {
       messageApi.error("Agrega al menos un tramo por cantidad");
       return;
     }
+
     const payload = {
+      sellerId: isManager ? (editingRow?.sellerId || effectiveSellerId) : undefined,
       productId: values.productId,
       variantKey: values.variantKey,
       scope: canUseCatalogScopes ? values.scope : "interno",
@@ -359,7 +418,7 @@ const SellerPromotionsPage = () => {
       tiers,
       startsAt,
       endsAt,
-      state: values.state
+      state: values.state,
     };
 
     const result = editingRow
@@ -367,22 +426,32 @@ const SellerPromotionsPage = () => {
       : await createSellerPromotionAPI(payload);
 
     if (result?.success === false) {
-      messageApi.error(String(result?.message || "No se pudo guardar la promoción"));
+      messageApi.error(String(result?.message || "No se pudo guardar la promocion"));
       return;
     }
 
-    messageApi.success(editingRow ? "Promoción actualizada" : "Promoción creada");
+    messageApi.success(editingRow ? "Promocion actualizada" : "Promocion creada");
     setModalOpen(false);
     resetForm();
     void loadPromotions();
   };
 
   const columns: ColumnsType<PromotionRow> = [
+    ...(isManager
+      ? [
+          {
+            title: "Vendedor",
+            dataIndex: "sellerName",
+            key: "sellerName",
+            render: (value?: string) => value || "Vendedor",
+          },
+        ]
+      : []),
     {
-      title: "Título",
+      title: "Titulo",
       dataIndex: "title",
       key: "title",
-      render: (value?: string) => value || "Sin título"
+      render: (value?: string) => value || "Sin titulo",
     },
     {
       title: "Producto",
@@ -393,13 +462,13 @@ const SellerPromotionsPage = () => {
           <Typography.Text strong>{row.productName}</Typography.Text>
           <div style={{ color: "#64748b", fontSize: 12 }}>{row.variantLabel}</div>
         </div>
-      )
+      ),
     },
     {
       title: "Canal",
       dataIndex: "scope",
       key: "scope",
-      render: (value: string) => <Tag color={scopeMeta[value]?.color}>{scopeMeta[value]?.label || value}</Tag>
+      render: (value: string) => <Tag color={scopeMeta[value]?.color}>{scopeMeta[value]?.label || value}</Tag>,
     },
     {
       title: "Precio promo",
@@ -425,7 +494,7 @@ const SellerPromotionsPage = () => {
             </div>
           )}
         </div>
-      )
+      ),
     },
     {
       title: "Vigencia",
@@ -437,7 +506,7 @@ const SellerPromotionsPage = () => {
             hasta {new Date(row.endsAt).toLocaleDateString("es-BO")}
           </div>
         </div>
-      )
+      ),
     },
     {
       title: "Estado",
@@ -451,7 +520,7 @@ const SellerPromotionsPage = () => {
             {row.isInvalid ? "Debe eliminarse y crearse de nuevo." : `Config: ${stateMeta[row.state]?.label}`}
           </Typography.Text>
         </Space>
-      )
+      ),
     },
     {
       title: "Acciones",
@@ -461,15 +530,15 @@ const SellerPromotionsPage = () => {
         <Space>
           <Button icon={<EditOutlined />} onClick={() => handleOpenEdit(row)} disabled={Boolean(row.isInvalid)} />
           <Popconfirm
-            title="Eliminar promoción"
-            description="Esta acción no se puede deshacer."
+            title="Eliminar promocion"
+            description="Esta accion no se puede deshacer."
             onConfirm={() => handleDelete(row.id)}
           >
             <Button danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -480,8 +549,7 @@ const SellerPromotionsPage = () => {
           <Card
             style={{
               borderRadius: 24,
-              background:
-                "linear-gradient(135deg, rgba(8,145,178,0.12) 0%, rgba(14,116,144,0.02) 100%)"
+              background: "linear-gradient(135deg, rgba(8,145,178,0.12) 0%, rgba(14,116,144,0.02) 100%)",
             }}
           >
             <Space direction="vertical" size={10} style={{ width: "100%" }}>
@@ -489,14 +557,14 @@ const SellerPromotionsPage = () => {
                 Promociones por variante
               </Tag>
               <Typography.Title level={2} style={{ margin: 0 }}>
-                Rebajas independientes para interno, catálogo o ambos
+                Rebajas independientes para interno, catalogo o ambos
               </Typography.Title>
               <Typography.Text type="secondary">
                 Define precio directo, escalas por cantidad y fechas exactas para cada variante.
               </Typography.Text>
               <Space wrap>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
-                  Nueva promoción
+                  Nueva promocion
                 </Button>
                 <Button icon={<ReloadOutlined />} onClick={() => void loadPromotions()}>
                   Recargar
@@ -508,7 +576,7 @@ const SellerPromotionsPage = () => {
         <Col xs={24} lg={7}>
           <Card style={{ borderRadius: 24 }}>
             <Space direction="vertical" size={14} style={{ width: "100%" }}>
-              <Typography.Text strong>Activación rápida</Typography.Text>
+              <Typography.Text strong>Activacion rapida</Typography.Text>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <span>Activas ahora</span>
@@ -532,8 +600,8 @@ const SellerPromotionsPage = () => {
         {[
           { label: "Total visibles", value: summary.total || 0, tone: "#0f172a" },
           { label: "Solo interno", value: summary.interno || 0, tone: "#2563eb" },
-          { label: "Solo catálogo", value: summary.catalogo || 0, tone: "#16a34a" },
-          { label: "Mixtas", value: summary.ambos || 0, tone: "#7c3aed" }
+          { label: "Solo catalogo", value: summary.catalogo || 0, tone: "#16a34a" },
+          { label: "Mixtas", value: summary.ambos || 0, tone: "#7c3aed" },
         ].map((card) => (
           <Col xs={24} md={12} xl={6} key={card.label}>
             <Card style={{ borderRadius: 20 }}>
@@ -550,19 +618,29 @@ const SellerPromotionsPage = () => {
 
       <Card style={{ marginTop: 16, borderRadius: 24 }}>
         <Row gutter={[12, 12]} align="middle">
-          <Col xs={24} md={10}>
+          {isManager ? (
+            <Col xs={24} md={8}>
+              <Select
+                value={selectedSellerId}
+                onChange={(value) => setSelectedSellerId(String(value))}
+                style={{ width: "100%" }}
+                options={sellerOptions}
+                showSearch
+                optionFilterProp="label"
+                placeholder="Selecciona un vendedor"
+              />
+            </Col>
+          ) : null}
+          <Col xs={24} md={isManager ? 7 : 10}>
             <Input
               value={searchText}
-              onChange={(event) => {
-                setSearchText(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Buscar por título, producto o variante"
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Buscar por titulo, producto o variante"
               prefix={<EyeOutlined />}
               allowClear
             />
           </Col>
-          <Col xs={12} md={7}>
+          <Col xs={12} md={isManager ? 5 : 7}>
             {!canUseCatalogScopes ? (
               <Tag color="blue" bordered={false} style={{ width: "100%", textAlign: "center", padding: "6px 12px" }}>
                 Solo interno
@@ -570,29 +648,23 @@ const SellerPromotionsPage = () => {
             ) : (
               <Select
                 value={scope}
-                onChange={(value) => {
-                  setScope(value);
-                  setPage(1);
-                }}
+                onChange={(value) => setScope(value)}
                 style={{ width: "100%" }}
                 options={scopeOptions}
               />
             )}
           </Col>
-          <Col xs={12} md={7}>
+          <Col xs={12} md={isManager ? 4 : 7}>
             <Select
               value={state}
               allowClear
               placeholder="Todos los estados"
-              onChange={(value) => {
-                setState(value);
-                setPage(1);
-              }}
+              onChange={(value) => setState(value)}
               style={{ width: "100%" }}
               options={[
                 { value: "draft", label: "Borrador" },
                 { value: "active", label: "Activa" },
-                { value: "disabled", label: "Deshabilitada" }
+                { value: "disabled", label: "Deshabilitada" },
               ]}
             />
           </Col>
@@ -611,7 +683,7 @@ const SellerPromotionsPage = () => {
             onChange: (nextPage, nextLimit) => {
               setPage(nextPage);
               setLimit(nextLimit);
-            }
+            },
           }}
         />
       </Card>
@@ -624,8 +696,8 @@ const SellerPromotionsPage = () => {
         }}
         onOk={() => void handleSubmit()}
         width={880}
-        okText={editingRow ? "Guardar cambios" : "Crear promoción"}
-        title={editingRow ? "Editar promoción" : "Nueva promoción"}
+        okText={editingRow ? "Guardar cambios" : "Crear promocion"}
+        title={editingRow ? "Editar promocion" : "Nueva promocion"}
       >
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={15}>
@@ -639,7 +711,7 @@ const SellerPromotionsPage = () => {
                 startsDate: dayjs().startOf("day"),
                 startsTime: dayjs().startOf("day"),
                 endsTime: dayjs().startOf("day"),
-                tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }]
+                tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }],
               }}
             >
               <Form.Item
@@ -656,7 +728,7 @@ const SellerPromotionsPage = () => {
                   placeholder="Busca producto o variante"
                   options={variantOptions.map((item) => ({
                     value: item.key,
-                    label: `${item.displayName} · ${formatMoney(item.basePrice)} · Stock ${item.totalStock}`
+                    label: `${item.displayName} · ${formatMoney(item.basePrice)} · Stock ${item.totalStock}`,
                   }))}
                 />
               </Form.Item>
@@ -675,32 +747,32 @@ const SellerPromotionsPage = () => {
                       <Input />
                     </Form.Item>
                   ) : (
-                    <Form.Item name="scope" label="Aplica a" rules={[{ required: true }]}> 
+                    <Form.Item name="scope" label="Aplica a" rules={[{ required: true }]}>
                       <Select options={scopeOptions.filter((option) => option.value !== "all")} />
                     </Form.Item>
                   )}
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="state" label="Estado" rules={[{ required: true }]}> 
+                  <Form.Item name="state" label="Estado" rules={[{ required: true }]}>
                     <Select
                       options={[
                         { value: "active", label: "Activa" },
                         { value: "draft", label: "Borrador" },
-                        { value: "disabled", label: "Deshabilitada" }
+                        { value: "disabled", label: "Deshabilitada" },
                       ]}
                     />
                   </Form.Item>
                 </Col>
               </Row>
 
-              <Form.Item name="pricingMode" label="Tipo de promoción" rules={[{ required: true }]}>
+              <Form.Item name="pricingMode" label="Tipo de promocion" rules={[{ required: true }]}>
                 <Radio.Group optionType="button" buttonStyle="solid" onChange={(event) => handlePricingModeChange(event.target.value)}>
                   <Radio.Button value="simple">Precio fijo</Radio.Button>
                   <Radio.Button value="tiers">Por cantidad</Radio.Button>
                 </Radio.Group>
               </Form.Item>
 
-              <Form.Item name="title" label="Título interno">
+              <Form.Item name="title" label="Titulo interno">
                 <Input placeholder="Ej. Rebaja de fin de mes" maxLength={90} />
               </Form.Item>
 
@@ -739,7 +811,7 @@ const SellerPromotionsPage = () => {
                                 {...field}
                                 name={[field.name, "minQuantity"]}
                                 label="Desde"
-                                rules={[{ required: true, message: "Cantidad mínima" }]}
+                                rules={[{ required: true, message: "Cantidad minima" }]}
                               >
                                 <InputNumber min={2} style={{ width: "100%" }} />
                               </Form.Item>
@@ -797,7 +869,7 @@ const SellerPromotionsPage = () => {
               title="Impacto estimado"
               style={{
                 borderRadius: 18,
-                background: "linear-gradient(180deg, rgba(14,165,233,0.08), rgba(255,255,255,1))"
+                background: "linear-gradient(180deg, rgba(14,165,233,0.08), rgba(255,255,255,1))",
               }}
             >
               {previewData ? (

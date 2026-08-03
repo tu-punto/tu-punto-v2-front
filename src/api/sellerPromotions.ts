@@ -8,6 +8,7 @@ const handleError = (error: unknown) => {
 };
 
 export const getSellerPromotionsAPI = async (params?: {
+  sellerId?: string;
   q?: string;
   scope?: "all" | "interno" | "catalogo" | "ambos";
   state?: string;
@@ -28,7 +29,7 @@ export const getSellerPromotionsAPI = async (params?: {
   }
 };
 
-export const getSellerPromotionVariantOptionsAPI = async (params?: { q?: string }) => {
+export const getSellerPromotionVariantOptionsAPI = async (params?: { q?: string; sellerId?: string }) => {
   try {
     const res = await apiClient.get("/product-promotions/variant-options", { params });
     return res.data;

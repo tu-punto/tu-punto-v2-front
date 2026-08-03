@@ -1,5 +1,5 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
-import { HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { GiftOutlined, HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -574,9 +574,23 @@ export const Sales = () => {
           </h1>
         </div>
         {(isAdmin || isOperator) && (
-          <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
-            Historial de Ventas
-          </Button>
+          <Space>
+            <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
+              Historial de Ventas
+            </Button>
+            <Button
+              icon={<GiftOutlined />}
+              onClick={() =>
+                navigate(
+                  selectedSellerId
+                    ? `/seller-promotions?sellerId=${encodeURIComponent(String(selectedSellerId))}`
+                    : "/seller-promotions"
+                )
+              }
+            >
+              Promociones Vendedores
+            </Button>
+          </Space>
         )}
       </div>
 
