@@ -1,4 +1,4 @@
-import { Card } from "antd";
+import { Card, Spin } from "antd";
 import { ReactNode } from "react";
 
 interface StatisticCardProps {
@@ -6,9 +6,10 @@ interface StatisticCardProps {
   value: number;
   prefix: ReactNode;
   color: string;
+  loading?: boolean;
 }
 
-const StatisticCard = ({ title, value, prefix, color }: StatisticCardProps) => (
+const StatisticCard = ({ title, value, prefix, color, loading = false }: StatisticCardProps) => (
   <Card
     className="h-full overflow-hidden shadow-sm transition-shadow hover:shadow-lg"
     style={{
@@ -29,10 +30,14 @@ const StatisticCard = ({ title, value, prefix, color }: StatisticCardProps) => (
             <span className="text-xl">{prefix}</span>
           </div>
           <div className="min-w-0 text-3xl font-black tracking-tight" style={{ color }}>
-            {new Intl.NumberFormat("es-BO", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }).format(Number(value || 0))}
+            {loading ? (
+              <Spin size="small" />
+            ) : (
+              new Intl.NumberFormat("es-BO", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }).format(Number(value || 0))
+            )}
           </div>
         </div>
       </div>

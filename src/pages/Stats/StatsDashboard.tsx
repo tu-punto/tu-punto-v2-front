@@ -22,7 +22,7 @@ import {
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import StatisticCard from "../../components/StatisticCard";
-import { getFinanceFluxCategoriesAPI, getFinancialSummaryAPI } from "../../api/financeFlux";
+import { getFinanceFluxCategoriesAPI, getFinancialSummaryAPI, getFinancialSummaryByBranchAPI } from "../../api/financeFlux";
 import { getSucursalsAPI } from "../../api/sucursal";
 
 type SummaryShape = {
@@ -148,7 +148,7 @@ const BranchBars = ({ rows, loading }: { rows: BranchChartRow[]; loading: boolea
 const StatisticsDashboard = () => {
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [selectedPeriodMode, setSelectedPeriodMode] = useState<"historico" | "1-mes" | "varios-meses">("historico");
+  const [selectedPeriodMode, setSelectedPeriodMode] = useState<"historico" | "1-mes" | "varios-meses">("1-mes");
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format("YYYY-MM"));
   const [selectedMonths, setSelectedMonths] = useState<string[]>([dayjs().format("YYYY-MM")]);
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
@@ -159,7 +159,9 @@ const StatisticsDashboard = () => {
   const [summary, setSummary] = useState<SummaryShape>({});
   const [historicalSummary, setHistoricalSummary] = useState<SummaryShape>({});
   const [branchRows, setBranchRows] = useState<BranchChartRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCards, setLoadingCards] = useState(true);
+  const [loadingHistorical, setLoadingHistorical] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(true);
 
   const monthSelection = useMemo(() => {
     if (selectedPeriodMode === "1-mes") return [selectedMonth];
@@ -206,55 +208,58 @@ const StatisticsDashboard = () => {
   }, []);
 
   useEffect(() => {
-    const loadSummary = async () => {
-      setLoading(true);
+    const loadCards = async () => {
+      setLoadingCards(true);
       try {
-        const [current, historical, perBranch] = await Promise.all([
-          getFinancialSummaryAPI(summaryParams),
-          getFinancialSummaryAPI({
-            includeCommissions: true,
-            includeDeliveries: true,
-            deliveryMode: "real",
-            expenseCategories: selectedExpenseCategories,
-          }),
-          Promise.all(
-            (selectedBranchIds.length ? selectedBranchIds : branches.map((branch) => branch.value))
-              .slice(0, 8)
-              .map(async (branchId) => ({
-                branchId,
-                summary: await getFinancialSummaryAPI({
-                  ...summaryParams,
-                  sucursalIds: [branchId],
-                }),
-              }))
-          ),
-        ]);
-
+        const current = await getFinancialSummaryAPI(summaryParams);
         setSummary(current || {});
-        setHistoricalSummary(historical || {});
-        setBranchRows(
-          perBranch
-            .map(({ branchId, summary: branchSummary }: any) => {
-              const branch = branches.find((item) => item.value === branchId);
-              const incomeParts = getSummaryIncome(branchSummary || {});
-              const expenses = toNumber((branchSummary as any)?.expenses ?? (branchSummary as any)?.gastos);
-              return {
-                id: branchId,
-                label: branch?.label || branchId,
-                utility: toNumber(branchSummary?.utility ?? incomeParts.total - expenses),
-                income: incomeParts.total,
-                expenses,
-              };
-            })
-            .sort((a, b) => Math.abs(b.utility) - Math.abs(a.utility))
-        );
+      } catch {
+        setSummary({});
       } finally {
-        setLoading(false);
+        setLoadingCards(false);
       }
     };
 
     if (!branches.length && selectedBranchIds.length) return;
-    void loadSummary();
+    void loadCards();
+  }, [branches, selectedBranchIds, selectedExpenseCategories, summaryParams]);
+
+  useEffect(() => {
+    const loadHistorical = async () => {
+      setLoadingHistorical(true);
+      try {
+        const historical = await getFinancialSummaryAPI({
+          includeCommissions: true,
+          includeDeliveries: true,
+          deliveryMode: "real",
+          expenseCategories: selectedExpenseCategories,
+        });
+        setHistoricalSummary(historical || {});
+      } catch {
+        setHistoricalSummary({});
+      } finally {
+        setLoadingHistorical(false);
+      }
+    };
+
+    void loadHistorical();
+  }, [selectedExpenseCategories]);
+
+  useEffect(() => {
+    const loadBranchRows = async () => {
+      setLoadingBranches(true);
+      try {
+        const rows = await getFinancialSummaryByBranchAPI(summaryParams);
+        setBranchRows(Array.isArray(rows) ? rows : []);
+      } catch {
+        setBranchRows([]);
+      } finally {
+        setLoadingBranches(false);
+      }
+    };
+
+    if (!branches.length && selectedBranchIds.length) return;
+    void loadBranchRows();
   }, [branches, selectedBranchIds, selectedExpenseCategories, summaryParams]);
 
   const income = getSummaryIncome(summary);
@@ -427,26 +432,24 @@ const StatisticsDashboard = () => {
           </Space>
         </Card>
 
-        <Spin spinning={loading}>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            <StatisticCard title="Pagos mensuales" value={income.monthly} prefix={<DollarOutlined />} color="#0f766e" />
-            <StatisticCard title="Comisiones" value={income.commissions} prefix={<RiseOutlined />} color="#7c3aed" />
-            <StatisticCard title="Entregas simples y externas" value={income.deliveries} prefix={<CarOutlined />} color="#ea580c" />
-            <StatisticCard title="Ingresos totales" value={totalIncome} prefix={<DollarOutlined />} color="#16a34a" />
-            <StatisticCard title="Gastos totales" value={expenses} prefix={<BankOutlined />} color="#dc2626" />
-            <StatisticCard title="Costo delivery" value={deliveryExpenses} prefix={<CarOutlined />} color="#f97316" />
-            <StatisticCard title="Ingreso delivery" value={deliveryIncome} prefix={<CarOutlined />} color="#0ea5e9" />
-            <StatisticCard title="Balance delivery" value={deliveryBalance} prefix={<RiseOutlined />} color="#059669" />
-            <StatisticCard title="Utilidad" value={utility} prefix={<RiseOutlined />} color="#2563eb" />
-            <StatisticCard title="Punto de equilibrio (%)" value={breakEven} prefix={<BarChartOutlined />} color="#ca8a04" />
-            <StatisticCard title="Total empresa historico" value={companyTotal} prefix={<BankOutlined />} color="#111827" />
-          </div>
-        </Spin>
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <StatisticCard title="Pagos mensuales" value={income.monthly} prefix={<DollarOutlined />} color="#0f766e" loading={loadingCards} />
+          <StatisticCard title="Comisiones" value={income.commissions} prefix={<RiseOutlined />} color="#7c3aed" loading={loadingCards} />
+          <StatisticCard title="Entregas simples y externas" value={income.deliveries} prefix={<CarOutlined />} color="#ea580c" loading={loadingCards} />
+          <StatisticCard title="Ingresos totales" value={totalIncome} prefix={<DollarOutlined />} color="#16a34a" loading={loadingCards} />
+          <StatisticCard title="Gastos totales" value={expenses} prefix={<BankOutlined />} color="#dc2626" loading={loadingCards} />
+          <StatisticCard title="Costo delivery" value={deliveryExpenses} prefix={<CarOutlined />} color="#f97316" loading={loadingCards} />
+          <StatisticCard title="Ingreso delivery" value={deliveryIncome} prefix={<CarOutlined />} color="#0ea5e9" loading={loadingCards} />
+          <StatisticCard title="Balance delivery" value={deliveryBalance} prefix={<RiseOutlined />} color="#059669" loading={loadingCards} />
+          <StatisticCard title="Utilidad" value={utility} prefix={<RiseOutlined />} color="#2563eb" loading={loadingCards} />
+          <StatisticCard title="Punto de equilibrio (%)" value={breakEven} prefix={<BarChartOutlined />} color="#ca8a04" loading={loadingCards} />
+          <StatisticCard title="Total empresa historico" value={companyTotal} prefix={<BankOutlined />} color="#111827" loading={loadingHistorical} />
+        </div>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} xl={16}>
             <Card className="h-full border-slate-200/80 shadow-sm" bodyStyle={{ padding: 0 }}>
-              <BranchBars rows={branchRows} loading={loading} />
+              <BranchBars rows={branchRows} loading={loadingBranches} />
             </Card>
           </Col>
           <Col xs={24} xl={8}>
