@@ -24,6 +24,9 @@ import SellerProductInfoPage from "../pages/SellerProductInfo/SellerProductInfoP
 import SuperadminVariantsPage from "../pages/SuperadminVariants/SuperadminVariantsPage";
 import SimplePackagesPage from "../pages/SimplePackages/SimplePackagesPage";
 import AttendancePage from "../pages/Attendance/AttendancePage";
+import SellerPromotionsPage from "../pages/SellerPromotions/SellerPromotionsPage";
+import SellerDashboardPage from "../pages/SellerDashboard/SellerDashboardPage";
+import InventoryAuditPage from "../pages/InventoryAudit/InventoryAuditPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -81,7 +84,7 @@ const AdminSellerProductInfoRoute = () => {
 const SuperadminVariantsRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!isSuperadminUser(user)) {
+  if (normalizeRole(user?.role) !== "admin") {
     return <Navigate to="/stock" replace />;
   }
 
@@ -101,11 +104,21 @@ const BoxCloseSummaryRoute = () => {
 const AttendanceRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!isSuperadminUser(user)) {
+  if (normalizeRole(user?.role) !== "admin") {
     return <Navigate to="/unauthorized" replace />;
   }
 
   return <AttendancePage />;
+};
+
+const InventoryAuditRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (normalizeRole(user?.role) !== "admin") {
+    return <Navigate to="/stock" replace />;
+  }
+
+  return <InventoryAuditPage />;
 };
 
 const protectedRoutes = [
@@ -206,12 +219,24 @@ const protectedRoutes = [
         element: guard("/seller-product-info", <SellerProductInfoRoute />),
       },
       {
+        path: "/seller-promotions",
+        element: guard("/seller-promotions", <SellerPromotionsPage />),
+      },
+      {
+        path: "/seller-dashboard",
+        element: guard("/seller-dashboard", <SellerDashboardPage />),
+      },
+      {
         path: "/admin-seller-product-info",
         element: guard("/admin-seller-product-info", <AdminSellerProductInfoRoute />),
       },
       {
         path: "/superadmin-variants",
         element: guard("/superadmin-variants", <SuperadminVariantsRoute />),
+      },
+      {
+        path: "/inventory-audit",
+        element: guard("/inventory-audit", <InventoryAuditRoute />),
       },
       {
         path: "*",

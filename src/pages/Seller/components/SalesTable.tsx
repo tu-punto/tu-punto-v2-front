@@ -3,6 +3,7 @@ import { Button, Popconfirm, Table, Empty, Select, Row } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState, useMemo } from "react";
 import { EditableCellInputNumber } from "../../components/editableCell";
+import PromotionPrice from "../../../components/PromotionPrice";
 
 interface CustomTableProps {
   data: any[];
@@ -136,24 +137,39 @@ const CustomTable = ({
       key: "precio_unitario",
       render: (_: any, record: any) =>
         allowActions ? (
-          <EditableCellInputNumber
-            isAdmin={isAdmin}
-            value={record.precio_unitario}
-            min={0}
-            onChange={(value) => {
-              handleValueChange(record.key, "precio_unitario", value);
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <PromotionPrice
+              price={record.precio_unitario}
+              basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+              promotion={record.pricingPromotion}
+              quantity={record.cantidad}
+              compact
+            />
+            <EditableCellInputNumber
+              isAdmin={isAdmin}
+              value={record.precio_unitario}
+              min={0}
+              onChange={(value) => {
+                handleValueChange(record.key, "precio_unitario", value);
 
-              const comision = Number(record.comision_porcentual || 0);
-              const cantidad = Number(record.cantidad || 0);
-              const newUtilidad = parseFloat(
-                ((value * cantidad * comision) / 100).toFixed(2)
-              );
+                const comision = Number(record.comision_porcentual || 0);
+                const cantidad = Number(record.cantidad || 0);
+                const newUtilidad = parseFloat(
+                  ((value * cantidad * comision) / 100).toFixed(2)
+                );
 
-              handleValueChange(record.key, "utilidad", newUtilidad);
-            }}
-          />
+                handleValueChange(record.key, "utilidad", newUtilidad);
+              }}
+            />
+          </div>
         ) : (
-          `Bs. ${record.precio_unitario}`
+          <PromotionPrice
+            price={record.precio_unitario}
+            basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+            promotion={record.pricingPromotion}
+            quantity={record.cantidad}
+            compact
+          />
         ),
       className: "text-mobile-sm xl:text-desktop-sm",
       sorter: (a: any, b: any) => (a.precio_unitario || 0) - (b.precio_unitario || 0),

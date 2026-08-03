@@ -24,13 +24,20 @@ import StockQRInfoModal from "./StockQRInfoModal.tsx";
 import SellerWithdrawalRequestModal from "./SellerWithdrawalRequestModal.tsx";
 import StockWithdrawalRequestsPanel from "./StockWithdrawalRequestsPanel.tsx";
 import { normalizeRole } from "../../utils/role";
+import { TagOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import infoProductIcon from '../../assets/infoProductIcon.svg';
+import superadminVariantsIcon from '../../assets/superadminVariantsIcon.svg';
+import historyIcon from '../../assets/historyIcono.png';
 import "./StockManagement.css";
 //test
 const SELLERS_PAGE_SIZE = 10;
 
 const StockManagement = () => {
+    const navigate = useNavigate();
     const { user }: any = useContext(UserContext);
     const isSeller = normalizeRole(user?.role) === 'seller';
+    const isAdminLike = normalizeRole(user?.role) === 'admin';
     const [stockListForConfirmModal, setStockListForConfirmModal] = useState([]);
     const [resetSignal, setResetSignal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -469,13 +476,26 @@ const StockManagement = () => {
     return (
 
         <div className="stock-management-page" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="stock-management-header flex justify-between items-center mb-4">
+            <div className="stock-management-header flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between mb-4">
                 <div className="stock-management-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
                     <img src="/inventory-icon.png" alt="Inventario" className="w-8 h-8" />
                     <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
                         Gestión de Inventario
                     </h1>
                 </div>
+                {isAdminLike && (
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <Button onClick={() => navigate("/admin-seller-product-info")} icon={<img src={infoProductIcon} alt="Productos cliente" className="w-4 h-4" />}>
+                            Productos cliente
+                        </Button>
+                        <Button onClick={() => navigate("/superadmin-variants")} icon={<img src={superadminVariantsIcon} alt="Control variantes" className="w-4 h-4" />}>
+                            Control variantes
+                        </Button>
+                        <Button onClick={() => navigate("/inventory-audit")} icon={<img src={historyIcon} alt="Auditoria" className="w-4 h-4" />}>
+                            Auditoria
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {isSeller ? (
@@ -726,7 +746,13 @@ const StockManagement = () => {
             </Row>
             {isSeller ? (
                 <>
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                        <Button
+                            onClick={() => navigate("/seller-promotions")}
+                            icon={<TagOutlined />}
+                        >
+                            Promociones
+                        </Button>
                         <Button
                             type="primary"
                             icon={<ExportOutlined />}

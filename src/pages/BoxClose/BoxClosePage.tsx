@@ -19,6 +19,7 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
   BarChartOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import { getBoxClosesAPI } from "../../api/boxClose";
 import { IBoxClose } from "../../models/boxClose";
@@ -27,6 +28,7 @@ import BoxCloseView from "./BoxCloseView";
 import BoxCloseSummaryPanel from "./BoxCloseSummaryPanel";
 import { UserContext } from "../../context/userContext";
 import { isSuperadminUser } from "../../utils/role";
+import { useNavigate } from "react-router-dom";
 
 function round(num: number) {
   return Math.round(num * 100) / 100;
@@ -39,6 +41,7 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
 const BoxClosePage = () => {
+  const navigate = useNavigate();
   const { user } = useContext(UserContext);
   const canSeeSummary = isSuperadminUser(user);
   const [boxClosings, setBoxClosings] = useState<IBoxClose[]>([]);
@@ -219,16 +222,21 @@ const BoxClosePage = () => {
             Cierre de Caja
           </h1>
         </div>
-        {canSeeSummary && (
-          <Button
-            type="primary"
-            icon={<BarChartOutlined />}
-            onClick={() => setSummaryOpen(true)}
-            className="h-11 rounded-xl bg-slate-900 px-5 font-semibold shadow-md hover:!bg-slate-800"
-          >
-            Resumen de cierre
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
+            Historial de Ventas
           </Button>
-        )}
+          {canSeeSummary && (
+            <Button
+              type="primary"
+              icon={<BarChartOutlined />}
+              onClick={() => setSummaryOpen(true)}
+              className="h-11 rounded-xl bg-slate-900 px-5 font-semibold shadow-md hover:!bg-slate-800"
+            >
+              Resumen de cierre
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>

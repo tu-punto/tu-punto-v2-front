@@ -1,5 +1,5 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -16,8 +16,11 @@ import QRScanner from "./QRScanner.tsx";
 import StockQRInfoModal from "../StockManagement/StockQRInfoModal.tsx";
 import { normalizeRole } from "../../utils/role";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
+import { resolvePromotionPricing } from "../../utils/promotionPricing";
+import { useNavigate } from "react-router-dom";
 
 export const Sales = () => {
+  const navigate = useNavigate();
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showInfoQRScanner, setShowInfoQRScanner] = useState(false);
   const { user }: any = useContext(UserContext);
@@ -66,6 +69,21 @@ export const Sales = () => {
     }, 0);
 
     return total;
+  };
+
+  const getSalePricing = (product: any, quantity = 1) => {
+    const basePrice = Number(
+      product?.precio_original ?? product?.originalPrice ?? product?.basePrice ?? product?.precio ?? 0
+    );
+    const promotion = product?.pricingPromotion || product?.promotionPricing || null;
+    const pricing = resolvePromotionPricing(basePrice, promotion, quantity);
+
+    return {
+      basePrice: pricing.basePrice,
+      unitPrice: pricing.effectivePrice,
+      promotion,
+      pricing
+    };
   };
 
   useEffect(() => {
@@ -394,7 +412,8 @@ export const Sales = () => {
       if (exists) return prevProducts;
 
       const cantidad = 1;
-      const precio = product.precio;
+      const pricing = getSalePricing(product, cantidad);
+      const precio = pricing.unitPrice;
       const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
       const comision = Number(vendedor?.comision_porcentual || 0);
       const utilidad = applySellerCommissionCap(
@@ -408,6 +427,8 @@ export const Sales = () => {
           ...product,
           cantidad,
           precio_unitario: precio,
+          precio_original: pricing.basePrice,
+          pricingPromotion: pricing.promotion,
           utilidad,
         }
       ];
@@ -447,6 +468,12 @@ export const Sales = () => {
             : value
         };
 
+        if (field === 'cantidad') {
+          const pricing = getSalePricing(updated, value);
+          updated.precio_original = pricing.basePrice;
+          updated.precio_unitario = pricing.unitPrice;
+        }
+
         if (field === 'cantidad' || field === 'precio_unitario') {
           const vendedor = sellers.find((v: any) => v._id === p.id_vendedor);
           const comision = Number(vendedor?.comision_porcentual || 0);
@@ -467,8 +494,9 @@ export const Sales = () => {
   const handleAddProduct = (newProduct: any) => {
     const vendedor = sellers.find((v: any) => String(v._id) === String(newProduct.id_vendedor));
     const comision = Number(vendedor?.comision_porcentual || 0);
-    const precio = Number(newProduct.precio_unitario || newProduct.precio || 0);
     const cantidadSolicitada = Number(newProduct.cantidad || 1);
+    const pricing = getSalePricing(newProduct, cantidadSolicitada);
+    const precio = Number(newProduct.precio_unitario ?? pricing.unitPrice ?? 0);
     const stockActual = Number(newProduct.stockActual ?? newProduct.stock ?? 0);
     const stableKey = String(
       newProduct.key ||
@@ -498,18 +526,25 @@ export const Sales = () => {
           message.warning("No hay mas stock disponible para esa variante");
         }
         existing.cantidad = nextCantidad;
-        existing.precio_unitario = precio;
+        const existingPricing = getSalePricing(existing, nextCantidad);
+        existing.precio_original = existingPricing.basePrice;
+        existing.pricingPromotion = existing.pricingPromotion || pricing.promotion || newProduct.pricingPromotion || null;
+        const effectivePrecio = existing.pricingPromotion
+          ? existingPricing.unitPrice
+          : precio;
+        existing.precio_unitario = effectivePrecio;
         existing.utilidad = applySellerCommissionCap(
           existing.id_vendedor,
-          parseFloat(((precio * nextCantidad * comision) / 100).toFixed(2))
+          parseFloat(((effectivePrecio * nextCantidad * comision) / 100).toFixed(2))
         );
         updated[duplicateIndex] = existing;
         return updated;
       }
 
+      const effectivePrecio = newProduct.pricingPromotion ? pricing.unitPrice : precio;
       const utilidad = applySellerCommissionCap(
         newProduct.id_vendedor,
-        parseFloat(((precio * cantidadSolicitada * comision) / 100).toFixed(2))
+        parseFloat(((effectivePrecio * cantidadSolicitada * comision) / 100).toFixed(2))
       );
       return [
         ...prevProducts,
@@ -517,7 +552,9 @@ export const Sales = () => {
           ...newProduct,
           key: stableKey,
           cantidad: cantidadSolicitada,
-          precio_unitario: precio,
+          precio_unitario: effectivePrecio,
+          precio_original: pricing.basePrice,
+          pricingPromotion: newProduct.pricingPromotion || pricing.promotion,
           utilidad,
           stockActual
         }
@@ -536,6 +573,11 @@ export const Sales = () => {
             Carrito
           </h1>
         </div>
+        {(isAdmin || isOperator) && (
+          <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
+            Historial de Ventas
+          </Button>
+        )}
       </div>
 
       <Row gutter={[16, 16]}>

@@ -469,6 +469,7 @@ const VariantQRBatchModal = ({
   const [loadingStocks, setLoadingStocks] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [resultGroups, setResultGroups] = useState<GroupSummaryResultItem[]>([]);
+  const [resultSearchText, setResultSearchText] = useState("");
   const [result, setResult] = useState<any>(null);
   const [visibleResultCount, setVisibleResultCount] = useState<number>(RESULT_PAGE_SIZE);
   const [groupManagerVisible, setGroupManagerVisible] = useState(false);
@@ -509,12 +510,23 @@ const VariantQRBatchModal = ({
   const generatedItems: QRItem[] = (result?.generatedItems || []) as QRItem[];
   const listedItems: QRItem[] = (result?.items || []) as QRItem[];
   const printableItems: QRItem[] = listedItems.length > 0 ? listedItems : generatedItems;
+  const filteredPrintableItems = useMemo(() => {
+    const query = resultSearchText.trim().toLowerCase();
+    if (!query) return printableItems;
+    return printableItems.filter((item) =>
+      String(item.productName || item.productId || "")
+        .trim()
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [printableItems, resultSearchText]);
   const visiblePrintableItems = useMemo(
-    () => printableItems.slice(0, visibleResultCount),
-    [printableItems, visibleResultCount]
+    () => filteredPrintableItems.slice(0, visibleResultCount),
+    [filteredPrintableItems, visibleResultCount]
   );
-  const hasMorePrintableItems = visibleResultCount < printableItems.length;
-  const canShowAllPrintableItems = printableItems.length > SHOW_ALL_THRESHOLD && hasMorePrintableItems;
+  const hasMorePrintableItems = visibleResultCount < filteredPrintableItems.length;
+  const canShowAllPrintableItems =
+    filteredPrintableItems.length > SHOW_ALL_THRESHOLD && hasMorePrintableItems;
   const hasMetrics = typeof result?.products === "number";
   const hasInitialProductIds = initialProductIds.length > 0;
   const effectiveProductIds = hasInitialProductIds ? initialProductIds : undefined;
@@ -539,16 +551,16 @@ const VariantQRBatchModal = ({
   };
   const printableQueue = useMemo(
     () =>
-      printableItems.flatMap((item) => {
+      filteredPrintableItems.flatMap((item) => {
         const quantity = getItemPrintQuantity(item) ?? 0;
         if (quantity <= 0) return [];
         return Array.from({ length: quantity }, () => item);
       }),
-    [printableItems, printQuantities, stockByItemKey]
+    [filteredPrintableItems, printQuantities, stockByItemKey]
   );
   const totalPrintQuantity = useMemo(
-    () => printableItems.reduce((acc, item) => acc + (getItemPrintQuantity(item) ?? 0), 0),
-    [printableItems, printQuantities, stockByItemKey]
+    () => filteredPrintableItems.reduce((acc, item) => acc + (getItemPrintQuantity(item) ?? 0), 0),
+    [filteredPrintableItems, printQuantities, stockByItemKey]
   );
   const getGroupPrintQuantity = (group: GroupSummaryResultItem) => {
     const stored = groupPrintQuantities[group.id];
@@ -601,6 +613,7 @@ const VariantQRBatchModal = ({
 
     setLoadingGenerate(true);
     setResult(null);
+    setResultSearchText("");
     try {
       const response = await batchGenerateVariantQRAPI({
         sellerId,
@@ -622,6 +635,7 @@ const VariantQRBatchModal = ({
     }
     setLoadingList(true);
     setResult(null);
+    setResultSearchText("");
     try {
       const response = await listVariantQRAPI({
         sellerId,
@@ -675,12 +689,12 @@ const VariantQRBatchModal = ({
   };
 
   const applySystemStockToAll = () => {
-    if (!printableItems.length) {
+    if (!filteredPrintableItems.length) {
       message.warning("No hay QRs en resultado para ajustar");
       return;
     }
 
-    const nextState = printableItems.reduce<Record<string, number>>((acc, item) => {
+    const nextState = filteredPrintableItems.reduce<Record<string, number>>((acc, item) => {
       acc[itemPrintKey(item)] = getItemSystemStock(item);
       return acc;
     }, {});
@@ -1064,7 +1078,7 @@ const VariantQRBatchModal = ({
       return;
     }
     setVisibleResultCount(RESULT_PAGE_SIZE);
-  }, [visible, result]);
+  }, [visible, result, resultSearchText]);
 
   return (
     <Modal
@@ -1379,9 +1393,9 @@ const VariantQRBatchModal = ({
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <Button
               icon={<EyeOutlined />}
-              onClick={() => void handleOpenDirectPreview(printableItems, resultGroups, false)}
+              onClick={() => void handleOpenDirectPreview(filteredPrintableItems, resultGroups, false)}
               loading={previewBusy}
-              disabled={(printableItems.length === 0 && resultGroups.length === 0) || qzBusy}
+              disabled={(filteredPrintableItems.length === 0 && resultGroups.length === 0) || qzBusy}
               style={{ borderRadius: 12 }}
             >
               Vista previa
@@ -1412,17 +1426,17 @@ const VariantQRBatchModal = ({
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 {hasMetrics && <div style={{ fontSize: 12, color: "#6b7280" }}>Errores: {(result.errors || []).length}</div>}
-                <Button onClick={applySystemStockToAll} disabled={!printableItems.length || loadingStocks} style={{ borderRadius: 12 }}>
+                <Button onClick={applySystemStockToAll} disabled={!filteredPrintableItems.length || loadingStocks} style={{ borderRadius: 12 }}>
                   Stock actual en todos
                 </Button>
                 <Button
                   onClick={() =>
-                    openPrintWindow(printableItems, resolveSellerLabel, {
+                    openPrintWindow(filteredPrintableItems, resolveSellerLabel, {
                       ticketWidthMm,
                       qrSizeMm
                     })
                   }
-                  disabled={!printableItems.length || qzBusy || previewBusy}
+                  disabled={!filteredPrintableItems.length || qzBusy || previewBusy}
                   style={{ borderRadius: 12 }}
                 >
                   Imprimir todos / PDF
@@ -1443,14 +1457,23 @@ const VariantQRBatchModal = ({
               </div>
             </div>
 
+            <Input
+              value={resultSearchText}
+              onChange={(event) => setResultSearchText(event.target.value)}
+              placeholder="Buscar por nombre de producto"
+              allowClear
+              style={{ borderRadius: 12 }}
+            />
+
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12, color: "#4b5563" }}>
               {hasMetrics && <span>Productos: {result.products || 0}</span>}
               {hasMetrics && <span>Omitidos: {result.skipped || 0}</span>}
               <span>Total a imprimir: {totalPrintQuantity}</span>
+              <span>Mostrando: {filteredPrintableItems.length}</span>
               <span>{loadingStocks ? "Consultando stock actual..." : "Stock actual cargado"}</span>
             </div>
 
-            {printableItems.length > 0 ? (
+            {filteredPrintableItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {visiblePrintableItems.map((item: QRItem) => {
                   const label = item.variantLabel || item.variantKey;
@@ -1484,9 +1507,30 @@ const VariantQRBatchModal = ({
                         onChange={(value) => handleQuantityChange(item, value)}
                         style={{ width: 92 }}
                       />
-                      <Button size="small" onClick={() => applySystemStockToItem(item)} disabled={loadingStocks}>
-                        Usar stock
-                      </Button>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <Button size="small" onClick={() => applySystemStockToItem(item)} disabled={loadingStocks}>
+                          Usar stock
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() =>
+                            openPrintWindow([item], resolveSellerLabel, {
+                              ticketWidthMm,
+                              qrSizeMm
+                            })
+                          }
+                        >
+                          PDF
+                        </Button>
+                        <Button
+                          size="small"
+                          type="primary"
+                          onClick={() => void handlePrintDirect([item])}
+                          disabled={!qzConnected || !selectedQzPrinter || previewBusy}
+                        >
+                          1x1
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1501,12 +1545,12 @@ const VariantQRBatchModal = ({
                     }}
                   >
                     <div style={{ fontSize: 12, color: "#8c8c8c" }}>
-                      Se muestran {visiblePrintableItems.length} de {printableItems.length} variantes del resultado.
+                      Se muestran {visiblePrintableItems.length} de {filteredPrintableItems.length} variantes del resultado.
                     </div>
                     <Button
                       onClick={() =>
                         setVisibleResultCount((current) =>
-                          Math.min(current + RESULT_PAGE_SIZE, printableItems.length)
+                          Math.min(current + RESULT_PAGE_SIZE, filteredPrintableItems.length)
                         )
                       }
                       style={{ borderRadius: 12 }}
@@ -1515,7 +1559,7 @@ const VariantQRBatchModal = ({
                     </Button>
                     {canShowAllPrintableItems && (
                       <Button
-                        onClick={() => setVisibleResultCount(printableItems.length)}
+                        onClick={() => setVisibleResultCount(filteredPrintableItems.length)}
                         style={{ borderRadius: 12 }}
                       >
                         Mostrar todos
@@ -1525,7 +1569,11 @@ const VariantQRBatchModal = ({
                 )}
               </div>
             ) : (
-              <div style={{ fontSize: 13, color: "#8c8c8c" }}>No hay QRs en resultado.</div>
+              <div style={{ fontSize: 13, color: "#8c8c8c" }}>
+                {printableItems.length > 0
+                  ? "No hay productos que coincidan con la busqueda."
+                  : "No hay QRs en resultado."}
+              </div>
             )}
 
             <div

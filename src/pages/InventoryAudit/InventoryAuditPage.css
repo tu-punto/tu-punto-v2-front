@@ -1,0 +1,142 @@
+.inventory-audit-page .ant-card {
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.08);
+}
+
+.inventory-audit-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.inventory-audit-subtitle {
+  margin: 8px 0 0;
+  max-width: 760px;
+  color: #64748b;
+}
+
+.inventory-audit-filter-card {
+  margin-bottom: 18px;
+}
+
+.inventory-audit-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.inventory-audit-filter-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.inventory-audit-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.inventory-audit-table-card .ant-card-body {
+  padding: 14px;
+}
+
+.inventory-audit-table-card .ant-card-extra {
+  margin-left: 16px;
+}
+
+.inventory-audit-table-card .ant-table-thead > tr > th {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.inventory-audit-product-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inventory-audit-product-title {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.inventory-audit-product-meta,
+.inventory-audit-muted {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.inventory-audit-stock-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.inventory-audit-stock-arrow {
+  color: #94a3b8;
+}
+
+.inventory-audit-resolved-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inventory-audit-row-resolved > td {
+  background: linear-gradient(0deg, rgba(34, 197, 94, 0.03), rgba(34, 197, 94, 0.03));
+}
+
+.inventory-audit-row-resolved:hover > td {
+  background: rgba(34, 197, 94, 0.06) !important;
+}
+
+.inventory-audit-control-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.inventory-audit-card-span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 1180px) {
+  .inventory-audit-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inventory-audit-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .inventory-audit-page {
+    padding: 12px;
+  }
+
+  .inventory-audit-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventory-audit-filter-grid,
+  .inventory-audit-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-audit-card-span-2 {
+    grid-column: span 1;
+  }
+}

@@ -432,7 +432,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             id_venta: p._id ?? null,
             key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
             esTemporal: p?.producto?.esTemporal || false, // ✅ nuevo
-            producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre"
+            producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre",
+            precio_original: p.precio_original ?? p.precio_unitario,
         }));
 
         const shouldRenderTemporaryProducts = ventasNormales.length === 0;
@@ -446,6 +447,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             nombre_variante: item?.nombre_variante || item?.nombre_producto || item?.producto || "Producto temporal",
             cantidad: Number(item?.cantidad || 1),
             precio_unitario: Number(item?.precio_unitario || 0),
+            precio_original: Number(item?.precio_original || item?.precio_unitario || 0),
             utilidad: Number(item?.utilidad || 0),
         }));
 

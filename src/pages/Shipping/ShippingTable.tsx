@@ -1,6 +1,6 @@
 import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Alert, Button, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Table, Tooltip } from 'antd';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Checkbox, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Spin, Table, Tooltip } from 'antd';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getShippingDashboardListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import ShippingInfoModal from './ShippingInfoModal';
@@ -31,6 +31,7 @@ const MOBILE_CARD_PAGE_SIZE = 12;
 const WAITING_STATUSES = new Set([WAITING_RAW_STATUS, READY_FOR_PICKUP_STATUS]);
 const FILTER_ALL = "todos";
 const FILTER_PENDING_SEND = "para_enviar";
+const FILTER_DELIVERIES = "deliverys";
 const GENERAL_VENDOR_SCOPE_TABS: Array<"todos" | "En Espera" | "para_enviar" | "en_camino"> = [
     "todos",
     "En Espera",
@@ -236,9 +237,10 @@ const ShippingTable = ({
         listo_para_recoger: 0,
         para_enviar: 0,
         en_camino: 0,
+        deliverys: 0,
         entregado: 0,
     });
-    const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'entregado'>(FILTER_ALL);
+    const [selectedStatus, setSelectedStatus] = useState<'todos' | 'En Espera' | 'para_enviar' | 'en_camino' | 'deliverys' | 'entregado'>(FILTER_ALL);
     const [tablePage, setTablePage] = useState(1);
     const [tablePageSize, setTablePageSize] = useState(30);
     const [tableTotal, setTableTotal] = useState(0);
@@ -272,20 +274,23 @@ const ShippingTable = ({
     const [markingSellerWithdrawal, setMarkingSellerWithdrawal] = useState(false);
     const [markingBranchTransfer, setMarkingBranchTransfer] = useState(false);
     const [rejectingCatalogOrderId, setRejectingCatalogOrderId] = useState("");
+    const [branchTransferRows, setBranchTransferRows] = useState<any[]>([]);
+    const [branchTransferLoading, setBranchTransferLoading] = useState(false);
     const [branchTransferModal, setBranchTransferModal] = useState<{
         open: boolean;
         mode: "send" | "receive" | null;
-        rows: any[];
+        selectedRowKeys: string[];
         totalDeliveryCost: number;
         paymentMethod: "1" | "2";
     }>({
         open: false,
         mode: null,
-        rows: [],
+        selectedRowKeys: [],
         totalDeliveryCost: 0,
         paymentMethod: "2",
     });
     const [branchTransferError, setBranchTransferError] = useState("");
+    const branchTransferFetchRef = useRef(0);
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator || isSuperadminUser(user);
@@ -296,11 +301,13 @@ const ShippingTable = ({
     );
     const pendingSendCount = tabCounts.para_enviar;
     const inTransitCount = tabCounts.en_camino;
+    const deliveriesCount = tabCounts.deliverys;
     const allCount = tabCounts.todos;
     const readyForPickupCount = tabCounts.listo_para_recoger;
     const deliveredCount = tabCounts.entregado;
     const pendingSendLabel = isVendedor ? "En sucursal de origen" : "Para enviar a otra sucursal";
     const currentRows = shippingData;
+    const branchTransferMode = selectedStatus === "para_enviar" ? "send" : selectedStatus === "en_camino" ? "receive" : null;
 
     const getOriginBranchId = (pedido: any) =>
         resolveBranchId(pedido?.lugar_origen) ||
@@ -347,26 +354,110 @@ const ShippingTable = ({
         });
     };
     const selectedSellerWithdrawalCount = getCurrentSellerWithdrawalRows().length;
-    const getAutoBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = shippingData;
-        return (activeRows as any[]).filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
+    const selectedBranchTransferRows = branchTransferRows.filter((row: any) =>
+        branchTransferModal.selectedRowKeys.includes(String(row?._id || row?.key || ""))
+    );
+
+    const getDashboardBaseParams = () => {
+        const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
+        const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
+        const sellerIdToQuery =
+            selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
+                ? selectedVendedor
+                : (!isAdmin && !isOperator ? user?.id_vendedor : undefined);
+        const isDeliveryTab = selectedStatus === FILTER_DELIVERIES;
+        const destinationMode =
+            isDeliveryTab
+                ? "other"
+                : selectedLocation === "other"
+                    ? "other"
+                    : selectedLocation
+                        ? "branch"
+                        : "any";
+        const destinationQuery =
+            isDeliveryTab
+                ? undefined
+                : selectedLocation === "other"
+                    ? otherLocation.trim() || undefined
+                    : selectedLocation || undefined;
+
+        return {
+            from,
+            to,
+            currentBranchId: currentSucursalId || undefined,
+            sellerId:
+                selectedVendedor === EXTERNAL_VENDOR_FILTER
+                    ? EXTERNAL_VENDOR_FILTER
+                    : sellerIdToQuery,
+            client: searchCliente.trim() || undefined,
+            destinationMode: destinationMode as "any" | "branch" | "other",
+            destinationQuery,
+        };
     };
-    const getSelectedBranchTransferRows = (mode: "send" | "receive") => {
-        const activeRows = shippingData;
-        const selectedKeys = new Set(selectedRowKeys.map(String));
-        return (activeRows as any[]).filter((row: any) => {
-            const rowKey = String(row?.key ?? row?._id ?? "");
-            return selectedKeys.has(rowKey) && (mode === "send" ? isPendingSend(row) : isPendingReceive(row));
-        });
+
+    const loadBranchTransferRows = async (mode: "send" | "receive") => {
+        const fetchId = ++branchTransferFetchRef.current;
+        setBranchTransferLoading(true);
+        setBranchTransferError("");
+
+        try {
+            const baseParams = getDashboardBaseParams();
+            const tab = mode === "send" ? "para_enviar" : "en_camino";
+            const limit = 100;
+            let page = 1;
+            let total = 0;
+            let rows: any[] = [];
+
+            while (true) {
+                const response = await getShippingDashboardListAPI({
+                    ...baseParams,
+                    page,
+                    limit,
+                    tab,
+                });
+
+                if (branchTransferFetchRef.current !== fetchId) return;
+
+                const pageRows = Array.isArray(response?.rows) ? response.rows : [];
+                rows = rows.concat(pageRows);
+                total = Number(response?.total || total || pageRows.length);
+
+                if (!pageRows.length || rows.length >= total) {
+                    break;
+                }
+
+                page += 1;
+            }
+
+            const transferRows = rows.filter((row: any) => (mode === "send" ? isPendingSend(row) : isPendingReceive(row)));
+
+            if (branchTransferFetchRef.current !== fetchId) return;
+
+            setBranchTransferRows(transferRows);
+            setBranchTransferModal((current) => ({
+                ...current,
+                selectedRowKeys: transferRows.map((row: any) => String(row?._id || row?.key || "")).filter(Boolean),
+            }));
+
+            if (!transferRows.length) {
+                setBranchTransferError(
+                    mode === "send"
+                        ? "No hay paquetes pendientes por enviar para tu sucursal"
+                        : "No hay paquetes pendientes por recibir para tu sucursal"
+                );
+            }
+        } catch (error) {
+            if (branchTransferFetchRef.current !== fetchId) return;
+            const errorMessage = error instanceof Error ? error.message : "No se pudo cargar la lista de sucursal";
+            setBranchTransferRows([]);
+            setBranchTransferError(errorMessage);
+            message.error(errorMessage);
+        } finally {
+            if (branchTransferFetchRef.current === fetchId) {
+                setBranchTransferLoading(false);
+            }
+        }
     };
-    const getBranchTransferRows = (mode: "send" | "receive") => {
-        const selectedRows = getSelectedBranchTransferRows(mode);
-        return selectedRows.length ? selectedRows : getAutoBranchTransferRows(mode);
-    };
-    const autoSendCount = getAutoBranchTransferRows("send").length;
-    const autoReceiveCount = getAutoBranchTransferRows("receive").length;
-    const sendCount = getBranchTransferRows("send").length;
-    const receiveCount = getBranchTransferRows("receive").length;
 
     const handleMarkSellerWithdrawal = () => {
         if (!selectedSellerWithdrawalCount) {
@@ -419,47 +510,57 @@ const ShippingTable = ({
         });
     };
 
-    const handleBranchTransfer = (mode: "send" | "receive") => {
-        const rowsToUpdate = getBranchTransferRows(mode);
+    const handleBranchTransfer = async (mode: "send" | "receive") => {
+        const hasLoadedRowsForMode = branchTransferMode === mode && branchTransferRows.length > 0;
 
-        if (!rowsToUpdate.length) {
-            message.warning(
-                mode === "send"
-                    ? "No hay paquetes pendientes por enviar para tu sucursal"
-                    : "No hay paquetes pendientes por recibir para tu sucursal"
-            );
-            return;
-        }
-
-        setBranchTransferModal({
+        setBranchTransferModal((current) => ({
+            ...current,
             open: true,
             mode,
-            rows: rowsToUpdate,
+            selectedRowKeys: [],
             totalDeliveryCost: 0,
             paymentMethod: "2",
-        });
-        setBranchTransferError("");
+        }));
+
+        if (!hasLoadedRowsForMode && !branchTransferLoading) {
+            await loadBranchTransferRows(mode);
+        } else if (hasLoadedRowsForMode) {
+            setBranchTransferModal((current) => ({
+                ...current,
+                selectedRowKeys: branchTransferRows.map((row: any) => String(row?._id || row?.key || "")).filter(Boolean),
+            }));
+        }
     };
 
     const closeBranchTransferModal = () => {
         if (markingBranchTransfer) return;
+        branchTransferFetchRef.current += 1;
         setBranchTransferError("");
-        setBranchTransferModal({ open: false, mode: null, rows: [], totalDeliveryCost: 0, paymentMethod: "2" });
+        setBranchTransferRows([]);
+        setBranchTransferLoading(false);
+        setBranchTransferModal({ open: false, mode: null, selectedRowKeys: [], totalDeliveryCost: 0, paymentMethod: "2" });
     };
 
     const submitBranchTransfer = async () => {
-        const { mode, rows } = branchTransferModal;
-        if (!mode || !rows.length) return;
+        const { mode, selectedRowKeys } = branchTransferModal;
+        if (!mode || !branchTransferRows.length) return;
+
+        const selectedSet = new Set(selectedRowKeys.map(String));
+        const selectedRows = branchTransferRows.filter((row: any) => selectedSet.has(String(row?._id || row?.key || "")));
+        if (!selectedRows.length) {
+            message.warning("Selecciona al menos un paquete para continuar");
+            return;
+        }
 
         const totalDeliveryCost = Number(branchTransferModal.totalDeliveryCost || 0);
-        const costPerPackage = rows.length > 0 ? Number((totalDeliveryCost / rows.length).toFixed(2)) : 0;
+        const costPerPackage = selectedRows.length > 0 ? Number((totalDeliveryCost / selectedRows.length).toFixed(2)) : 0;
         const nowIso = moment().tz("America/La_Paz").toISOString();
 
         setMarkingBranchTransfer(true);
         setBranchTransferError("");
         try {
             const updates = await Promise.all(
-                rows.map((row: any) => {
+                selectedRows.map((row: any) => {
                     const payload =
                         mode === "send"
                             ? {
@@ -506,7 +607,7 @@ const ShippingTable = ({
                         mode,
                         currentSucursalId,
                         branchTransferModal.paymentMethod === "1" ? "qr" : "efectivo",
-                        rows.map((row: any) => String(row?._id || row?.key || "")).sort().join(","),
+                        selectedRows.map((row: any) => String(row?._id || row?.key || "")).sort().join(","),
                     ].join(":");
 
                     await registerBranchTransferBoxCloseOperationAPI({
@@ -516,23 +617,33 @@ const ShippingTable = ({
                         method: branchTransferModal.paymentMethod === "1" ? "qr" : "efectivo",
                         mode,
                         occurredAt: nowIso,
-                        packageCount: rows.length,
+                        packageCount: selectedRows.length,
                     });
                 }
 
                 message.success(
                     mode === "send"
-                        ? `Se marcaron ${rows.length} paquete(s) como enviados`
-                        : `Se confirmaron ${rows.length} llegada(s)`
+                        ? `Se marcaron ${selectedRows.length} paquete(s) como enviados`
+                        : `Se confirmaron ${selectedRows.length} llegada(s)`
                 );
                 setBranchTransferError("");
-                setBranchTransferModal({ open: false, mode: null, rows: [], totalDeliveryCost: 0, paymentMethod: "2" });
+                setBranchTransferRows([]);
+                setBranchTransferModal({ open: false, mode: null, selectedRowKeys: [], totalDeliveryCost: 0, paymentMethod: "2" });
                 fetchShippings();
             }
             setSelectedRowKeys([]);
         } finally {
             setMarkingBranchTransfer(false);
         }
+    };
+
+    const toggleBranchTransferRow = (rowKey: string, checked: boolean) => {
+        setBranchTransferModal((current) => ({
+            ...current,
+            selectedRowKeys: checked
+                ? Array.from(new Set([...current.selectedRowKeys, rowKey]))
+                : current.selectedRowKeys.filter((key) => key !== rowKey),
+        }));
     };
 
     const fetchShippings = async () => {
@@ -544,21 +655,22 @@ const ShippingTable = ({
                 selectedVendedor && selectedVendedor !== EXTERNAL_VENDOR_FILTER
                     ? selectedVendedor
                     : (!isAdmin && !isOperator ? user?.id_vendedor : undefined);
+            const isDeliveryTab = selectedStatus === FILTER_DELIVERIES;
             const destinationMode =
-                selectedLocation === "other"
+                isDeliveryTab
                     ? "other"
-                    : selectedLocation
-                        ? "branch"
-                        : "any";
+                    : selectedLocation === "other"
+                        ? "other"
+                        : selectedLocation
+                            ? "branch"
+                            : "any";
             const destinationQuery =
-                selectedLocation === "other"
-                    ? otherLocation.trim() || undefined
-                    : selectedLocation || undefined;
-
-            const dashboardData = await getShippingDashboardListAPI({
-                page: tablePage,
-                limit: tablePageSize,
-                tab: selectedStatus,
+                isDeliveryTab
+                    ? undefined
+                    : selectedLocation === "other"
+                        ? otherLocation.trim() || undefined
+                        : selectedLocation || undefined;
+            const commonParams = {
                 from,
                 to,
                 currentBranchId: currentSucursalId || undefined,
@@ -567,9 +679,26 @@ const ShippingTable = ({
                         ? EXTERNAL_VENDOR_FILTER
                         : sellerIdToQuery,
                 client: searchCliente.trim() || undefined,
-                destinationMode: destinationMode as "any" | "branch" | "other",
-                destinationQuery,
-            });
+            };
+
+            const [dashboardData, deliveryDashboardData] = await Promise.all([
+                getShippingDashboardListAPI({
+                    page: tablePage,
+                    limit: tablePageSize,
+                    tab: isDeliveryTab ? FILTER_ALL : selectedStatus,
+                    ...commonParams,
+                    destinationMode: destinationMode as "any" | "branch" | "other",
+                    destinationQuery,
+                }),
+                getShippingDashboardListAPI({
+                    page: 1,
+                    limit: 1,
+                    tab: FILTER_ALL,
+                    ...commonParams,
+                    destinationMode: "other",
+                    destinationQuery: undefined,
+                })
+            ]);
 
             const rows = Array.isArray(dashboardData?.rows) ? dashboardData.rows : [];
             setShippingData(rows);
@@ -578,6 +707,7 @@ const ShippingTable = ({
                 listo_para_recoger: Number(dashboardData?.counts?.listo_para_recoger || 0),
                 para_enviar: Number(dashboardData?.counts?.para_enviar || 0),
                 en_camino: Number(dashboardData?.counts?.en_camino || 0),
+                deliverys: Number(deliveryDashboardData?.total || deliveryDashboardData?.counts?.todos || 0),
                 entregado: Number(dashboardData?.counts?.entregado || 0),
             });
             setTableTotal(Number(dashboardData?.total || 0));
@@ -676,6 +806,24 @@ const ShippingTable = ({
         setTablePage(1);
         setSelectedRowKeys([]);
     }, [selectedStatus, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente]);
+
+    useEffect(() => {
+        if (branchTransferMode) {
+            void loadBranchTransferRows(branchTransferMode);
+            return;
+        }
+
+        branchTransferFetchRef.current += 1;
+        setBranchTransferRows([]);
+        setBranchTransferLoading(false);
+        setBranchTransferError("");
+        setBranchTransferModal((current) => ({
+            ...current,
+            open: false,
+            mode: null,
+            selectedRowKeys: [],
+        }));
+    }, [branchTransferMode, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente, currentSucursalId, refreshKey]);
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -1056,10 +1204,10 @@ const ShippingTable = ({
         if (selectedStatus === "para_enviar") {
             onHeaderActionChange({
                 label: "Enviar sucursal",
-                count: sendCount,
+                count: branchTransferMode === "send" ? branchTransferRows.length : 0,
                 visible: true,
-                disabled: !sendCount,
-                loading: markingBranchTransfer,
+                disabled: branchTransferMode === "send" ? branchTransferRows.length === 0 : true,
+                loading: markingBranchTransfer || (branchTransferMode === "send" && branchTransferLoading),
                 tone: "orange",
                 onClick: () => handleBranchTransfer("send"),
             });
@@ -1069,10 +1217,10 @@ const ShippingTable = ({
         if (selectedStatus === "en_camino") {
             onHeaderActionChange({
                 label: "Confirmar llegada",
-                count: receiveCount,
+                count: branchTransferMode === "receive" ? branchTransferRows.length : 0,
                 visible: true,
-                disabled: !receiveCount,
-                loading: markingBranchTransfer,
+                disabled: branchTransferMode === "receive" ? branchTransferRows.length === 0 : true,
+                loading: markingBranchTransfer || (branchTransferMode === "receive" && branchTransferLoading),
                 tone: "green",
                 onClick: () => handleBranchTransfer("receive"),
             });
@@ -1083,9 +1231,10 @@ const ShippingTable = ({
     }, [
         canManageExternal,
         selectedStatus,
-        sendCount,
-        receiveCount,
         markingBranchTransfer,
+        branchTransferLoading,
+        branchTransferRows.length,
+        branchTransferMode,
         onHeaderActionChange,
     ]);
     //console.log("Rol", user?.role?.toLowerCase());
@@ -1354,11 +1503,13 @@ const ShippingTable = ({
                 <div
                     style={{
                         display: "flex",
-                        flexWrap: "wrap",
+                        flexWrap: isMobile ? "nowrap" : "wrap",
+                        overflowX: isMobile ? "auto" : "visible",
                         alignItems: "center",
-                        justifyContent: "center",
+                        justifyContent: isMobile ? "flex-start" : "center",
                         gap: 10,
                         padding: "10px 14px",
+                        paddingBottom: isMobile ? 14 : 10,
                         borderRadius: 999,
                         background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
                         border: "1px solid #e5e7eb",
@@ -1462,6 +1613,7 @@ const ShippingTable = ({
                             boxShadow: selectedStatus === "en_camino" ? "0 8px 22px rgba(249, 115, 22, 0.16)" : "none",
                             transform: selectedStatus === "en_camino" ? "translateY(-1px)" : "translateY(0)",
                             transition: "all 220ms ease",
+                            flex: "0 0 auto",
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "en_camino" ? "#f97316" : "#9ca3af", transition: "all 220ms ease" }} />
@@ -1469,6 +1621,34 @@ const ShippingTable = ({
                         {inTransitCount > 0 && (
                             <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === "en_camino" ? "#ffedd5" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
                                 {inTransitCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedStatus(FILTER_DELIVERIES)}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            borderRadius: 999,
+                            padding: "10px 16px",
+                            border: selectedStatus === FILTER_DELIVERIES ? "1px solid #c4b5fd" : "1px solid #d1d5db",
+                            background: selectedStatus === FILTER_DELIVERIES ? "#f5f3ff" : "#ffffff",
+                            color: selectedStatus === FILTER_DELIVERIES ? "#6d28d9" : "#111827",
+                            fontWeight: 700,
+                            boxShadow: selectedStatus === FILTER_DELIVERIES ? "0 8px 22px rgba(124, 58, 237, 0.16)" : "none",
+                            transform: selectedStatus === FILTER_DELIVERIES ? "translateY(-1px)" : "translateY(0)",
+                            transition: "all 220ms ease",
+                            flex: "0 0 auto",
+                        }}
+                    >
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === FILTER_DELIVERIES ? "#7c3aed" : "#9ca3af", transition: "all 220ms ease" }} />
+                        <span>Deliverys</span>
+                        {deliveriesCount > 0 && (
+                            <span style={{ borderRadius: 999, padding: "2px 8px", background: selectedStatus === FILTER_DELIVERIES ? "#ede9fe" : "#f3f4f6", fontSize: 12, transition: "all 220ms ease" }}>
+                                {deliveriesCount}
                             </span>
                         )}
                     </button>
@@ -1489,6 +1669,7 @@ const ShippingTable = ({
                             boxShadow: selectedStatus === "entregado" ? "0 8px 22px rgba(34, 197, 94, 0.16)" : "none",
                             transform: selectedStatus === "entregado" ? "translateY(-1px)" : "translateY(0)",
                             transition: "all 220ms ease",
+                            flex: "0 0 auto",
                         }}
                     >
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: selectedStatus === "entregado" ? "#22c55e" : "#9ca3af", transition: "all 220ms ease" }} />
@@ -1655,6 +1836,7 @@ const ShippingTable = ({
                 okText={branchTransferModal.mode === "send" ? "Marcar enviado" : "Confirmar llegada"}
                 cancelText="Cancelar"
                 confirmLoading={markingBranchTransfer}
+                okButtonProps={{ disabled: branchTransferLoading || branchTransferRows.length === 0 || markingBranchTransfer }}
                 destroyOnClose
                 width={960}
             >
@@ -1670,7 +1852,7 @@ const ShippingTable = ({
 
                     <div className="rounded-2xl bg-slate-50 p-4">
                         <div className="text-sm text-slate-500">Paquetes seleccionados</div>
-                        <div className="text-2xl font-bold text-slate-900">{branchTransferModal.rows.length}</div>
+                        <div className="text-2xl font-bold text-slate-900">{branchTransferLoading ? "..." : selectedBranchTransferRows.length}</div>
                         <div className="mt-1 text-sm text-slate-600">
                             {branchTransferModal.mode === "send"
                                 ? "Se marcarán como saliendo hacia la sucursal destino."
@@ -1681,15 +1863,42 @@ const ShippingTable = ({
                     <div className="rounded-2xl border border-slate-200 p-3">
                         <div className="text-xs uppercase tracking-wide text-slate-500">Paquetes detectados</div>
                         <div className="branch-transfer-scroll mt-2 text-sm text-slate-700">
-                            {branchTransferModal.rows.map((row: any, index: number) => (
-                                <div key={String(row?._id || index)} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
-                                    <div>
-                                        <div className="font-medium">{row?.cliente || row?.comprador || "Sin cliente"}</div>
-                                        <div className="text-xs text-slate-500">{row?.numero_guia || row?._id || "Sin guia"}</div>
+                            {branchTransferLoading ? (
+                                <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8">
+                                    <div className="text-center">
+                                        <Spin size="large" />
+                                        <div className="mt-4 text-sm font-medium text-slate-700">Cargando paquetes</div>
+                                        <div className="mt-1 text-xs text-slate-500">Buscando en todas las páginas del filtro actual</div>
                                     </div>
-                                    <div className="text-xs font-medium text-orange-600">{row?.lugar_entrega || "Sucursal"}</div>
                                 </div>
-                            ))}
+                            ) : branchTransferRows.length ? (
+                                branchTransferRows.map((row: any, index: number) => (
+                                    <div
+                                        key={String(row?._id || index)}
+                                        className={`flex items-start justify-between gap-3 rounded-xl border px-3 py-3 transition ${
+                                            branchTransferModal.selectedRowKeys.includes(String(row?._id || row?.key || ""))
+                                                ? "border-blue-200 bg-blue-50/60"
+                                                : "border-slate-100 bg-white"
+                                        }`}
+                                    >
+                                        <label className="flex flex-1 items-start gap-3 cursor-pointer">
+                                            <Checkbox
+                                                checked={branchTransferModal.selectedRowKeys.includes(String(row?._id || row?.key || ""))}
+                                                onChange={(event) => toggleBranchTransferRow(String(row?._id || row?.key || ""), event.target.checked)}
+                                            />
+                                            <div>
+                                                <div className="font-medium">{row?.cliente || row?.comprador || "Sin cliente"}</div>
+                                                <div className="text-xs text-slate-500">{row?.numero_guia || row?._id || "Sin guia"}</div>
+                                            </div>
+                                        </label>
+                                        <div className="text-xs font-medium text-orange-600">{row?.lugar_entrega || "Sucursal"}</div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex min-h-[140px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-sm text-slate-500">
+                                    No hay paquetes para mostrar
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1700,7 +1909,7 @@ const ShippingTable = ({
                         </div>
                         <div className="rounded-2xl border border-slate-200 p-3">
                             <div className="text-xs uppercase tracking-wide text-slate-500">Costo por paquete</div>
-                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {branchTransferModal.rows.length > 0 ? (Number(branchTransferModal.totalDeliveryCost || 0) / branchTransferModal.rows.length).toFixed(2) : "0.00"}</div>
+                            <div className="mt-1 text-lg font-semibold text-slate-900">Bs. {selectedBranchTransferRows.length > 0 ? (Number(branchTransferModal.totalDeliveryCost || 0) / selectedBranchTransferRows.length).toFixed(2) : "0.00"}</div>
                         </div>
                         <div className="rounded-2xl border border-slate-200 p-3">
                             <div className="text-xs uppercase tracking-wide text-slate-500">Impacto</div>

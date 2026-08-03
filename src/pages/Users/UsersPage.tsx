@@ -1,16 +1,18 @@
 import { useContext, useEffect, useState } from "react";
 import { Button, Row, Col, Typography, Card } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { HistoryOutlined, PlusOutlined } from "@ant-design/icons";
 import UsersTable from "./UsersTable";
 import UserFormModal from "./UserFormModal";
 import { useUserStore } from "../../stores/userStore";
 import { UserContext } from "../../context/userContext";
-import { isSuperadminUser } from "../../utils/role";
+import { isSuperadminUser, normalizeRole } from "../../utils/role";
+import { useNavigate } from "react-router-dom";
 import "./UsersPage.css";
 
 const { Title } = Typography;
 
 const UsersPage = () => {
+  const navigate = useNavigate();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const createUser = useUserStore((state) => state.createUser);
@@ -18,6 +20,7 @@ const UsersPage = () => {
   const fetchUsers = useUserStore((state) => state.fetchUsers);
   const { user } = useContext(UserContext)!;
   const canAssignRoles = isSuperadminUser(user);
+  const canSeeAttendance = normalizeRole(user?.role) === "admin";
 
   useEffect(() => {
     fetchUsers();
@@ -56,8 +59,18 @@ const UsersPage = () => {
             </Title>
           </Card>
         </Col>
-        {canAssignRoles && (
-          <Col>
+        <Col>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {canSeeAttendance && (
+              <Button
+                icon={<HistoryOutlined />}
+                onClick={() => navigate("/attendance")}
+                size="large"
+              >
+                Asistencia
+              </Button>
+            )}
+            {canAssignRoles && (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -66,8 +79,9 @@ const UsersPage = () => {
             >
               Nuevo Usuario
             </Button>
-          </Col>
-        )}
+            )}
+          </div>
+        </Col>
       </Row>
 
       <UsersTable onEdit={handleEdit} />

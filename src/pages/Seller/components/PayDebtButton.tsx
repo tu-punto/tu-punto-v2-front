@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Checkbox, Image, Popover, Tooltip, message } from "antd";
-import { DollarOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Image, Popover, Tooltip, Typography, message } from "antd";
+import { DollarOutlined, QrcodeOutlined } from "@ant-design/icons";
 
 import { paySellerDebtAPI } from "../../../api/seller";
 
@@ -9,15 +9,38 @@ interface Props {
   onSuccess: () => void; // para refrescar la tabla
 }
 
+const paymentOptionCardStyle = (
+  selected: boolean,
+  disabled = false
+): React.CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  minHeight: 52,
+  borderRadius: 14,
+  border: selected ? "1.5px solid #1677ff" : "1px solid #d9d9d9",
+  background: disabled ? "#f5f5f5" : selected ? "#eff6ff" : "#ffffff",
+  color: disabled ? "#bfbfbf" : selected ? "#1677ff" : "#262626",
+  fontWeight: selected ? 700 : 600,
+  cursor: disabled ? "not-allowed" : "pointer",
+  transition: "all 0.18s ease"
+});
+
 const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   const [visible, setVisible] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "qr" | null>(null);
   const [loading, setLoading] = useState(false);
 
   /** click “Pagar” */
   const handleConfirm = async () => {
     if (!checked) {
       message.warning("Marca la casilla para confirmar el pago.");
+      return;
+    }
+    if (!paymentMethod) {
+      message.warning("Selecciona como se pago al vendedor.");
       return;
     }
 
@@ -37,7 +60,10 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
 
     setLoading(true);
     try {
-      const res = await paySellerDebtAPI(seller._id, { payAll: true });
+      const res = await paySellerDebtAPI(seller._id, {
+        payAll: true,
+        paymentMethod
+      });
       if (!res?.success) throw new Error("fail");
 
       const pdfBlob = new Blob([res.data], { type: "application/pdf" });
@@ -78,6 +104,7 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       setLoading(false);
       setVisible(false);
       setChecked(false);
+      setPaymentMethod(null);
     }
   };
 
@@ -85,6 +112,7 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
   const handleCancel = () => {
     setVisible(false);
     setChecked(false);
+    setPaymentMethod(null);
     message.info("Pago cancelado");
   };
 
@@ -115,6 +143,36 @@ const PayDebtButton: React.FC<Props> = ({ seller, onSuccess }) => {
       >
         ¿Desea pagar las deudas existentes?
       </Checkbox>
+
+      <div className="mt-3">
+        <Typography.Text strong>Metodo de pago</Typography.Text>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+            marginTop: 10
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("efectivo")}
+            style={paymentOptionCardStyle(paymentMethod === "efectivo")}
+          >
+            <DollarOutlined />
+            <span>Efectivo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => seller?.qr_pago_url && setPaymentMethod("qr")}
+            disabled={!seller?.qr_pago_url}
+            style={paymentOptionCardStyle(paymentMethod === "qr", !seller?.qr_pago_url)}
+          >
+            <QrcodeOutlined />
+            <span>QR</span>
+          </button>
+        </div>
+      </div>
 
       <div className="mt-2 text-right">
         <Button

@@ -123,6 +123,7 @@ function SalesFormModal({
         sucursal: branchIdFromProps,
         cantidad: p.cantidad,
         precio_unitario: p.precio_unitario,
+        precio_original: Number(p.precio_original ?? p.precio_unitario ?? 0),
         utilidad: applySellerCommissionCap(
           vendedor,
           isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad

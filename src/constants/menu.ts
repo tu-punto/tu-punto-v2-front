@@ -8,12 +8,22 @@ import statsIcon from "../assets/statsIcon.svg";
 import branchIcon from "../assets/branchIcon.svg";
 import salesHistoryIcon from "../assets/historyIcono.png";
 import infoProductIcon from "../assets/infoProductIcon.svg";
+import tagIcon from "../assets/tagIcon.svg";
 import superadminVariantsIcon from "../assets/superadminVariantsIcon.svg";
 import servicesIcon from "../assets/services.png";
 import attendanceClockIcon from "../assets/attendanceClockIcon.svg";
+import historyIcon from "../assets/historyIcono.png";
+import paperNoteIcon from "../assets/paperNoteIcon.svg";
 import { getAllowedRoles } from "./accessControl";
 
 export const menu = [
+  {
+    path: "/seller-dashboard",
+    label: "Mi Dashboard",
+    icon: statsIcon,
+    roles: getAllowedRoles("/seller-dashboard"),
+    hiddenInMenuForRoles: ["seller"],
+  },
   {
     path: "/seller",
     label: "Vendedores",
@@ -58,7 +68,7 @@ export const menu = [
   },
   {
     path: "/stats",
-    label: "Estadisticas",
+    label: "Gestión Empresarial",
     icon: statsIcon,
     roles: getAllowedRoles("/stats"),
   },
@@ -73,12 +83,14 @@ export const menu = [
     label: "Sucursales",
     icon: branchIcon,
     roles: getAllowedRoles("/branch"),
+    hiddenInMenuForRoles: ["admin"],
   },
   {
     path: "/sales-history",
     label: "Historial de Ventas",
     icon: salesHistoryIcon,
     roles: getAllowedRoles("/sales-history"),
+    hiddenInMenuForRoles: ["admin", "operator"],
   },
   {
     path: "/user",
@@ -92,12 +104,14 @@ export const menu = [
     icon: attendanceClockIcon,
     roles: getAllowedRoles("/attendance"),
     requiresSuperadmin: true,
+    hiddenInMenuForRoles: ["admin"],
   },
   {
     path: "/servicesPage",
-    label: "Servicios",
+    label: "Comunicados y Tutoriales",
     icon: servicesIcon,
     roles: getAllowedRoles("/servicesPage"),
+    hiddenInMenuForRoles: ["admin"],
   },
   {
     path: "/simple-packages",
@@ -108,7 +122,7 @@ export const menu = [
   {
     path: "/shipping-guide",
     label: "Guias de Envio",
-    icon: shippingIcon,
+    icon: paperNoteIcon,
     roles: getAllowedRoles("/shipping-guide"),
   },
   {
@@ -118,10 +132,18 @@ export const menu = [
     roles: getAllowedRoles("/seller-product-info"),
   },
   {
+    path: "/seller-promotions",
+    label: "Promociones",
+    icon: tagIcon,
+    roles: getAllowedRoles("/seller-promotions"),
+    hiddenInMenuForRoles: ["seller"],
+  },
+  {
     path: "/admin-seller-product-info",
     label: "Productos Clientes",
     icon: infoProductIcon,
     roles: getAllowedRoles("/admin-seller-product-info"),
+    hiddenInMenuForRoles: ["admin"],
   },
   {
     path: "/superadmin-variants",
@@ -129,5 +151,14 @@ export const menu = [
     icon: superadminVariantsIcon,
     roles: getAllowedRoles("/superadmin-variants"),
     requiresSuperadmin: true,
+    hiddenInMenuForRoles: ["admin"],
+  },
+  {
+    path: "/inventory-audit",
+    label: "Auditoria Stock",
+    icon: historyIcon,
+    roles: getAllowedRoles("/inventory-audit"),
+    requiresSuperadmin: true,
+    hiddenInMenuForRoles: ["admin"],
   },
 ];

@@ -1,31 +1,71 @@
+import { Button, Card, Empty, Spin } from "antd";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import StatisticsDashboard from "./StatsDashboard";
-import SidebarNavButton from "../../components/SidebarNavButton";
 import ReportsLauncher from "../../components/ReportsLauncher";
-import sellerIcon from "../../assets/sellersIcon.svg";
 import servicesIcon from "../../assets/services.png";
+import branchIcon from "../../assets/branchIcon.svg";
+import ServiciosResumenTable from "../Service/components/ServicesSummaryTable";
+import { getServicesSummaryAPI } from "../../api/services";
+import "../Service/ServicePanelPage.css";
 
 const StatsPage = () => {
-  const isOpen = true;
+  const navigate = useNavigate();
+  const [summary, setSummary] = useState<any | null>(null);
+  const [sucursals, setSucursals] = useState<string[]>([]);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSummary = async () => {
+      try {
+        setLoadingSummary(true);
+        const data = await getServicesSummaryAPI();
+        if (!mounted) return;
+        const sucursalesFiltradas = Object.keys(data || {}).filter((s) => s !== "TOTAL");
+        setSummary(data);
+        setSucursals(sucursalesFiltradas);
+      } catch (err) {
+        if (!mounted) return;
+        setSummary(null);
+        setSucursals([]);
+      } finally {
+        if (mounted) setLoadingSummary(false);
+      }
+    };
+
+    void loadSummary();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div>
-      <div className="px-4 pt-4 flex justify-end">
+      <div className="px-4 pt-4 flex justify-end gap-2 flex-wrap">
         <ReportsLauncher />
+        <Button type="default" onClick={() => navigate("/servicesPage")} icon={<img src={servicesIcon} alt="Comunicados y Tutoriales" className="w-4 h-4" />}>
+          Comunicados y Tutoriales
+        </Button>
+        <Button type="default" onClick={() => navigate("/branch")} icon={<img src={branchIcon} alt="Sucursales" className="w-4 h-4" />}>
+          Sucursales
+        </Button>
       </div>
       <StatisticsDashboard />
       <div className="p-2 space-y-2">
-        <SidebarNavButton 
-          to="/sellerFactura"
-          description="Detalle Vendedores"
-          icon={sellerIcon}
-          isOpen={isOpen}
-        />
-        <SidebarNavButton 
-          to="/servicesPage"
-          description="Desglose de servicios"
-          icon={servicesIcon} 
-          isOpen={isOpen}
-        />
+        <Card className="service-announcement-card" title="Resumen administrativo">
+          {loadingSummary ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
+              <Spin />
+            </div>
+          ) : summary && sucursals.length ? (
+            <ServiciosResumenTable summary={summary} allSucursals={sucursals} />
+          ) : (
+            <Empty description="No se pudo cargar el resumen de servicios" />
+          )}
+        </Card>
       </div>
     </div>
 

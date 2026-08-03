@@ -68,7 +68,7 @@ export const updateSellerAPI = async (sellerId: string, updateData: any) => {
 }
 
 export const paySellerDebtAPI = async (sellerId: string,
-    payload: { payAll: boolean }) => {
+    payload: { payAll: boolean; paymentMethod: "efectivo" | "qr" }) => {
     try {
         const res = await apiClient.post(`/seller/${sellerId}/pay`, payload, {responseType: 'blob'});
         return { success: true, data: res.data }
@@ -135,6 +135,20 @@ export const getSellerDebtsAPI  = async (sellerId: string) => {
     try {
         const res = await apiClient.get(`/seller/${sellerId}/debts`)
         return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const getSellerDashboardAPI = async (sellerId: string, params?: { months?: number; sucursalIds?: string[] }) => {
+    try {
+        const res = await apiClient.get(`/seller/${sellerId}/dashboard`, {
+            params: {
+                months: params?.months,
+                sucursalIds: params?.sucursalIds?.length ? params.sucursalIds.join(",") : undefined,
+            }
+        })
+        return res.data
     } catch (error) {
         parseError(error as AxiosError)
     }

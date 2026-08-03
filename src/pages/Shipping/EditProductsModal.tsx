@@ -53,6 +53,7 @@ const EditProductsModal = ({
         return {
           ...p,
           cantidadMaximaEditable,
+          precio_original: p.precio_original ?? p.precio_unitario,
         };
       })
     );
@@ -140,6 +141,7 @@ const EditProductsModal = ({
         id_producto: selected._id || selected.id_producto,
         cantidad: 1,
         precio_unitario: selected.precio,
+        precio_original: selected.precio_original ?? selected.precio,
         utilidad: utilidadCalculada,
       },
     ]);
@@ -215,6 +217,7 @@ const EditProductsModal = ({
         temporalesPreparados.push({
           cantidad: temp.cantidad,
           precio_unitario: temp.precio_unitario,
+          precio_original: temp.precio_original ?? temp.precio_unitario,
           utilidad: temp.utilidad,
           id_producto: temp.id_producto,
           id_pedido: shippingId,
@@ -233,6 +236,7 @@ const EditProductsModal = ({
         ...temporalesYaRegistrados.map((p) => ({
           cantidad: p.cantidad,
           precio_unitario: p.precio_unitario,
+          precio_original: p.precio_original ?? p.precio_unitario,
           utilidad: p.utilidad,
           id_producto: p.id_producto,
           id_pedido: shippingId,
@@ -261,6 +265,7 @@ const EditProductsModal = ({
           id_venta: p.id_venta,
           cantidad: p.cantidad,
           precio_unitario: p.precio_unitario,
+          precio_original: p.precio_original ?? p.precio_unitario,
           utilidad: p.utilidad,
           id_producto: p.id_producto,
           quien_paga_delivery: p.quien_paga_delivery,

@@ -28,6 +28,17 @@ const PaymentProofTable = ({ data }: PaymentProofProps) => {
       className: "text-mobile-sm xl:text-desktop-sm",
     },
     {
+      title: "Metodo de pago",
+      dataIndex: "metodo_pago",
+      key: "metodo_pago",
+      render: (value?: string) => {
+        if (value === "efectivo") return "Efectivo";
+        if (value === "qr") return "QR";
+        return "No registrado";
+      },
+      className: "text-mobile-sm xl:text-desktop-sm",
+    },
+    {
       title: "PDF",
       dataIndex: "comprobante_entrada_pdf",
       key: "pdf_url",
@@ -51,7 +62,14 @@ const PaymentProofTable = ({ data }: PaymentProofProps) => {
 
   return (
     <div>
-      <Table columns={columns} dataSource={data} pagination={{ pageSize: 5 }} />
+      <Table
+        rowKey={(record: any) =>
+          String(record?._id || record?.id || record?.comprobante_entrada_pdf || record?.createdAt)
+        }
+        columns={columns}
+        dataSource={data}
+        pagination={{ pageSize: 5 }}
+      />
     </div>
   );
 };
