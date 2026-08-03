@@ -2,6 +2,7 @@ import "./Header.css";
 import logoImg from "../../../public/logo-no-letter-dark-bg.png";
 import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
 import NotificationBell from "../../components/NotificationBell";
+import TourQuickMenu from "../../components/TourQuickMenu";
 
 const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { sucursalNombre, sucursalImagenHeader, pillLabel } = useBranchHeaderInfo();
@@ -14,7 +15,7 @@ const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
 
   return (
     <div className="flex items-center gap-2 py-2 px-3 bg-blue border-light-gray">
-      <button className="tp-menu-btn" onClick={toggleSidebar} aria-label="Abrir menu">
+      <button className="tp-menu-btn" onClick={toggleSidebar} aria-label="Abrir menu" data-tour-id="mobile-header-menu-trigger">
         &#9776;
       </button>
 
@@ -30,7 +31,8 @@ const HeaderXS = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
         </div>
       </div>
 
-      <div style={{ marginLeft: "auto" }}>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <TourQuickMenu compact />
         <NotificationBell compact />
       </div>
     </div>

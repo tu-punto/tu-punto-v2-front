@@ -8,6 +8,7 @@ import { UserContext } from "../../context/userContext";
 import { useBranchHeaderInfo } from "../../hooks/useBranchHeaderInfo";
 import NotificationBell from "../../components/NotificationBell";
 import { KeyOutlined } from "@ant-design/icons";
+import TourQuickMenu from "../../components/TourQuickMenu";
 
 const Header = () => {
   const { user, setUser } = useContext(UserContext)!;
@@ -58,6 +59,7 @@ const Header = () => {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <TourQuickMenu />
         <NotificationBell />
         <Button
           onClick={() => navigate("/change-password")}

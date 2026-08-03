@@ -8,6 +8,7 @@ import Sider from "antd/es/layout/Sider";
 import BottomMenu from "./MobileMenu/BottomMenu";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import ServiceAnnouncementGate from "../components/ServiceAnnouncementGate";
+import { TourProvider } from "../context/tourContext";
 
 const { Content } = Layout;
 
@@ -32,6 +33,7 @@ const AppLayout = () => {
   }, [isMobile, isOpen]);
 
   return (
+      <TourProvider isMobile={isMobile}>
       <Layout className="flex min-h-screen w-full">
         {!isMobile && (
             <Sider
@@ -83,6 +85,7 @@ const AppLayout = () => {
           {isMobile && <BottomMenu />}
         </Layout>
       </Layout>
+      </TourProvider>
   );
 };
 

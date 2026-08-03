@@ -2,13 +2,10 @@ import { Link, useLocation } from "react-router-dom";
 import "./Sidebar.css";
 import { useContext } from "react";
 import { UserContext } from "../../context/userContext";
-import { menu } from "../../constants/menu";
 import { Button, message } from "antd";
 import { logoutUserAPI } from "../../api/user";
 import { KeyOutlined } from "@ant-design/icons";
-import { isSuperadminUser, normalizeRole } from "../../utils/role";
-import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
-import { canSellerAccessInventory, canSellerAccessShop } from "../../utils/sellerServiceAccess";
+import { getVisibleMenuItems } from "../../utils/navigationMenu";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,14 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const filteredMenuItems = menu.filter((item) =>
-    item.roles.includes(normalizeRole(user?.role)) &&
-    (!item.hiddenInMenuForRoles?.includes(normalizeRole(user?.role))) &&
-    (item.path !== "/stock" || canSellerAccessInventory(user)) &&
-    (item.path !== "/shop" || canSellerAccessShop(user)) &&
-    (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
-    (!item.requiresSuperadmin || isSuperadminUser(user))
-  );
+  const filteredMenuItems = getVisibleMenuItems(user);
 
   const isActivePath = (pathname: string, path: string) =>
     pathname === path || pathname.startsWith(`${path}/`);
@@ -62,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {filteredMenuItems.map((item) => (
           <Link
             to={item.path}
+            data-tour-id={`sidebar-link-${item.path.replace(/^\//, "")}`}
             aria-current={isActivePath(location.pathname, item.path) ? "page" : undefined}
             className={`sidebar-link flex items-center p-4 transition-colors duration-200 ${
               isActivePath(location.pathname, item.path) ? "sidebar-link-active" : ""
