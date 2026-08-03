@@ -84,7 +84,7 @@ const AdminSellerProductInfoRoute = () => {
 const SuperadminVariantsRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!isSuperadminUser(user)) {
+  if (normalizeRole(user?.role) !== "admin") {
     return <Navigate to="/stock" replace />;
   }
 
@@ -104,7 +104,7 @@ const BoxCloseSummaryRoute = () => {
 const AttendanceRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!isSuperadminUser(user)) {
+  if (normalizeRole(user?.role) !== "admin") {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -114,7 +114,7 @@ const AttendanceRoute = () => {
 const InventoryAuditRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!isSuperadminUser(user)) {
+  if (normalizeRole(user?.role) !== "admin") {
     return <Navigate to="/stock" replace />;
   }
 

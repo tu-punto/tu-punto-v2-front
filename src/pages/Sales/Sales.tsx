@@ -1,5 +1,5 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -17,8 +17,10 @@ import StockQRInfoModal from "../StockManagement/StockQRInfoModal.tsx";
 import { normalizeRole } from "../../utils/role";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import { resolvePromotionPricing } from "../../utils/promotionPricing";
+import { useNavigate } from "react-router-dom";
 
 export const Sales = () => {
+  const navigate = useNavigate();
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showInfoQRScanner, setShowInfoQRScanner] = useState(false);
   const { user }: any = useContext(UserContext);
@@ -571,6 +573,11 @@ export const Sales = () => {
             Carrito
           </h1>
         </div>
+        {(isAdmin || isOperator) && (
+          <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
+            Historial de Ventas
+          </Button>
+        )}
       </div>
 
       <Row gutter={[16, 16]}>

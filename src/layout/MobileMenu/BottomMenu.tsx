@@ -34,6 +34,7 @@ const BottomMenu = () => {
         const filtered = menu.filter(
             i =>
               i.roles.includes(role) &&
+              (!i.hiddenInMenuForRoles?.includes(role)) &&
               (i.path !== "/stock" || canSellerAccessInventory(user)) &&
               (i.path !== "/shop" || canSellerAccessShop(user)) &&
               (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&

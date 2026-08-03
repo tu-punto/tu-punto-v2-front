@@ -30,8 +30,6 @@ import {
   UpOutlined,
   VideoCameraOutlined,
 } from "@ant-design/icons";
-import ServiciosResumenTable from "./components/ServicesSummaryTable";
-import { getServicesSummaryAPI } from "../../api/services";
 import servicesIcon from "../../assets/services2.png";
 import { UserContext } from "../../context/userContext";
 import { normalizeRole } from "../../utils/role";
@@ -290,9 +288,6 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   const isSeller = role === "seller";
 
   const [form] = Form.useForm();
-  const [summary, setSummary] = useState<any | null>(null);
-  const [sucursals, setSucursals] = useState<string[]>([]);
-  const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [busyAnnouncementId, setBusyAnnouncementId] = useState<string | null>(null);
@@ -424,22 +419,6 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
     });
   };
 
-  const loadSummary = async () => {
-    if (!isAdmin) return;
-    try {
-      setLoadingSummary(true);
-      const data = await getServicesSummaryAPI();
-      const sucursalesFiltradas = Object.keys(data || {}).filter((s) => s !== "TOTAL");
-      setSummary(data);
-      setSucursals(sucursalesFiltradas);
-    } catch (err) {
-      console.error("Error al cargar resumen de servicios", err);
-      message.error("No se pudo cargar el resumen de servicios");
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
   const loadAnnouncements = async () => {
     if (!role) return;
     try {
@@ -467,9 +446,8 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
   };
 
   useEffect(() => {
-    void loadSummary();
     void loadAnnouncements();
-  }, [isAdmin, role]);
+  }, [role]);
 
   const handleCreate = async (publishNow = false) => {
     try {
@@ -878,20 +856,6 @@ export const ServicePanelPage: React.FC<{ isFactura: boolean }> = () => {
               </Button>
             </div>
           </Form>
-        </Card>
-      ) : null}
-
-      {isAdmin ? (
-        <Card className="service-announcement-card" title="Resumen administrativo">
-          {loadingSummary ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
-              <Spin />
-            </div>
-          ) : summary && sucursals.length ? (
-            <ServiciosResumenTable summary={summary} allSucursals={sucursals} />
-          ) : (
-            <Empty description="No se pudo cargar el resumen de servicios" />
-          )}
         </Card>
       ) : null}
 

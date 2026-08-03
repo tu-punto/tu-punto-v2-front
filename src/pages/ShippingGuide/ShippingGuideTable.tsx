@@ -40,8 +40,8 @@ const ShippingGuideTable = (
             );
             setGuidesList(sortedData)
         } catch (error) {
-            console.error("Error al obtener GuÃ­as de EnvÃ­o: ", error)
-            message.error("Error al cargar GuÃ­as de EnvÃ­o")
+            console.error("Error al obtener Guí­as de Enví­o: ", error)
+            message.error("Error al cargar Guí­as de Enví­o")
         }
     }
     const fetchGuidesBySeller = async () => {
@@ -52,8 +52,8 @@ const ShippingGuideTable = (
             );
             setGuidesList(sortedData)
         } catch (error) {
-            console.error("Error al obtener GuÃ­as de EnvÃ­o por vendedor: ", error)
-            message.error("Error al cargar GuÃ­as de EnvÃ­o")
+            console.error("Error al obtener Guí­as de Enví­o por vendedor: ", error)
+            message.error("Error al cargar Guí­as de Enví­o")
         }
     };
 
@@ -66,8 +66,8 @@ const ShippingGuideTable = (
             setGuidesList(sortedData)
             setPickupFilter("all")
         } catch (error) {
-            console.error("Error al obtener GuÃ­as de EnvÃ­o por vendedor: ", error)
-            message.error("Error al cargar GuÃ­as de EnvÃ­o")
+            console.error("Error al obtener Guí­as de Enví­o por vendedor: ", error)
+            message.error("Error al cargar Guí­as de Enví­o")
         }
     }
 
@@ -92,13 +92,13 @@ const ShippingGuideTable = (
 
     const handleCheckShipping = async (record: any) => {
         if (record.isRecogido) {
-            message.info("Esta guÃ­a ya fue marcada como recogida")
+            message.info("Esta guí­a ya fue marcada como recogida")
             return
         }
         try {
             const res = await markAsDelivered(record._id);
             if (res.success) {
-                message.success("El estado de la guÃ­a se ha actualizado correctamente")
+                message.success("El estado de la guí­a se ha actualizado correctamente")
                 setGuidesList((current: any[]) =>
                     current.map((item) =>
                         String(item._id) === String(record._id)
@@ -107,11 +107,11 @@ const ShippingGuideTable = (
                     )
                 );
             } else {
-                message.error("Error al actualizar el estado de la guÃ­a")
+                message.error("Error al actualizar el estado de la guí­a")
             }
         } catch (error) {
-            console.error("Erorr al actualizar el estado entregado de GuÃ­a de EnvÃ­o: ", error)
-            message.error("Error al actualizar el estado de la guÃ­a")
+            console.error("Erorr al actualizar el estado entregado de Guí­a de Enví­o: ", error)
+            message.error("Error al actualizar el estado de la guí­a")
         }
     }
 
@@ -140,7 +140,7 @@ const ShippingGuideTable = (
             }
         },
         {
-            title: 'Fecha de creaciÃ³n',
+            title: 'Fecha de creación',
             dataIndex: 'fecha_subida',
             key: 'fecha_subida',
             width: 180,
@@ -156,12 +156,12 @@ const ShippingGuideTable = (
             }),
         },
         {
-            title: 'DescripciÃ³n',
+            title: 'Descripción',
             dataIndex: 'descripcion',
             key: 'descripcion',
             render: (_: any, record: any) => {
                 if (record.descripcion == "undefined") {
-                    return "Sin descripciÃ³n"
+                    return "Sin descripción"
                 } else {
                     return record.descripcion
                 }
@@ -229,7 +229,7 @@ const ShippingGuideTable = (
                 }}
                 footer={null}
             >
-                <Card title="Foto - GuÃ­a de EnvÃ­o" bordered={false}>
+                <Card title="Foto - Guí­a de Enví­o" bordered={false}>
                     <Row gutter={16}>
                         {imageUrl && <img src={imageUrl} alt="Imagen" style={{ width: '100%' }} />}
                     </Row>

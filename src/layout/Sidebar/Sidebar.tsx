@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import "./Sidebar.css";
 import { useContext } from "react";
 import { UserContext } from "../../context/userContext";
@@ -22,6 +22,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isMobile,
 }) => {
   const { user, setUser } = useContext(UserContext)!;
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -39,11 +40,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const filteredMenuItems = menu.filter((item) =>
     item.roles.includes(normalizeRole(user?.role)) &&
+    (!item.hiddenInMenuForRoles?.includes(normalizeRole(user?.role))) &&
     (item.path !== "/stock" || canSellerAccessInventory(user)) &&
     (item.path !== "/shop" || canSellerAccessShop(user)) &&
     (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
     (!item.requiresSuperadmin || isSuperadminUser(user))
   );
+
+  const isActivePath = (pathname: string, path: string) =>
+    pathname === path || pathname.startsWith(`${path}/`);
 
   return (
     <div className={`sidebar ${isOpen ? "open" : "closed"}`}>
@@ -57,7 +62,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         {filteredMenuItems.map((item) => (
           <Link
             to={item.path}
-            className="flex items-center p-4 bg-blue hover:bg-light-blue/10 transition-colors duration-200"
+            aria-current={isActivePath(location.pathname, item.path) ? "page" : undefined}
+            className={`sidebar-link flex items-center p-4 transition-colors duration-200 ${
+              isActivePath(location.pathname, item.path) ? "sidebar-link-active" : ""
+            }`}
             key={item.path}
           >
             <img src={item.icon} alt={item.label} className="w-6 h-6 mx-3" />
