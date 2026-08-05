@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { Button, Row, Col, Typography, Card } from "antd";
-import { HistoryOutlined, PlusOutlined } from "@ant-design/icons";
+import { HistoryOutlined, PlusOutlined, ToolOutlined } from "@ant-design/icons";
 import UsersTable from "./UsersTable";
 import UserFormModal from "./UserFormModal";
 import { useUserStore } from "../../stores/userStore";
@@ -8,18 +8,21 @@ import { UserContext } from "../../context/userContext";
 import { isSuperadminUser, normalizeRole } from "../../utils/role";
 import { useNavigate } from "react-router-dom";
 import "./UsersPage.css";
+import MaintenanceModeModal from "../../components/MaintenanceModeModal";
 
 const { Title } = Typography;
 
 const UsersPage = () => {
   const navigate = useNavigate();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isMaintenanceVisible, setIsMaintenanceVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const createUser = useUserStore((state) => state.createUser);
   const updateUser = useUserStore((state) => state.updateUser);
   const fetchUsers = useUserStore((state) => state.fetchUsers);
   const { user } = useContext(UserContext)!;
   const canAssignRoles = isSuperadminUser(user);
+  const canManageMaintenance = isSuperadminUser(user);
   const canSeeAttendance = normalizeRole(user?.role) === "admin";
 
   useEffect(() => {
@@ -71,6 +74,15 @@ const UsersPage = () => {
               </Button>
             )}
             {canAssignRoles && (
+              <Button
+                icon={<ToolOutlined />}
+                onClick={() => setIsMaintenanceVisible(true)}
+                size="large"
+              >
+                Mantenimiento
+              </Button>
+            )}
+            {canAssignRoles && (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -93,6 +105,10 @@ const UsersPage = () => {
         editingUser={editingUser}
         canAssignRoles={canAssignRoles}
       />
+
+      {canManageMaintenance ? (
+        <MaintenanceModeModal open={isMaintenanceVisible} onClose={() => setIsMaintenanceVisible(false)} />
+      ) : null}
     </div>
   );
 };

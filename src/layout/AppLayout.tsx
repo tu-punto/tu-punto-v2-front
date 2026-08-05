@@ -9,6 +9,7 @@ import BottomMenu from "./MobileMenu/BottomMenu";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import ServiceAnnouncementGate from "../components/ServiceAnnouncementGate";
 import { TourProvider } from "../context/tourContext";
+import MaintenanceGate from "../components/MaintenanceGate";
 
 const { Content } = Layout;
 
@@ -33,9 +34,10 @@ const AppLayout = () => {
   }, [isMobile, isOpen]);
 
   return (
+    <MaintenanceGate>
       <TourProvider isMobile={isMobile}>
-      <Layout className="flex min-h-screen w-full">
-        {!isMobile && (
+        <Layout className="flex min-h-screen w-full">
+          {!isMobile && (
             <Sider
               trigger={null}
               collapsible
@@ -44,48 +46,41 @@ const AppLayout = () => {
               collapsedWidth={80}
               style={{ background: "#094f89" }}
             >
-              <Sidebar
-                  isOpen={isOpen}
-                  toggleSidebar={toggleSidebar}
-                  isMobile={false}
-              />
+              <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} isMobile={false} />
             </Sider>
-        )}
+          )}
 
-        <Layout>
-          {isMobile ? <HeaderXS toggleSidebar={toggleSidebar} /> : <Header />}
-          {isMobile && (
+          <Layout>
+            {isMobile ? <HeaderXS toggleSidebar={toggleSidebar} /> : <Header />}
+            {isMobile && (
               <>
                 <button
-                    aria-label="Cerrar menú"
-                    onClick={() => setIsOpen(false)}
-                    className={`fixed inset-0 z-40 bg-black/30 transition-opacity ${
-                        isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-                    }`}
+                  aria-label="Cerrar menú"
+                  onClick={() => setIsOpen(false)}
+                  className={`fixed inset-0 z-40 bg-black/30 transition-opacity ${
+                    isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                  }`}
                 />
                 <div
-                    className={`fixed inset-y-0 left-0 z-50 w-[200px] max-w-[85%] bg-blue transform transition-transform ${
-                        isOpen ? "translate-x-0" : "-translate-x-full"
-                    }`}
+                  className={`fixed inset-y-0 left-0 z-50 w-[200px] max-w-[85%] bg-blue transform transition-transform ${
+                    isOpen ? "translate-x-0" : "-translate-x-full"
+                  }`}
                 >
-                  <Sidebar
-                      isOpen={isOpen}
-                      toggleSidebar={toggleSidebar}
-                      isMobile={true}
-                  />
+                  <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} isMobile={true} />
                 </div>
               </>
-          )}
-          <Content className={`flex flex-col bg-white p-6 ${isMobile ? "pb-28" : ""}`}>
-            <Outlet />
-          </Content>
+            )}
+            <Content className={`flex flex-col bg-white p-6 ${isMobile ? "pb-28" : ""}`}>
+              <Outlet />
+            </Content>
 
-          <ServiceAnnouncementGate />
+            <ServiceAnnouncementGate />
 
-          {isMobile && <BottomMenu />}
+            {isMobile && <BottomMenu />}
+          </Layout>
         </Layout>
-      </Layout>
       </TourProvider>
+    </MaintenanceGate>
   );
 };
 
