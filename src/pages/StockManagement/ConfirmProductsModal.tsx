@@ -492,7 +492,7 @@ const ConfirmProductsModal = ({
         </Button>
       ]}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }} data-tour-id="stock-ingress-modal">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <div>
             <Title level={4} style={{ margin: 0 }}>

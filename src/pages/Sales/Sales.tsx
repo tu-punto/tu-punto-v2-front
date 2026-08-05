@@ -258,6 +258,22 @@ export const Sales = () => {
     setModalType(null);
   };
 
+  useEffect(() => {
+    const closeDemoModals = () => setModalType(null);
+    const openSalesDemoModal = () => setModalType("sales");
+    const openShippingDemoModal = () => setModalType("shipping");
+
+    window.addEventListener("tp-tour-close-sales-demo-modals", closeDemoModals);
+    window.addEventListener("tp-tour-open-sales-modal", openSalesDemoModal);
+    window.addEventListener("tp-tour-open-delivery-modal", openShippingDemoModal);
+
+    return () => {
+      window.removeEventListener("tp-tour-close-sales-demo-modals", closeDemoModals);
+      window.removeEventListener("tp-tour-open-sales-modal", openSalesDemoModal);
+      window.removeEventListener("tp-tour-open-delivery-modal", openShippingDemoModal);
+    };
+  }, []);
+
   const handleProductModalCancel = () => {
     setProductAddModal(false);
   };
@@ -705,6 +721,7 @@ export const Sales = () => {
                         onClick={showSalesModal}
                         type="primary"
                         className="text-mobile-base xl:text-desktop-sm "
+                        data-tour-id="sales-sale-button"
                       >
                         Realizar Venta
                       </Button>

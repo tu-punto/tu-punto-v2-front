@@ -403,6 +403,7 @@ function ShippingFormModal({
 
     return (
         <Modal title="Realizar Entrega" open={visible} onCancel={onCancel} footer={null} width={800}>
+            <div data-tour-id="sales-delivery-modal">
             <Form
                 form={form}
                 name="shippingForm"
@@ -875,6 +876,7 @@ function ShippingFormModal({
                     </Button>
                 </Form.Item>
             </Form>
+            </div>
         </Modal>
     );
 

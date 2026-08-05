@@ -134,6 +134,7 @@ const AddVariantModal = ({ visible, onCancel, group }: any) => {
             ]}
             width={1000}
         >
+            <div data-tour-id="stock-variant-create-modal">
             <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
                 Si abriste este modal desde una variante, esa combinacion ya viene cargada como base. Si no, el formulario empieza vacio y usa las variantes ya registradas solo como sugerencias.
             </Typography.Paragraph>
@@ -147,6 +148,7 @@ const AddVariantModal = ({ visible, onCancel, group }: any) => {
                 prefillCombination={group?.referenceCombination || null}
                 resetKey={`${resetKey}-${buildCombinationFingerprint(group?.referenceCombination || {}) || 'blank'}`}
             />
+            </div>
         </Modal>
     );
 };

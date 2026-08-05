@@ -645,6 +645,7 @@ const SimplePackagesPage = () => {
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">Paquetes del servicio</h1>
         </div>
         <Button
+          data-tour-id="simple-packages-pending-button"
           onClick={() => {
             setPendingModalVisible(true);
             void fetchPendingPackages();
@@ -666,6 +667,7 @@ const SimplePackagesPage = () => {
           PEDIDOS PENDIENTES
         </Button>
         {useEscalation && <div
+          data-tour-id="simple-packages-monthly-streak"
           style={{
             minWidth: 280,
             maxWidth: 520,

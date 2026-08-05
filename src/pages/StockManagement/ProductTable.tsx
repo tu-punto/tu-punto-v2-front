@@ -384,12 +384,13 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             key: "addVariant",
             render: (_: any, record: any) =>
                 !selectedSeller ? (
-                    <Button disabled title="Seleccione un vendedor para habilitar">
+                    <Button disabled title="Seleccione un vendedor para habilitar" data-tour-id="stock-variant-create-action">
                         {record.variant ? <CopyOutlined /> : <PlusOutlined />}
                     </Button>
                 ) : record.variant ? (
                     <Tooltip title="Abrir agregar variantes usando esta variante como referencia">
                         <Button
+                            data-tour-id="stock-variant-create-action"
                             size="small"
                             onClick={(event) => {
                                 event.stopPropagation();
@@ -401,6 +402,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                     </Tooltip>
                 ) : (
                     <Button
+                        data-tour-id="stock-variant-create-action"
                         onClick={(event) => {
                             event.stopPropagation();
                             openVariantModal(record.productOriginal, null);

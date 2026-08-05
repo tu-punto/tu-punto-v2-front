@@ -4,6 +4,14 @@
   width: min(390px, calc(100vw - 28px)) !important;
 }
 
+.tp-tour-interaction-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 1195;
+  background: transparent;
+  pointer-events: auto;
+}
+
 .tp-tour-overlay .ant-tour-inner {
   position: relative;
   overflow: hidden;

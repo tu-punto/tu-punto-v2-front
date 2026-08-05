@@ -150,6 +150,7 @@ function SalesFormModal({
 
   return (
     <Modal title="Registrar Venta" open={visible} onCancel={onCancel} footer={null}>
+      <div data-tour-id="sales-sale-modal">
       <Form form={form} onFinish={handleFinish} layout="vertical">
         <Form.Item label="Monto Total de la Venta" name="montoTotal">
           <Input prefix="Bs." readOnly />
@@ -250,6 +251,7 @@ function SalesFormModal({
           </Button>
         </Form.Item>
       </Form>
+      </div>
     </Modal>
   );
 }

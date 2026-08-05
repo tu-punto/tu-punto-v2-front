@@ -1027,6 +1027,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       style={{ maxWidth: "96vw" }}
       destroyOnClose
     >
+      <div data-tour-id="shipping-external-delivery-modal">
       <Form form={form} layout="vertical" onFinish={onFinish}>
         <Collapse
           style={{ marginBottom: 16 }}
@@ -1399,6 +1400,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Button>
         </div>
       </Form>
+      </div>
     </Modal>
   );
 };

@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { UserContext } from "../../context/userContext.tsx";
 import { Button } from 'antd';
 import UploadGuideModal from "./UploadGuideModal.tsx";
@@ -16,6 +16,19 @@ const ShippingGuide = () => {
         setIsUploadGuideModalView(false); 
         console.log("key",refreshKey)
     };
+
+    useEffect(() => {
+        const openTourModal = () => setIsUploadGuideModalView(true);
+        const closeTourModal = () => setIsUploadGuideModalView(false);
+
+        window.addEventListener("tp-tour-open-shipping-guide-modal", openTourModal);
+        window.addEventListener("tp-tour-close-shipping-guide-modal", closeTourModal);
+
+        return () => {
+            window.removeEventListener("tp-tour-open-shipping-guide-modal", openTourModal);
+            window.removeEventListener("tp-tour-close-shipping-guide-modal", closeTourModal);
+        };
+    }, []);
 
     return (
         <div className="p-4" data-tour-id="shipping-guide-root">

@@ -1237,6 +1237,30 @@ const ShippingTable = ({
         branchTransferMode,
         onHeaderActionChange,
     ]);
+
+    useEffect(() => {
+        const closeShippingDemoModals = () => {
+            setIsExternalCreateVisible(false);
+            setBranchTransferModal({ open: false, mode: null, selectedRowKeys: [], totalDeliveryCost: 0, paymentMethod: "2" });
+        };
+        const openExternalDemoModal = () => setIsExternalCreateVisible(true);
+        const openTransferSendDemoModal = () =>
+            setBranchTransferModal({ open: true, mode: "send", selectedRowKeys: [], totalDeliveryCost: 0, paymentMethod: "2" });
+        const openTransferReceiveDemoModal = () =>
+            setBranchTransferModal({ open: true, mode: "receive", selectedRowKeys: [], totalDeliveryCost: 0, paymentMethod: "2" });
+
+        window.addEventListener("tp-tour-close-shipping-demo-modals", closeShippingDemoModals);
+        window.addEventListener("tp-tour-open-external-delivery-modal", openExternalDemoModal);
+        window.addEventListener("tp-tour-open-transfer-send-modal", openTransferSendDemoModal);
+        window.addEventListener("tp-tour-open-transfer-receive-modal", openTransferReceiveDemoModal);
+
+        return () => {
+            window.removeEventListener("tp-tour-close-shipping-demo-modals", closeShippingDemoModals);
+            window.removeEventListener("tp-tour-open-external-delivery-modal", openExternalDemoModal);
+            window.removeEventListener("tp-tour-open-transfer-send-modal", openTransferSendDemoModal);
+            window.removeEventListener("tp-tour-open-transfer-receive-modal", openTransferReceiveDemoModal);
+        };
+    }, []);
     //console.log("Rol", user?.role?.toLowerCase());
     return (
         <div>
@@ -1283,7 +1307,7 @@ const ShippingTable = ({
                     border: 2px solid #eef2f7;
                 }
             `}</style>
-            <div className="shipping-filter-panel mb-4 bg-white rounded-xl border border-gray-200 p-3">
+            <div className="shipping-filter-panel mb-4 bg-white rounded-xl border border-gray-200 p-3" data-tour-id="shipping-filters">
                 <div className="shipping-filter-grid">
                 {(isAdmin || isOperator) && (
                     <Select
@@ -1408,6 +1432,7 @@ const ShippingTable = ({
                 {canManageExternal && (
                     <Tooltip title="Registrar entrega externa">
                         <Button
+                            data-tour-id="shipping-external-create-button"
                             className="shipping-filter-action shipping-filter-create"
                             type="primary"
                             icon={<span className="inline-flex items-center gap-0.5"><InboxOutlined /><ArrowRightOutlined /></span>}
@@ -1571,6 +1596,7 @@ const ShippingTable = ({
                     </button>
 
                     <button
+                        data-tour-id="shipping-status-send"
                         type="button"
                         onClick={() => setSelectedStatus('para_enviar')}
                         style={{
@@ -1598,6 +1624,7 @@ const ShippingTable = ({
                     </button>
 
                     <button
+                        data-tour-id="shipping-status-transit"
                         type="button"
                         onClick={() => setSelectedStatus('en_camino')}
                         style={{
@@ -1840,7 +1867,7 @@ const ShippingTable = ({
                 destroyOnClose
                 width={960}
             >
-                <div className="space-y-4">
+                <div className="space-y-4" data-tour-id="shipping-transfer-modal">
                     {branchTransferError ? (
                         <Alert
                             type="error"

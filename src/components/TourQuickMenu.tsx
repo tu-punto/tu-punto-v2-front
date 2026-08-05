@@ -1,12 +1,17 @@
 import { Button, Popover, Typography } from "antd";
 import { CompassOutlined } from "@ant-design/icons";
+import { useState } from "react";
 import { TourMenuList } from "../context/tourContext";
 
 const TourQuickMenu = ({ compact = false }: { compact?: boolean }) => {
+  const [open, setOpen] = useState(false);
+
   return (
     <Popover
       trigger="click"
       placement="bottomRight"
+      open={open}
+      onOpenChange={setOpen}
       content={
         <div style={{ width: compact ? 300 : 340 }}>
           <div style={{ marginBottom: 12 }}>
@@ -17,7 +22,7 @@ const TourQuickMenu = ({ compact = false }: { compact?: boolean }) => {
               </Typography.Text>
             </div>
           </div>
-          <TourMenuList />
+          <TourMenuList onTourStart={() => setOpen(false)} />
         </div>
       }
     >

@@ -110,6 +110,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
             footer={null}
             width={1000}
         >
+            <div data-tour-id="stock-product-create-modal">
             <Form
                 form={form}
                 name="productForm"
@@ -167,6 +168,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                     </Button>
                 </Form.Item>
             </Form>
+            </div>
         </Modal>
     );
 };

@@ -468,6 +468,47 @@ const StockManagement = () => {
         }
     };
 
+    useEffect(() => {
+        const closeStockDemoModals = () => {
+            setProductFormVisible(false);
+            setIsVariantModalVisible(false);
+            setIsConfirmModalVisible(false);
+            setIsWithdrawalRequestModalVisible(false);
+        };
+        const openProductDemoModal = () => setProductFormVisible(true);
+        const openIngressDemoModal = () => setIsConfirmModalVisible(true);
+        const openVariantDemoModal = () => {
+            setSelectedGroup({
+                name: "Producto demo",
+                product: {
+                    _id: "tour-demo-product",
+                    nombre_producto: "Producto demo",
+                    sucursales: [],
+                },
+                referenceCombination: null,
+            });
+            setIsVariantModalVisible(true);
+        };
+        const openWithdrawalDemoModal = () => {
+            setWithdrawalProducts([]);
+            setIsWithdrawalRequestModalVisible(true);
+        };
+
+        window.addEventListener("tp-tour-close-stock-demo-modals", closeStockDemoModals);
+        window.addEventListener("tp-tour-open-product-modal", openProductDemoModal);
+        window.addEventListener("tp-tour-open-stock-ingress-modal", openIngressDemoModal);
+        window.addEventListener("tp-tour-open-variant-modal", openVariantDemoModal);
+        window.addEventListener("tp-tour-open-withdrawal-modal", openWithdrawalDemoModal);
+
+        return () => {
+            window.removeEventListener("tp-tour-close-stock-demo-modals", closeStockDemoModals);
+            window.removeEventListener("tp-tour-open-product-modal", openProductDemoModal);
+            window.removeEventListener("tp-tour-open-stock-ingress-modal", openIngressDemoModal);
+            window.removeEventListener("tp-tour-open-variant-modal", openVariantDemoModal);
+            window.removeEventListener("tp-tour-open-withdrawal-modal", openWithdrawalDemoModal);
+        };
+    }, []);
+
 
 
 
@@ -543,6 +584,7 @@ const StockManagement = () => {
                 <div
                     className="bg-white rounded-xl px-4 py-4 shadow-md mb-4"
                     style={{ border: "1px solid #f1ece4" }}
+                    data-tour-id="stock-admin-filters"
                 >
                     <div data-stock-filters="true">
                         <div
@@ -592,7 +634,7 @@ const StockManagement = () => {
                             </Button>
                         </div>
                         <div className="stock-filter-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                        <div>
+                        <div data-tour-id="stock-admin-seller-selector">
                             <SellerList
                                 sellers={sellers}
                                 selectedSeller={selectedSeller}
@@ -602,6 +644,7 @@ const StockManagement = () => {
                         {!isSeller && (
                             <div>
                                 <Button
+                                    data-tour-id="stock-product-create-button"
                                     onClick={() => setProductFormVisible(true)}
                                     type="default"
                                     icon={<PlusOutlined />}
@@ -633,6 +676,7 @@ const StockManagement = () => {
                         </div>
                         <div>
                             <Button
+                                data-tour-id="stock-ingress-button"
                                 onClick={() => {
                                     const stockMapped = stockListForConfirmModal.map(item => ({
                                         ...item,
@@ -682,6 +726,7 @@ const StockManagement = () => {
                         </div>
                         <div>
                             <Input.Search
+                                data-tour-id="stock-admin-search"
                                 placeholder="Buscar producto o variante..."
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
@@ -790,20 +835,22 @@ const StockManagement = () => {
                     </div>
                 </>
             ) : (
-                <ProductTable
-                    productsList={finalProductList}
-                    groupList={groups || []}
-                    onUpdateProducts={() => fetchInventoryPage(true)}
-                    setStockListForConfirmModal={setStockListForConfirmModal}
-                    resetSignal={resetSignal}
-                    searchText={searchText}
-                    setSearchText={setSearchText}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    selectedSeller={selectedSeller}
-                    onShowVariantModal={showVariantModal}
-                    sellersVigentes={sellersVigentes}
-                />
+                <div data-tour-id="stock-products-table">
+                    <ProductTable
+                        productsList={finalProductList}
+                        groupList={groups || []}
+                        onUpdateProducts={() => fetchInventoryPage(true)}
+                        setStockListForConfirmModal={setStockListForConfirmModal}
+                        resetSignal={resetSignal}
+                        searchText={searchText}
+                        setSearchText={setSearchText}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        selectedSeller={selectedSeller}
+                        onShowVariantModal={showVariantModal}
+                        sellersVigentes={sellersVigentes}
+                    />
+                </div>
 
             )}
             {!isSeller && !selectedSeller && (
