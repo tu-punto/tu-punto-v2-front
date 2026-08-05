@@ -475,9 +475,16 @@ const StockManagement = () => {
 
     return (
 
-        <div className="stock-management-page" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div
+            className="stock-management-page"
+            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+            data-tour-id="stock-root"
+        >
             <div className="stock-management-header flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between mb-4">
-                <div className="stock-management-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+                <div
+                    className="stock-management-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md"
+                    data-tour-id="stock-header"
+                >
                     <img src="/inventory-icon.png" alt="Inventario" className="w-8 h-8" />
                     <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
                         Gestión de Inventario
@@ -746,7 +753,10 @@ const StockManagement = () => {
             </Row>
             {isSeller ? (
                 <>
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                    <div
+                        style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginBottom: 12, flexWrap: "wrap" }}
+                        data-tour-id="stock-seller-actions"
+                    >
                         <Button
                             onClick={() => navigate("/seller-promotions")}
                             icon={<TagOutlined />}
@@ -758,23 +768,26 @@ const StockManagement = () => {
                             icon={<ExportOutlined />}
                             disabled={!sellerSucursales.length}
                             onClick={() => void openWithdrawalRequestModal()}
+                            data-tour-id="stock-withdrawal-button"
                         >
                             Solicitar salida de productos
                         </Button>
                     </div>
-                    <ProductTableSeller
-                        productsList={isLoadingInventory ? [] : finalProductList}
-                        loading={isLoadingInventory}
-                        onUpdateProducts={() => fetchInventoryPage(true)}
-                        sucursalId={sucursalId}
-                        setSucursalId={setSucursalId}
-                        branches={sellerSucursales}
-                        categories={categories}
-                        searchText={searchText}
-                        setSearchText={setSearchText}
-                        selectedCategory={selectedCategory}
-                        setSelectedCategory={setSelectedCategory}
-                    />
+                    <div data-tour-id="stock-seller-products">
+                        <ProductTableSeller
+                            productsList={isLoadingInventory ? [] : finalProductList}
+                            loading={isLoadingInventory}
+                            onUpdateProducts={() => fetchInventoryPage(true)}
+                            sucursalId={sucursalId}
+                            setSucursalId={setSucursalId}
+                            branches={sellerSucursales}
+                            categories={categories}
+                            searchText={searchText}
+                            setSearchText={setSearchText}
+                            selectedCategory={selectedCategory}
+                            setSelectedCategory={setSelectedCategory}
+                        />
+                    </div>
                 </>
             ) : (
                 <ProductTable

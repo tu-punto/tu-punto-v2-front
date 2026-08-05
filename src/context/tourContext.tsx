@@ -2,7 +2,7 @@ import { Button, Space, Tag, Tour, Typography, message } from "antd";
 import type { TourStepProps } from "antd";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from "@ant-design/icons";
 import { completeTourAPI, getMyTourProgressAPI, type TourProgressMap } from "../api/userTourProgress";
 import { getVisibleMenuItems } from "../utils/navigationMenu";
@@ -11,7 +11,12 @@ import { UserContext } from "./userContext";
 import "./tourContext.css";
 
 type TourDevice = "desktop" | "mobile";
-type TourKey = "seller-welcome";
+type TourKey =
+  | "seller-welcome"
+  | "seller-simple-deliveries"
+  | "seller-stock-shipping-guide"
+  | "seller-stock-deliveries"
+  | "seller-stock-withdrawal-request";
 type TourStatus = "unseen" | "seen";
 
 type TourMenuItem = {
@@ -40,6 +45,7 @@ type TourDefinition = {
   description: string;
   role: "seller";
   autoLaunch: boolean;
+  route?: string;
   buildSteps: (params: {
     device: TourDevice;
     dismiss: () => void;
@@ -86,13 +92,25 @@ const buildStepDescription = ({
   text,
   dismiss,
   hint,
+  demo,
 }: {
   text: string;
   dismiss: () => void;
   hint?: string;
+  demo?: Array<{ label: string; value: string }>;
 }) => (
   <>
     <div>{text}</div>
+    {demo?.length ? (
+      <div className="tp-tour-demo-values" aria-label="Valores de ejemplo">
+        {demo.map((item) => (
+          <div className="tp-tour-demo-value" key={`${item.label}-${item.value}`}>
+            <span className="tp-tour-demo-label">{item.label}</span>
+            <span className="tp-tour-demo-text">{item.value}</span>
+          </div>
+        ))}
+      </div>
+    ) : null}
     {hint ? <div className="tp-tour-step-hint">{hint}</div> : null}
     <div style={{ marginTop: 10 }}>
       <Button
@@ -276,6 +294,209 @@ const tourDefinitions: TourDefinition[] = [
       ];
     },
   },
+  {
+    key: "seller-simple-deliveries",
+    title: "Registro de entregas simples",
+    description: "Aprende el flujo para crear paquetes simples sin usar datos reales.",
+    role: "seller",
+    autoLaunch: false,
+    route: "/simple-packages",
+    buildSteps: ({ dismiss }) => [
+      {
+        title: "Entregas simples",
+        targetId: "simple-packages-root",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Aqui registras paquetes simples para enviarlos entre sucursales.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Cantidad y ruta",
+        targetId: "simple-packages-route",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Primero defines cuantos paquetes crearas y de que sucursal salen hacia que destino.",
+          dismiss,
+          demo: [
+            { label: "Paquetes", value: "2" },
+            { label: "Origen", value: "Sucursal Central" },
+            { label: "Destino", value: "Sucursal Norte" },
+          ],
+        }),
+      },
+      {
+        title: "Descripcion general",
+        targetId: "simple-packages-description",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Si varios paquetes comparten descripcion, puedes escribirla una vez y aplicarla a todos.",
+          dismiss,
+          demo: [{ label: "Descripcion", value: "Ropa y accesorios pequenos" }],
+        }),
+      },
+      {
+        title: "Detalle por paquete",
+        targetId: "simple-packages-table",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Luego completas o ajustas los datos de cada paquete antes de guardar.",
+          dismiss,
+          demo: [
+            { label: "Comprador", value: "Maria Lopez" },
+            { label: "Celular", value: "70000000" },
+            { label: "Saldo", value: "Bs. 85" },
+          ],
+        }),
+      },
+      {
+        title: "Guardar paquetes",
+        targetId: "simple-packages-save",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Cuando todo este correcto, este boton registra los paquetes reales. El tour solo muestra ejemplos, no guarda nada.",
+          dismiss,
+        }),
+      },
+    ],
+  },
+  {
+    key: "seller-stock-shipping-guide",
+    title: "Subir guia de envio de stock",
+    description: "Ubica donde subir y revisar guias de envio de stock.",
+    role: "seller",
+    autoLaunch: false,
+    route: "/shipping-guide",
+    buildSteps: ({ dismiss }) => [
+      {
+        title: "Guias de envio",
+        targetId: "shipping-guide-header",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Este modulo concentra las guias de envio relacionadas a tu operacion.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Subir nueva guia",
+        targetId: "shipping-guide-upload-button",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Desde aqui abres el formulario para cargar una nueva guia cuando corresponda.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Guias registradas",
+        targetId: "shipping-guide-table",
+        placement: "top",
+        description: buildStepDescription({
+          text: "En esta tabla revisas las guias ya cargadas y su informacion principal.",
+          dismiss,
+        }),
+      },
+    ],
+  },
+  {
+    key: "seller-stock-deliveries",
+    title: "Registro de entregas con stock",
+    description: "Aprende como seleccionar productos de stock y preparar la entrega.",
+    role: "seller",
+    autoLaunch: false,
+    route: "/shop",
+    buildSteps: ({ dismiss }) => [
+      {
+        title: "Carrito con stock",
+        targetId: "sales-root",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Aqui preparas entregas usando productos disponibles en tu stock.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Inventario",
+        targetId: "sales-inventory-card",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Busca el producto, filtra por sucursal si aplica y agrega lo que ira en la entrega.",
+          dismiss,
+          demo: [
+            { label: "Producto", value: "Polera negra M" },
+            { label: "Cantidad", value: "1" },
+          ],
+        }),
+      },
+      {
+        title: "Carrito",
+        targetId: "sales-cart-card",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Aqui se arma el detalle de productos seleccionados antes de crear la entrega.",
+          dismiss,
+          demo: [
+            { label: "Precio", value: "Bs. 120" },
+            { label: "Utilidad", value: "Segun comision" },
+          ],
+        }),
+      },
+      {
+        title: "Realizar entrega",
+        targetId: "sales-delivery-button",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Cuando el carrito esta listo, este boton abre el formulario final de entrega.",
+          dismiss,
+        }),
+      },
+    ],
+  },
+  {
+    key: "seller-stock-withdrawal-request",
+    title: "Solicitud de salida de stock",
+    description: "Ubica el flujo para pedir salida de productos de tu inventario.",
+    role: "seller",
+    autoLaunch: false,
+    route: "/stock",
+    buildSteps: ({ dismiss }) => [
+      {
+        title: "Stock disponible",
+        targetId: "stock-root",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Este modulo muestra los productos y variantes disponibles para tu cuenta.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Filtros",
+        targetId: "stock-seller-filters",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Puedes cambiar sucursal, categoria o buscar productos para encontrar lo que necesitas.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Solicitar salida",
+        targetId: "stock-withdrawal-button",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Este boton inicia una solicitud para retirar productos del stock seleccionado.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Listado de productos",
+        targetId: "stock-seller-products",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Desde la lista revisas stock y detalles de productos antes de solicitar una salida.",
+          dismiss,
+        }),
+      },
+    ],
+  },
 ];
 
 const TourContext = createContext<TourContextValue | null>(null);
@@ -319,6 +540,7 @@ export const TourProvider = ({
 }) => {
   const { user } = useContext(UserContext) || {};
   const location = useLocation();
+  const navigate = useNavigate();
   const role = normalizeRole(user?.role);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<TourProgressMap>({});
@@ -395,9 +617,18 @@ export const TourProvider = ({
         window.clearTimeout(autoOpenTimeoutRef.current);
       }
 
-      autoOpenTimeoutRef.current = window.setTimeout(() => {
+      const shouldNavigate = Boolean(definition.route && location.pathname !== definition.route);
+      if (shouldNavigate && definition.route) {
+        navigate(definition.route);
+      }
+
+      const startTourWhenReady = (attempt = 0) => {
         const steps = buildResolvedSteps(definition);
         if (!steps.length) {
+          if (attempt < 8) {
+            autoOpenTimeoutRef.current = window.setTimeout(() => startTourWhenReady(attempt + 1), 180);
+            return;
+          }
           message.warning("No se pudieron encontrar los elementos del tour en esta pantalla.");
           autoOpenTimeoutRef.current = null;
           return;
@@ -410,9 +641,11 @@ export const TourProvider = ({
           steps,
         });
         autoOpenTimeoutRef.current = null;
-      }, 120);
+      };
+
+      autoOpenTimeoutRef.current = window.setTimeout(() => startTourWhenReady(), shouldNavigate ? 420 : 120);
     },
-    [buildResolvedSteps]
+    [buildResolvedSteps, location.pathname, navigate]
   );
 
   const refreshProgress = useCallback(async () => {
@@ -460,14 +693,18 @@ export const TourProvider = ({
   const tours = useMemo<TourMenuItem[]>(() => {
     if (role !== "seller") return [];
 
-    return tourDefinitions.map((item) => ({
-      key: item.key,
-      title: item.title,
-      description: item.description,
-      status: progress[item.key]?.status === "seen" ? "seen" : "unseen",
-      canAutoLaunch: item.autoLaunch,
-    }));
-  }, [progress, role]);
+    const visiblePaths = new Set(getVisibleMenuItems(user).map((item) => item.path));
+
+    return tourDefinitions
+      .filter((item) => !item.route || visiblePaths.has(item.route))
+      .map((item) => ({
+        key: item.key,
+        title: item.title,
+        description: item.description,
+        status: progress[item.key]?.status === "seen" ? "seen" : "unseen",
+        canAutoLaunch: item.autoLaunch,
+      }));
+  }, [progress, role, user]);
 
   useEffect(() => {
     if (role !== "seller" || loading || activeTour) return;
@@ -511,7 +748,8 @@ export const TourProvider = ({
     }));
   }, [activeTour, completeActiveTour]);
 
-  const shouldShowMobileNavTop = isMobile && currentStep >= 4 && currentStep <= 7;
+  const shouldShowMobileNavTop =
+    isMobile && activeTour?.key === "seller-welcome" && currentStep >= 4 && currentStep <= 7;
 
   const contextValue = useMemo<TourContextValue>(
     () => ({

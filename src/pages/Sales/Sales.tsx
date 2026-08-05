@@ -566,7 +566,7 @@ export const Sales = () => {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4" data-tour-id="sales-root">
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/shopping-cart-icon.png" alt="Carrito" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
@@ -598,6 +598,7 @@ export const Sales = () => {
         {/* Columna de Inventario */}
         <Col xs={24} md={12}>
           <Card
+            data-tour-id="sales-inventory-card"
             title={
               <Row justify="space-between" align="middle" gutter={[8, 8]}>
                 <Col>
@@ -608,6 +609,7 @@ export const Sales = () => {
                 <Col>
                   <Space wrap>
                     <Input.Search
+                      data-tour-id="sales-product-search"
                       placeholder="Buscar producto..."
                       onChange={(e) => setSearchText(e.target.value)}
                       style={{ width: 200 }}
@@ -673,11 +675,13 @@ export const Sales = () => {
           >
             <Spin spinning={inventoryLoading || sellersLoading} tip="Cargando inventario...">
               <div style={{ pointerEvents: (inventoryLoading || sellersLoading) ? "none" : "auto" }}></div>
-              <ProductTable
-                onSelectProduct={handleProductSelect}
-                refreshKey={refreshKey}
-                data={filteredBySeller}
-              />
+              <div data-tour-id="sales-products-list">
+                <ProductTable
+                  onSelectProduct={handleProductSelect}
+                  refreshKey={refreshKey}
+                  data={filteredBySeller}
+                />
+              </div>
             </Spin>
           </Card>
         </Col>
@@ -685,6 +689,7 @@ export const Sales = () => {
         {/* Columna de Ventas */}
         <Col xs={24} md={12}>
           <Card
+            data-tour-id="sales-cart-card"
             title={
               <Row justify="space-between" align="middle" gutter={[8, 8]}>
                 <Col>
@@ -704,7 +709,7 @@ export const Sales = () => {
                         Realizar Venta
                       </Button>
                     )}
-                    <Button onClick={showShippingModal} type="primary">
+                    <Button onClick={showShippingModal} type="primary" data-tour-id="sales-delivery-button">
                       Realizar Entrega
                     </Button>
                     {(isAdmin || isOperator) && (

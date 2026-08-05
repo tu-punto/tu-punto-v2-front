@@ -167,7 +167,10 @@ const ProductTableSeller = ({
 
     return (
         <>
-            <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
+            <div
+                style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", marginBottom: 20 }}
+                data-tour-id="stock-seller-filters"
+            >
                 <Select
                     value={sucursalId}
                     onChange={setSucursalId}
