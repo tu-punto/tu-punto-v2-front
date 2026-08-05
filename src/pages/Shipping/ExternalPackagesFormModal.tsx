@@ -50,6 +50,11 @@ const DEFAULT_DELIVERY_SPACES: PackageDeliverySpace[] = [
   { size: "estandar", spaces: 1 },
   { size: "grande", spaces: 2 },
 ];
+const PAYMENT_STATE_OPTIONS = [
+  { label: "Pagado por vendedor", value: "si" },
+  { label: "No pagado", value: "no" },
+  { label: "Mixto", value: "mixto" },
+];
 const roundCurrency = (value: number) => +Number(value || 0).toFixed(2);
 const getTotalPaymentAmount = (packagePrice: number, branchRoutePrice: number) =>
   roundCurrency(Number(packagePrice || 0) + Number(branchRoutePrice || 0));
@@ -428,6 +433,21 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     );
   };
 
+  const applyPaymentStateToAll = () => {
+    const paymentState = String(form.getFieldValue("bulk_esta_pagado") || "").trim().toLowerCase();
+    if (!["si", "no", "mixto"].includes(paymentState)) {
+      message.warning("Selecciona un estado de pago para aplicarlo");
+      return;
+    }
+
+    const currentRows = form.getFieldValue("paquetes") || [];
+    const nextRows = buildPackages(packageCount, currentRows).map((row) => ({
+      ...row,
+      esta_pagado: paymentState,
+    }));
+    setCalculatedPackageRows(recalculateRowsByDeliverySpaces(nextRows, packageCount));
+  };
+
   const handlePaymentModeChange = (rowIndex: number, mode: "si" | "no" | "mixto") => {
     const price = Number(form.getFieldValue(["paquetes", rowIndex, "precio_paquete"]) || 0);
     const branchRoutePrice = Number(form.getFieldValue(["paquetes", rowIndex, "precio_entre_sucursal"]) || 0);
@@ -578,6 +598,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
 
     const topLevelMethod = paidMethods[0] || "";
+    const paymentStates = Array.from(new Set(rows.map((row) => String(row.esta_pagado || "").trim()).filter(Boolean)));
+    const bulkPaymentState = paymentStates.length === 1 ? paymentStates[0] : "no";
       const basePackages = rows.map((row) => ({
         comprador: row.comprador,
         descripcion_paquete: row.descripcion_paquete,
@@ -601,6 +623,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       destino_sucursal_id: resolveDestinationId(rows[0]?.destino_sucursal) || currentSucursalId,
       numero_paquetes: rows.length,
       metodo_pago: topLevelMethod,
+      bulk_esta_pagado: bulkPaymentState,
       paquetes: nextRows,
     });
     setCalculatedPackageRows(nextRows);
@@ -746,6 +769,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       destino_sucursal_id: currentSucursalId,
       numero_paquetes: MIN_PACKAGES,
       metodo_pago: "efectivo",
+      bulk_esta_pagado: "no",
       paquetes: buildPackages(MIN_PACKAGES).map((row) => ({
         ...row,
         destino_sucursal_id: currentSucursalId,
@@ -1135,6 +1159,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Button>
         </Space>
 
+        <Space wrap size={[8, 8]} style={{ marginBottom: 12 }}>
+          <Form.Item name="bulk_esta_pagado" style={{ marginBottom: 0 }}>
+            <Select options={PAYMENT_STATE_OPTIONS} placeholder="Estado pago para todos" style={{ width: 240 }} />
+          </Form.Item>
+          <Button onClick={applyPaymentStateToAll}>
+            Usar estado pago en todos
+          </Button>
+        </Space>
+
         <div style={{ overflowX: "auto", marginTop: 8 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead>
@@ -1302,11 +1335,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                           style={{ marginBottom: 0 }}
                         >
                           <Select
-                            options={[
-                              { label: "Pagado por vendedor", value: "si" },
-                              { label: "No pagado", value: "no" },
-                              { label: "Mixto", value: "mixto" },
-                            ]}
+                            options={PAYMENT_STATE_OPTIONS}
                             onChange={(value) => handlePaymentModeChange(rowIndex, value as "si" | "no" | "mixto")}
                           />
                         </Form.Item>
