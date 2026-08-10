@@ -344,14 +344,14 @@ const SellerProductInfoEditModal = ({ visible, record, onClose, onSuccess }: Pro
         <Button key="cancel" onClick={onClose}>
           Cancelar
         </Button>,
-        <Button key="save" type="primary" loading={saving} onClick={handleConfirmSave}>
+        <Button key="save" type="primary" loading={saving} onClick={handleConfirmSave} data-tour-id="seller-product-info-edit-submit">
           Guardar cambios
         </Button>,
       ]}
     >
       <Form form={form} layout="vertical" className="seller-product-info-edit-form">
         <div className="seller-product-info-edit-grid">
-          <section className="seller-product-info-edit-section">
+          <section className="seller-product-info-edit-section" data-tour-id="seller-product-info-edit-description">
             <div className="seller-product-info-edit-section-header">
               <div>
                 <div className="seller-product-info-edit-title">Descripción</div>
@@ -367,7 +367,7 @@ const SellerProductInfoEditModal = ({ visible, record, onClose, onSuccess }: Pro
             </Form.Item>
           </section>
 
-          <section className="seller-product-info-edit-section">
+          <section className="seller-product-info-edit-section" data-tour-id="seller-product-info-edit-usage">
             <div className="seller-product-info-edit-section-header seller-product-info-edit-section-header-inline">
               <div>
                 <div className="seller-product-info-edit-title">Uso</div>
@@ -404,7 +404,7 @@ const SellerProductInfoEditModal = ({ visible, record, onClose, onSuccess }: Pro
           </section>
         </div>
 
-        <section className="seller-product-info-edit-section">
+        <section className="seller-product-info-edit-section" data-tour-id="seller-product-info-edit-promotion">
           <div className="seller-product-info-edit-section-header seller-product-info-edit-section-header-inline">
             <div>
               <div className="seller-product-info-edit-title">Promoción</div>
@@ -469,7 +469,7 @@ const SellerProductInfoEditModal = ({ visible, record, onClose, onSuccess }: Pro
           )}
         </section>
 
-        <section className="seller-product-info-edit-section">
+        <section className="seller-product-info-edit-section" data-tour-id="seller-product-info-edit-images">
           <div className="seller-product-info-edit-section-header">
             <div>
               <div className="seller-product-info-edit-title">Imagenes</div>

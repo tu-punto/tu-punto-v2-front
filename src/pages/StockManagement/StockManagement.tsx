@@ -805,6 +805,7 @@ const StockManagement = () => {
                         <Button
                             onClick={() => navigate("/seller-promotions")}
                             icon={<TagOutlined />}
+                            data-tour-id="stock-seller-promotions-button"
                         >
                             Promociones
                         </Button>

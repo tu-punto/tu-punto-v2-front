@@ -1042,7 +1042,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           ]}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-tour-id="external-delivery-seller">
           <Form.Item
             name="carnet_vendedor"
             label="Carnet del vendedor"
@@ -1097,7 +1097,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Form.Item>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-tour-id="external-delivery-seller-payment">
           <Form.Item
             name="metodo_pago"
             label="Pago del vendedor"
@@ -1114,7 +1114,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Form.Item>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end" data-tour-id="external-delivery-route">
           <Form.Item
             name="origen_sucursal_id"
             label="Sucursal origen (donde el vendedor dejara el producto)"
@@ -1169,7 +1169,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           </Button>
         </Space>
 
-        <div style={{ overflowX: "auto", marginTop: 8 }}>
+        <div style={{ overflowX: "auto", marginTop: 8 }} data-tour-id="external-delivery-packages">
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead>
               <tr>
@@ -1395,7 +1395,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
           >
             Cancelar
           </Button>
-          <Button type="primary" htmlType="submit" loading={loading}>
+          <Button type="primary" htmlType="submit" loading={loading} data-tour-id="external-delivery-submit">
             Guardar
           </Button>
         </div>

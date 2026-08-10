@@ -17,6 +17,8 @@ type TourKey =
   | "seller-stock-shipping-guide"
   | "seller-stock-deliveries"
   | "seller-stock-withdrawal-request"
+  | "seller-catalog-product-info"
+  | "seller-promotions-create"
   | "staff-operator-sales"
   | "staff-stock-ingress"
   | "staff-product-create"
@@ -44,6 +46,7 @@ type TourStepSpec = {
 };
 
 type ResolvedTourStep = TourStepProps & {
+  targetId?: string;
   onEnter?: () => void;
 };
 
@@ -58,6 +61,7 @@ type TourDefinition = {
     device: TourDevice;
     dismiss: () => void;
     user: any;
+    navigate: ReturnType<typeof useNavigate>;
   }) => TourStepSpec[];
 };
 
@@ -102,6 +106,8 @@ const closeTourDemoSurfaces = () => {
     "tp-tour-close-sales-demo-modals",
     "tp-tour-close-stock-demo-modals",
     "tp-tour-close-shipping-demo-modals",
+    "tp-tour-close-seller-product-info-modal",
+    "tp-tour-close-promotions-modal",
   ].forEach(dispatchWindowEvent);
 };
 
@@ -499,6 +505,68 @@ const tourDefinitions: TourDefinition[] = [
           dismiss,
         }),
       },
+      {
+        title: "Datos del cliente",
+        targetId: "delivery-form-client",
+        placement: "right",
+        onEnter: () => dispatchWindowEvent("tp-tour-open-delivery-modal"),
+        description: buildStepDescription({
+          text: "Aqui se coloca el nombre del cliente y su celular. Estos datos ayudan a ubicar al comprador si hay dudas con la entrega.",
+          dismiss,
+          demo: [
+            { label: "Cliente", value: "Carlos Rojas" },
+            { label: "Celular", value: "70000000" },
+          ],
+        }),
+      },
+      {
+        title: "Fecha y horario",
+        targetId: "delivery-form-order",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Define la fecha de entrega y, si corresponde, una hora especifica o rango horario acordado con el cliente.",
+          dismiss,
+          demo: [
+            { label: "Fecha", value: "Hoy o fecha pactada" },
+            { label: "Hora", value: "Opcional" },
+          ],
+        }),
+      },
+      {
+        title: "Destino de entrega",
+        targetId: "delivery-form-destination",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Elige si el pedido se queda en esta sucursal, va a otra sucursal o se entrega en otro lugar. Esto define donde queda asignado el cobro.",
+          dismiss,
+          demo: [
+            { label: "Esta sucursal", value: "Retiro local" },
+            { label: "Otro lugar", value: "Direccion cliente" },
+          ],
+        }),
+      },
+      {
+        title: "Pago y saldo",
+        targetId: "delivery-form-payment",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Marca si ya esta pagado, si queda saldo pendiente o si hay adelanto. Si se entrega al momento, selecciona tambien el metodo de pago.",
+          dismiss,
+          demo: [
+            { label: "Estado", value: "No / Si / Adelanto" },
+            { label: "Pago", value: "Efectivo, QR o mixto" },
+          ],
+        }),
+      },
+      {
+        title: "Guardar entrega",
+        targetId: "delivery-form-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Solo al presionar Guardar se crea la entrega real. En este tour no se guarda nada.",
+          dismiss,
+        }),
+      },
     ],
   },
   {
@@ -557,6 +625,250 @@ const tourDefinitions: TourDefinition[] = [
         onEnter: () => dispatchWindowEvent("tp-tour-close-stock-demo-modals"),
         description: buildStepDescription({
           text: "Desde la lista revisas stock y detalles de productos antes de solicitar una salida.",
+          dismiss,
+        }),
+      },
+    ],
+  },
+  {
+    key: "seller-catalog-product-info",
+    title: "Subir productos al catalogo",
+    description: "Guia para completar descripcion, imagenes y datos que se muestran en catalogo.",
+    roles: ["seller"],
+    autoLaunch: true,
+    route: "/seller-product-info",
+    buildSteps: ({ dismiss }) => [
+      {
+        title: "Informacion para catalogo",
+        targetId: "seller-product-info-root",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Esta pantalla solo aparece para vendedores habilitados para catalogo. Desde aqui mejoras lo que vera el cliente final.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Filtros de productos",
+        targetId: "seller-product-info-filters",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Busca por producto, sucursal, categoria o estado para encontrar rapido las variantes que necesitan informacion.",
+          dismiss,
+          demo: [
+            { label: "Busqueda", value: "Nombre o uso" },
+            { label: "Filtros", value: "Stock, imagenes, descripcion" },
+          ],
+        }),
+      },
+      {
+        title: "Semaforo de informacion",
+        targetId: "seller-product-info-legend",
+        placement: "left",
+        description: buildStepDescription({
+          text: "El color te indica prioridad: rojo sin informacion, amarillo incompleto y verde listo para mostrarse mejor.",
+          dismiss,
+          demo: [
+            { label: "Rojo", value: "Falta descripcion e imagen" },
+            { label: "Verde", value: "Completo" },
+          ],
+        }),
+      },
+      {
+        title: "Lista de variantes",
+        targetId: "seller-product-info-table",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Cada fila representa una variante. Revisa descripcion, uso, imagenes, promocion y usa el lapiz para actualizar.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Editar variante",
+        targetId: "seller-product-info-edit-action",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Este boton abre el formulario de informacion de la variante seleccionada.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Descripcion clara",
+        targetId: "seller-product-info-edit-description",
+        placement: "right",
+        onEnter: () => dispatchWindowEvent("tp-tour-open-seller-product-info-modal"),
+        description: buildStepDescription({
+          text: "Resume el producto como lo leeria un comprador: material, estilo, medidas o detalle importante.",
+          dismiss,
+          demo: [{ label: "Ejemplo", value: "Tela suave, corte amplio" }],
+        }),
+      },
+      {
+        title: "Uso recomendado",
+        targetId: "seller-product-info-edit-usage",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Activa el uso solo si aporta valor: cuidados, modo de uso o recomendacion para elegir mejor.",
+          dismiss,
+          demo: [{ label: "Uso", value: "Ideal para clima frio" }],
+        }),
+      },
+      {
+        title: "Imagenes",
+        targetId: "seller-product-info-edit-images",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Sube imagenes claras. La primera queda como principal, asi que pon ahi la foto mas representativa.",
+          dismiss,
+          demo: [
+            { label: "Maximo", value: "4 imagenes" },
+            { label: "Principal", value: "Primera tarjeta" },
+          ],
+        }),
+      },
+      {
+        title: "Guardar cambios",
+        targetId: "seller-product-info-edit-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Este boton guarda la informacion real. En el tour solo se muestra el flujo y no se presiona guardar.",
+          dismiss,
+        }),
+      },
+    ],
+  },
+  {
+    key: "seller-promotions-create",
+    title: "Crear promociones",
+    description: "Guia para entrar desde stock y crear promociones por variante.",
+    roles: ["seller"],
+    autoLaunch: true,
+    route: "/stock",
+    buildSteps: ({ dismiss, navigate }) => [
+      {
+        title: "Stock del vendedor",
+        targetId: "stock-root",
+        placement: "bottom",
+        onEnter: () => dispatchWindowEvent("tp-tour-close-promotions-modal"),
+        description: buildStepDescription({
+          text: "Las promociones se crean desde tu stock porque se aplican a productos y variantes existentes.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Entrar a promociones",
+        targetId: "stock-seller-promotions-button",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Usa este boton para ir a la pantalla donde administras descuentos y precios promocionales.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Pantalla de promociones",
+        targetId: "seller-promotions-root",
+        placement: "bottom",
+        onEnter: () => navigate("/seller-promotions"),
+        description: buildStepDescription({
+          text: "Aqui ves tus promociones activas, programadas y por canal. El tour te guia sin crear nada real.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Resumen y accion principal",
+        targetId: "seller-promotions-hero",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Este bloque resume el modulo. Nueva promocion abre el formulario para configurar una rebaja.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Filtros",
+        targetId: "seller-promotions-filters",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Filtra por texto, canal y estado para revisar promociones antes de crear o editar una.",
+          dismiss,
+          demo: [
+            { label: "Canal", value: "Interno, catalogo o ambos" },
+            { label: "Estado", value: "Activa, borrador" },
+          ],
+        }),
+      },
+      {
+        title: "Nueva promocion",
+        targetId: "seller-promotions-create-button",
+        placement: "bottom",
+        description: buildStepDescription({
+          text: "Este boton abre el formulario. En el tour se abre como demostracion y no se guarda.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Seleccionar variante",
+        targetId: "seller-promotions-form-selection",
+        placement: "left",
+        onEnter: () => dispatchWindowEvent("tp-tour-open-promotions-modal"),
+        description: buildStepDescription({
+          text: "Busca el producto o variante exacta. La promocion se aplica a esa combinacion, no a todo el inventario.",
+          dismiss,
+          demo: [{ label: "Variante", value: "Polera negra / M" }],
+        }),
+      },
+      {
+        title: "Canal y estado",
+        targetId: "seller-promotions-form-scope",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Define si aplica al sistema interno, catalogo o ambos, y si queda activa o como borrador.",
+          dismiss,
+          demo: [
+            { label: "Canal", value: "Ambos" },
+            { label: "Estado", value: "Activa" },
+          ],
+        }),
+      },
+      {
+        title: "Tipo y precio",
+        targetId: "seller-promotions-form-pricing",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Elige precio fijo para una rebaja directa o por cantidad si quieres escalas como 3+ unidades a menor precio.",
+          dismiss,
+          demo: [
+            { label: "Fijo", value: "Bs. 95" },
+            { label: "Escala", value: "3+ unidades" },
+          ],
+        }),
+      },
+      {
+        title: "Vigencia",
+        targetId: "seller-promotions-form-dates",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Configura inicio y fin para evitar promociones vencidas o abiertas por error.",
+          dismiss,
+          demo: [
+            { label: "Inicio", value: "Hoy" },
+            { label: "Fin", value: "Fecha limite" },
+          ],
+        }),
+      },
+      {
+        title: "Vista previa",
+        targetId: "seller-promotions-preview",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Usa la vista previa para validar el precio efectivo antes de guardar la promocion real.",
+          dismiss,
+        }),
+      },
+      {
+        title: "Crear promocion",
+        targetId: "seller-promotions-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Al confirmar se crea la promocion real. Durante el tour no se presiona este boton.",
           dismiss,
         }),
       },
@@ -629,6 +941,28 @@ const tourDefinitions: TourDefinition[] = [
         }),
       },
       {
+        title: "Tipo de pago",
+        targetId: "sales-sale-modal-payment",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Selecciona como se cobro la venta. Si eliges efectivo + QR, revisa que los subtotales sumen el total.",
+          dismiss,
+          demo: [
+            { label: "QR", value: "Pago digital" },
+            { label: "Mixto", value: "Efectivo + QR" },
+          ],
+        }),
+      },
+      {
+        title: "Registrar venta",
+        targetId: "sales-sale-modal-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Este boton registra la venta real. El tour solo muestra el flujo y no presiona el guardado.",
+          dismiss,
+        }),
+      },
+      {
         title: "Realizar entrega",
         targetId: "sales-delivery-button",
         placement: "bottom",
@@ -650,6 +984,54 @@ const tourDefinitions: TourDefinition[] = [
             { label: "Cliente", value: "Carlos Rojas" },
             { label: "Destino", value: "Otra sucursal" },
           ],
+        }),
+      },
+      {
+        title: "Cliente de la entrega",
+        targetId: "delivery-form-client",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Completa nombre y celular del cliente para que el equipo pueda contactar y validar la entrega.",
+          dismiss,
+          demo: [
+            { label: "Cliente", value: "Carlos Rojas" },
+            { label: "Celular", value: "70000000" },
+          ],
+        }),
+      },
+      {
+        title: "Destino y fecha",
+        targetId: "delivery-form-order",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Define cuando se entrega y hacia donde va. La opcion de destino afecta el flujo operativo y el cobro.",
+          dismiss,
+          demo: [
+            { label: "Fecha", value: "Fecha pactada" },
+            { label: "Destino", value: "Sucursal o direccion" },
+          ],
+        }),
+      },
+      {
+        title: "Pago de la entrega",
+        targetId: "delivery-form-payment",
+        placement: "right",
+        description: buildStepDescription({
+          text: "Revisa si el pedido esta pagado, pendiente o con adelanto, y completa el metodo de pago cuando corresponda.",
+          dismiss,
+          demo: [
+            { label: "Estado", value: "En espera / Entregado" },
+            { label: "Saldo", value: "Calculado automatico" },
+          ],
+        }),
+      },
+      {
+        title: "Guardar entrega",
+        targetId: "delivery-form-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Este boton crea la entrega real. Durante el tour solo se muestra donde queda.",
+          dismiss,
         }),
       },
     ],
@@ -769,6 +1151,48 @@ const tourDefinitions: TourDefinition[] = [
             { label: "Nombre", value: "Polera basica" },
             { label: "Variante", value: "Color / Talla" },
           ],
+        }),
+      },
+      {
+        title: "Nombre del producto",
+        targetId: "stock-product-name-field",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Escribe un nombre claro y facil de buscar. Evita mezclar talla o color aqui si eso se manejara como variante.",
+          dismiss,
+          demo: [{ label: "Nombre", value: "Polera basica" }],
+        }),
+      },
+      {
+        title: "Categoria",
+        targetId: "stock-product-category-field",
+        placement: "left",
+        description: buildStepDescription({
+          text: "La categoria ayuda a filtrar el inventario y el catalogo. Selecciona la opcion mas cercana al producto.",
+          dismiss,
+          demo: [{ label: "Categoria", value: "Ropa" }],
+        }),
+      },
+      {
+        title: "Variantes iniciales",
+        targetId: "stock-product-variants-field",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Aqui defines combinaciones como Color y Talla, luego asignas stock y precio por cada combinacion generada.",
+          dismiss,
+          demo: [
+            { label: "Variante", value: "Color: Negro" },
+            { label: "Subvariante", value: "Talla: M" },
+          ],
+        }),
+      },
+      {
+        title: "Registrar producto",
+        targetId: "stock-product-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Este boton guarda el producto real. El tour no crea productos ni modifica stock.",
+          dismiss,
         }),
       },
     ],
@@ -901,6 +1325,29 @@ const tourDefinitions: TourDefinition[] = [
           ],
         }),
       },
+      {
+        title: "Campos de variante",
+        targetId: "stock-variant-create-fields",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Agrega el nombre de la variante, sus valores y revisa las combinaciones. Cada combinacion debe tener stock y precio valido.",
+          dismiss,
+          demo: [
+            { label: "Variante", value: "Color" },
+            { label: "Valor", value: "Negro" },
+            { label: "Precio", value: "Bs. 120" },
+          ],
+        }),
+      },
+      {
+        title: "Guardar variantes",
+        targetId: "stock-variant-create-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Al guardar se preparan las variantes nuevas. El tour no presiona este boton ni guarda cambios reales.",
+          dismiss,
+        }),
+      },
     ],
   },
   {
@@ -955,6 +1402,64 @@ const tourDefinitions: TourDefinition[] = [
             { label: "Comprador", value: "Carlos Rojas" },
             { label: "Destino", value: "Sucursal Norte" },
           ],
+        }),
+      },
+      {
+        title: "Datos del vendedor",
+        targetId: "external-delivery-seller",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Completa carnet, nombre, celular y cantidad de paquetes. Las sugerencias ayudan a reutilizar contactos ya registrados.",
+          dismiss,
+          demo: [
+            { label: "Carnet", value: "1234567" },
+            { label: "Paquetes", value: "2" },
+          ],
+        }),
+      },
+      {
+        title: "Pago del vendedor",
+        targetId: "external-delivery-seller-payment",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Si el vendedor paga al dejar el paquete, marca si sera efectivo o QR para cuadrar caja correctamente.",
+          dismiss,
+          demo: [{ label: "Pago", value: "Efectivo o QR" }],
+        }),
+      },
+      {
+        title: "Origen y destino",
+        targetId: "external-delivery-route",
+        placement: "left",
+        description: buildStepDescription({
+          text: "Selecciona la sucursal de origen y destino. Puedes aplicar el mismo destino a todos los paquetes si corresponde.",
+          dismiss,
+          demo: [
+            { label: "Origen", value: "Sucursal actual" },
+            { label: "Destino", value: "Sucursal Norte" },
+          ],
+        }),
+      },
+      {
+        title: "Datos de cada paquete",
+        targetId: "external-delivery-packages",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Por cada paquete revisa comprador, descripcion, celular, destino, precio y estado de pago. Esta tabla es donde mas errores suelen ocurrir.",
+          dismiss,
+          demo: [
+            { label: "Comprador", value: "Nombre o celular" },
+            { label: "Estado pago", value: "Si / No / Mixto" },
+          ],
+        }),
+      },
+      {
+        title: "Guardar externos",
+        targetId: "external-delivery-submit",
+        placement: "top",
+        description: buildStepDescription({
+          text: "Este boton registra las entregas externas reales. El tour solo indica el paso final y no guarda nada.",
+          dismiss,
         }),
       },
     ],
@@ -1063,14 +1568,15 @@ export const TourProvider = ({
   const buildResolvedSteps = useCallback(
     (definition: TourDefinition) => {
       const device: TourDevice = isMobile ? "mobile" : "desktop";
-      const baseSteps = definition.buildSteps({ device, dismiss: dismissActiveTour, user });
-      const mobilePanelWidth = "min(320px, calc(100vw - 92px))";
+      const baseSteps = definition.buildSteps({ device, dismiss: dismissActiveTour, user, navigate });
+      const mobilePanelWidth = "min(292px, calc(100vw - 120px))";
 
       return baseSteps
         .map((step) => {
           return {
             title: step.title,
             description: step.description,
+            targetId: step.targetId,
             placement: step.placement,
             target: step.targetId ? (() => findTargetById(step.targetId) as HTMLElement) : null,
             onEnter: step.onEnter,
@@ -1084,7 +1590,7 @@ export const TourProvider = ({
         })
         .filter(Boolean) as ResolvedTourStep[];
     },
-    [dismissActiveTour, isMobile, user]
+    [dismissActiveTour, isMobile, navigate, user]
   );
 
   const openTour = useCallback(
@@ -1203,6 +1709,24 @@ export const TourProvider = ({
     currentResolvedStep?.onEnter?.();
   }, [activeTour, currentStep]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const targetId = activeTour?.steps[currentStep]?.targetId || "";
+    const isModalStep =
+      targetId.includes("modal") ||
+      targetId.includes("form") ||
+      targetId.includes("edit") ||
+      targetId.includes("submit");
+
+    document.body.classList.toggle("tp-tour-active", Boolean(activeTour));
+    document.body.classList.toggle("tp-tour-modal-step", Boolean(activeTour && isModalStep));
+    return () => {
+      document.body.classList.remove("tp-tour-active");
+      document.body.classList.remove("tp-tour-modal-step");
+    };
+  }, [activeTour, currentStep]);
+
   const renderedSteps = useMemo(() => {
     if (!activeTour) return [];
 
@@ -1220,8 +1744,15 @@ export const TourProvider = ({
     }));
   }, [activeTour, completeActiveTour]);
 
+  const currentTargetId = activeTour?.steps[currentStep]?.targetId || "";
+  const isModalOrFormStep =
+    currentTargetId.includes("modal") ||
+    currentTargetId.includes("form") ||
+    currentTargetId.includes("field") ||
+    currentTargetId.includes("submit");
   const shouldShowMobileNavTop =
-    isMobile && activeTour?.key === "seller-welcome" && currentStep >= 4 && currentStep <= 7;
+    isMobile &&
+    ((activeTour?.key === "seller-welcome" && currentStep >= 4 && currentStep <= 7) || isModalOrFormStep);
 
   const contextValue = useMemo<TourContextValue>(
     () => ({
@@ -1247,7 +1778,8 @@ export const TourProvider = ({
         current={currentStep}
         onChange={setCurrentStep}
         type="default"
-        zIndex={1200}
+        mask={!isModalOrFormStep}
+        zIndex={1320}
         indicatorsRender={() => null}
         scrollIntoViewOptions={{ behavior: "smooth", block: "center" }}
       />

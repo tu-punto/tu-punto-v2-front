@@ -166,6 +166,26 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
   }, [searchText]);
 
   useEffect(() => {
+    const openDemoModal = () => {
+      if (isReadOnly || !rows.length) return;
+      setEditingRecord(rows[0]);
+      setEditModalOpen(true);
+    };
+    const closeDemoModal = () => {
+      setEditModalOpen(false);
+      setEditingRecord(null);
+    };
+
+    window.addEventListener("tp-tour-open-seller-product-info-modal", openDemoModal);
+    window.addEventListener("tp-tour-close-seller-product-info-modal", closeDemoModal);
+
+    return () => {
+      window.removeEventListener("tp-tour-open-seller-product-info-modal", openDemoModal);
+      window.removeEventListener("tp-tour-close-seller-product-info-modal", closeDemoModal);
+    };
+  }, [isReadOnly, rows]);
+
+  useEffect(() => {
     const loadFiltersData = async () => {
       try {
         const [categoriesResponse, sellersResponse] = await Promise.all([
@@ -500,6 +520,7 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
       render: (_value, record) => (
         <Tooltip title="Editar informacion">
           <Button
+            data-tour-id="seller-product-info-edit-action"
             icon={<EditOutlined />}
             onClick={() => {
               setEditingRecord(record);
@@ -512,7 +533,7 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
   }
 
   return (
-    <div className="seller-product-info-page p-4">
+    <div className="seller-product-info-page p-4" data-tour-id="seller-product-info-root">
         <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
           <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src={infoProductIcon} alt="Informacion Productos" className="w-8 h-8" />
@@ -529,7 +550,11 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
       </div>
 
       <div className="seller-product-info-top-grid">
-        <Card className="seller-product-info-filters seller-product-info-filters-compact" style={{ marginBottom: 16 }}>
+        <Card
+          className="seller-product-info-filters seller-product-info-filters-compact"
+          style={{ marginBottom: 16 }}
+          data-tour-id="seller-product-info-filters"
+        >
           <div className="seller-product-info-filters-grid">
             <Input
               prefix={<SearchOutlined />}
@@ -639,7 +664,12 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
           </div>
         </Card>
 
-        <Card className="seller-product-info-legend-card seller-product-info-legend-card-compact" size="small" style={{ marginBottom: 16 }}>
+        <Card
+          className="seller-product-info-legend-card seller-product-info-legend-card-compact"
+          size="small"
+          style={{ marginBottom: 16 }}
+          data-tour-id="seller-product-info-legend"
+        >
           <div className="seller-product-info-legend-grid">
             <div className="seller-product-info-legend-section">
               <div className="seller-product-info-legend-title">Estado de stock</div>
@@ -681,7 +711,7 @@ const SellerProductInfoPage = ({ mode = "seller" }: SellerProductInfoPageProps) 
         </Card>
       </div>
 
-      <Card className="seller-product-info-table-card">
+      <Card className="seller-product-info-table-card" data-tour-id="seller-product-info-table">
         <Table
           rowKey="key"
           columns={columns}

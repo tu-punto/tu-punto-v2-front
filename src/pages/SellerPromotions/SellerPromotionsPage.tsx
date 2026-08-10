@@ -305,6 +305,35 @@ const SellerPromotionsPage = () => {
     });
   };
 
+  useEffect(() => {
+    const openDemoModal = () => {
+      if (!canCreatePromotion) return;
+      resetForm();
+      setModalOpen(true);
+      form.setFieldsValue({
+        scope: canUseCatalogScopes ? "ambos" : "interno",
+        state: "active",
+        pricingMode: "simple",
+        startsDate: dayjs().startOf("day"),
+        startsTime: dayjs().startOf("day"),
+        endsTime: dayjs().startOf("day"),
+        tiers: [{ minQuantity: 3, unitPrice: undefined as unknown as number }],
+      });
+    };
+    const closeDemoModal = () => {
+      setModalOpen(false);
+      resetForm();
+    };
+
+    window.addEventListener("tp-tour-open-promotions-modal", openDemoModal);
+    window.addEventListener("tp-tour-close-promotions-modal", closeDemoModal);
+
+    return () => {
+      window.removeEventListener("tp-tour-open-promotions-modal", openDemoModal);
+      window.removeEventListener("tp-tour-close-promotions-modal", closeDemoModal);
+    };
+  }, [canCreatePromotion, canUseCatalogScopes, form]);
+
   const handleOpenEdit = (row: PromotionRow) => {
     if (row.isInvalid) {
       messageApi.error("Esta promocion es invalida porque mezcla precio fijo y escalas. Debe rehacerse.");
@@ -542,11 +571,12 @@ const SellerPromotionsPage = () => {
   ];
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: 16 }} data-tour-id="seller-promotions-root">
       {contextHolder}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={17}>
           <Card
+            data-tour-id="seller-promotions-hero"
             style={{
               borderRadius: 24,
               background: "linear-gradient(135deg, rgba(8,145,178,0.12) 0%, rgba(14,116,144,0.02) 100%)",
@@ -563,7 +593,7 @@ const SellerPromotionsPage = () => {
                 Define precio directo, escalas por cantidad y fechas exactas para cada variante.
               </Typography.Text>
               <Space wrap>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate} data-tour-id="seller-promotions-create-button">
                   Nueva promocion
                 </Button>
                 <Button icon={<ReloadOutlined />} onClick={() => void loadPromotions()}>
@@ -616,7 +646,7 @@ const SellerPromotionsPage = () => {
         ))}
       </Row>
 
-      <Card style={{ marginTop: 16, borderRadius: 24 }}>
+      <Card style={{ marginTop: 16, borderRadius: 24 }} data-tour-id="seller-promotions-filters">
         <Row gutter={[12, 12]} align="middle">
           {isManager ? (
             <Col xs={24} md={8}>
@@ -698,6 +728,7 @@ const SellerPromotionsPage = () => {
         width={880}
         okText={editingRow ? "Guardar cambios" : "Crear promocion"}
         title={editingRow ? "Editar promocion" : "Nueva promocion"}
+        okButtonProps={{ "data-tour-id": "seller-promotions-submit" } as any}
       >
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={15}>
@@ -715,6 +746,7 @@ const SellerPromotionsPage = () => {
               }}
             >
               <Form.Item
+                data-tour-id="seller-promotions-form-selection"
                 name="selection"
                 label="Variante"
                 rules={[{ required: true, message: "Selecciona una variante" }]}
@@ -740,7 +772,7 @@ const SellerPromotionsPage = () => {
                 <Input />
               </Form.Item>
 
-              <Row gutter={12}>
+              <Row gutter={12} data-tour-id="seller-promotions-form-scope">
                 <Col span={12}>
                   {!canUseCatalogScopes ? (
                     <Form.Item name="scope" hidden>
@@ -765,7 +797,7 @@ const SellerPromotionsPage = () => {
                 </Col>
               </Row>
 
-              <Form.Item name="pricingMode" label="Tipo de promocion" rules={[{ required: true }]}>
+              <Form.Item name="pricingMode" label="Tipo de promocion" rules={[{ required: true }]} data-tour-id="seller-promotions-form-pricing">
                 <Radio.Group optionType="button" buttonStyle="solid" onChange={(event) => handlePricingModeChange(event.target.value)}>
                   <Radio.Button value="simple">Precio fijo</Radio.Button>
                   <Radio.Button value="tiers">Por cantidad</Radio.Button>
@@ -839,7 +871,7 @@ const SellerPromotionsPage = () => {
                 </Form.List>
               )}
 
-              <Row gutter={12} style={{ marginTop: 16 }}>
+              <Row gutter={12} style={{ marginTop: 16 }} data-tour-id="seller-promotions-form-dates">
                 <Col span={6}>
                   <Form.Item name="startsDate" label="Inicio fecha" rules={[{ required: true }]}>
                     <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
@@ -866,6 +898,7 @@ const SellerPromotionsPage = () => {
 
           <Col xs={24} lg={9}>
             <Card
+              data-tour-id="seller-promotions-preview"
               title="Impacto estimado"
               style={{
                 borderRadius: 18,

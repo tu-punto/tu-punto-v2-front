@@ -156,18 +156,20 @@ function SalesFormModal({
           <Input prefix="Bs." readOnly />
         </Form.Item>
 
-        <Form.Item
-          name="tipoDePago"
-          label="Tipo de Pago"
-          rules={[{ required: true, message: "Selecciona un tipo de pago" }]}
-        >
-          <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
-            <Radio.Button value="1">{tipoPagoMap[1]}</Radio.Button>
-            <Radio.Button value="2">{tipoPagoMap[2]}</Radio.Button>
-            <Radio.Button value="3">{tipoPagoMap[3]}</Radio.Button>
-            <Radio.Button value="4">{tipoPagoMap[4]}</Radio.Button>
-          </Radio.Group>
-        </Form.Item>
+        <div data-tour-id="sales-sale-modal-payment">
+          <Form.Item
+            name="tipoDePago"
+            label="Tipo de Pago"
+            rules={[{ required: true, message: "Selecciona un tipo de pago" }]}
+          >
+            <Radio.Group onChange={(e) => setTipoPago(e.target.value.toString())}>
+              <Radio.Button value="1">{tipoPagoMap[1]}</Radio.Button>
+              <Radio.Button value="2">{tipoPagoMap[2]}</Radio.Button>
+              <Radio.Button value="3">{tipoPagoMap[3]}</Radio.Button>
+              <Radio.Button value="4">{tipoPagoMap[4]}</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+        </div>
 
         {tipoPago === "1" && (
           <Form.Item label="Subtotal QR" name="subtotal_qr">
@@ -246,7 +248,7 @@ function SalesFormModal({
         )}
 
         <Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading} disabled={showWarning}>
+          <Button type="primary" htmlType="submit" loading={loading} disabled={showWarning} data-tour-id="sales-sale-modal-submit">
             Registrar
           </Button>
         </Form.Item>
