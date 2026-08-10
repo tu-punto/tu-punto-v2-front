@@ -422,7 +422,8 @@ const ConfirmProductsModal = ({
           productId,
           sucursalId,
           variantes,
-          stock: nextStock
+          stock: delta,
+          stockMode: "delta"
         });
 
         await createEntryAPI({

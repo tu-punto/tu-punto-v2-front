@@ -446,12 +446,14 @@ export const updateSubvariantStockAPI = async ({
                                                    productId,
                                                    sucursalId,
                                                    variantes,
-                                                   stock
+                                                   stock,
+                                                   stockMode = "absolute"
                                                }: {
     productId: string;
     sucursalId: string;
     variantes: Record<string, string>;
     stock: number;
+    stockMode?: "absolute" | "delta";
 }) => {
     /*
     console.log("📦 Enviando actualización de stock:", {
@@ -466,7 +468,8 @@ export const updateSubvariantStockAPI = async ({
             productId,
             sucursalId,
             variantes,
-            stock
+            stock,
+            stockMode
         });
         return res.data;
     } catch (error) {

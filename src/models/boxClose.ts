@@ -16,6 +16,7 @@ export interface IBoxClose {
   bancario_real: number;
   diferencia_efectivo: number;
   diferencia_bancario: number;
+  cambios_externos?: number;
   observaciones: string;
   closed_at?: string;
   created_at: string;
