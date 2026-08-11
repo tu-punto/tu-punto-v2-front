@@ -110,7 +110,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
             footer={null}
             width={1000}
         >
-            <div data-tour-id="stock-product-create-modal">
+            <div data-tour-id="stock-product-create-modal" data-testid="stock-product-form-content">
             <Form
                 form={form}
                 name="productForm"
@@ -128,11 +128,11 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                         label="Nombre del Producto"
                         rules={[{ required: true, message: "Por favor ingrese el nombre del producto" }]}
                     >
-                        <Input placeholder="Nombre del Producto" />
+                        <Input placeholder="Nombre del Producto" data-testid="stock-product-name-input" />
                     </Form.Item>
                 </div>
 
-                <p style={{ fontWeight: 600, marginBottom: 10 }}>
+                <p style={{ fontWeight: 600, marginBottom: 10 }} data-testid="stock-product-selected-seller">
                     Vendedor: {selectedSeller?.nombre} {selectedSeller?.apellido}
                 </p>
 
@@ -143,6 +143,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                         rules={[{ required: true, message: "Por favor seleccione una categoría" }]}
                     >
                         <Select
+                            data-testid="stock-product-category-select"
                             placeholder="Selecciona una categoría"
                             options={categories.map((category: any) => ({
                                 value: category._id,
@@ -170,6 +171,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                         loading={loading}
                         disabled={combinations.length === 0}
                         data-tour-id="stock-product-submit"
+                        data-testid="stock-product-submit"
                     >
                         Registrar Producto
                     </Button>

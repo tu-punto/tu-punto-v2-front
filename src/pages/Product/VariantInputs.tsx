@@ -305,6 +305,7 @@ const VariantInputs = ({
                 <InputNumber
                     min={0}
                     value={record.stock}
+                    data-testid="stock-combination-stock-input"
                     onChange={(value) => handleChange(record.key, 'stock', value)}
                     disabled={record.disabled}
                 />
@@ -325,6 +326,7 @@ const VariantInputs = ({
                 <InputNumber
                     min={0}
                     value={record.price}
+                    data-testid="stock-combination-price-input"
                     onChange={(value) => handleChange(record.key, 'price', value)}
                     disabled={record.disabled}
                 />
@@ -333,10 +335,10 @@ const VariantInputs = ({
     ];
 
     return (
-        <div style={{ padding: '1rem 0' }}>
+        <div style={{ padding: '1rem 0' }} data-testid="stock-product-variant-inputs">
             <Typography.Title level={5}>Variantes</Typography.Title>
             {variants.map((variant, index) => (
-                <div key={index} style={{ marginBottom: 16 }}>
+                <div key={index} style={{ marginBottom: 16 }} data-testid={`stock-variant-block-${index}`}>
                     <Space direction="vertical" style={{ width: '100%' }}>
                         <Space wrap>
                             <AutoComplete
@@ -346,13 +348,14 @@ const VariantInputs = ({
                                 onChange={(value) => updateVariantName(index, value)}
                                 disabled={variant.readOnly}
                                 placeholder="Nombre de la variante (ej: Color)"
+                                data-testid={`stock-variant-name-input-${index}`}
                                 filterOption={(inputValue, option) =>
                                     String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
                                 }
                             />
                             {!variant.readOnly && (
                                 <>
-                                    <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} />
+                                    <Button icon={<DeleteOutlined />} danger onClick={() => removeVariant(index)} data-testid={`stock-variant-remove-button-${index}`} />
                                 </>
                             )}
                         </Space>
@@ -454,6 +457,7 @@ const VariantInputs = ({
                                 }}
                                 placeholder={`Agregar subvariante a ${variant.name || 'Variante'}`}
                                 disabled={!variant.name}
+                                data-testid={`stock-subvariant-input-${index}`}
                                 filterOption={(inputValue, option) =>
                                     String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
                                 }
@@ -468,6 +472,7 @@ const VariantInputs = ({
                                 type="primary"
                                 icon={<PlusOutlined />}
                                 disabled={!variant.name || !String(inputValues[index] || '').trim()}
+                                data-testid={`stock-subvariant-add-button-${index}`}
                                 onClick={() => {
                                     submitSubvariantInput(index);
                                 }}
@@ -477,7 +482,7 @@ const VariantInputs = ({
                 </div>
             ))}
 
-            <Button icon={<PlusOutlined />} onClick={addVariant}>
+            <Button icon={<PlusOutlined />} onClick={addVariant} data-testid="stock-add-variant-button">
                 Agregar Variante
             </Button>
 

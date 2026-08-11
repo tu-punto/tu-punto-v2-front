@@ -9,13 +9,14 @@ type SellerListProps = {
 
 const SellerList = ({ sellers, selectedSeller, onSelectSeller }: SellerListProps) => {
     return (
-        <div>
+        <div data-testid="stock-seller-selector-container">
             <Select
                 style={{ width: "100%" }}
                 placeholder="Lista de vendedores"
                 value={selectedSeller}
                 onChange={(value) => onSelectSeller(value)}
                 showSearch
+                data-testid="stock-seller-selector"
                 optionFilterProp="children"
                 filterOption={(input, option) =>
                     option?.children?.toString().toLowerCase().includes(input.toLowerCase())

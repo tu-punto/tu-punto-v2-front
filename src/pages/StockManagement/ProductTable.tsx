@@ -351,6 +351,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             render: (_: any, record: any) =>
                 record.variant ? (
                     <Input
+                        data-testid="stock-income-input"
                         value={ingresoData[record.key] ?? ''}
                         onChange={(e) => handleIngresoChange(record.key, Number(e.target.value))}
                         placeholder="Ingresar cantidad"
@@ -531,55 +532,57 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                     if (groupedProducts.length === 0) return null;
 
                     return (
-                        <div key={i}>
+                        <div key={i} data-testid="stock-group-section">
                             <h2 style={{ textAlign: 'left', marginTop: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {group.name}
+                                <span data-testid="stock-group-name">{group.name}</span>
                                 <span style={{
                                     backgroundColor: "#f0f0f0",
                                     borderRadius: "12px",
                                     padding: "2px 10px",
                                     fontSize: "0.8rem",
                                     fontWeight: 500
-                                }}>
+                                }} data-testid="stock-group-total">
             {group.products.reduce((sum, p) => sum + (p.stock ?? 0), 0)}
           </span>
                             </h2>
 
-                            <Table
-                                className="stock-products-table"
-                                columns={columns}
-                                dataSource={groupedProducts}
-                                rowClassName={(record) =>
-                                    record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
-                                        ? "bg-green-50 border-l-4 border-green-500"
-                                        : ""
-                                }
-                                expandable={{
-                                    expandedRowKeys,
-                                    onExpand: (expanded, record) => {
-                                        setExpandedRowKeys(
-                                            expanded
-                                                ? [...expandedRowKeys, record.key]
-                                                : expandedRowKeys.filter((key) => key !== record.key)
-                                        );
-                                    },
-                                    expandRowByClick: true,
-                                }}
-                                pagination={{
-                                    pageSize: 10,
-                                    showSizeChanger: true,
-                                    pageSizeOptions: ['5', '10', '20', '50'],
-                                    showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`
-                                }}
-                                scroll={{ x: 820 }}
-                                rowKey="key"
-                            />
+                            <div data-testid="stock-group-table">
+                                <Table
+                                    className="stock-products-table"
+                                    columns={columns}
+                                    dataSource={groupedProducts}
+                                    rowClassName={(record) =>
+                                        record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
+                                            ? "bg-green-50 border-l-4 border-green-500"
+                                            : ""
+                                    }
+                                    expandable={{
+                                        expandedRowKeys,
+                                        onExpand: (expanded, record) => {
+                                            setExpandedRowKeys(
+                                                expanded
+                                                    ? [...expandedRowKeys, record.key]
+                                                    : expandedRowKeys.filter((key) => key !== record.key)
+                                            );
+                                        },
+                                        expandRowByClick: true,
+                                    }}
+                                    pagination={{
+                                        pageSize: 10,
+                                        showSizeChanger: true,
+                                        pageSizeOptions: ['5', '10', '20', '50'],
+                                        showTotal: (total, range) => `${range[0]}-${range[1]} de ${total} productos`
+                                    }}
+                                    scroll={{ x: 820 }}
+                                    rowKey="key"
+                                />
+                            </div>
                         </div>
                     );
                 })}
 
             {tableGroup.filter(group => group.products && group.products.length > 0).length === 0 && (
-                <p>No hay grupos de productos.</p>
+                <p data-testid="stock-empty-state">No hay grupos de productos.</p>
             )}
 
             {/* Modales */}
