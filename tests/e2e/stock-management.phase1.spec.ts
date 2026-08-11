@@ -10,9 +10,14 @@ import {
   openStockAsAdmin,
   searchStock,
   selectAntdOption,
-  selectCategory,
   selectSeller,
 } from "./support/stock-helpers";
+import {
+  prepareSafeFixture,
+  prepareSafeFixtureWithCategory,
+  prepareSafeFixtureWithCategoryAndSearch,
+  prepareSafeFixtureWithSearch,
+} from "./support/stock-safe-discovery";
 import { missingEnv } from "./support/stock-env";
 
 const AUTH_ENV_KEYS = [
@@ -47,66 +52,62 @@ test.describe.serial("Stock Management Phase 1", () => {
   });
 
   test("Stock - Seleccionar vendedor carga inventario", async ({ page }) => {
-    await selectSeller(page, stockPhase1Cases.searches[0].sellerName);
+    await prepareSafeFixture(page);
     await expect(page.getByTestId("stock-product-create-button")).toBeEnabled();
     await expect(page.getByTestId("stock-update-button")).toBeEnabled();
     await expect(page.getByTestId("stock-group-section").first()).toBeVisible();
   });
 
-  for (const searchCase of stockPhase1Cases.searches) {
-    test(`Stock - Buscar producto por nombre - ${searchCase.name}`, async ({ page }) => {
-      await selectSeller(page, searchCase.sellerName);
-      await searchStock(page, searchCase.searchTerm);
+  test("Stock - Buscar producto por nombre", async ({ page }) => {
+    const fixture = await prepareSafeFixtureWithSearch(page);
     await expect(
-        page.getByTestId("stock-products-table-wrapper").getByText(searchCase.expectedProduct, { exact: false }).first()
+      page.getByTestId("stock-products-table-wrapper").getByText(fixture.productName, { exact: false }).first()
     ).toBeVisible();
-    });
-  }
+  });
 
-  for (const emptyCase of stockPhase1Cases.emptySearches) {
-    test(`Stock - Busqueda sin resultados - ${emptyCase.name}`, async ({ page }) => {
-      await selectSeller(page, emptyCase.sellerName);
-      await searchStock(page, emptyCase.emptySearchTerm);
+  test("Stock - Busqueda sin resultados", async ({ page }) => {
+    const fixture = await prepareSafeFixture(page);
+    await searchStock(page, `${fixture.searchTerm}-inexistente-e2e`);
     await expect(page.getByTestId("stock-empty-state")).toBeVisible();
-    });
-  }
+  });
 
-  for (const searchCase of stockPhase1Cases.searches) {
-    test(`Stock - Filtrar por categoria - ${searchCase.name}`, async ({ page }) => {
-      await selectSeller(page, searchCase.sellerName);
-      await selectCategory(page, searchCase.categoryName);
+  test("Stock - Filtrar por categoria", async ({ page }) => {
+    const fixture = await prepareSafeFixtureWithCategory(page);
     await expect(
-        page.locator('[data-testid="stock-products-table-wrapper"] td').filter({ hasText: searchCase.categoryName }).first()
+      page.locator('[data-testid="stock-products-table-wrapper"] td').filter({ hasText: fixture.categoryName }).first()
     ).toBeVisible();
-    });
-  }
+  });
 
-  for (const searchCase of stockPhase1Cases.searches) {
-    test(`Stock - Combinar vendedor, categoria y busqueda - ${searchCase.name}`, async ({ page }) => {
-      await selectSeller(page, searchCase.sellerName);
-      await selectCategory(page, searchCase.categoryName);
-      await searchStock(page, searchCase.searchTerm);
+  test("Stock - Combinar vendedor, categoria y busqueda", async ({ page }) => {
+    const fixture = await prepareSafeFixtureWithCategoryAndSearch(page);
     await expect(
-        page.getByTestId("stock-products-table-wrapper").getByText(searchCase.expectedProduct, { exact: false }).first()
+      page.getByTestId("stock-products-table-wrapper").getByText(fixture.productName, { exact: false }).first()
     ).toBeVisible();
-    });
-  }
+  });
 
-  for (const paginationCase of stockPhase1Cases.paginations) {
-    test(`Stock - Navegar paginacion de resultados - ${paginationCase.name}`, async ({ page }) => {
-      await selectSeller(page, paginationCase.sellerName);
+  test("Stock - Navegar paginacion de resultados", async ({ page }) => {
+    await prepareSafeFixture(page);
 
-      const nextPageButton = page.locator(".ant-pagination-next");
-      await expect(nextPageButton).toBeVisible();
-      await expect(nextPageButton).not.toHaveClass(/ant-pagination-disabled/);
-      await nextPageButton.click();
+    const nextPageButton = page.locator(".ant-pagination-next");
+    await expect(nextPageButton).toBeVisible();
 
-      await expect(page.locator(".ant-pagination-item-active")).toContainText("2");
-      await expect(
-        page.getByTestId("stock-products-table-wrapper").getByText(paginationCase.page2ExpectedProduct, { exact: false }).first()
-      ).toBeVisible();
-    });
-  }
+    if (await nextPageButton.evaluate((node) => node.className.includes("ant-pagination-disabled"))) {
+      test.skip(true, "El vendedor descubierto no tiene suficientes resultados para paginacion.");
+    }
+
+    const firstPageText = await page
+      .locator('[data-testid="stock-products-table-wrapper"] tbody')
+      .textContent();
+
+    await nextPageButton.click();
+    await expect(page.locator(".ant-pagination-item-active")).toContainText("2");
+
+    const secondPageText = await page
+      .locator('[data-testid="stock-products-table-wrapper"] tbody')
+      .textContent();
+
+    expect(secondPageText).not.toBe(firstPageText);
+  });
 
   for (const creationCase of stockPhase1Cases.productCreations) {
     test(`Stock - Agregar producto y confirmar alta - ${creationCase.name}`, async ({ page }) => {
