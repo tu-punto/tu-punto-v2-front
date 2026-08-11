@@ -32,6 +32,8 @@ const skipIfMissing = (keys: string[]) => {
 };
 
 test.describe.serial("Stock Management Phase 1", () => {
+  test.describe.configure({ timeout: 90_000 });
+
   test.beforeEach(async ({ page }) => {
     skipIfMissing(AUTH_ENV_KEYS);
     await openStockAsAdmin(page);

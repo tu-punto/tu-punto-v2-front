@@ -12,34 +12,40 @@ export const selectAntdOption = async (page: Page, trigger: Locator, optionText:
   await expect(dropdown).toBeVisible();
 
   const visibleOptions = dropdown.locator(".ant-select-item-option-content");
+  await expect(visibleOptions.first()).toBeVisible({ timeout: 10_000 });
   const normalizedTarget = optionText.trim().toLowerCase();
+  const escapedTarget = optionText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let lastVisibleTexts: string[] = [];
 
-  const exactVisibleOption = visibleOptions.filter({
-    hasText: new RegExp(`^\\s*${optionText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"),
-  });
-  if (await exactVisibleOption.count()) {
-    await exactVisibleOption.first().click();
-    return;
-  }
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const visibleOptionCount = await visibleOptions.count();
+    lastVisibleTexts = [];
 
-  const visibleOptionCount = await visibleOptions.count();
-  for (let index = 0; index < visibleOptionCount; index += 1) {
-    const option = visibleOptions.nth(index);
-    const text = (await option.textContent())?.trim().toLowerCase() || "";
-    if (text.includes(normalizedTarget)) {
-      await option.click();
-      return;
+    for (let index = 0; index < visibleOptionCount; index += 1) {
+      const option = visibleOptions.nth(index);
+      const rawText = (await option.textContent()) || "";
+      const normalizedText = rawText.trim();
+
+      if (!normalizedText) continue;
+      lastVisibleTexts.push(normalizedText);
+
+      if (new RegExp(`^\\s*${escapedTarget}\\s*$`, "i").test(normalizedText)) {
+        await option.click();
+        return;
+      }
+
+      if (normalizedText.toLowerCase().includes(normalizedTarget)) {
+        await option.click();
+        return;
+      }
     }
+
+    await page.waitForTimeout(300);
   }
 
-  const optionByText = dropdown.getByText(optionText, { exact: true });
-  if (await optionByText.count()) {
-    await optionByText.first().click();
-    return;
-  }
-
-  const optionByRole = dropdown.getByRole("option", { name: optionText, exact: true });
-  await optionByRole.first().click({ force: true });
+  throw new Error(
+    `No se pudo encontrar la opcion "${optionText}" en el selector. Opciones visibles: ${lastVisibleTexts.join(" | ")}`
+  );
 };
 
 export const loginAsAdmin = async (page: Page) => {
@@ -70,13 +76,21 @@ export const selectCategory = async (page: Page, categoryName: string) => {
 };
 
 export const searchStock = async (page: Page, term: string) => {
-  const searchInput = page.getByTestId("stock-search-input").locator("input");
+  const searchInput = page
+    .getByPlaceholder(/Buscar producto o variante/i)
+    .or(page.getByTestId("stock-search-input"))
+    .first();
+  await expect(searchInput).toBeVisible();
   await searchInput.fill(term);
   await page.waitForTimeout(450);
 };
 
 export const clearStockSearch = async (page: Page) => {
-  const searchInput = page.getByTestId("stock-search-input").locator("input");
+  const searchInput = page
+    .getByPlaceholder(/Buscar producto o variante/i)
+    .or(page.getByTestId("stock-search-input"))
+    .first();
+  await expect(searchInput).toBeVisible();
   await searchInput.fill("");
   await page.waitForTimeout(450);
 };
