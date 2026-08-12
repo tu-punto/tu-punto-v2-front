@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - stock
+          - stock-operations
       mode:
         description: Execution mode
         required: true
@@ -18,6 +19,54 @@ on:
         options:
           - safe
           - full
+          - run
+      op_seller_name:
+        description: Seller name for stock-operations (optional)
+        required: false
+        default: ""
+        type: string
+      op_create_products:
+        description: Create products before running operations
+        required: false
+        default: false
+        type: boolean
+      op_product_count:
+        description: Number of products to create when create_products is true
+        required: false
+        default: "1"
+        type: string
+      op_ingress_count:
+        description: Number of ingress operations to execute
+        required: false
+        default: "1"
+        type: string
+      op_egress_count:
+        description: Number of egress operations to execute
+        required: false
+        default: "0"
+        type: string
+      op_min_amount:
+        description: Minimum random amount per operation
+        required: false
+        default: "1"
+        type: string
+      op_max_amount:
+        description: Maximum random amount per operation
+        required: false
+        default: "5"
+        type: string
+      op_start_step:
+        description: Functional step to start from after login
+        required: false
+        default: login
+        type: choice
+        options:
+          - login
+          - select-seller
+          - create-products
+          - ingress
+          - egress
+          - verify
 
 jobs:
   e2e-staging:
@@ -42,7 +91,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -62,11 +111,27 @@ jobs:
             stock:full)
               echo "command=npm run test:e2e:stock:full" >> "$GITHUB_OUTPUT"
               ;;
+            stock-operations:run)
+              echo "command=npm run test:e2e:stock:operations" >> "$GITHUB_OUTPUT"
+              ;;
             *)
               echo "Unsupported combination: ${{ github.event.inputs.module }} / ${{ github.event.inputs.mode }}"
               exit 1
               ;;
           esac
+
+      - name: Export stock-operations inputs
+        if: github.event.inputs.module == 'stock-operations'
+        shell: bash
+        run: |
+          echo "PW_OP_SELLER_NAME=${{ github.event.inputs.op_seller_name }}" >> "$GITHUB_ENV"
+          echo "PW_OP_CREATE_PRODUCTS=${{ github.event.inputs.op_create_products }}" >> "$GITHUB_ENV"
+          echo "PW_OP_PRODUCT_COUNT=${{ github.event.inputs.op_product_count }}" >> "$GITHUB_ENV"
+          echo "PW_OP_INGRESS_COUNT=${{ github.event.inputs.op_ingress_count }}" >> "$GITHUB_ENV"
+          echo "PW_OP_EGRESS_COUNT=${{ github.event.inputs.op_egress_count }}" >> "$GITHUB_ENV"
+          echo "PW_OP_MIN_AMOUNT=${{ github.event.inputs.op_min_amount }}" >> "$GITHUB_ENV"
+          echo "PW_OP_MAX_AMOUNT=${{ github.event.inputs.op_max_amount }}" >> "$GITHUB_ENV"
+          echo "PW_OP_START_STEP=${{ github.event.inputs.op_start_step }}" >> "$GITHUB_ENV"
 
       - name: Run Playwright suite
         run: ${{ steps.resolve.outputs.command }}
