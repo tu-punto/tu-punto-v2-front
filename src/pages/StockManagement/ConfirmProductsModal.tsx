@@ -422,7 +422,8 @@ const ConfirmProductsModal = ({
           productId,
           sucursalId,
           variantes,
-          stock: nextStock
+          stock: delta,
+          stockMode: "delta"
         });
 
         await createEntryAPI({
@@ -466,10 +467,10 @@ const ConfirmProductsModal = ({
       width={activeScannerMode ? (isCompactScannerLayout ? "96%" : 1340) : isCompactScannerLayout ? "96%" : 980}
       destroyOnClose
       footer={[
-        <Button key="clear" danger onClick={clearAll}>
+        <Button key="clear" danger onClick={clearAll} data-testid="stock-confirm-clear-button">
           Limpiar cambios
         </Button>,
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" onClick={onClose} data-testid="stock-confirm-cancel-button">
           Cancelar
         </Button>,
         <Button
@@ -477,6 +478,7 @@ const ConfirmProductsModal = ({
           type="primary"
           loading={loadingSave}
           disabled={loadingSave}
+          data-testid="stock-confirm-save-button"
           onClick={async () => {
             setLoadingSave(true);
             try {
@@ -492,7 +494,7 @@ const ConfirmProductsModal = ({
         </Button>
       ]}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }} data-tour-id="stock-ingress-modal" data-testid="stock-confirm-content">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <div>
             <Title level={4} style={{ margin: 0 }}>
@@ -521,6 +523,7 @@ const ConfirmProductsModal = ({
               <Button
                 icon={<ArrowUpOutlined />}
                 style={getScannerButtonStyle("ingress")}
+                data-testid="stock-scanner-ingress-button"
                 onClick={() => openScanner("ingress")}
               >
                 Ingresos
@@ -528,6 +531,7 @@ const ConfirmProductsModal = ({
               <Button
                 icon={<ArrowDownOutlined />}
                 style={getScannerButtonStyle("egress")}
+                data-testid="stock-scanner-egress-button"
                 onClick={() => openScanner("egress")}
               >
                 Salidas
@@ -558,6 +562,7 @@ const ConfirmProductsModal = ({
 
           {movementRows.length > 0 ? (
             <Table
+              data-testid="stock-confirm-movements-table"
               dataSource={movementRows}
               rowKey={buildDraftKey}
               pagination={false}
@@ -646,6 +651,7 @@ const ConfirmProductsModal = ({
           </Title>
           {variantData.length > 0 ? (
             <Table
+              data-testid="stock-confirm-new-variants-table"
               dataSource={variantData.flatMap((record: any, recordIndex: number) =>
                 (record.combinaciones || []).map((combination: any, combinationIndex: number) => ({
                   key: `${recordIndex}-${combinationIndex}`,
@@ -748,6 +754,7 @@ const ConfirmProductsModal = ({
           </Title>
           {flattenedCombinations.length > 0 ? (
             <Table
+              data-testid="stock-confirm-new-products-table"
               dataSource={flattenedCombinations}
               rowKey="key"
               pagination={false}

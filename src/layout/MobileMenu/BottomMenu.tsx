@@ -1,14 +1,12 @@
 import { Menu } from "antd";
-import { menu } from "../../constants/menu";
 import { useContext, useEffect, useState } from "react";
 import { UserContext } from "../../context/userContext";
 import { Link, useLocation } from "react-router-dom";
 import plusIcon from "../../assets/plusIcon.svg";
 import minusIcon from "../../assets/minusIcon.svg";
 import "./bottom-menu.css";
-import { isSuperadminUser, normalizeRole } from "../../utils/role";
-import { canAccessSellerProductInfo } from "../../constants/sellerProductInfoAccess";
-import { canSellerAccessInventory, canSellerAccessShop } from "../../utils/sellerServiceAccess";
+import { normalizeRole } from "../../utils/role";
+import { getVisibleMenuItems } from "../../utils/navigationMenu";
 
 const adminBottomPaths = ["/shipping", "/sales", "/stock"];
 const sellerBottomPaths = ["/shipping", "/simple-packages", "/shop"];
@@ -31,15 +29,7 @@ const BottomMenu = () => {
 
     useEffect(() => {
         const role = normalizeRole(user?.role);
-        const filtered = menu.filter(
-            i =>
-              i.roles.includes(role) &&
-              (!i.hiddenInMenuForRoles?.includes(role)) &&
-              (i.path !== "/stock" || canSellerAccessInventory(user)) &&
-              (i.path !== "/shop" || canSellerAccessShop(user)) &&
-              (i.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
-              (!i.requiresSuperadmin || isSuperadminUser(user))
-        );
+        const filtered = getVisibleMenuItems(user);
         const bottomPaths = role === "seller" ? sellerBottomPaths : adminBottomPaths;
         const bottom: any[] = [];
         const plus: any[] = [];
@@ -50,6 +40,19 @@ const BottomMenu = () => {
     }, [user]);
 
     useEffect(() => setShowPlusMenu(false), [location.pathname]);
+
+    useEffect(() => {
+        const openPlusMenu = () => setShowPlusMenu(true);
+        const closePlusMenu = () => setShowPlusMenu(false);
+
+        window.addEventListener("tp-tour-open-mobile-plus", openPlusMenu);
+        window.addEventListener("tp-tour-close-mobile-plus", closePlusMenu);
+
+        return () => {
+            window.removeEventListener("tp-tour-open-mobile-plus", openPlusMenu);
+            window.removeEventListener("tp-tour-close-mobile-plus", closePlusMenu);
+        };
+    }, []);
 
     return (
         <div
@@ -67,6 +70,7 @@ const BottomMenu = () => {
                                     <Link
                                         to={item.path}
                                         key={item.path}
+                                        data-tour-id={`mobile-plus-link-${item.path.replace(/^\//, "")}`}
                                         className={`rounded-xl px-4 py-3 text-gray-100 text-sm
                                 ${active ? "bg-white/20" : "bg-white/10"}
                                 hover:bg-white/15 active:bg-white/25 transition-colors`}
@@ -93,6 +97,7 @@ const BottomMenu = () => {
                             <Menu.Item key={item.path} style={{ flex: 1, textAlign: "center", padding: 0 }}>
                                 <Link
                                     to={item.path}
+                                    data-tour-id={`mobile-menu-link-${item.path.replace(/^\//, "")}`}
                                     className={`flex flex-col items-center justify-center h-20
                               px-3 gap-1.5 rounded-md transition-colors
                               ${active ? "bg-white/15" : "bg-transparent"}
@@ -109,6 +114,7 @@ const BottomMenu = () => {
                         <button
                             type="button"
                             onClick={() => setShowPlusMenu(v => !v)}
+                            data-tour-id="mobile-menu-plus"
                             className={`flex flex-col items-center justify-center h-20
                           w-full px-3 gap-1.5 rounded-md transition-colors
                           ${showPlusMenu ? "bg-white/15" : "bg-transparent"}

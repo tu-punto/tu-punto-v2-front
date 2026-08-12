@@ -403,6 +403,7 @@ function ShippingFormModal({
 
     return (
         <Modal title="Realizar Entrega" open={visible} onCancel={onCancel} footer={null} width={800}>
+            <div data-tour-id="sales-delivery-modal">
             <Form
                 form={form}
                 name="shippingForm"
@@ -414,7 +415,7 @@ function ShippingFormModal({
                 }}
             >
                 {/* INFORMACIÓN DEL CLIENTE */}
-                <Card title="Información del Cliente" bordered={false}>
+                <Card title="Información del Cliente" bordered={false} data-tour-id="delivery-form-client">
                     <Row gutter={16}>
                         <Col span={18}>
                             <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true }]}>
@@ -465,7 +466,7 @@ function ShippingFormModal({
                 </Card>
 
                 {/* DATOS DEL PEDIDO */}
-                <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }}>
+                <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }} data-tour-id="delivery-form-order">
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}> 
@@ -506,7 +507,7 @@ function ShippingFormModal({
                             </Col>
                         )}
                     </Row>
-                    <Row gutter={16}>
+                    <Row gutter={16} data-tour-id="delivery-form-destination">
                         <Col span={24}>
                             <Form.Item
                                 name="tipo_destino"
@@ -638,6 +639,7 @@ function ShippingFormModal({
 
                 {/* DETALLES DEL PAGO */}
                 <Card
+                    data-tour-id="delivery-form-payment"
                     title={
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span>Detalles del Pago</span>
@@ -870,11 +872,12 @@ function ShippingFormModal({
                 </Card>
 
                 <Form.Item style={{ marginTop: 16 }}>
-                    <Button type="primary" htmlType="submit" loading={loading}>
+                    <Button type="primary" htmlType="submit" loading={loading} data-tour-id="delivery-form-submit">
                         Guardar
                     </Button>
                 </Form.Item>
             </Form>
+            </div>
         </Modal>
     );
 

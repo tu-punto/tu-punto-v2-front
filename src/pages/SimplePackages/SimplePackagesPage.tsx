@@ -638,13 +638,14 @@ const SimplePackagesPage = () => {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4" data-tour-id="simple-packages-root">
       <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-3 mb-4">
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/box-icon.png" alt="Paquetes" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">Paquetes del servicio</h1>
         </div>
         <Button
+          data-tour-id="simple-packages-pending-button"
           onClick={() => {
             setPendingModalVisible(true);
             void fetchPendingPackages();
@@ -666,6 +667,7 @@ const SimplePackagesPage = () => {
           PEDIDOS PENDIENTES
         </Button>
         {useEscalation && <div
+          data-tour-id="simple-packages-monthly-streak"
           style={{
             minWidth: 280,
             maxWidth: 520,
@@ -865,11 +867,12 @@ const SimplePackagesPage = () => {
 
       <Spin spinning={loadingConfig}>
         <Space direction="vertical" size={16} style={{ display: "flex" }}>
-          <Card>
+          <Card data-tour-id="simple-packages-route">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[220px_240px_1fr_auto] gap-3 items-end">
               <div>
                 <Typography.Text strong>Número de paquetes</Typography.Text>
                 <InputNumber
+                  data-tour-id="simple-packages-count"
                   min={MIN_PACKAGES}
                   style={{ width: "100%", marginTop: 8 }}
                   value={packageCount}
@@ -903,7 +906,7 @@ const SimplePackagesPage = () => {
             </div>
           </Card>
 
-          <Card>
+          <Card data-tour-id="simple-packages-description">
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
               <div>
                 <Typography.Text strong>Descripcion general</Typography.Text>
@@ -918,7 +921,7 @@ const SimplePackagesPage = () => {
             </div>
           </Card>
 
-          <Card bodyStyle={{ padding: 0 }}>
+          <Card bodyStyle={{ padding: 0 }} data-tour-id="simple-packages-table">
             <div className="hidden md:block" style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <thead>
@@ -1170,7 +1173,7 @@ const SimplePackagesPage = () => {
             >
               Limpiar
             </Button>
-            <Button type="primary" loading={saving} onClick={handleSubmit}>
+            <Button type="primary" loading={saving} onClick={handleSubmit} data-tour-id="simple-packages-save">
               Guardar paquetes
             </Button>
           </div>

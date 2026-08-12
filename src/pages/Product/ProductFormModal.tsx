@@ -110,6 +110,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
             footer={null}
             width={1000}
         >
+            <div data-tour-id="stock-product-create-modal" data-testid="stock-product-form-content">
             <Form
                 form={form}
                 name="productForm"
@@ -121,40 +122,47 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                     }
                 }}
             >
-                <Form.Item
-                    name="nombre_producto"
-                    label="Nombre del Producto"
-                    rules={[{ required: true, message: "Por favor ingrese el nombre del producto" }]}
-                >
-                    <Input placeholder="Nombre del Producto" />
-                </Form.Item>
+                <div data-tour-id="stock-product-name-field">
+                    <Form.Item
+                        name="nombre_producto"
+                        label="Nombre del Producto"
+                        rules={[{ required: true, message: "Por favor ingrese el nombre del producto" }]}
+                    >
+                        <Input placeholder="Nombre del Producto" data-testid="stock-product-name-input" />
+                    </Form.Item>
+                </div>
 
-                <p style={{ fontWeight: 600, marginBottom: 10 }}>
+                <p style={{ fontWeight: 600, marginBottom: 10 }} data-testid="stock-product-selected-seller">
                     Vendedor: {selectedSeller?.nombre} {selectedSeller?.apellido}
                 </p>
 
-                <Form.Item
-                    name="id_categoria"
-                    label="Categoría"
-                    rules={[{ required: true, message: "Por favor seleccione una categoría" }]}
-                >
-                    <Select
-                        placeholder="Selecciona una categoría"
-                        options={categories.map((category: any) => ({
-                            value: category._id,
-                            label: category.categoria,
-                        }))}
-                        showSearch
-                        filterOption={(input, option: any) =>
-                            option.label.toLowerCase().includes(input.toLowerCase())
-                        }
-                    />
-                </Form.Item>
+                <div data-tour-id="stock-product-category-field">
+                    <Form.Item
+                        name="id_categoria"
+                        label="Categoría"
+                        rules={[{ required: true, message: "Por favor seleccione una categoría" }]}
+                    >
+                        <Select
+                            data-testid="stock-product-category-select"
+                            placeholder="Selecciona una categoría"
+                            options={categories.map((category: any) => ({
+                                value: category._id,
+                                label: category.categoria,
+                            }))}
+                            showSearch
+                            filterOption={(input, option: any) =>
+                                option.label.toLowerCase().includes(input.toLowerCase())
+                            }
+                        />
+                    </Form.Item>
+                </div>
 
-                <VariantInputs
-                    combinations={combinations}
-                    setCombinations={setCombinations}
-                />
+                <div data-tour-id="stock-product-variants-field">
+                    <VariantInputs
+                        combinations={combinations}
+                        setCombinations={setCombinations}
+                    />
+                </div>
 
                 <Form.Item>
                     <Button
@@ -162,11 +170,14 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                         htmlType="submit"
                         loading={loading}
                         disabled={combinations.length === 0}
+                        data-tour-id="stock-product-submit"
+                        data-testid="stock-product-submit"
                     >
                         Registrar Producto
                     </Button>
                 </Form.Item>
             </Form>
+            </div>
         </Modal>
     );
 };

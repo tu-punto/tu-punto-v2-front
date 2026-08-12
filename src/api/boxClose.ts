@@ -48,7 +48,7 @@ export const registerBoxCloseAPI = async (boxCloseData: any) => {
     const res = await apiClient.post("/boxClose/register", boxCloseData);
     return res.data;
   } catch (error) {
-    parseError(error as AxiosError);
+    throw parseError(error as AxiosError);
   }
 };
 
@@ -66,7 +66,7 @@ export const updateBoxCloseAPI = async (id: string, boxCloseData: any) => {
     const res = await apiClient.patch(`/boxClose/${id}`, boxCloseData);
     return res.data;
   } catch (error) {
-    parseError(error as AxiosError);
+    throw parseError(error as AxiosError);
   }
 };
 

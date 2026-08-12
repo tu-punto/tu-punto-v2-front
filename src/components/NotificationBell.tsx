@@ -324,6 +324,7 @@ const NotificationBell = ({ compact = false }: { compact?: boolean }) => {
       <Button
         type="text"
         aria-label="Notificaciones"
+        data-tour-id={compact ? "notification-bell-trigger-mobile" : "notification-bell-trigger-desktop"}
         style={{
           color: "#eaf5ff",
           borderRadius: 12,

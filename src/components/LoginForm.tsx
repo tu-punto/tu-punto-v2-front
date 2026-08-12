@@ -71,7 +71,7 @@ export default function LoginForm({
         name="sucursalId"
         rules={[{ required: true, message: "Selecciona una sucursal" }]}
       >
-        <Select placeholder="Sucursal" size="large" className="w-full h-11 rounded-xl">
+        <Select placeholder="Sucursal" size="large" className="w-full h-11 rounded-xl" data-testid="login-branch-select">
             {(Array.isArray(branches) ? branches : []).map((b) => (
               <Select.Option key={b._id} value={b._id}>
                 {b.nombre}
@@ -85,7 +85,7 @@ export default function LoginForm({
         name="email"
         rules={[{ required: true, message: "Ingresa tu email" }]}
       >
-        <Input prefix={<UserOutlined />} placeholder="Email" size="large" className="w-full h-11 rounded-xl" />
+        <Input prefix={<UserOutlined />} placeholder="Email" size="large" className="w-full h-11 rounded-xl" data-testid="login-email-input" />
       </Form.Item>
 
       <Form.Item
@@ -96,7 +96,7 @@ export default function LoginForm({
       </Form.Item>
 
       <Form.Item>
-        <Button type="primary" htmlType="submit" block loading={loading} className="h-11 rounded-xl font-semibold shadow-sm">
+        <Button type="primary" htmlType="submit" block loading={loading} className="h-11 rounded-xl font-semibold shadow-sm" data-testid="login-submit-button">
           Iniciar sesión
         </Button>
       </Form.Item>

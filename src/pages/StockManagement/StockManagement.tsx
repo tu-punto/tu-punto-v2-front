@@ -468,6 +468,47 @@ const StockManagement = () => {
         }
     };
 
+    useEffect(() => {
+        const closeStockDemoModals = () => {
+            setProductFormVisible(false);
+            setIsVariantModalVisible(false);
+            setIsConfirmModalVisible(false);
+            setIsWithdrawalRequestModalVisible(false);
+        };
+        const openProductDemoModal = () => setProductFormVisible(true);
+        const openIngressDemoModal = () => setIsConfirmModalVisible(true);
+        const openVariantDemoModal = () => {
+            setSelectedGroup({
+                name: "Producto demo",
+                product: {
+                    _id: "tour-demo-product",
+                    nombre_producto: "Producto demo",
+                    sucursales: [],
+                },
+                referenceCombination: null,
+            });
+            setIsVariantModalVisible(true);
+        };
+        const openWithdrawalDemoModal = () => {
+            setWithdrawalProducts([]);
+            setIsWithdrawalRequestModalVisible(true);
+        };
+
+        window.addEventListener("tp-tour-close-stock-demo-modals", closeStockDemoModals);
+        window.addEventListener("tp-tour-open-product-modal", openProductDemoModal);
+        window.addEventListener("tp-tour-open-stock-ingress-modal", openIngressDemoModal);
+        window.addEventListener("tp-tour-open-variant-modal", openVariantDemoModal);
+        window.addEventListener("tp-tour-open-withdrawal-modal", openWithdrawalDemoModal);
+
+        return () => {
+            window.removeEventListener("tp-tour-close-stock-demo-modals", closeStockDemoModals);
+            window.removeEventListener("tp-tour-open-product-modal", openProductDemoModal);
+            window.removeEventListener("tp-tour-open-stock-ingress-modal", openIngressDemoModal);
+            window.removeEventListener("tp-tour-open-variant-modal", openVariantDemoModal);
+            window.removeEventListener("tp-tour-open-withdrawal-modal", openWithdrawalDemoModal);
+        };
+    }, []);
+
 
 
 
@@ -475,9 +516,17 @@ const StockManagement = () => {
 
     return (
 
-        <div className="stock-management-page" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div
+            className="stock-management-page"
+            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+            data-tour-id="stock-root"
+            data-testid="stock-page"
+        >
             <div className="stock-management-header flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between mb-4">
-                <div className="stock-management-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
+                <div
+                    className="stock-management-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md"
+                    data-tour-id="stock-header"
+                >
                     <img src="/inventory-icon.png" alt="Inventario" className="w-8 h-8" />
                     <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
                         Gestión de Inventario
@@ -536,6 +585,7 @@ const StockManagement = () => {
                 <div
                     className="bg-white rounded-xl px-4 py-4 shadow-md mb-4"
                     style={{ border: "1px solid #f1ece4" }}
+                    data-tour-id="stock-admin-filters"
                 >
                     <div data-stock-filters="true">
                         <div
@@ -570,6 +620,7 @@ const StockManagement = () => {
                                 size="small"
                                 disabled={pendingWithdrawalCount === 0}
                                 onClick={() => setIsWithdrawalRequestsListVisible(true)}
+                                data-testid="stock-withdrawal-requests-button"
                                 style={{
                                     borderRadius: 999,
                                     height: 28,
@@ -585,7 +636,7 @@ const StockManagement = () => {
                             </Button>
                         </div>
                         <div className="stock-filter-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                        <div>
+                        <div data-tour-id="stock-admin-seller-selector">
                             <SellerList
                                 sellers={sellers}
                                 selectedSeller={selectedSeller}
@@ -595,6 +646,8 @@ const StockManagement = () => {
                         {!isSeller && (
                             <div>
                                 <Button
+                                    data-tour-id="stock-product-create-button"
+                                    data-testid="stock-product-create-button"
                                     onClick={() => setProductFormVisible(true)}
                                     type="default"
                                     icon={<PlusOutlined />}
@@ -610,6 +663,7 @@ const StockManagement = () => {
                         )}
                         <div>
                             <Button
+                                data-testid="stock-generate-qr-button"
                                 onClick={() => {
                                     setQrModalProductIds([]);
                                     setQrModalAutoGenerate(false);
@@ -626,6 +680,8 @@ const StockManagement = () => {
                         </div>
                         <div>
                             <Button
+                                data-tour-id="stock-ingress-button"
+                                data-testid="stock-update-button"
                                 onClick={() => {
                                     const stockMapped = stockListForConfirmModal.map(item => ({
                                         ...item,
@@ -653,6 +709,7 @@ const StockManagement = () => {
                             <Button
                                 icon={<QrcodeOutlined />}
                                 block
+                                data-testid="stock-inventory-qr-button"
                                 style={actionButtonStyle}
                                 disabled={inventoryQrDisabled}
                                 onClick={() => setIsInventoryQRModalVisible(true)}
@@ -665,6 +722,7 @@ const StockManagement = () => {
                             <Button
                                 icon={<InfoCircleOutlined />}
                                 block
+                                data-testid="stock-info-qr-button"
                                 style={actionButtonStyle}
                                 disabled={infoQrDisabled}
                                 onClick={() => setIsStockQRInfoModalVisible(true)}
@@ -675,6 +733,8 @@ const StockManagement = () => {
                         </div>
                         <div>
                             <Input.Search
+                                data-tour-id="stock-admin-search"
+                                data-testid="stock-search-input"
                                 placeholder="Buscar producto o variante..."
                                 value={searchText}
                                 onChange={(e) => setSearchText(e.target.value)}
@@ -687,6 +747,7 @@ const StockManagement = () => {
                             <Select
                                 value={selectedCategory}
                                 onChange={setSelectedCategory}
+                                data-testid="stock-category-selector"
                                 className="w-full"
                                 size="large"
                             >
@@ -746,10 +807,14 @@ const StockManagement = () => {
             </Row>
             {isSeller ? (
                 <>
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                    <div
+                        style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginBottom: 12, flexWrap: "wrap" }}
+                        data-tour-id="stock-seller-actions"
+                    >
                         <Button
                             onClick={() => navigate("/seller-promotions")}
                             icon={<TagOutlined />}
+                            data-tour-id="stock-seller-promotions-button"
                         >
                             Promociones
                         </Button>
@@ -758,44 +823,50 @@ const StockManagement = () => {
                             icon={<ExportOutlined />}
                             disabled={!sellerSucursales.length}
                             onClick={() => void openWithdrawalRequestModal()}
+                            data-tour-id="stock-withdrawal-button"
                         >
                             Solicitar salida de productos
                         </Button>
                     </div>
-                    <ProductTableSeller
-                        productsList={isLoadingInventory ? [] : finalProductList}
-                        loading={isLoadingInventory}
+                    <div data-tour-id="stock-seller-products">
+                        <ProductTableSeller
+                            productsList={isLoadingInventory ? [] : finalProductList}
+                            loading={isLoadingInventory}
+                            onUpdateProducts={() => fetchInventoryPage(true)}
+                            sucursalId={sucursalId}
+                            setSucursalId={setSucursalId}
+                            branches={sellerSucursales}
+                            categories={categories}
+                            searchText={searchText}
+                            setSearchText={setSearchText}
+                            selectedCategory={selectedCategory}
+                            setSelectedCategory={setSelectedCategory}
+                        />
+                    </div>
+                </>
+            ) : (
+                <div data-tour-id="stock-products-table" data-testid="stock-products-table-wrapper">
+                    <ProductTable
+                        productsList={finalProductList}
+                        groupList={groups || []}
                         onUpdateProducts={() => fetchInventoryPage(true)}
-                        sucursalId={sucursalId}
-                        setSucursalId={setSucursalId}
-                        branches={sellerSucursales}
-                        categories={categories}
+                        setStockListForConfirmModal={setStockListForConfirmModal}
+                        resetSignal={resetSignal}
                         searchText={searchText}
                         setSearchText={setSearchText}
                         selectedCategory={selectedCategory}
                         setSelectedCategory={setSelectedCategory}
+                        selectedSeller={selectedSeller}
+                        onShowVariantModal={showVariantModal}
+                        sellersVigentes={sellersVigentes}
                     />
-                </>
-            ) : (
-                <ProductTable
-                    productsList={finalProductList}
-                    groupList={groups || []}
-                    onUpdateProducts={() => fetchInventoryPage(true)}
-                    setStockListForConfirmModal={setStockListForConfirmModal}
-                    resetSignal={resetSignal}
-                    searchText={searchText}
-                    setSearchText={setSearchText}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    selectedSeller={selectedSeller}
-                    onShowVariantModal={showVariantModal}
-                    sellersVigentes={sellersVigentes}
-                />
+                </div>
 
             )}
             {!isSeller && !selectedSeller && (
                 <div className="flex justify-center">
                     <Button
+                        data-testid="stock-load-more-sellers-button"
                         onClick={handleLoadMoreInventory}
                         loading={isLoadingInventory}
                         disabled={!hasMoreInventory}

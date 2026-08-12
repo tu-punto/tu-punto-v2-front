@@ -128,25 +128,29 @@ const AddVariantModal = ({ visible, onCancel, group }: any) => {
                 <Button key="cancel" onClick={onCancel}>
                     Cancelar
                 </Button>,
-                <Button key="submit" type="primary" onClick={handleFinish}>
+                <Button key="submit" type="primary" onClick={handleFinish} data-tour-id="stock-variant-create-submit">
                     Guardar Variantes
                 </Button>
             ]}
             width={1000}
         >
+            <div data-tour-id="stock-variant-create-modal">
             <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
                 Si abriste este modal desde una variante, esa combinacion ya viene cargada como base. Si no, el formulario empieza vacio y usa las variantes ya registradas solo como sugerencias.
             </Typography.Paragraph>
-            <VariantInputs
-                combinations={combinations}
-                setCombinations={setCombinations}
-                readOnlyCombinations={[]}
-                startEmpty
-                variantSuggestions={variantSuggestions}
-                subvariantSuggestions={subvariantSuggestions}
-                prefillCombination={group?.referenceCombination || null}
-                resetKey={`${resetKey}-${buildCombinationFingerprint(group?.referenceCombination || {}) || 'blank'}`}
-            />
+            <div data-tour-id="stock-variant-create-fields">
+                <VariantInputs
+                    combinations={combinations}
+                    setCombinations={setCombinations}
+                    readOnlyCombinations={[]}
+                    startEmpty
+                    variantSuggestions={variantSuggestions}
+                    subvariantSuggestions={subvariantSuggestions}
+                    prefillCombination={group?.referenceCombination || null}
+                    resetKey={`${resetKey}-${buildCombinationFingerprint(group?.referenceCombination || {}) || 'blank'}`}
+                />
+            </div>
+            </div>
         </Modal>
     );
 };

@@ -438,9 +438,27 @@ const BoxCloseForm = ({
 
       if (mode === "edit" && initialData?._id) {
         const updatePayload = {
+          responsable: values.responsable
+            ? {
+                id: values.responsable.value,
+                nombre: values.responsable.label,
+              }
+            : initialData.responsable,
+          closed_at: closingAtISO,
+          efectivo_inicial: form.getFieldValue("efectivo_inicial"),
+          bancario_inicial: form.getFieldValue("bancario_inicial"),
+          ventas_efectivo: form.getFieldValue("ventas_efectivo"),
+          ventas_qr: form.getFieldValue("ventas_qr"),
+          ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
+          efectivo_esperado: form.getFieldValue("efectivo_esperado"),
           efectivo_real: form.getFieldValue("efectivo_real"),
+          bancario_esperado: form.getFieldValue("bancario_esperado"),
+          bancario_real: form.getFieldValue("bancario_real"),
           diferencia_efectivo: form.getFieldValue("diferencia_efectivo"),
+          diferencia_bancario: form.getFieldValue("diferencia_bancario"),
+          cambios_externos: form.getFieldValue("cambios_externos") || 0,
           observaciones: form.getFieldValue("observaciones") || "",
+          id_sucursal: localStorage.getItem("sucursalId"),
           efectivo_diario,
           operaciones_adicionales: operationsPayload,
         };

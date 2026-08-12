@@ -105,6 +105,7 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
 
     return (
         <Modal title="Guía de Envío" open={visible} onCancel={handleCancel} width={700} footer={null}>
+            <div data-tour-id="shipping-guide-upload-modal">
             <Form form={form} name="uploadGuideForm" onFinish={handleFinish} layout='vertical'>
                 <Card title="Información Básica" bordered={false}>
                     <Row gutter={16}>
@@ -165,6 +166,7 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
                     </Button>
                 </Form.Item>
             </Form>
+            </div>
         </Modal>
     );
 }

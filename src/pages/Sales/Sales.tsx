@@ -1,5 +1,5 @@
 import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
-import { HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { GiftOutlined, HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
 import ProductTable from "../Product/ProductTable";
@@ -257,6 +257,22 @@ export const Sales = () => {
   const handleCancel = () => {
     setModalType(null);
   };
+
+  useEffect(() => {
+    const closeDemoModals = () => setModalType(null);
+    const openSalesDemoModal = () => setModalType("sales");
+    const openShippingDemoModal = () => setModalType("shipping");
+
+    window.addEventListener("tp-tour-close-sales-demo-modals", closeDemoModals);
+    window.addEventListener("tp-tour-open-sales-modal", openSalesDemoModal);
+    window.addEventListener("tp-tour-open-delivery-modal", openShippingDemoModal);
+
+    return () => {
+      window.removeEventListener("tp-tour-close-sales-demo-modals", closeDemoModals);
+      window.removeEventListener("tp-tour-open-sales-modal", openSalesDemoModal);
+      window.removeEventListener("tp-tour-open-delivery-modal", openShippingDemoModal);
+    };
+  }, []);
 
   const handleProductModalCancel = () => {
     setProductAddModal(false);
@@ -566,7 +582,7 @@ export const Sales = () => {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4" data-tour-id="sales-root">
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/shopping-cart-icon.png" alt="Carrito" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
@@ -574,9 +590,23 @@ export const Sales = () => {
           </h1>
         </div>
         {(isAdmin || isOperator) && (
-          <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
-            Historial de Ventas
-          </Button>
+          <Space>
+            <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
+              Historial de Ventas
+            </Button>
+            <Button
+              icon={<GiftOutlined />}
+              onClick={() =>
+                navigate(
+                  selectedSellerId
+                    ? `/seller-promotions?sellerId=${encodeURIComponent(String(selectedSellerId))}`
+                    : "/seller-promotions"
+                )
+              }
+            >
+              Promociones Vendedores
+            </Button>
+          </Space>
         )}
       </div>
 
@@ -584,6 +614,7 @@ export const Sales = () => {
         {/* Columna de Inventario */}
         <Col xs={24} md={12}>
           <Card
+            data-tour-id="sales-inventory-card"
             title={
               <Row justify="space-between" align="middle" gutter={[8, 8]}>
                 <Col>
@@ -594,6 +625,7 @@ export const Sales = () => {
                 <Col>
                   <Space wrap>
                     <Input.Search
+                      data-tour-id="sales-product-search"
                       placeholder="Buscar producto..."
                       onChange={(e) => setSearchText(e.target.value)}
                       style={{ width: 200 }}
@@ -659,11 +691,13 @@ export const Sales = () => {
           >
             <Spin spinning={inventoryLoading || sellersLoading} tip="Cargando inventario...">
               <div style={{ pointerEvents: (inventoryLoading || sellersLoading) ? "none" : "auto" }}></div>
-              <ProductTable
-                onSelectProduct={handleProductSelect}
-                refreshKey={refreshKey}
-                data={filteredBySeller}
-              />
+              <div data-tour-id="sales-products-list">
+                <ProductTable
+                  onSelectProduct={handleProductSelect}
+                  refreshKey={refreshKey}
+                  data={filteredBySeller}
+                />
+              </div>
             </Spin>
           </Card>
         </Col>
@@ -671,6 +705,7 @@ export const Sales = () => {
         {/* Columna de Ventas */}
         <Col xs={24} md={12}>
           <Card
+            data-tour-id="sales-cart-card"
             title={
               <Row justify="space-between" align="middle" gutter={[8, 8]}>
                 <Col>
@@ -686,11 +721,12 @@ export const Sales = () => {
                         onClick={showSalesModal}
                         type="primary"
                         className="text-mobile-base xl:text-desktop-sm "
+                        data-tour-id="sales-sale-button"
                       >
                         Realizar Venta
                       </Button>
                     )}
-                    <Button onClick={showShippingModal} type="primary">
+                    <Button onClick={showShippingModal} type="primary" data-tour-id="sales-delivery-button">
                       Realizar Entrega
                     </Button>
                     {(isAdmin || isOperator) && (

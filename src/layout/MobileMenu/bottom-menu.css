@@ -38,6 +38,16 @@
     line-height: 1.05;
 }
 
+.bottom-menu {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+.fixed:has(> .bottom-menu) {
+    bottom: 0 !important;
+}
+
 @media (max-width: 380px) {
     .bottom-menu .ant-menu-horizontal {
         height: 76px !important;

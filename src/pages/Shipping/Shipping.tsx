@@ -36,8 +36,8 @@ const Shipping = () => {
 
 
 	return (
-		<div className="shipping-page p-4">
-			<div className="shipping-page-header flex justify-between items-center mb-4">
+		<div className="shipping-page p-4" data-tour-id="shipping-root">
+			<div className="shipping-page-header flex justify-between items-center mb-4" data-tour-id="shipping-header">
 				<div
 					className={`shipping-page-title flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md ${isSuperadmin ? "cursor-pointer hover:shadow-lg transition-shadow" : ""}`}
 					role={isSuperadmin ? "button" : undefined}
@@ -59,6 +59,7 @@ const Shipping = () => {
 				<div className="shipping-page-actions flex items-center gap-3">
 					{headerAction?.visible && (
 						<Button
+							data-tour-id="shipping-transfer-action"
 							type="primary"
 							onClick={headerAction.onClick}
 							loading={headerAction.loading}

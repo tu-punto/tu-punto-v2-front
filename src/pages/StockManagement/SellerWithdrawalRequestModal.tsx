@@ -172,7 +172,7 @@ const SellerWithdrawalRequestModal = ({
                 </Button>
             ]}
         >
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }} data-tour-id="stock-withdrawal-modal">
                 <Select
                     value={branchId || undefined}
                     onChange={(value) => {
