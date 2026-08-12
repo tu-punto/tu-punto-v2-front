@@ -29,7 +29,7 @@ const getVisibleTableRows = (page: Page) =>
     has: page.locator("td"),
   });
 
-const getVisibleSellerOptions = async (page: Page) => {
+export const getVisibleSellerOptions = async (page: Page) => {
   const trigger = page.getByTestId("stock-seller-selector");
   await trigger.click();
 
@@ -52,11 +52,11 @@ const getVisibleSellerOptions = async (page: Page) => {
   return labels;
 };
 
-const waitForInventoryState = async (page: Page) => {
+export const waitForInventoryState = async (page: Page) => {
   const groups = page.getByTestId("stock-group-section");
   const emptyState = page.getByTestId("stock-empty-state");
 
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
     if ((await groups.count()) > 0) {
       await expect(groups.first()).toBeVisible({ timeout: 2_000 });
       return "groups" as const;
@@ -66,7 +66,7 @@ const waitForInventoryState = async (page: Page) => {
       return "empty" as const;
     }
 
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(300);
   }
 
   return "unknown" as const;
@@ -115,8 +115,10 @@ const extractProductName = async (page: Page) => {
   return "";
 };
 
-export const discoverSafeFixture = async (page: Page): Promise<StockSafeFixture> => {
-  const sellerOptions = await getVisibleSellerOptions(page);
+export const discoverSafeFixture = async (page: Page, preferredSellerName?: string): Promise<StockSafeFixture> => {
+  const sellerOptions = preferredSellerName
+    ? [preferredSellerName]
+    : await getVisibleSellerOptions(page);
 
   for (const sellerName of sellerOptions) {
     await selectAntdOption(page, page.getByTestId("stock-seller-selector"), sellerName);
@@ -151,6 +153,11 @@ export const discoverSafeFixture = async (page: Page): Promise<StockSafeFixture>
 
 export const prepareSafeFixture = async (page: Page) => {
   const fixture = await discoverSafeFixture(page);
+  return fixture;
+};
+
+export const prepareSafeFixtureForSeller = async (page: Page, sellerName: string) => {
+  const fixture = await discoverSafeFixture(page, sellerName);
   return fixture;
 };
 

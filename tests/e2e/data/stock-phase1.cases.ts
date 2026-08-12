@@ -73,9 +73,9 @@ export const stockPhase1Cases = {
   stockUpdates: [
     {
       name: "Incrementar stock en una unidad",
-      sellerName: "Alvaro Carreras",
-      existingProduct: "Polo estilo Zara",
-      existingVariant: "Polo estilo Zara",
+      sellerName: "Sin marca - Juan Perez",
+      existingProduct: "Canguro",
+      existingVariant: "Rojo / S",
       updateDelta: 1,
     },
   ] satisfies StockUpdateCase[],
@@ -83,7 +83,7 @@ export const stockPhase1Cases = {
   productCreations: [
     {
       name: "Alta producto color rojo",
-      sellerName: "Alvaro Carreras",
+      sellerName: "Sin marca - Juan Perez",
       categoryName: "Ropa",
       variantName: "Color",
       variantValue: "Rojo E2E",
