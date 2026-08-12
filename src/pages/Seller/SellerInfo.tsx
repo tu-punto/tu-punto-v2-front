@@ -24,8 +24,7 @@ const SellerInfoPageWrapper = () => {
                 // Sumar alquiler, exhibición y delivery desde todas las sucursales
                 const totalAlquiler = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.alquiler || 0), 0);
                 const totalExhibicion = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.exhibicion || 0), 0);
-                const totalDelivery = sellerData.pago_sucursales.reduce((sum:number, s:any) => sum + (s.delivery || 0), 0);
-                const pagoMensualTotal = totalAlquiler + totalExhibicion + totalDelivery;
+                const pagoMensualTotal = totalAlquiler + totalExhibicion;
 
                 const sellerWithKey = {
                     key: sellerData._id,
@@ -38,7 +37,7 @@ const SellerInfoPageWrapper = () => {
                     pago_mensual: `Bs. ${pagoMensualTotal}`,
                     alquiler: totalAlquiler,
                     exhibicion: totalExhibicion,
-                    delivery: totalDelivery,
+                    delivery: 0,
                     comision_porcentual: `${sellerData.comision_porcentual}%`,
                     comision_fija: `Bs. ${sellerData.comision_fija}`,
                     telefono: sellerData.telefono,

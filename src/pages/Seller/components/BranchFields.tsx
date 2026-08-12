@@ -133,7 +133,7 @@ const BranchFields = ({
       </Row>
 
       <Row gutter={[16, 16]}>
-        {["Almacenamiento", "Exhibicion", "Delivery", "Entrega_simple"].map(
+        {["Almacenamiento", "Exhibicion", "Entrega_simple"].map(
           (k) => (
             <Col xs={12} sm={6} md={6} key={k}>
               <Form.Item

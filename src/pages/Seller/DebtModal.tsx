@@ -65,7 +65,7 @@ export default function DebtModal({
             alquiler: p.alquiler,
             almacenamiento: p.alquiler,
             exhibicion: p.exhibicion,
-            delivery: p.delivery,
+            delivery: 0,
             entrega_simple: p.entrega_simple,
             fecha_ingreso: p.fecha_ingreso ? dayjs(p.fecha_ingreso) : null,
             fecha_salida: p.fecha_salida ? dayjs(p.fecha_salida) : null,
@@ -81,7 +81,7 @@ export default function DebtModal({
         comision_porcentual: seller.comision_porcentual,
         comision_fija: seller.comision_fija,
         isDebt: true,
-        sucursales: initSucursales.length ? initSucursales : [{}],
+        sucursales: initSucursales.length ? initSucursales : [{ delivery: 0 }],
       });
     })();
   }, [visible]);
@@ -91,7 +91,7 @@ export default function DebtModal({
     if (list.length >= sucursalOptions.length) {
       return message.warning("Ya agregaste todas las sucursales");
     }
-    form.setFieldsValue({ sucursales: [...list, {}] });
+    form.setFieldsValue({ sucursales: [...list, { delivery: 0 }] });
   };
 
   const onFinish = async (values: any) => {
@@ -102,7 +102,6 @@ export default function DebtModal({
           tot +
           Number(p.alquiler || 0) +
           Number(p.exhibicion || 0) +
-          Number(p.delivery || 0) +
           Number(p.entrega_simple || 0),
         0
       );
@@ -118,6 +117,7 @@ export default function DebtModal({
         pago_sucursales: values.sucursales.map((formSucursal: any) => ({
           ...formSucursal,
           alquiler: formSucursal.almacenamiento,
+          delivery: 0,
           sucursalName: sucursalOptions.find(
             (optionSucursal) => optionSucursal._id === formSucursal.id_sucursal
           )?.nombre,

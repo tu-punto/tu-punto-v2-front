@@ -426,7 +426,6 @@ export default function SellerTable({
                 totalMensual +
                 Number(p.alquiler || 0) +
                 Number(p.exhibicion || 0) +
-                Number(p.delivery || 0) +
                 Number(p.entrega_simple || 0),
               0
             );
