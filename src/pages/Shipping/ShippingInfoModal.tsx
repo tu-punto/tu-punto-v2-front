@@ -663,9 +663,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 : moment().format("HH:mm:ss");
 
             const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
+            const selectedStatus = String(values.estado_pedido || estadoPedido || shipping?.estado_pedido || "LISTO PARA RECOGER");
             const effectivePaidStatus = values.esta_pagado;
             const effectivePaymentType =
-                values.estado_pedido === "Entregado" && values.esta_pagado === "si"
+                selectedStatus === "Entregado" && values.esta_pagado === "si"
                     ? "3"
                     : values.tipo_de_pago;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
@@ -693,19 +694,21 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ? effectiveDestinationBranchId
                 : origenBranchId;
 
-            let horaEntregaReal = values.estado_pedido === "Entregado"
+            let horaEntregaReal = selectedStatus === "Entregado"
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
                 : fechaHoraEntregaAcordada;
 
             //console.log("🕒 Hora de entrega acordada:", fechaHoraEntregaAcordada);
             const updateShippingInfo: any = {
                 ...values,
+                estado_pedido: selectedStatus,
                 tipo_destino: effectiveDestinationType,
                 sucursal: paymentBranchIdForUpdate,
                 lugar_entrega: lugarEntregaFinal,
                 ubicacion_link: ubicacionLinkFinal,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,
+                hora_entrega_real: selectedStatus === "Entregado" ? horaEntregaReal : undefined,
                 pagado_al_vendedor: effectivePaymentType === '3',
                 hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: effectivePaidStatus,
@@ -1248,7 +1251,14 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
-                                <Radio.Group onChange={(e) => setEstadoPedido(e.target.value.toString())} value={estadoPedido || "LISTO PARA RECOGER"}>
+                                <Radio.Group
+                                    onChange={(e) => {
+                                        const nextStatus = e.target.value.toString();
+                                        setEstadoPedido(nextStatus);
+                                        internalForm.setFieldValue("estado_pedido", nextStatus);
+                                    }}
+                                    value={estadoPedido || "LISTO PARA RECOGER"}
+                                >
                                     <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                                     <Radio.Button value="En camino">En camino</Radio.Button>
                                     <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
