@@ -31,7 +31,7 @@ import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
 import { isSuperadminUser, normalizeRole } from "../utils/role";
-import { canSellerAccessInventory, canSellerAccessShop } from "../utils/sellerServiceAccess";
+import { canSellerAccessInventory, canSellerAccessShop, canSellerAccessSales, canSellerAccessSimplePackages } from "../utils/sellerServiceAccess";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
@@ -47,21 +47,37 @@ const SellerProductInfoRoute = () => {
   return <SellerProductInfoPage mode="seller" />;
 };
 
+const sellerAccessDeniedState = (reason: string) => ({
+  redirectTo: "/seller-info",
+  seconds: 4,
+  reason,
+});
+
 const StockRoute = () => {
   const { user } = useContext(UserContext);
 
   if (!canSellerAccessInventory(user)) {
-    return <Navigate to="/simple-packages" replace />;
+    return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("stock")} />;
   }
 
   return <StockManagement />;
+};
+
+const SalesRoute = () => {
+  const { user } = useContext(UserContext);
+
+  if (!canSellerAccessSales(user)) {
+    return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("sales")} />;
+  }
+
+  return <Sales />;
 };
 
 const ShopRoute = () => {
   const { user } = useContext(UserContext);
 
   if (!canSellerAccessShop(user)) {
-    return <Navigate to="/seller-info" replace />;
+    return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("shop")} />;
   }
 
   return <Sales />;
@@ -70,8 +86,8 @@ const ShopRoute = () => {
 const SimplePackagesRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (normalizeRole(user?.role) !== "seller") {
-    return <Navigate to="/shipping" replace />;
+  if (!canSellerAccessSimplePackages(user)) {
+    return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("simple-packages")} />;
   }
 
   return <SimplePackagesPage />;
@@ -140,7 +156,7 @@ const protectedRoutes = [
       },
       {
         path: "/sales",
-        element: guard("/sales", <Sales />),
+        element: guard("/sales", <SalesRoute />),
       },
       {
         path: "/shipping",
