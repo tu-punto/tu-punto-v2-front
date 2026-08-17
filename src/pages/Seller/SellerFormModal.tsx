@@ -62,7 +62,7 @@ export default function SellerFormModal({
         const res = await getSucursalsAPI();
         setSucursalOptions(res || []);
         form.resetFields();
-        const initialBranches = [{}];
+        const initialBranches = [{ delivery: 0 }];
         form.setFieldsValue({ sucursales: initialBranches });
         syncServiceFlags(initialBranches);
       })();
@@ -76,7 +76,7 @@ export default function SellerFormModal({
     if (list.length >= sucursalOptions.length) {
       return message.warning("Ya agregaste todas las sucursales");
     }
-    form.setFieldsValue({ sucursales: [...list, {}] });
+    form.setFieldsValue({ sucursales: [...list, { delivery: 0 }] });
   };
 
   /* submit (alta) */
@@ -96,7 +96,7 @@ export default function SellerFormModal({
             "",
           alquiler: s.almacenamiento ?? 0,
           exhibicion: s.exhibicion ?? 0,
-          delivery: s.delivery ?? 0,
+          delivery: 0,
           entrega_simple: s.entrega_simple ?? 0,
           fecha_ingreso: s.fecha_ingreso
             ? s.fecha_ingreso.toISOString()

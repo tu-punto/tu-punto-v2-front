@@ -216,7 +216,7 @@ const ExternalShippingInfoModal = ({
   const canEditCreatedToday = canEditDelivery && isSameBusinessDay(externalShipping?.fecha_pedido);
   const canEditBuyerName = canEditCreatedToday && !isSimplePackage;
   const canEditChargeSummary = canEditCreatedToday;
-  const canEditDestination = canEditCreatedToday;
+  const canEditDestination = canEditDelivery;
   const canAnnulExternal =
     isAdmin &&
     !isSimplePackage &&
@@ -827,7 +827,7 @@ const ExternalShippingInfoModal = ({
               </Col>
               <Col span={24}>
                 <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
-                  Solo se puede cambiar la sucursal destino el mismo dia en que se creo el pedido.
+                  Disponible para usuarios con permiso de edicion.
                 </div>
               </Col>
             </Row>

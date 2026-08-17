@@ -171,10 +171,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       ? sellerData.pago_sucursales.map((sucursal: any) => ({
           ...sucursal,
           almacenamiento: sucursal.alquiler,
+          delivery: 0,
           fecha_ingreso: sucursal.fecha_ingreso ? dayjs(sucursal.fecha_ingreso) : null,
           fecha_salida: sucursal.fecha_salida ? dayjs(sucursal.fecha_salida) : null,
         }))
-      : [{}];
+      : [{ delivery: 0 }];
 
     return {
       telefono: sellerData?.telefono,
@@ -631,6 +632,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
           ...sucursal,
           alquiler: sucursal.almacenamiento,
+          delivery: 0,
         })),
       });
       if (!resSeller?.success) {
@@ -914,6 +916,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
                 almacenamiento: sucursal.alquiler,
+                delivery: 0,
                 fecha_ingreso: sucursal.fecha_ingreso
                   ? dayjs(sucursal.fecha_ingreso)
                   : null,
@@ -921,7 +924,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                   ? dayjs(sucursal.fecha_salida)
                   : null,
               }))
-            : [{}],
+            : [{ delivery: 0 }],
         }}
       >
         {/* Información del vendedor */}
@@ -1049,7 +1052,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               icon={<PlusOutlined />}
               onClick={() => {
                 const curr = form.getFieldValue("sucursales") || [];
-                form.setFieldsValue({ sucursales: [...curr, {}] });
+                form.setFieldsValue({ sucursales: [...curr, { delivery: 0 }] });
               }}
               disabled={isSeller}
             >

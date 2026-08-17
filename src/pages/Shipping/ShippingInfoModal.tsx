@@ -247,7 +247,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const canMarkAsDelivered = useMemo(() => {
         return !deliveryPermissionBranchId || String(deliveryPermissionBranchId) === String(currentSucursalId);
     }, [deliveryPermissionBranchId, currentSucursalId]);
-    const canEditDestinationCreatedToday = canEditShipping && isSameBusinessDay(shipping?.fecha_pedido);
+    const canEditDestination = canEditShipping;
     const originalSimplePackageDestinationBranchId = useMemo(
         () => resolveBranchId(shipping?.destino_sucursal) || paymentBranchId || origenBranchId,
         [shipping, paymentBranchId, origenBranchId]
@@ -965,7 +965,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         </Row>
                     </Card>
                 )}
-                {isSimplePackageOrder && canEditDestinationCreatedToday && (
+                {isSimplePackageOrder && canEditDestination && (
                     <Card title="Sucursal destino" bordered={false} style={{ marginTop: 16 }}>
                         <Row gutter={16}>
                             <Col span={24}>
@@ -975,7 +975,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
                                 >
                                     <Select
-                                        disabled={!canEditDestinationCreatedToday}
+                                        disabled={!canEditDestination}
                                         placeholder="Seleccione la sucursal destino"
                                         allowClear
                                         style={{ width: '100%' }}
@@ -988,7 +988,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             </Col>
                             <Col span={24}>
                                 <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
-                                    Solo se puede cambiar la sucursal destino el mismo dia en que se creo el pedido.
+                                    Disponible para usuarios con permiso de edicion.
                                 </div>
                             </Col>
                         </Row>

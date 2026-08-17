@@ -8,20 +8,48 @@ interface Props {
   sucursales: ISucursalPago[];
 }
 
-const columns = [
-  { title: "Sucursal", dataIndex: "sucursalName", key: "sucursal" },
-  { title: "Almacenamiento", dataIndex: "alquiler", key: "alquiler", render: (v: number) => `Bs. ${v}` },
-  { title: "Exhibición", dataIndex: "exhibicion", key: "exhibicion", render: (v: number) => `Bs. ${v}` },
-  { title: "Entrega Simple", dataIndex: "entrega_simple", key: "entrega", render: (v: number) => `Bs. ${v}` },
-  { title: "Delivery", dataIndex: "delivery", key: "delivery", render: (v: number) => `Bs. ${v}` },
-];
-
 export default function SucursalDrawer({
   open,
   onClose,
   sellerName,
   sucursales,
 }: Props) {
+  const showDelivery = sucursales.some(
+    (sucursal) => Number(sucursal?.delivery || 0) > 0
+  );
+
+  const columns = [
+    { title: "Sucursal", dataIndex: "sucursalName", key: "sucursal" },
+    {
+      title: "Almacenamiento",
+      dataIndex: "alquiler",
+      key: "alquiler",
+      render: (value: number) => `Bs. ${value}`,
+    },
+    {
+      title: "Exhibicion",
+      dataIndex: "exhibicion",
+      key: "exhibicion",
+      render: (value: number) => `Bs. ${value}`,
+    },
+    {
+      title: "Entrega Simple",
+      dataIndex: "entrega_simple",
+      key: "entrega",
+      render: (value: number) => `Bs. ${value}`,
+    },
+    ...(showDelivery
+      ? [
+          {
+            title: "Delivery",
+            dataIndex: "delivery",
+            key: "delivery",
+            render: (value: number) => `Bs. ${value}`,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <Drawer
       title={`Detalle por sucursal - ${sellerName ?? ""}`}
@@ -31,7 +59,10 @@ export default function SucursalDrawer({
       open={open}
     >
       <Table
-        dataSource={sucursales.map((s, i) => ({ ...s, key: i }))}
+        dataSource={sucursales.map((sucursal, index) => ({
+          ...sucursal,
+          key: index,
+        }))}
         columns={columns}
         pagination={false}
       />

@@ -1,4 +1,13 @@
-import { Button, Drawer, Form, InputNumber, Select, Space, Table, message } from "antd";
+import {
+  Button,
+  Drawer,
+  Form,
+  InputNumber,
+  Select,
+  Space,
+  Table,
+  message,
+} from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { getSucursalsAPI } from "../../api/sucursal";
 import { updateFinanceFluxAPI } from "../../api/financeFlux";
@@ -33,6 +42,9 @@ const normalizeDetail = (details: ServiceDetail[] = []) =>
       delivery: Number(detail.delivery || 0),
     };
   });
+
+const hasDeliveryValue = (details: ServiceDetail[] = []) =>
+  details.some((detail) => Number(detail?.delivery || 0) > 0);
 
 export default function ServiceDetailDrawer({
   open,
@@ -77,6 +89,7 @@ export default function ServiceDetailDrawer({
   );
 
   const details = Form.useWatch("detalle_servicios", form) || [];
+  const showDeliveryColumn = hasDeliveryValue(details);
   const total = details.reduce(
     (sum: number, detail: any) =>
       sum +
@@ -93,7 +106,9 @@ export default function ServiceDetailDrawer({
     try {
       const values = await form.validateFields();
       const payloadDetail = (values.detalle_servicios || []).map((detail: any) => {
-        const sucursal = sucursals.find((item: any) => item._id === detail.id_sucursal);
+        const sucursal = sucursals.find(
+          (item: any) => item._id === detail.id_sucursal
+        );
         return {
           id_sucursal: detail.id_sucursal,
           sucursalName: sucursal?.nombre || detail.sucursalName || "",
@@ -113,14 +128,14 @@ export default function ServiceDetailDrawer({
       message.success("Detalle actualizado");
       onSaved?.();
       onClose();
-    } catch (error) {
+    } catch {
       message.error("Error al actualizar el detalle");
     } finally {
       setSaving(false);
     }
   };
 
-  const columns = [
+  const columns: any[] = [
     {
       title: "Sucursal",
       dataIndex: "id_sucursal",
@@ -155,7 +170,7 @@ export default function ServiceDetailDrawer({
         ),
     },
     {
-      title: "Exhibición",
+      title: "Exhibicion",
       dataIndex: "exhibicion",
       key: "exhibicion",
       render: (_: any, record: any) =>
@@ -176,7 +191,10 @@ export default function ServiceDetailDrawer({
           </Form.Item>
         ),
     },
-    {
+  ];
+
+  if (showDeliveryColumn) {
+    columns.push({
       title: "Delivery",
       dataIndex: "delivery",
       key: "delivery",
@@ -186,8 +204,8 @@ export default function ServiceDetailDrawer({
             <InputNumber min={0} prefix="Bs." style={{ width: 120 }} />
           </Form.Item>
         ),
-    },
-  ];
+    });
+  }
 
   return (
     <Drawer
@@ -225,17 +243,30 @@ export default function ServiceDetailDrawer({
             return (
               <>
                 <Table
-                  columns={tableColumns as any}
+                  columns={tableColumns}
                   dataSource={dataSource}
                   pagination={false}
                   scroll={{ x: "max-content" }}
                 />
                 {!readOnly && (
                   <Space style={{ marginTop: 16 }}>
-                    <Button onClick={() => add({ alquiler: 0, exhibicion: 0, entrega_simple: 0, delivery: 0 })}>
+                    <Button
+                      onClick={() =>
+                        add({
+                          alquiler: 0,
+                          exhibicion: 0,
+                          entrega_simple: 0,
+                          delivery: 0,
+                        })
+                      }
+                    >
                       Añadir sucursal
                     </Button>
-                    <Button type="primary" onClick={handleSave} loading={saving}>
+                    <Button
+                      type="primary"
+                      onClick={handleSave}
+                      loading={saving}
+                    >
                       Guardar cambios
                     </Button>
                   </Space>

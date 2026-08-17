@@ -12,6 +12,9 @@ const money = (monto: number) =>
     minimumFractionDigits: 2,
   })}`;
 
+const hasDeliveryValue = (details: any[] = []) =>
+  details.some((detail: any) => Number(detail?.delivery || 0) > 0);
+
 function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
   const [dataWithKey, setDataWithKey] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -36,21 +39,21 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
             }))
           : [];
 
-          return {
-            ...financeFlux,
-            detalle_servicios: detalleServicios,
-            key: financeFlux._id,
-            id_flujo_financiero: financeFlux._id,
+        return {
+          ...financeFlux,
+          detalle_servicios: detalleServicios,
+          key: financeFlux._id,
+          id_flujo_financiero: financeFlux._id,
           vendedor: financeFlux.id_vendedor
             ? `${financeFlux.id_vendedor.nombre} ${financeFlux.id_vendedor.apellido}`
             : "N/A",
-            encargado: financeFlux.id_trabajador?.nombre || "N/A",
-            sucursal: financeFlux.id_sucursal?.nombre || "N/A",
-            esDeuda: financeFlux.esDeuda ? "SI" : "NO",
-            attachment_url: financeFlux.attachment_url,
-            attachment_name: financeFlux.attachment_name,
-          };
-        });
+          encargado: financeFlux.id_trabajador?.nombre || "N/A",
+          sucursal: financeFlux.id_sucursal?.nombre || "N/A",
+          esDeuda: financeFlux.esDeuda ? "SI" : "NO",
+          attachment_url: financeFlux.attachment_url,
+          attachment_name: financeFlux.attachment_name,
+        };
+      });
 
       setDataWithKey(dataWithKeys);
       setFilteredData(dataWithKeys);
@@ -66,13 +69,11 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
   useEffect(() => {
     const filterData = (data: any) => {
       return data.filter((financeFlux: any) => {
-        // Filtro por tipo
         const matchesType =
           !selectedType ||
           selectedType === "" ||
           financeFlux.tipo === selectedType;
 
-        // Filtro por fecha
         const matchesDateRange =
           dateRange[0] && dateRange[1]
             ? new Date(financeFlux.fecha) >= dateRange[0] &&
@@ -145,7 +146,7 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       sorter: (a: any, b: any) => a.sucursal.localeCompare(b.sucursal),
     },
     {
-      title: "Categoría",
+      title: "Categoria",
       dataIndex: "categoria",
       key: "finance_flux_category",
       className: "text-mobile-sm xl:text-desktop-sm",
@@ -159,7 +160,11 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       render: (monto: number, record: any) =>
         Array.isArray(record.detalle_servicios) &&
         record.detalle_servicios.length > 0 ? (
-          <Button type="link" onClick={() => setDetailFlux(record)} style={{ padding: 0 }}>
+          <Button
+            type="link"
+            onClick={() => setDetailFlux(record)}
+            style={{ padding: 0 }}
+          >
             {money(monto)}
           </Button>
         ) : (
@@ -180,7 +185,13 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       className: "text-mobile-sm xl:text-desktop-sm",
       render: (_: any, record: any) =>
         record.attachment_url ? (
-          <Button type="link" href={record.attachment_url} target="_blank" rel="noreferrer" style={{ padding: 0 }}>
+          <Button
+            type="link"
+            href={record.attachment_url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ padding: 0 }}
+          >
             {record.attachment_name || "Ver archivo"}
           </Button>
         ) : (
@@ -195,12 +206,12 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       sorter: (a: any, b: any) => a.vendedor.localeCompare(b.vendedor),
     },
     {
-      title: "¿Es deuda?",
+      title: "Es deuda?",
       dataIndex: "esDeuda",
       key: "finance_flux_isDebt",
       className: "text-mobile-sm xl:text-desktop-sm",
       filters: [
-        { text: "Sí", value: "SI" },
+        { text: "Si", value: "SI" },
         { text: "No", value: "NO" },
       ],
       onFilter: (value: any, record: any) => record.esDeuda === value,
@@ -228,43 +239,50 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
     },
   ];
 
-  const detailColumns = [
-    { title: "Sucursal", dataIndex: "sucursalName", key: "sucursalName" },
-    {
-      title: "Almacenamiento",
-      dataIndex: "alquiler",
-      key: "alquiler",
-      render: (value: number) => money(value),
-    },
-    {
-      title: "Exhibición",
-      dataIndex: "exhibicion",
-      key: "exhibicion",
-      render: (value: number) => money(value),
-    },
-    {
-      title: "Entrega Simple",
-      dataIndex: "entrega_simple",
-      key: "entrega_simple",
-      render: (value: number) => money(value),
-    },
-    {
-      title: "Delivery",
-      dataIndex: "delivery",
-      key: "delivery",
-      render: (value: number) => money(value),
-    },
-    {
+  const getDetailColumns = (details: any[] = []) => {
+    const detailColumns: any[] = [
+      { title: "Sucursal", dataIndex: "sucursalName", key: "sucursalName" },
+      {
+        title: "Almacenamiento",
+        dataIndex: "alquiler",
+        key: "alquiler",
+        render: (value: number) => money(value),
+      },
+      {
+        title: "Exhibicion",
+        dataIndex: "exhibicion",
+        key: "exhibicion",
+        render: (value: number) => money(value),
+      },
+      {
+        title: "Entrega Simple",
+        dataIndex: "entrega_simple",
+        key: "entrega_simple",
+        render: (value: number) => money(value),
+      },
+    ];
+
+    if (hasDeliveryValue(details)) {
+      detailColumns.push({
+        title: "Delivery",
+        dataIndex: "delivery",
+        key: "delivery",
+        render: (value: number) => money(value),
+      });
+    }
+
+    detailColumns.push({
       title: "Total",
       dataIndex: "total",
       key: "total",
       render: (value: number) => money(value),
-    },
-  ];
+    });
+
+    return detailColumns;
+  };
 
   return (
     <div>
-      {/* Barra de búsqueda y filtros */}
       <div style={{ marginBottom: 16 }}>
         <Space wrap size="middle">
           <Select
@@ -272,14 +290,13 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
             value={selectedType}
             onChange={setSelectedType}
             options={Object.entries(FLUX_TYPES).map(([_, value]) => ({
-              value: value,
+              value,
               label: value,
             }))}
             allowClear
             style={{ width: 200 }}
           />
 
-          {/* Filtro por fecha */}
           <RangePicker
             onChange={(dates) => {
               if (dates && dates[0] && dates[1]) {
@@ -293,7 +310,6 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
           />
         </Space>
 
-        {/* Búsquedas específicas */}
         <div style={{ marginTop: 12 }}>
           <Space wrap size="middle">
             <Input
@@ -305,7 +321,7 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
               allowClear
             />
             <Input
-              placeholder="Buscar categoría..."
+              placeholder="Buscar categoria..."
               prefix={<SearchOutlined />}
               value={searchCategoria}
               onChange={(e) => setSearchCategoria(e.target.value)}
@@ -325,30 +341,30 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
       </div>
 
       <Table
-          columns={columns}
-          dataSource={filteredData}
-          expandable={{
-            expandedRowRender: (record: any) => (
-              <Table
-                columns={detailColumns}
-                dataSource={record.detalle_servicios}
-                pagination={false}
-                size="small"
-              />
-            ),
-            rowExpandable: (record: any) =>
-              Array.isArray(record.detalle_servicios) &&
-              record.detalle_servicios.length > 0,
-          }}
-          scroll={{ x: "max-content" }}
-          pagination={{
-            showSizeChanger: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} de ${total} registros`,
-            pageSize: 10,
-            pageSizeOptions: ["10", "20", "50", "100"],
-          }}
-        />
+        columns={columns}
+        dataSource={filteredData}
+        expandable={{
+          expandedRowRender: (record: any) => (
+            <Table
+              columns={getDetailColumns(record.detalle_servicios)}
+              dataSource={record.detalle_servicios}
+              pagination={false}
+              size="small"
+            />
+          ),
+          rowExpandable: (record: any) =>
+            Array.isArray(record.detalle_servicios) &&
+            record.detalle_servicios.length > 0,
+        }}
+        scroll={{ x: "max-content" }}
+        pagination={{
+          showSizeChanger: true,
+          showTotal: (total, range) =>
+            `${range[0]}-${range[1]} de ${total} registros`,
+          pageSize: 10,
+          pageSizeOptions: ["10", "20", "50", "100"],
+        }}
+      />
       <ServiceDetailDrawer
         open={!!detailFlux}
         onClose={() => setDetailFlux(null)}

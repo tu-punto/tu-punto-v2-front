@@ -1,13 +1,17 @@
 import React from "react";
 import { Table } from "antd";
 
-type Servicio = "Almacenamiento" | "Exhibición" | "Entregas Simples" | "Delivery";
+type Servicio =
+  | "Almacenamiento"
+  | "Exhibicion"
+  | "Entregas Simples"
+  | "Delivery";
 
 type SummaryData = Record<
   string,
   {
     Almacenamiento: number;
-    Exhibición: number;
+    Exhibicion: number;
     "Entregas Simples": number;
     Delivery: number;
     TOTAL: number;
@@ -19,24 +23,38 @@ type Props = {
   allSucursals: string[];
 };
 
-export default function ServiciosResumenTable({ summary, allSucursals }: Props) {
+export default function ServiciosResumenTable({
+  summary,
+  allSucursals,
+}: Props) {
   const sucursales = allSucursals;
-  const servicios: Servicio[] = ["Almacenamiento", "Exhibición", "Entregas Simples", "Delivery"];
+  const servicios: Servicio[] = [
+    "Almacenamiento",
+    "Exhibicion",
+    "Entregas Simples",
+    "Delivery",
+  ];
 
-  const rows = servicios.map((servicio) => {
-    const row: Record<string, any> = {
-      key: servicio,
-      servicio,
-    };
+  const hasDeliveryValues =
+    sucursales.some((sucursal) => Number(summary[sucursal]?.Delivery || 0) > 0) ||
+    Number(summary.TOTAL?.Delivery || 0) > 0;
 
-    sucursales.forEach((sucursal) => {
-      row[sucursal] = summary[sucursal]?.[servicio] || 0;
+  const rows = servicios
+    .filter((servicio) => servicio !== "Delivery" || hasDeliveryValues)
+    .map((servicio) => {
+      const row: Record<string, any> = {
+        key: servicio,
+        servicio,
+      };
+
+      sucursales.forEach((sucursal) => {
+        row[sucursal] = summary[sucursal]?.[servicio] || 0;
+      });
+
+      row.total = summary.TOTAL?.[servicio] || 0;
+
+      return row;
     });
-
-    row.total = summary.TOTAL?.[servicio] || 0;
-
-    return row;
-  });
 
   const totalRow: Record<string, any> = {
     key: "total",
@@ -52,7 +70,7 @@ export default function ServiciosResumenTable({ summary, allSucursals }: Props) 
 
   const columns = [
     {
-      title: "Servicio \\ Sucursal",
+      title: "Servicio / Sucursal",
       dataIndex: "servicio",
       key: "servicio",
       fixed: "left" as const,
@@ -61,24 +79,15 @@ export default function ServiciosResumenTable({ summary, allSucursals }: Props) 
       title: sucursal,
       dataIndex: sucursal,
       key: sucursal,
-      render: (val: number) => (
-        <span>{val !== 0 ? val.toFixed(2) : "-"}</span>
-      ),
+      render: (value: number) => <span>{value !== 0 ? value.toFixed(2) : "-"}</span>,
     })),
     {
       title: "TOTAL",
       dataIndex: "total",
       key: "total",
-      render: (val: number) => <strong>{val.toFixed(2)}</strong>,
+      render: (value: number) => <strong>{value.toFixed(2)}</strong>,
     },
   ];
 
-  return (
-    <Table
-      columns={columns}
-      dataSource={rows}
-      pagination={false}
-      bordered
-    />
-  );
+  return <Table columns={columns} dataSource={rows} pagination={false} bordered />;
 }
