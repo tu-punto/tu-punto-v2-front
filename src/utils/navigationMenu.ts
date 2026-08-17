@@ -1,6 +1,6 @@
 import { menu } from "../constants/menu";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
-import { canSellerAccessInventory, canSellerAccessShop } from "./sellerServiceAccess";
+import { canSellerAccessInventory, canSellerAccessShop, canSellerAccessSales, canSellerAccessSimplePackages } from "./sellerServiceAccess";
 import { isSuperadminUser, normalizeRole } from "./role";
 
 export const getVisibleMenuItems = (user: any) => {
@@ -10,8 +10,10 @@ export const getVisibleMenuItems = (user: any) => {
     (item) =>
       item.roles.includes(role) &&
       !item.hiddenInMenuForRoles?.includes(role) &&
+      (item.path !== "/sales" || canSellerAccessSales(user)) &&
       (item.path !== "/stock" || canSellerAccessInventory(user)) &&
       (item.path !== "/shop" || canSellerAccessShop(user)) &&
+      (item.path !== "/simple-packages" || canSellerAccessSimplePackages(user)) &&
       (item.path !== "/seller-product-info" || canAccessSellerProductInfo(user)) &&
       (!item.requiresSuperadmin || isSuperadminUser(user))
   );

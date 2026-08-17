@@ -1069,7 +1069,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 >
                                     <Radio.Button value="esta_sucursal">Esta sucursal</Radio.Button>
                                     <Radio.Button value="otro_lugar">Otro lugar</Radio.Button>
-                                    <Radio.Button value="sucursal">Otra sucursal</Radio.Button>
+                                    <Radio.Button value="sucursal" disabled>Otra sucursal</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
                         </Col>
