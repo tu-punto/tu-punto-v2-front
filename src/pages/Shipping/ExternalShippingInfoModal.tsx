@@ -641,9 +641,16 @@ const ExternalShippingInfoModal = ({
 
       const normalizedType = normalizeDeliveryPaymentCode(values.tipo_de_pago);
       const nextDestinationBranchId = String(values.destino_sucursal_id || "").trim();
+      const currentDestinationBranchId = String(
+        getBranchId(externalShipping?.destino_sucursal) ||
+        getBranchId(externalShipping?.sucursal) ||
+        ""
+      ).trim();
       const payload = {
         ...(canEditBuyerName ? { comprador: String(values.comprador || "").trim() } : {}),
-        ...(canEditDestination && nextDestinationBranchId ? { destino_sucursal_id: nextDestinationBranchId } : {}),
+        ...(canEditDestination && nextDestinationBranchId && nextDestinationBranchId !== currentDestinationBranchId
+          ? { destino_sucursal_id: nextDestinationBranchId }
+          : {}),
         estado_pedido: values.estado_pedido,
         delivered: values.estado_pedido === "Entregado",
         tipo_de_pago:
