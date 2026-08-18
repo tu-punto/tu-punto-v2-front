@@ -528,7 +528,7 @@ function ShippingFormModal({
                                                 lugar_entrega_input: undefined,
                                                 ubicacion_link: undefined
                                             });
-                                        } else {
+                                        } else if (nextType !== "sucursal") {
                                             form.setFieldsValue({
                                                 destino_sucursal_id: undefined,
                                                 lugar_entrega_input: undefined,
@@ -539,7 +539,17 @@ function ShippingFormModal({
                                 >
                                     <Radio.Button value="esta_sucursal">Esta sucursal</Radio.Button>
                                     <Radio.Button value="otro_lugar">Otro lugar</Radio.Button>
-                                    <Radio.Button value="sucursal">Otra sucursal</Radio.Button>
+                                    <Radio.Button
+                                        value="sucursal"
+                                        disabled
+                                        style={{
+                                            color: "rgba(0,0,0,0.25)",
+                                            background: "#f5f5f5",
+                                            borderColor: "#d9d9d9",
+                                        }}
+                                    >
+                                        Otra sucursal
+                                    </Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
                         </Col>
