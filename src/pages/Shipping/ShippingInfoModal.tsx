@@ -663,12 +663,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 : moment().format("HH:mm:ss");
 
             const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
-            const selectedStatus = String(values.estado_pedido || estadoPedido || shipping?.estado_pedido || "LISTO PARA RECOGER");
-            const effectivePaidStatus = values.esta_pagado;
+            const selectedStatus = String(estadoPedido || internalForm.getFieldValue("estado_pedido") || values.estado_pedido || shipping?.estado_pedido || "LISTO PARA RECOGER");
+            const effectivePaidStatus = String(estaPagado || internalForm.getFieldValue("esta_pagado") || values.esta_pagado || "no");
+            const selectedPaymentType = String(tipoPago || internalForm.getFieldValue("tipo_de_pago") || values.tipo_de_pago || "");
             const effectivePaymentType =
-                selectedStatus === "Entregado" && values.esta_pagado === "si"
+                selectedStatus === "Entregado" && effectivePaidStatus === "si"
                     ? "3"
-                    : values.tipo_de_pago;
+                    : selectedPaymentType;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
             const simplePackageDestinationId =
                 values.destino_sucursal_id || paymentBranchId || origenBranchId;
@@ -1212,6 +1213,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 <Radio.Group
                                     onChange={(e) => {
                                         const value = e.target.value;
+                                        internalForm.setFieldValue("esta_pagado", value);
                                         setEstaPagado(value);
                                         setAdelantoVisible(value === 'adelanto');
 
