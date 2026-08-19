@@ -121,7 +121,7 @@ const resolveBranchId = (value: any) => {
     return "";
 };
 
-const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
+const getVisualStatusMeta = (pedido: any, now: moment.Moment, allowVisualInTransit = false) => {
     const estadoReal = normalizeStatus(pedido?.estado_pedido);
     const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS;
 
@@ -167,7 +167,9 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
-    if (estadoReal === IN_TRANSIT_STATUS || shouldDisplayInTransit(pedido, now)) {
+    const shouldShowVisualInTransit = allowVisualInTransit && shouldDisplayInTransit(pedido, now);
+
+    if (estadoReal === IN_TRANSIT_STATUS || shouldShowVisualInTransit) {
         return {
             label: "En camino",
             tone: {
@@ -177,7 +179,7 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
                 dot: "#fa8c16",
             },
             tooltip: undefined,
-            isVisualOnly: estadoReal !== IN_TRANSIT_STATUS,
+            isVisualOnly: shouldShowVisualInTransit,
         };
     }
 
@@ -875,7 +877,7 @@ const ShippingTable = ({
             key: 'estado_visual',
             width: 150,
             render: (_: any, record: any) => {
-                const statusMeta = getVisualStatusMeta(record, statusNow);
+                const statusMeta = getVisualStatusMeta(record, statusNow, isVendedor);
 
                 return (
                     <Tooltip title={statusMeta.tooltip}>
@@ -1713,7 +1715,7 @@ const ShippingTable = ({
             {isMobile && (
                 <div className="shipping-mobile-list">
                     {currentRows.map((record: any) => {
-                        const statusMeta = getVisualStatusMeta(record, statusNow);
+                        const statusMeta = getVisualStatusMeta(record, statusNow, isVendedor);
                         return (
                             <button
                                 type="button"

@@ -385,10 +385,15 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         const rawFecha = shipping.hora_entrega_acordada;
         const originalHoraEntregaUTC = rawFecha ? dayjs.utc(rawFecha) : null;
 
-        const fechaRango = shipping.hora_entrega_rango_final
+        const fechaRango = shipping.hora_entrega_rango_final;
         const originalHoraRangoUTC = fechaRango ? dayjs.utc(fechaRango) : null;
+        const hasMeaningfulRangeHour = Boolean(
+            originalHoraEntregaUTC &&
+            originalHoraRangoUTC &&
+            originalHoraRangoUTC.format("HH:mm:ss") !== originalHoraEntregaUTC.format("HH:mm:ss")
+        );
 
-        setIsRangeHour(shipping.hora_entrega_rango_final)
+        setIsRangeHour(hasMeaningfulRangeHour);
 
         //console.log("🟢 UTC:", dayjs.utc(shipping.hora_entrega_acordada).format());
         //console.log("🟡 Local:", dayjs.utc(shipping.hora_entrega_acordada).local().format());
@@ -409,7 +414,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             hora_entrega_acordada: originalHoraEntregaUTC
                 ? dayjs(originalHoraEntregaUTC.format("HH:mm:ss"), "HH:mm:ss")
                 : null,
-            hora_entrega_rango_final: originalHoraRangoUTC
+            hora_entrega_rango_final: hasMeaningfulRangeHour && originalHoraRangoUTC
                 ? dayjs(originalHoraRangoUTC.format("HH:mm:ss"), "HH:mm:ss")
                 : null,
             observaciones: shipping.observaciones,
@@ -658,11 +663,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
             const fechaHoraEntregaAcordada = `${fechaEntrega.format("YYYY-MM-DD")} ${horaAcordada}`;
 
-            const horaRango = values.hora_entrega_rango_final && dayjs.isDayjs(values.hora_entrega_rango_final)
+            const horaRango = isRangeHour && values.hora_entrega_rango_final && dayjs.isDayjs(values.hora_entrega_rango_final)
                 ? values.hora_entrega_rango_final.format("HH:mm:ss")
-                : moment().format("HH:mm:ss");
+                : null;
 
-            const horaEntregaRangoFinal = `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`;
+            const horaEntregaRangoFinal = horaRango
+                ? `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`
+                : null;
             const selectedStatus = String(estadoPedido || internalForm.getFieldValue("estado_pedido") || values.estado_pedido || shipping?.estado_pedido || "LISTO PARA RECOGER");
             const effectivePaidStatus = String(estaPagado || internalForm.getFieldValue("esta_pagado") || values.esta_pagado || "no");
             const selectedPaymentType = String(tipoPago || internalForm.getFieldValue("tipo_de_pago") || values.tipo_de_pago || "");
@@ -1017,7 +1024,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             <Switch
                                 checked={isRangeHour}
                                 disabled={isDeliveryLocked}
-                                onChange={(checked) => { setIsRangeHour(checked); }}
+                                onChange={(checked) => {
+                                    setIsRangeHour(checked);
+                                    if (!checked) {
+                                        internalForm.setFieldValue("hora_entrega_rango_final", null);
+                                    }
+                                }}
                                 unCheckedChildren="Hora específica"
                                 checkedChildren="Rango de horas"
                             />
