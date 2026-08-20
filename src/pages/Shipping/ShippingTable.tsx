@@ -290,6 +290,7 @@ const ShippingTable = ({
     });
     const [branchTransferError, setBranchTransferError] = useState("");
     const branchTransferFetchRef = useRef(0);
+    const lastDeliveryCountFilterKeyRef = useRef("");
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator || isSuperadminUser(user);
@@ -307,6 +308,34 @@ const ShippingTable = ({
     const pendingSendLabel = isVendedor ? "En sucursal de origen" : "Para enviar a otra sucursal";
     const currentRows = shippingData;
     const branchTransferMode = selectedStatus === "para_enviar" ? "send" : selectedStatus === "en_camino" ? "receive" : null;
+    const deliveryCountFilterKey = useMemo(
+        () => JSON.stringify({
+            selectedStatus,
+            selectedLocation,
+            otherLocation,
+            dateRange: dateRange.map((item) => item ? item.toISOString() : null),
+            selectedVendedor,
+            externalSellerSearch,
+            searchCliente,
+            currentSucursalId,
+            refreshKey,
+            userId: user?.id_vendedor || "",
+            canManageExternal,
+        }),
+        [
+            selectedStatus,
+            selectedLocation,
+            otherLocation,
+            dateRange,
+            selectedVendedor,
+            externalSellerSearch,
+            searchCliente,
+            currentSucursalId,
+            refreshKey,
+            user?.id_vendedor,
+            canManageExternal,
+        ]
+    );
 
     const getOriginBranchId = (pedido: any) =>
         resolveBranchId(pedido?.lugar_origen) ||
@@ -683,6 +712,7 @@ const ShippingTable = ({
                         ? externalSellerSearch.trim() || undefined
                         : undefined,
             };
+            const shouldRefreshDeliveryCount = lastDeliveryCountFilterKeyRef.current !== deliveryCountFilterKey;
 
             const [dashboardData, deliveryDashboardData] = await Promise.all([
                 getShippingDashboardListAPI({
@@ -693,27 +723,34 @@ const ShippingTable = ({
                     destinationMode: destinationMode as "any" | "branch" | "other",
                     destinationQuery,
                 }),
-                getShippingDashboardListAPI({
-                    page: 1,
-                    limit: 1,
-                    tab: FILTER_ALL,
-                    ...commonParams,
-                    destinationMode: "other",
-                    destinationQuery: undefined,
-                })
+                shouldRefreshDeliveryCount
+                    ? getShippingDashboardListAPI({
+                        page: 1,
+                        limit: 1,
+                        tab: FILTER_ALL,
+                        ...commonParams,
+                        destinationMode: "other",
+                        destinationQuery: undefined,
+                    })
+                    : Promise.resolve(null)
             ]);
 
             const rows = Array.isArray(dashboardData?.rows) ? dashboardData.rows : [];
             setShippingData(rows);
-            setTabCounts({
+            setTabCounts((prev) => ({
                 todos: Number(dashboardData?.counts?.todos || 0),
                 listo_para_recoger: Number(dashboardData?.counts?.listo_para_recoger || 0),
                 para_enviar: Number(dashboardData?.counts?.para_enviar || 0),
                 en_camino: Number(dashboardData?.counts?.en_camino || 0),
-                deliverys: Number(deliveryDashboardData?.total || deliveryDashboardData?.counts?.todos || 0),
+                deliverys: shouldRefreshDeliveryCount
+                    ? Number(deliveryDashboardData?.total || deliveryDashboardData?.counts?.todos || 0)
+                    : prev.deliverys,
                 entregado: Number(dashboardData?.counts?.entregado || 0),
-            });
+            }));
             setTableTotal(Number(dashboardData?.total || 0));
+            if (shouldRefreshDeliveryCount) {
+                lastDeliveryCountFilterKeyRef.current = deliveryCountFilterKey;
+            }
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
