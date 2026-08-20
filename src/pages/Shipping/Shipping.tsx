@@ -97,7 +97,6 @@ const Shipping = () => {
 
 			<ShippingTable
 				refreshKey={refreshKey}
-				onOpenQR={canScanOrders ? () => setIsQRModalOpen(true) : undefined}
 				onHeaderActionChange={setHeaderAction}
 			/>
 			<ShippingQRScannerModal

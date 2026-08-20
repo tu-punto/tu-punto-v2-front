@@ -77,7 +77,7 @@ function ShippingFormModal({
     const [adelantoVisible, setAdelantoVisible] = useState(false);
     const [montoCobradoDelivery, setMontoCobradoDelivery] = useState<number>(0);
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
-    const [codigoCelular, setCodigoCelular] = useState<number | null>()
+    const [codigoCelular, setCodigoCelular] = useState<string | null>(COUNTRY_CODES[0]?.code || null)
     const [estadoPedido, setEstadoPedido] = useState<string | null>(null);
     const [tipoPago, setTipoPago] = useState<string | null>(null);
     const [form] = Form.useForm();
@@ -170,6 +170,13 @@ function ShippingFormModal({
             }
         }
     }, [estadoPedido, form]);
+
+    useEffect(() => {
+        if (visible) {
+            setCodigoCelular(COUNTRY_CODES[0]?.code || null);
+            form.setFieldValue("celular_cliente", COUNTRY_CODES[0]?.code);
+        }
+    }, [visible]);
 
     const hideDeliveryCosts = !isAdmin;
     const hayMultiplesVendedores = useMemo(() => {
@@ -279,6 +286,8 @@ function ShippingFormModal({
                 }
             }
 
+            const selectedCountryCode = String(form.getFieldValue("celular_cliente") || codigoCelular || COUNTRY_CODES[0]?.code || "");
+
             const response = await registerShippingAPI({
                 ...values,
                 tipo_destino: effectiveDestinationType,
@@ -286,7 +295,7 @@ function ShippingFormModal({
                 ubicacion_link: ubicacionLinkFinal,
                 esta_pagado: effectivePaidStatus,
                 adelanto_cliente: effectiveAdvance,
-                telefono_cliente: (codigoCelular) ? codigoCelular + values.telefono_cliente : "",
+                telefono_cliente: selectedCountryCode ? `${selectedCountryCode}${values.telefono_cliente}` : "",
                 fecha_pedido: fechaPedido,
                 hora_entrega_acordada: horaEntregaAcordada,
                 hora_entrega_real: horaEntregaReal,
@@ -294,6 +303,9 @@ function ShippingFormModal({
                 pagado_al_vendedor: effectivePaymentType === "3",
                 sucursal: paymentBranchId,
                 lugar_origen: branchIdFromProps,
+                hora_entrega_rango_final: isRangeHour
+                    ? moment.tz(`${fechaSeleccionada} ${values.hora_entrega_rango_final?.format?.("HH:mm:ss") || horaSeleccionada}`, "America/La_Paz").toDate()
+                    : undefined,
             });
 
             if (!response.success) {
@@ -410,6 +422,7 @@ function ShippingFormModal({
                 onFinish={handleFinish}
                 layout="vertical"
                 initialValues={{
+                    celular_cliente: COUNTRY_CODES[0]?.code,
                     tipo_destino: "esta_sucursal",
                     estado_pedido: "En Espera"
                 }}
@@ -429,8 +442,7 @@ function ShippingFormModal({
                                 <Select
                                     placeholder="Código celular"
                                     allowClear
-                                    value={codigoCelular}
-                                    onChange={(value) => setCodigoCelular(value)}
+                                    onChange={(value) => setCodigoCelular(value || null)}
                                 >
                                     {COUNTRY_CODES.map((codigo) => (
                                         <Select.Option key={codigo.code} value={codigo.code} >

@@ -1,5 +1,5 @@
-import { ArrowRightOutlined, InboxOutlined, QrcodeOutlined } from '@ant-design/icons';
-import { Alert, Button, Checkbox, DatePicker, Input, InputNumber, message, Modal, Pagination, Radio, Select, Spin, Table, Tooltip } from 'antd';
+import { ArrowRightOutlined, InboxOutlined } from '@ant-design/icons';
+import { Alert, Button, Checkbox, Input, InputNumber, message, Modal, Pagination, Radio, Select, Spin, Table, Tooltip } from 'antd';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getShippingDashboardListAPI, getShippingByIdAPI, markSellerWithdrawalAPI, rejectCatalogOrderAPI, updateShippingAPI } from '../../api/shipping';
 import { getExternalSaleByIdAPI, updateExternalSaleAPI } from '../../api/externalSale';
@@ -23,7 +23,6 @@ import {
 } from "./shippingStatus";
 import moment from "moment-timezone";
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
 const VISUAL_IN_TRANSIT_THRESHOLD_MINUTES = 30;
@@ -122,7 +121,7 @@ const resolveBranchId = (value: any) => {
     return "";
 };
 
-const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
+const getVisualStatusMeta = (pedido: any, now: moment.Moment, allowVisualInTransit = false) => {
     const estadoReal = normalizeStatus(pedido?.estado_pedido);
     const isPendingBranchSend = estadoReal === SEND_TO_BRANCH_STATUS;
 
@@ -168,7 +167,9 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
         };
     }
 
-    if (estadoReal === IN_TRANSIT_STATUS || shouldDisplayInTransit(pedido, now)) {
+    const shouldShowVisualInTransit = allowVisualInTransit && shouldDisplayInTransit(pedido, now);
+
+    if (estadoReal === IN_TRANSIT_STATUS || shouldShowVisualInTransit) {
         return {
             label: "En camino",
             tone: {
@@ -178,7 +179,7 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment) => {
                 dot: "#fa8c16",
             },
             tooltip: undefined,
-            isVisualOnly: estadoReal !== IN_TRANSIT_STATUS,
+            isVisualOnly: shouldShowVisualInTransit,
         };
     }
 
@@ -223,11 +224,9 @@ const getShippingDateSortValue = (value: unknown) => {
 
 const ShippingTable = ({
     refreshKey,
-    onOpenQR,
     onHeaderActionChange,
 }: {
     refreshKey: number;
-    onOpenQR?: () => void;
     onHeaderActionChange?: (action: ShippingHeaderAction) => void;
 }) => {
     const { user }: any = useContext(UserContext);
@@ -259,6 +258,7 @@ const ShippingTable = ({
     const [generalVendorIds, setGeneralVendorIds] = useState<string[]>([]);
     const [deliveredVendorIds, setDeliveredVendorIds] = useState<string[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("");
+    const [externalSellerSearch, setExternalSellerSearch] = useState("");
     const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
     const normalizedUserRole = String(user?.role || "").toLowerCase();
     const isAdmin = normalizedUserRole === 'admin';
@@ -266,7 +266,6 @@ const ShippingTable = ({
     const isOperator = normalizedUserRole === 'operator';
     //console.log("Usuario:", user);
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
-    const [openPicker, setOpenPicker] = useState<'start' | 'end' | null>(null);
     const [loadingTable, setLoadingTable] = useState(false);
     const [statusNow, setStatusNow] = useState(() => moment().tz("America/La_Paz"));
     const [mobilePage, setMobilePage] = useState(1);
@@ -291,6 +290,7 @@ const ShippingTable = ({
     });
     const [branchTransferError, setBranchTransferError] = useState("");
     const branchTransferFetchRef = useRef(0);
+    const lastDeliveryCountFilterKeyRef = useRef("");
 
     const [isMobile, setIsMobile] = useState(false);
     const canManageExternal = isAdmin || isOperator || isSuperadminUser(user);
@@ -308,6 +308,34 @@ const ShippingTable = ({
     const pendingSendLabel = isVendedor ? "En sucursal de origen" : "Para enviar a otra sucursal";
     const currentRows = shippingData;
     const branchTransferMode = selectedStatus === "para_enviar" ? "send" : selectedStatus === "en_camino" ? "receive" : null;
+    const deliveryCountFilterKey = useMemo(
+        () => JSON.stringify({
+            selectedStatus,
+            selectedLocation,
+            otherLocation,
+            dateRange: dateRange.map((item) => item ? item.toISOString() : null),
+            selectedVendedor,
+            externalSellerSearch,
+            searchCliente,
+            currentSucursalId,
+            refreshKey,
+            userId: user?.id_vendedor || "",
+            canManageExternal,
+        }),
+        [
+            selectedStatus,
+            selectedLocation,
+            otherLocation,
+            dateRange,
+            selectedVendedor,
+            externalSellerSearch,
+            searchCliente,
+            currentSucursalId,
+            refreshKey,
+            user?.id_vendedor,
+            canManageExternal,
+        ]
+    );
 
     const getOriginBranchId = (pedido: any) =>
         resolveBranchId(pedido?.lugar_origen) ||
@@ -679,7 +707,12 @@ const ShippingTable = ({
                         ? EXTERNAL_VENDOR_FILTER
                         : sellerIdToQuery,
                 client: searchCliente.trim() || undefined,
+                externalSellerSearch:
+                    selectedVendedor === EXTERNAL_VENDOR_FILTER
+                        ? externalSellerSearch.trim() || undefined
+                        : undefined,
             };
+            const shouldRefreshDeliveryCount = lastDeliveryCountFilterKeyRef.current !== deliveryCountFilterKey;
 
             const [dashboardData, deliveryDashboardData] = await Promise.all([
                 getShippingDashboardListAPI({
@@ -690,27 +723,34 @@ const ShippingTable = ({
                     destinationMode: destinationMode as "any" | "branch" | "other",
                     destinationQuery,
                 }),
-                getShippingDashboardListAPI({
-                    page: 1,
-                    limit: 1,
-                    tab: FILTER_ALL,
-                    ...commonParams,
-                    destinationMode: "other",
-                    destinationQuery: undefined,
-                })
+                shouldRefreshDeliveryCount
+                    ? getShippingDashboardListAPI({
+                        page: 1,
+                        limit: 1,
+                        tab: FILTER_ALL,
+                        ...commonParams,
+                        destinationMode: "other",
+                        destinationQuery: undefined,
+                    })
+                    : Promise.resolve(null)
             ]);
 
             const rows = Array.isArray(dashboardData?.rows) ? dashboardData.rows : [];
             setShippingData(rows);
-            setTabCounts({
+            setTabCounts((prev) => ({
                 todos: Number(dashboardData?.counts?.todos || 0),
                 listo_para_recoger: Number(dashboardData?.counts?.listo_para_recoger || 0),
                 para_enviar: Number(dashboardData?.counts?.para_enviar || 0),
                 en_camino: Number(dashboardData?.counts?.en_camino || 0),
-                deliverys: Number(deliveryDashboardData?.total || deliveryDashboardData?.counts?.todos || 0),
+                deliverys: shouldRefreshDeliveryCount
+                    ? Number(deliveryDashboardData?.total || deliveryDashboardData?.counts?.todos || 0)
+                    : prev.deliverys,
                 entregado: Number(dashboardData?.counts?.entregado || 0),
-            });
+            }));
             setTableTotal(Number(dashboardData?.total || 0));
+            if (shouldRefreshDeliveryCount) {
+                lastDeliveryCountFilterKeyRef.current = deliveryCountFilterKey;
+            }
         } catch (error) {
             console.error("Error fetching shipping data:", error);
         } finally {
@@ -805,7 +845,7 @@ const ShippingTable = ({
         setMobilePage(1);
         setTablePage(1);
         setSelectedRowKeys([]);
-    }, [selectedStatus, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente]);
+    }, [selectedStatus, selectedLocation, otherLocation, dateRange, selectedVendedor, externalSellerSearch, searchCliente]);
 
     useEffect(() => {
         if (branchTransferMode) {
@@ -823,7 +863,7 @@ const ShippingTable = ({
             mode: null,
             selectedRowKeys: [],
         }));
-    }, [branchTransferMode, selectedLocation, otherLocation, dateRange, selectedVendedor, searchCliente, currentSucursalId, refreshKey]);
+    }, [branchTransferMode, selectedLocation, otherLocation, dateRange, selectedVendedor, externalSellerSearch, searchCliente, currentSucursalId, refreshKey]);
 
     const toggleStatus = () => {
         setSelectedStatus(prev => prev === 'entregado' ? 'En Espera' : 'entregado');
@@ -874,7 +914,7 @@ const ShippingTable = ({
             key: 'estado_visual',
             width: 150,
             render: (_: any, record: any) => {
-                const statusMeta = getVisualStatusMeta(record, statusNow);
+                const statusMeta = getVisualStatusMeta(record, statusNow, isVendedor);
 
                 return (
                     <Tooltip title={statusMeta.tooltip}>
@@ -1071,6 +1111,7 @@ const ShippingTable = ({
         otherLocation,
         dateRange,
         selectedVendedor,
+        externalSellerSearch,
         searchCliente,
         user?.id_vendedor,
         sucursal.length
@@ -1113,6 +1154,10 @@ const ShippingTable = ({
                     to,
                     currentBranchId: currentSucursalId || undefined,
                     client: searchCliente.trim() || undefined,
+                    externalSellerSearch:
+                        selectedVendedor === EXTERNAL_VENDOR_FILTER
+                            ? externalSellerSearch.trim() || undefined
+                            : undefined,
                     destinationMode: destinationMode as "any" | "branch" | "other",
                     destinationQuery,
                 };
@@ -1183,7 +1228,9 @@ const ShippingTable = ({
         selectedLocation,
         otherLocation,
         currentSucursalId,
+        selectedVendedor,
         searchCliente,
+        externalSellerSearch,
         refreshKey,
     ]);
 
@@ -1310,34 +1357,51 @@ const ShippingTable = ({
             <div className="shipping-filter-panel mb-4 bg-white rounded-xl border border-gray-200 p-3" data-tour-id="shipping-filters">
                 <div className="shipping-filter-grid">
                 {(isAdmin || isOperator) && (
-                    <Select
-                        className="shipping-filter-vendor"
-                        placeholder="Vendedores"
-                        value={selectedVendedor || undefined}
-                        onChange={(value) => setSelectedVendedor(value || "")}
-                        allowClear
-                        showSearch
-                        filterOption={(input, option) => {
-                            const label =
-                                (option?.children ??
-                                    // por si en algún momento usas `options` en vez de `<Option>`
-                                    (option as any)?.label ??
-                                    "");
+                    <>
+                        <Select
+                            className="shipping-filter-vendor"
+                            placeholder="Vendedores"
+                            value={selectedVendedor || undefined}
+                            onChange={(value) => {
+                                const nextValue = value || "";
+                                setSelectedVendedor(nextValue);
+                                if (nextValue !== EXTERNAL_VENDOR_FILTER) {
+                                    setExternalSellerSearch("");
+                                }
+                            }}
+                            allowClear
+                            showSearch
+                            filterOption={(input, option) => {
+                                const label =
+                                    (option?.children ??
+                                        // por si en algún momento usas `options` en vez de `<Option>`
+                                        (option as any)?.label ??
+                                        "");
 
-                            return String(label)
-                                .toLowerCase()
-                                .includes(input.toLowerCase());
-                        }}
-                    >
-                        {hasExternalInCurrentStatus() && (
-                            <Option value={EXTERNAL_VENDOR_FILTER}>Externo</Option>
+                                return String(label)
+                                    .toLowerCase()
+                                    .includes(input.toLowerCase());
+                            }}
+                        >
+                            {hasExternalInCurrentStatus() && (
+                                <Option value={EXTERNAL_VENDOR_FILTER}>Externo</Option>
+                            )}
+                            {getFilteredVendedores().map((vendedor: any) => (
+                                <Option key={vendedor._id} value={vendedor._id}>
+                                    {vendedor.nombre} {vendedor.apellido}
+                                </Option>
+                            ))}
+                        </Select>
+                        {selectedVendedor === EXTERNAL_VENDOR_FILTER && (
+                            <Input
+                                className="shipping-filter-search"
+                                placeholder="Buscar vendedor externo por nombre, carnet o celular..."
+                                value={externalSellerSearch}
+                                onChange={(e) => setExternalSellerSearch(e.target.value)}
+                                allowClear
+                            />
                         )}
-                        {getFilteredVendedores().map((vendedor: any) => (
-                            <Option key={vendedor._id} value={vendedor._id}>
-                                {vendedor.nombre} {vendedor.apellido}
-                            </Option>
-                        ))}
-                    </Select>
+                    </>
                 )}
                 <Input
                     className="shipping-filter-search"
@@ -1346,19 +1410,6 @@ const ShippingTable = ({
                     onChange={(e) => setSearchCliente(e.target.value)}
                     allowClear
                 />
-                {
-                /*
-                <Select
-                    style={{ width: 200, margin: 8 }}
-                    placeholder="Estado del pedido"
-                    value={selectedStatus}
-                    onChange={(value) => setSelectedStatus(value)}
-                >
-                    <Option value="En Espera">En Espera</Option>
-                    <Option value="entregado">Entregado</Option>
-                </Select>
-
-                */}
                 <Select
                     className="shipping-filter-destination"
                     placeholder="Sucursal De Destino"
@@ -1383,50 +1434,6 @@ const ShippingTable = ({
                         placeholder="Especificar otro lugar"
                         value={otherLocation}
                         onChange={(e) => setOtherLocation(e.target.value)}
-                    />
-                )}
-                {isMobile ? (
-                    <>
-                        <DatePicker
-                            className="shipping-filter-start"
-                            placeholder="Start date"
-                            open={openPicker === 'start'}
-                            value={dateRange[0] ? moment(dateRange[0]) : null}
-                            onFocus={() => setOpenPicker('start')}
-                            onBlur={() => setOpenPicker(null)}
-                            onChange={date => {
-                                setDateRange([date ? date.toDate() : null, dateRange[1]]);
-                                setOpenPicker(null);
-                            }}
-                        />
-                        <DatePicker
-                            className="shipping-filter-end"
-                            placeholder="End date"
-                            open={openPicker === 'end'}
-                            value={dateRange[1] ? moment(dateRange[1]) : null}
-                            onFocus={() => setOpenPicker('end')}
-                            onBlur={() => setOpenPicker(null)}
-                            onChange={date => {
-                                setDateRange([dateRange[0], date ? date.toDate() : null]);
-                                setOpenPicker(null);
-                            }}
-                        />
-                    </>
-                ) : (
-                    <RangePicker
-                        className="mt-2"
-                        style={{ width: 240, margin: 0 }}
-                        value={[
-                            dateRange[0] ? moment(dateRange[0]) : null,
-                            dateRange[1] ? moment(dateRange[1]) : null,
-                        ]}
-                        onChange={(dates) => {
-                            if (dates && dates[0] && dates[1]) {
-                                setDateRange([dates[0].toDate(), dates[1].toDate()]);
-                            } else {
-                                setDateRange([null, null]);
-                            }
-                        }}
                     />
                 )}
                 {canManageExternal && (
@@ -1468,17 +1475,6 @@ const ShippingTable = ({
                         >
                             Retiro vendedor{selectedSellerWithdrawalCount ? ` (${selectedSellerWithdrawalCount})` : ""}
                         </Button>
-                    </Tooltip>
-                )}
-                {onOpenQR && (
-                    <Tooltip title="Escanear QR de pedidos">
-                        <Button
-                            className="shipping-filter-action shipping-filter-qr"
-                            type="default"
-                            icon={<QrcodeOutlined />}
-                            onClick={onOpenQR}
-                            style={{ height: 46, borderRadius: 10, fontSize: 18 }}
-                        />
                     </Tooltip>
                 )}
                 </div>
@@ -1756,7 +1752,7 @@ const ShippingTable = ({
             {isMobile && (
                 <div className="shipping-mobile-list">
                     {currentRows.map((record: any) => {
-                        const statusMeta = getVisualStatusMeta(record, statusNow);
+                        const statusMeta = getVisualStatusMeta(record, statusNow, isVendedor);
                         return (
                             <button
                                 type="button"

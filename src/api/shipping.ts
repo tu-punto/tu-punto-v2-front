@@ -47,6 +47,7 @@ const getShippingDashboardListAPI = async (params?: {
   to?: string;
   currentBranchId?: string;
   sellerId?: string;
+  externalSellerSearch?: string;
   client?: string;
   guide?: string;
   destinationMode?: "any" | "branch" | "other";
