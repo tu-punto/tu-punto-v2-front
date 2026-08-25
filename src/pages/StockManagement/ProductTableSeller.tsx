@@ -3,6 +3,8 @@ import { Table, Select, Input, Switch } from "antd";
 import VariantInfoModal from "./VariantInfoModal.tsx";
 import PromotionPrice from "../../components/PromotionPrice";
 
+const CRITICAL_STOCK_THRESHOLD = 1;
+
 type BranchOption = {
     _id: string;
     nombre: string;
@@ -111,7 +113,8 @@ const ProductTableSeller = ({
             width: 40,
             render: (_: any, record: any) => {
                 if (record.esCabecera) return { props: { colSpan: 0 } };
-                const color = Number(record.stock || 0) > 0 ? "bg-green-500" : "bg-red-500";
+                const stock = Number(record.stock || 0);
+                const color = stock > CRITICAL_STOCK_THRESHOLD ? "bg-green-500" : stock > 0 ? "bg-amber-500" : "bg-red-500";
                 return {
                     children: <div className={`w-4 h-4 rounded-full ${color}`} />
                 };
@@ -137,8 +140,16 @@ const ProductTableSeller = ({
         {
             title: "Stock actual",
             key: "stock",
-            render: (_: any, record: any) =>
-                record.esCabecera ? { children: null, props: { colSpan: 0 } } : <span>{record.stock}</span>
+            render: (_: any, record: any) => {
+                if (record.esCabecera) return { children: null, props: { colSpan: 0 } };
+                const stock = Number(record.stock || 0);
+                return (
+                    <span className={stock === 0 ? "text-red-700 font-semibold" : stock <= CRITICAL_STOCK_THRESHOLD ? "text-amber-700 font-semibold" : ""}>
+                        {stock}
+                        {stock === 0 ? " (agotado)" : stock <= CRITICAL_STOCK_THRESHOLD ? " (critico)" : ""}
+                    </span>
+                );
+            }
         },
         {
             title: "Precio Unitario",

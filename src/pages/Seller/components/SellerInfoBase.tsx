@@ -120,9 +120,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
   /* datos agregados de sub-componentes */
   const [salesData, setSalesData] = useState<any[]>([]);
-  const [deletedSales, setDeletedSales] = useState<any[]>([]);
+  const [deletedSales] = useState<any[]>([]);
   const [entryData, setEntryData] = useState<any[]>([]);
-  const [deletedEntryData, setDeletedEntryData] = useState<any[]>([]);
+  const [deletedEntryData] = useState<any[]>([]);
   const [paymentProofs, setPaymentProofs] = useState<any[]>([]);
   const [sellerDebts, setSellerDebts] = useState<any[]>([]);
   const [sellerMetrics, setSellerMetrics] = useState<{
@@ -130,6 +130,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     deuda: number;
     pago_pendiente: number;
   } | null>(null);
+  const [sellerDetail, setSellerDetail] = useState<any>(null);
   const [paymentRequest, setPaymentRequest] = useState({
     qr_pago_url: seller?.qr_pago_url || "",
     fecha_solicitud_pago: seller?.fecha_solicitud_pago || null,
@@ -209,8 +210,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         const detail = await getSellerAPI(String(seller.key));
         if (!detail) {
           setSellerMetrics(null);
+          setSellerDetail(null);
           return;
         }
+
+        setSellerDetail(detail);
 
         const saldoPendiente = Number(detail.saldo_pendiente ?? 0);
         const deuda = Number(detail.deuda ?? 0);
@@ -939,6 +943,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                   type="email"
                 />
               </Form.Item>
+              {isSuperadmin && (
+                <div style={{ marginTop: -8, marginBottom: 16, color: "#6b7280" }}>
+                  Ultimo login: <span style={{ fontWeight: 600 }}>{(sellerDetail?.last_login_at || seller?.last_login_at) ? dayjs(sellerDetail?.last_login_at || seller?.last_login_at).format("DD/MM/YYYY HH:mm") : "Sin registro"}</span>
+                </div>
+              )}
             </Col>
             <Col xs={24} sm={12} md={6}>
               <Form.Item name="telefono" label="Teléfono">

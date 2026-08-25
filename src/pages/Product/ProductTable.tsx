@@ -1,11 +1,9 @@
 import { Table , message} from 'antd';
-import { useContext } from 'react';
-import { UserContext } from '../../context/userContext';
 import PromotionPrice from '../../components/PromotionPrice';
 
-const ProductTable = ({ data, onSelectProduct }: any) => {
-    const { user }: any = useContext(UserContext);
+const CRITICAL_STOCK_THRESHOLD = 1;
 
+const ProductTable = ({ data, onSelectProduct }: any) => {
     const columns = [
         {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Producto</span>,
@@ -16,6 +14,16 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Stock actual</span>,
             dataIndex: 'stockActual',
             key: 'stockActual',
+            render: (stockActual: number) => {
+                const stock = Number(stockActual || 0);
+                const critical = stock <= CRITICAL_STOCK_THRESHOLD;
+                return (
+                    <span className={stock === 0 ? 'text-red-700 font-semibold' : critical ? 'text-amber-700 font-semibold' : ''}>
+                        {stock}
+                        {stock === 0 ? ' (agotado)' : critical ? ' (critico)' : ''}
+                    </span>
+                );
+            }
         },
         {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Precio</span>,
@@ -50,7 +58,7 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                 pagination={{ pageSize: 10, pageSizeOptions: [] }}
                 scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
-                    className: `text-mobile-sm xl:text-desktop-sm ${record.stockActual === 0 ? 'bg-red-100 text-red-700' : ''}`,
+                    className: `text-mobile-sm xl:text-desktop-sm ${record.stockActual === 0 ? 'bg-red-100 text-red-700' : record.stockActual <= CRITICAL_STOCK_THRESHOLD ? 'bg-amber-100 text-amber-900' : ''}`,
                     onClick: () => {
                         if (record.stockActual === 0) {
                             message.error(`El producto "${record.producto}" no tiene stock disponible.`);

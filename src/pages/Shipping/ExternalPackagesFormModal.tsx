@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AutoComplete, Button, Collapse, Form, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Upload, message } from "antd";
+import { AutoComplete, Button, Card, Collapse, Form, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Upload, message } from "antd";
 import {
   ExternalContactSuggestion,
   getExternalContactSuggestionsAPI,
@@ -153,6 +153,18 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
   const watchedPackages = Form.useWatch("paquetes", form) || [];
+  const totalsSummary = useMemo(() => {
+    const rows = buildPackages(packageCount, watchedPackages).slice(0, packageCount);
+    const delivery = rows.reduce((sum, row) => sum + roundCurrency(Number(row?.precio_entre_sucursal || 0)), 0);
+    const total = rows.reduce(
+      (sum, row) => sum + getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0)),
+      0
+    );
+    const sellerDebt = rows.reduce((sum, row) => sum + roundCurrency(Number(row?.monto_paga_vendedor || 0)), 0);
+    const buyerDebt = rows.reduce((sum, row) => sum + roundCurrency(Number(row?.monto_paga_comprador || 0)), 0);
+
+    return { delivery, total, sellerDebt, buyerDebt };
+  }, [packageCount, watchedPackages]);
   const hasSellerPayment = useMemo(
     () =>
       watchedPackages
@@ -1385,6 +1397,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             </tbody>
           </table>
         </div>
+
+        <Card size="small" style={{ marginTop: 16, background: "#fafafa" }} title="Totales">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div><strong>Delivery:</strong> Bs. {totalsSummary.delivery.toFixed(2)}</div>
+            <div><strong>Monto total:</strong> Bs. {totalsSummary.total.toFixed(2)}</div>
+            <div><strong>Deuda vendedor:</strong> Bs. {totalsSummary.sellerDebt.toFixed(2)}</div>
+            <div><strong>Deuda comprador:</strong> Bs. {totalsSummary.buyerDebt.toFixed(2)}</div>
+          </div>
+        </Card>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
           <Button
