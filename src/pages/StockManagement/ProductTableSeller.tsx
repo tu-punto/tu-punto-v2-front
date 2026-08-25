@@ -34,7 +34,8 @@ const ProductTableSeller = ({
     searchText,
     setSearchText,
     selectedCategory,
-    setSelectedCategory
+    setSelectedCategory,
+    onUpdateProducts
 }: Props) => {
     const [filterAvailableStock, setFilterAvailableStock] = useState(false);
     const [selectedProductForList, setSelectedProductForList] = useState<string>("all");
@@ -254,6 +255,7 @@ const ProductTableSeller = ({
                 visible={showProductInfoModal}
                 onClose={() => setShowProductInfoModal(false)}
                 rowRecord={selectedRecord}
+                onUpdateProducts={onUpdateProducts}
             />
         </>
     );

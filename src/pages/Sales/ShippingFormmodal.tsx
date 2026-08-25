@@ -187,6 +187,7 @@ function ShippingFormModal({
     const tipoDestino = useWatch('tipo_destino', form);
     const destinoSucursalId = useWatch('destino_sucursal_id', form);
     const lugarEntregaInput = useWatch('lugar_entrega_input', form);
+    const ubicacionLinkInput = useWatch('ubicacion_link', form);
     const effectiveDestinationBranchId = tipoDestino === 'esta_sucursal' ? branchIdFromProps : destinoSucursalId;
     const destinoSucursalSeleccionada = useMemo(
         () => sucursals.find((s: any) => String(s._id) === String(effectiveDestinationBranchId)),
@@ -204,9 +205,11 @@ function ShippingFormModal({
         return Boolean(tipoDestino === 'otro_lugar' && (lugarEntregaInput || '').trim());
     }, [tipoDestino, origenEsIgualADestino, lugarEntregaInput]);
     const mapsPreviewUrl = useMemo(() => {
+        const link = String(ubicacionLinkInput || '').trim();
+        if (link) return link;
         const query = (lugarEntregaInput || '').trim();
         return query ? buildGoogleMapsSearchUrl(query) : '';
-    }, [lugarEntregaInput]);
+    }, [lugarEntregaInput, ubicacionLinkInput]);
 
     const handleFinish = async (values: any) => {
         //console.log(" selectedProducts:", selectedProducts);

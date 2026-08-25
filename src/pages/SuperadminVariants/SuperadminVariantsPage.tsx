@@ -19,11 +19,12 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { DeleteOutlined, EditOutlined, ReloadOutlined, SaveOutlined, SearchOutlined } from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SearchOutlined } from "@ant-design/icons";
 
 import { getSellersBasicAPI } from "../../api/seller";
 import {
   deleteSuperadminVariantAPI,
+  duplicateSuperadminVariantAPI,
   getSuperadminVariantInventoryPageAPI,
   renameSuperadminVariantAPI,
   updateSuperadminVariantStockAPI,
@@ -56,6 +57,7 @@ type VariantRow = {
   variantLabel: string;
   displayName: string;
   categoryName?: string | null;
+  price?: number;
   totalStock: number;
   variantAttributes: Record<string, string>;
   branchStocks: BranchStock[];
@@ -139,6 +141,9 @@ const SuperadminVariantsPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<VariantRow | null>(null);
   const [editForm] = Form.useForm();
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicatingRow, setDuplicatingRow] = useState<VariantRow | null>(null);
+  const [duplicateForm] = Form.useForm();
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   useEffect(() => {
@@ -327,8 +332,34 @@ const SuperadminVariantsPage = () => {
     editForm.setFieldsValue({
       scope: "all",
       sucursalId: defaultBranchId,
-      ...row.variantAttributes,
+      attributes: Object.entries(row.variantAttributes).length
+        ? Object.entries(row.variantAttributes).map(([name, value]) => ({ name, value }))
+        : [{ name: "", value: "" }],
     });
+  };
+
+  const openDuplicateModal = (row: VariantRow) => {
+    const defaultBranchId = row.branchStocks.find((branch) => branches.some((option) => option.sucursalId === branch.sucursalId))?.sucursalId
+      || branches.find((branch) => row.branchStocks.some((item) => item.sucursalId === branch.sucursalId))?.sucursalId
+      || branches[0]?.sucursalId;
+
+    setDuplicatingRow(row);
+    setDuplicateModalOpen(true);
+    duplicateForm.setFieldsValue({
+      scope: "branch",
+      sucursalId: defaultBranchId,
+      price: Number(row.price || 0),
+      stock: 0,
+      attributes: Object.entries(row.variantAttributes).length
+        ? Object.entries(row.variantAttributes).map(([name, value]) => ({ name, value }))
+        : [{ name: "", value: "" }],
+    });
+  };
+
+  const closeDuplicateModal = () => {
+    setDuplicateModalOpen(false);
+    setDuplicatingRow(null);
+    duplicateForm.resetFields();
   };
 
   const closeEditModal = () => {
@@ -341,10 +372,19 @@ const SuperadminVariantsPage = () => {
     if (!editingRow || !selectedSellerId) return;
 
     const values = await editForm.validateFields();
-    const nextAttributes = Object.keys(editingRow.variantAttributes).reduce<Record<string, string>>((acc, key) => {
-      acc[key] = String(values[key] || "").trim();
+    const nextAttributes = (Array.isArray(values.attributes) ? values.attributes : []).reduce<Record<string, string>>((acc, item) => {
+      const key = String(item?.name || "").trim();
+      const nextValue = String(item?.value || "").trim();
+      if (key && nextValue) {
+        acc[key] = nextValue;
+      }
       return acc;
     }, {});
+
+    if (!Object.keys(nextAttributes).length) {
+      message.error("Debes dejar al menos una variante completa.");
+      return;
+    }
 
     const key = `rename-${editingRow.key}`;
     setBusyKey(key);
@@ -365,6 +405,64 @@ const SuperadminVariantsPage = () => {
 
       message.success("Variante actualizada.");
       closeEditModal();
+      refreshData();
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const handleSubmitDuplicate = async () => {
+    if (!duplicatingRow || !selectedSellerId) return;
+
+    const values = await duplicateForm.validateFields();
+    const nextAttributes = (Array.isArray(values.attributes) ? values.attributes : []).reduce<Record<string, string>>((acc, item) => {
+      const key = String(item?.name || "").trim();
+      const nextValue = String(item?.value || "").trim();
+      if (key && nextValue) {
+        acc[key] = nextValue;
+      }
+      return acc;
+    }, {});
+
+    const originalAttributes = Object.entries(duplicatingRow.variantAttributes).reduce<Record<string, string>>((acc, [key, value]) => {
+      acc[String(key).trim()] = String(value || "").trim();
+      return acc;
+    }, {});
+
+    const nextFingerprint = JSON.stringify(Object.entries(nextAttributes).sort(([a], [b]) => a.localeCompare(b)));
+    const originalFingerprint = JSON.stringify(Object.entries(originalAttributes).sort(([a], [b]) => a.localeCompare(b)));
+
+    if (!Object.keys(nextAttributes).length) {
+      message.error("Debes completar al menos un atributo.");
+      return;
+    }
+
+    if (nextFingerprint === originalFingerprint) {
+      message.error("Debes cambiar al menos un atributo para duplicar la variante.");
+      return;
+    }
+
+    const key = `duplicate-${duplicatingRow.key}`;
+    setBusyKey(key);
+    try {
+      const response = await duplicateSuperadminVariantAPI({
+        productId: duplicatingRow.productId,
+        sellerId: selectedSellerId,
+        sourceVariantKey: duplicatingRow.variantKey,
+        sucursalId: values.scope === "branch" ? values.sucursalId : undefined,
+        scope: values.scope,
+        variantAttributes: nextAttributes,
+        price: Number(values.price || 0),
+        stock: Number(values.stock || 0),
+      });
+
+      if (!response?.success) {
+        message.error(response?.message || response?.msg || "No se pudo duplicar la variante.");
+        return;
+      }
+
+      message.success(response?.message || "Variante duplicada.");
+      closeDuplicateModal();
       refreshData();
     } finally {
       setBusyKey("");
@@ -426,12 +524,15 @@ const SuperadminVariantsPage = () => {
         title: "Acciones",
         key: "actions",
         fixed: isMobile ? undefined : "right",
-        width: isMobile ? 130 : 140,
+        width: isMobile ? 190 : 220,
         align: "center",
         render: (_value, row) => (
           <Space direction="vertical" size={8}>
             <Button icon={<EditOutlined />} onClick={() => openEditModal(row)} size="small">
               Editar
+            </Button>
+            <Button icon={<CopyOutlined />} onClick={() => openDuplicateModal(row)} size="small">
+              Duplicar
             </Button>
             <Popconfirm
               title="Eliminar la variante en todas las sucursales?"
@@ -454,7 +555,7 @@ const SuperadminVariantsPage = () => {
         ),
       },
     ],
-    [branchColumns, busyKey, isMobile]
+    [branchColumns, busyKey, isMobile, handleDeleteEverywhere, openDuplicateModal, openEditModal]
   );
 
   const tableScrollX = useMemo(
@@ -644,16 +745,136 @@ const SuperadminVariantsPage = () => {
               }
             </Form.Item>
 
-            {Object.entries(editingRow.variantAttributes).map(([key]) => (
-              <Form.Item
-                key={key}
-                name={key}
-                label={key}
-                rules={[{ required: true, message: `Completa ${key}` }]}
-              >
-                <Input size="large" />
+            <Form.List name="attributes">
+              {(fields, { add, remove }) => (
+                <>
+                  {fields.map((field, index) => (
+                    <Space key={field.key} align="start" style={{ display: "flex", marginBottom: 8 }}>
+                      <Form.Item
+                        {...field}
+                        name={[field.name, "name"]}
+                        rules={[{ required: true, message: "Nombre" }]}
+                        style={{ marginBottom: 0, width: 180 }}
+                      >
+                        <Input placeholder="Nombre" />
+                      </Form.Item>
+                      <Form.Item
+                        {...field}
+                        name={[field.name, "value"]}
+                        rules={[{ required: true, message: "Valor" }]}
+                        style={{ marginBottom: 0, flex: 1 }}
+                      >
+                        <Input placeholder="Valor" />
+                      </Form.Item>
+                      <Button
+                        danger
+                        type="text"
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                      />
+                    </Space>
+                  ))}
+                  <Button type="dashed" onClick={() => add({ name: "", value: "" })} icon={<PlusOutlined />} block>
+                    Agregar atributo
+                  </Button>
+                </>
+              )}
+            </Form.List>
+          </Form>
+        )}
+      </Modal>
+
+      <Modal
+        open={duplicateModalOpen}
+        title="Duplicar variante"
+        okText="Crear copia"
+        cancelText="Cancelar"
+        confirmLoading={busyKey.startsWith("duplicate-")}
+        onOk={() => void handleSubmitDuplicate()}
+        onCancel={closeDuplicateModal}
+        width={720}
+      >
+        {duplicatingRow && (
+          <Form form={duplicateForm} layout="vertical">
+            <Alert
+              type="info"
+              showIcon
+              message="Copia base"
+              description="Puedes duplicar esta variante, pero debes cambiar al menos un atributo antes de guardarla."
+              style={{ marginBottom: 16 }}
+            />
+
+            <Form.Item name="scope" label="Alcance" rules={[{ required: true, message: "Selecciona el alcance" }]}>
+              <Radio.Group optionType="button" buttonStyle="solid">
+                <Radio.Button value="branch">Solo una sucursal</Radio.Button>
+                <Radio.Button value="all">Todas las sucursales</Radio.Button>
+              </Radio.Group>
+            </Form.Item>
+
+            <Form.Item shouldUpdate noStyle>
+              {({ getFieldValue }) =>
+                getFieldValue("scope") === "branch" ? (
+                  <Form.Item
+                    name="sucursalId"
+                    label="Sucursal"
+                    rules={[{ required: true, message: "Selecciona la sucursal" }]}
+                  >
+                    <Select
+                      options={branches
+                        .filter((branch) => duplicatingRow.branchStocks.some((item) => item.sucursalId === branch.sucursalId))
+                        .map((branch) => ({ value: branch.sucursalId, label: branch.sucursalName }))}
+                    />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Form.Item name="price" label="Precio" rules={[{ required: true, message: "Completa el precio" }]}>
+                <InputNumber min={0} precision={2} style={{ width: "100%" }} prefix="Bs." />
               </Form.Item>
-            ))}
+              <Form.Item name="stock" label="Stock inicial" rules={[{ required: true, message: "Completa el stock" }]}>
+                <InputNumber min={0} precision={0} style={{ width: "100%" }} />
+              </Form.Item>
+            </div>
+
+            <Form.List name="attributes">
+              {(fields, { add, remove }) => (
+                <>
+                  {fields.map((field, index) => (
+                    <Space key={field.key} align="start" style={{ display: "flex", marginBottom: 8 }}>
+                      <Form.Item
+                        {...field}
+                        name={[field.name, "name"]}
+                        rules={[{ required: true, message: "Nombre" }]}
+                        style={{ marginBottom: 0, width: 180 }}
+                      >
+                        <Input placeholder="Nombre" />
+                      </Form.Item>
+                      <Form.Item
+                        {...field}
+                        name={[field.name, "value"]}
+                        rules={[{ required: true, message: "Valor" }]}
+                        style={{ marginBottom: 0, flex: 1 }}
+                      >
+                        <Input placeholder="Valor" />
+                      </Form.Item>
+                      <Button
+                        danger
+                        type="text"
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                      />
+                    </Space>
+                  ))}
+                  <Button type="dashed" onClick={() => add({ name: "", value: "" })} icon={<PlusOutlined />} block>
+                    Agregar atributo
+                  </Button>
+                </>
+              )}
+            </Form.List>
           </Form>
         )}
       </Modal>

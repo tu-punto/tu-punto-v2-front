@@ -150,6 +150,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const tipoDestino = useWatch("tipo_destino", internalForm);
     const destinoSucursalId = useWatch("destino_sucursal_id", internalForm);
     const lugarEntregaInput = useWatch("lugar_entrega_input", internalForm);
+    const ubicacionLinkInput = useWatch("ubicacion_link", internalForm);
     const origenBranchId = useMemo(() => resolveBranchId(shipping?.lugar_origen), [shipping]);
     const legacyDestinationSucursal = useMemo(
         () => findBranchByName(sucursals, shipping?.lugar_entrega),
@@ -200,9 +201,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         return Boolean(tipoDestino === "otro_lugar" && (lugarEntregaInput || "").trim());
     }, [tipoDestino, origenEsIgualADestino, lugarEntregaInput]);
     const mapsPreviewUrl = useMemo(() => {
+        const link = String(ubicacionLinkInput || "").trim();
+        if (link) return link;
         const query = String(lugarEntregaInput || "").trim();
         return query ? buildGoogleMapsSearchUrl(query) : "";
-    }, [lugarEntregaInput]);
+    }, [lugarEntregaInput, ubicacionLinkInput]);
     const deliveryOwnerBranchId = useMemo(() => {
         if (tipoDestino === "sucursal") {
             return String(destinoSucursalId || paymentBranchId || "");
