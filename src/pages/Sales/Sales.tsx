@@ -18,6 +18,7 @@ import { normalizeRole } from "../../utils/role";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import { resolvePromotionPricing } from "../../utils/promotionPricing";
 import { useNavigate } from "react-router-dom";
+import { includesNormalized } from "../../utils/search";
 
 export const Sales = () => {
   const navigate = useNavigate();
@@ -152,8 +153,7 @@ export const Sales = () => {
     }
 
     if (searchText.trim()) {
-      const lower = searchText.trim().toLowerCase();
-      const words = lower.split(" ");
+      const words = searchText.trim().toLowerCase().split(" ");
       const specialChars = /[!@#$%^&*?:{}|<>]/
 
       const filterWords = (p: any, words: string[]) => {
@@ -161,7 +161,7 @@ export const Sales = () => {
         for (const word of words) {
           if (!match) return false;
           if (specialChars.test(word)) continue;
-          match = match && (p.producto ?? '').toString().toLowerCase().includes(word);
+          match = match && includesNormalized(p.producto, word);
         }
         return match;
       };
@@ -412,7 +412,7 @@ export const Sales = () => {
       if (searchText.trim()) {
           const lowerSearch = searchText.toLowerCase();
           filteredData = filteredData.filter(product =>
-              product.producto.toLowerCase().includes(lowerSearch)
+              includesNormalized(product.producto, lowerSearch)
           );
       }
       filteredData = filteredData.filter(product => product.stockActual > 0);
@@ -674,7 +674,7 @@ export const Sales = () => {
                         showSearch
                         optionFilterProp="label"
                         filterOption={(input, option) =>
-                          String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                          includesNormalized(option?.label, input)
                         }
                         style={{ minWidth: 200 }}
                         value={selectedSellerId}

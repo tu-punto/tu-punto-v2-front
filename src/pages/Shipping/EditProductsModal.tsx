@@ -6,6 +6,7 @@ import { deleteProductsByShippingAPI, updateProductsByShippingAPI } from "../../
 import { registerSalesToShippingAPI } from "../../api/shipping";
 import { registerProductAPI } from "../../api/product.ts";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
+import { includesNormalized } from "../../utils/search";
 
 interface EditProductsModalProps {
   visible: boolean;
@@ -329,9 +330,7 @@ const EditProductsModal = ({
             options={filteredOptions}
             style={{ width: "100%" }}
             allowClear
-            filterOption={(input, option) =>
-              (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-            }
+            filterOption={(input, option) => includesNormalized(option?.label, input)}
           />
         </div>
       )}

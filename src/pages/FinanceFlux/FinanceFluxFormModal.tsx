@@ -23,6 +23,7 @@ import { getSellersAPI, registerSellerAPI } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
 import { getAdminsAPI } from "../../api/user";
 import { useFinanceFluxCategoryStore } from "../../stores/financeFluxCategoriesStore";
+import { includesNormalized } from "../../utils/search";
 import { UserContext } from "../../context/userContext";
 
 function FinanceFluxFormModal({
@@ -238,7 +239,7 @@ function FinanceFluxFormModal({
                   label: fluxCategory.nombre,
                 }))}
                 filterOption={(input, option: any) =>
-                  option.label.toLowerCase().includes(input.toLowerCase())
+                  includesNormalized(option?.label, input)
                 }
                 dropdownRender={(menu) => (
                   <>
@@ -310,7 +311,7 @@ function FinanceFluxFormModal({
                 }))}
                 showSearch
                 filterOption={(input, option: any) =>
-                  option.label.toLowerCase().includes(input.toLowerCase())
+                  includesNormalized(option?.label, input)
                 }
               />
             </Form.Item>
@@ -344,7 +345,7 @@ function FinanceFluxFormModal({
                 }))}
                 showSearch
                 filterOption={(input, option: any) =>
-                  option.label.toLowerCase().includes(input.toLowerCase())
+                  includesNormalized(option?.label, input)
                 }
               />
             </Form.Item>

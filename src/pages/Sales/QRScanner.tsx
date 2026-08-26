@@ -9,6 +9,7 @@ import {
   SearchOutlined
 } from "@ant-design/icons";
 import { resolveVariantQRGroupPayloadAPI, resolveVariantQRPayloadAPI } from "../../api/qr";
+import { includesNormalized } from "../../utils/search";
 
 const { Text, Title } = Typography;
 
@@ -842,10 +843,7 @@ function QRScanner({
     if (!q) return sorted;
 
     return sorted.filter((item) =>
-      [item.productName, item.variantLabel, item.variantKey]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
+      includesNormalized([item.productName, item.variantLabel, item.variantKey].join(" "), q)
     );
   }, [groupSelection, groupSearch]);
 

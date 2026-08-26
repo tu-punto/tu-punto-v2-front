@@ -13,6 +13,7 @@ import {
   Row,
   Space,
   Tag,
+  Table,
   Upload,
 } from "antd";
 import {
@@ -23,7 +24,7 @@ import {
   DeleteOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 
 import {
@@ -146,6 +147,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
   const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [deliveryChargesModalOpen, setDeliveryChargesModalOpen] = useState(false);
   const [declineServiceDate, setDeclineServiceDate] = useState(
     seller?.declinacion_servicio_fecha || null
   );
@@ -593,6 +595,39 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     }
   };
 
+  const pendingDeliveryCharges = useMemo(() => {
+    const byOrder = new Map<string, any>();
+
+    (Array.isArray(salesData) ? salesData : []).forEach((sale: any) => {
+      const deliveryAmount = Number(sale?.id_pedido?.cargo_delivery ?? sale?.cargo_delivery ?? 0);
+      const deposited = sale?.id_pedido?.deposito_realizado === true || sale?.deposito_realizado === true;
+
+      if (!Number.isFinite(deliveryAmount) || deliveryAmount <= 0 || deposited) return;
+
+      const orderId = String(sale?.id_pedido?._id || sale?.id_pedido || sale?.key || sale?.id_venta || "").trim();
+      if (!orderId || byOrder.has(orderId)) return;
+
+      byOrder.set(orderId, {
+        key: orderId,
+        fecha: sale?.fecha_pedido || sale?.id_pedido?.fecha_pedido || null,
+        cliente: String(sale?.cliente || sale?.id_pedido?.cliente || "").trim() || "Sin cliente",
+        sucursal: String(sale?.sucursal || sale?.id_pedido?.lugar_entrega || "").trim() || "Sin sucursal",
+        estado: String(sale?.id_pedido?.estado_pedido || sale?.tipo || "").trim() || "Sin estado",
+        monto: Number(deliveryAmount.toFixed(2)),
+      });
+    });
+
+    return Array.from(byOrder.values()).sort((a, b) => {
+      const left = new Date(a.fecha || 0).getTime();
+      const right = new Date(b.fecha || 0).getTime();
+      return right - left;
+    });
+  }, [salesData]);
+
+  const pendingDeliveryTotal = Number(
+    pendingDeliveryCharges.reduce((sum, item) => sum + Number(item.monto || 0), 0).toFixed(2)
+  );
+
   const openResetPasswordModal = () => {
     setResetPasswordValue("");
     setResetPasswordModalOpen(true);
@@ -708,6 +743,62 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         ultimaFechaPago={ultimaFechaPagoLabel}
       />
 
+      {pendingDeliveryCharges.length > 0 && (
+        <Card
+          size="small"
+          className="mb-5 cursor-pointer border-amber-200 bg-amber-50/70 shadow-sm transition hover:border-amber-300 hover:bg-amber-50"
+          bodyStyle={{ padding: 16 }}
+          onClick={() => setDeliveryChargesModalOpen(true)}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                Cobros de delivery pendientes
+              </div>
+              <div className="mt-1 text-2xl font-black text-amber-950">
+                Bs. {pendingDeliveryTotal.toFixed(2)}
+              </div>
+              <div className="mt-1 text-sm text-amber-900/80">
+                {pendingDeliveryCharges.length} entrega{pendingDeliveryCharges.length === 1 ? "" : "s"} por descontar
+              </div>
+            </div>
+            <Button type="default" onClick={() => setDeliveryChargesModalOpen(true)}>
+              Ver detalle
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Modal
+        title="Detalle de cobros de delivery"
+        open={deliveryChargesModalOpen}
+        onCancel={() => setDeliveryChargesModalOpen(false)}
+        footer={null}
+        width={760}
+      >
+        <Table
+          size="small"
+          pagination={false}
+          dataSource={pendingDeliveryCharges}
+          columns={[
+            {
+              title: "Fecha",
+              dataIndex: "fecha",
+              render: (value: any) => (value ? dayjs(value).format("DD/MM/YYYY") : "-"),
+            },
+            { title: "Cliente", dataIndex: "cliente" },
+            { title: "Sucursal", dataIndex: "sucursal" },
+            { title: "Estado", dataIndex: "estado" },
+            {
+              title: "Delivery",
+              dataIndex: "monto",
+              align: "right" as const,
+              render: (value: number) => `Bs. ${Number(value || 0).toFixed(2)}`,
+            },
+          ]}
+        />
+      </Modal>
+
       {isSeller && (
         <div className="mb-5 flex flex-col items-center gap-3">
           {hasPendingPaymentRequest && (
@@ -727,28 +818,29 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             Solicitar cobro
           </Button>
           {declineServiceDate ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="Informaste que declinaras el servicio."
-              description={
-                <div className="space-y-1">
+            <Card
+              size="small"
+              style={{ width: "100%", maxWidth: 620, borderColor: "#f59e0b" }}
+              bodyStyle={{ padding: 16 }}
+              title={<span className="font-semibold text-amber-900">Seguimiento de salida</span>}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="gold">Pendiente de retiro</Tag>
+                {serviceStockPickupDeadline?.isValid() ? (
+                  <Tag color="orange">Hasta {serviceStockPickupDeadline.format("DD/MM/YYYY")}</Tag>
+                ) : null}
+              </div>
+              <div className="mt-3 space-y-1 text-sm text-slate-700">
+                <div>Recoge tu stock y pedidos antes del plazo indicado.</div>
+                {declineSourceLabel ? <div>Registrado por: {declineSourceLabel}</div> : null}
+                {declineReasonLabel ? <div>Motivo: {declineReasonLabel}</div> : null}
+                {seller?.declinacion_servicio_probabilidad_retorno ? (
                   <div>
-                    {serviceStockPickupDeadline?.isValid()
-                      ? `Recoge tu stock y pedidos hasta el ${serviceStockPickupDeadline.format("DD/MM/YYYY")}.`
-                      : undefined}
+                    Probabilidad de retorno: {DECLINE_RETURN_LABELS[seller.declinacion_servicio_probabilidad_retorno] || seller.declinacion_servicio_probabilidad_retorno}
                   </div>
-                  {declineSourceLabel ? <div>Registrado por: {declineSourceLabel}</div> : null}
-                  {declineReasonLabel ? <div>Motivo: {declineReasonLabel}</div> : null}
-                  {seller?.declinacion_servicio_probabilidad_retorno ? (
-                    <div>
-                      Probabilidad de retorno: {DECLINE_RETURN_LABELS[seller.declinacion_servicio_probabilidad_retorno] || seller.declinacion_servicio_probabilidad_retorno}
-                    </div>
-                  ) : null}
-                </div>
-              }
-              style={{ width: "100%", maxWidth: 620 }}
-            />
+                ) : null}
+              </div>
+            </Card>
           ) : (
             <Button
               danger

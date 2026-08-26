@@ -11,6 +11,7 @@ import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path 
 import ProductPriceMatrixModal from "./ProductPriceMatrixModal.tsx";
 import { saveTempStock } from "../../utils/storageHelpers";
 import { reconstructProductFromFlat, fetchFullProductById } from "../../utils/storageHelpers";
+import { includesNormalized } from "../../utils/search";
 
 
 interface ProductTableProps {
@@ -267,8 +268,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             let varianteMatch = true;
             for (const word of searchWords) {
                 if (specialChars.test(word)) continue
-                nombreMatch = nombreMatch && baseName?.toLowerCase().includes(word.toLowerCase());
-                varianteMatch = varianteMatch && product.variant?.toLowerCase().includes(word.toLowerCase());
+                nombreMatch = nombreMatch && includesNormalized(baseName, word);
+                varianteMatch = varianteMatch && includesNormalized(product.variant, word);
             }
 
             if (searchText && !nombreMatch && !varianteMatch) return;
@@ -468,12 +469,10 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         const lowerSearch = searchText.toLowerCase();
 
         const filteredProducts = updatedProducts.filter(product => {
-            const nombre = product.nombre_producto?.toLowerCase() || "";
-            const variante = product.variant?.toLowerCase() || "";
             return (
                 lowerSearch === "" ||
-                nombre.includes(lowerSearch) ||
-                variante.includes(lowerSearch)
+                includesNormalized(product.nombre_producto, lowerSearch) ||
+                includesNormalized(product.variant, lowerSearch)
             );
         });
 

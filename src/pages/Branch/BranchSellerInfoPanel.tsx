@@ -2,6 +2,7 @@ import { Card, Empty, Select, Space, Tag, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { getSellersBasicAPI } from "../../api/seller";
+import { includesNormalized } from "../../utils/search";
 
 type BranchSeller = {
   _id: string;
@@ -93,7 +94,7 @@ export default function BranchSellerInfoPanel({
             value: seller._id,
             label: `${seller.nombre} ${seller.apellido}`,
           }))}
-          filterOption={(input, option: any) => String(option?.label || "").toLowerCase().includes(input.toLowerCase())}
+          filterOption={(input, option: any) => includesNormalized(option?.label, input)}
         />
 
         {!selectedSeller ? (

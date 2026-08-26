@@ -6,6 +6,7 @@ import { UserContext } from "../../context/userContext.tsx";
 import moment from "moment-timezone";
 import ExternalSalesModal from './ExternalSalesModal.tsx';
 import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
+import { includesNormalized } from '../../utils/search';
 
 const { Option } = Select;
 
@@ -170,8 +171,7 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
     const isRowOnWordFilter = (fila: any) => {
         if (searchText.trim().length <= 0) return true
 
-        const lower = searchText.trim().toLowerCase();
-        const words = lower.split(" ");
+        const words = searchText.trim().toLowerCase().split(" ");
         const specialChars = /[!@#$%^&*?:{}|<>]/
 
         const filterWords = (text: any, words: string[]) => {
@@ -179,12 +179,12 @@ const ExternalSalesTable = ({ refreshKey }: { refreshKey: number }) => {
             for (const word of words) {
                 if (!match) return false;
                 if (specialChars.test(word)) continue;
-                match = match && text.toString().toLowerCase().includes(word);
+                match = match && includesNormalized(text, word);
             }
             return match;
         };
 
-        const fullText = `${fila.comprador} ${fila.vendedor}`.toLowerCase()
+        const fullText = `${fila.comprador} ${fila.vendedor}`
         return filterWords(fullText, words)
     }
 

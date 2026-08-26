@@ -22,6 +22,7 @@ import type { ColumnsType } from "antd/es/table";
 import { CopyOutlined, DeleteOutlined, EditOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SearchOutlined } from "@ant-design/icons";
 
 import { getSellersBasicAPI } from "../../api/seller";
+import { includesNormalized } from "../../utils/search";
 import {
   deleteSuperadminVariantAPI,
   duplicateSuperadminVariantAPI,
@@ -600,9 +601,7 @@ const SuperadminVariantsPage = () => {
               placeholder="Selecciona un vendedor"
               showSearch
               allowClear
-              filterOption={(input, option) =>
-                String((option as SellerOption | undefined)?.searchText || "").includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => includesNormalized((option as SellerOption | undefined)?.searchText, input)}
             />
 
             <Input

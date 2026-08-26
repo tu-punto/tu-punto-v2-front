@@ -6,6 +6,7 @@ import { getSucursalsAPI } from "../../api/sucursal";
 import VariantInputs from "./VariantInputs";
 import { registerVariantAPI } from "../../api/product.ts";
 import { saveTempProduct } from '../../utils/storageHelpers';
+import { includesNormalized } from "../../utils/search";
 const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) => {
     const [loading, setLoading] = useState(false);
     const [sellers, setSellers] = useState([]);
@@ -150,9 +151,7 @@ const ProductFormModal = ({ visible, onCancel, onSuccess ,selectedSeller}: any) 
                                 label: category.categoria,
                             }))}
                             showSearch
-                            filterOption={(input, option: any) =>
-                                option.label.toLowerCase().includes(input.toLowerCase())
-                            }
+                            filterOption={(input, option: any) => includesNormalized(option?.label, input)}
                         />
                     </Form.Item>
                 </div>

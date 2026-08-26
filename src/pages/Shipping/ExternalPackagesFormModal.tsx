@@ -121,7 +121,12 @@ const getSuggestionValue = (contact: ExternalContactSuggestion, field: Suggestio
   return contact.nombre || "";
 };
 
-const normalizeSearchText = (value: string) => String(value || "").trim().toLowerCase();
+const normalizeSearchText = (value: string) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 
 const buildSuggestionLabel = (contact: ExternalContactSuggestion) => (
   <div style={{ display: "flex", flexDirection: "column" }}>

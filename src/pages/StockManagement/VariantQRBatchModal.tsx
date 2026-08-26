@@ -18,6 +18,7 @@ import {
   isQzConnected,
   qzPrint
 } from "../../utils/qzTray";
+import { includesNormalized } from "../../utils/search";
 
 const { Text } = Typography;
 
@@ -1137,11 +1138,7 @@ const VariantQRBatchModal = ({
                 onChange={(value) => setSellerId(value)}
                 options={sellerOptions}
                 placeholder="Buscar vendedor"
-                filterOption={(input, option) =>
-                  String(option?.label || "")
-                    .toLowerCase()
-                    .includes(String(input || "").toLowerCase())
-                }
+                filterOption={(input, option) => includesNormalized(option?.label, input)}
               />
             </div>
             <div>

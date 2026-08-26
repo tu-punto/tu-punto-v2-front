@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import { getSellersAPI } from "../../api/seller";
 import { ISeller } from "../../models/sellerModels";
+import { includesNormalized } from "../../utils/search";
 
 const { RangePicker } = DatePicker;
 
@@ -28,8 +29,6 @@ const DECLINE_RETURN_LABELS: Record<string, string> = {
   poco_probable: "Poco probable",
   nunca: "Nunca",
 };
-
-const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
 type DeclineRow = ISeller & { key: string };
 
@@ -78,8 +77,6 @@ export default function DeclineResponsesModal({
   }, [open]);
 
   const filteredRows = useMemo(() => {
-    const query = normalizeText(searchText);
-
     return rows.filter((row) => {
       if (originFilter !== "todos" && String(row?.declinacion_servicio_origen || "") !== originFilter) {
         return false;
@@ -120,8 +117,6 @@ export default function DeclineResponsesModal({
         if (end && declineDate.isAfter(end)) return false;
       }
 
-      if (!query) return true;
-
       const haystack = [
         row?.nombre,
         row?.apellido,
@@ -130,9 +125,8 @@ export default function DeclineResponsesModal({
       ]
         .map((value) => String(value || ""))
         .join(" ")
-        .toLowerCase();
 
-      return haystack.includes(query);
+      return includesNormalized(haystack, searchText);
     });
   }, [branchFilter, dateRange, originFilter, reasonFilter, returnFilter, rows, searchText]);
 
