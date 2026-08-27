@@ -39,6 +39,8 @@ interface Props {
   selectedSellerId?: string | null;
   initialProductIds?: string[];
   autoGenerateOnOpen?: boolean;
+  initialGeneratedItems?: QRItem[];
+  initialPrintQuantities?: Record<string, number>;
 }
 
 interface DirectPreviewItem {
@@ -439,7 +441,9 @@ const VariantQRBatchModal = ({
   sellers,
   selectedSellerId,
   initialProductIds = [],
-  autoGenerateOnOpen = false
+  autoGenerateOnOpen = false,
+  initialGeneratedItems = [],
+  initialPrintQuantities = {}
 }: Props) => {
   const [sellerId, setSellerId] = useState<string | undefined>(
     selectedSellerId ? String(selectedSellerId) : undefined
@@ -1018,6 +1022,32 @@ const VariantQRBatchModal = ({
       setSellerId(String(selectedSellerId));
     }
 
+    if (initialGeneratedItems.length > 0) {
+      autoRunDoneRef.current = true;
+      setOnlyMissing(true);
+      setForceRegenerate(false);
+      setResult({
+        products: initialGeneratedItems.length,
+        variantsProcessed: initialGeneratedItems.length,
+        generated: initialGeneratedItems.length,
+        skipped: 0,
+        generatedItems: initialGeneratedItems,
+        errors: [],
+      });
+      setResultSearchText("");
+      setVisibleResultCount(RESULT_PAGE_SIZE);
+      setPrintQuantities((current) => {
+        const next = { ...current };
+        for (const item of initialGeneratedItems) {
+          const key = itemPrintKey(item);
+          const quantity = Number(initialPrintQuantities[key] ?? current[key] ?? 0);
+          next[key] = Math.max(0, Math.floor(quantity));
+        }
+        return next;
+      });
+      return;
+    }
+
     if (!autoGenerateOnOpen || autoRunDoneRef.current) return;
     autoRunDoneRef.current = true;
 
@@ -1028,7 +1058,7 @@ const VariantQRBatchModal = ({
       forceRegenerate: false,
       skipConfirm: true
     });
-  }, [visible, autoGenerateOnOpen, selectedSellerId]);
+  }, [visible, autoGenerateOnOpen, selectedSellerId, initialGeneratedItems, initialPrintQuantities]);
 
   useEffect(() => {
     if (!visible) return;

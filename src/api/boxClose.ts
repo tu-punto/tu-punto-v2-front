@@ -87,3 +87,28 @@ export const registerBranchTransferBoxCloseOperationAPI = async (payload: {
     return { success: false };
   }
 };
+
+export const registerPendingBoxCloseOperationAPI = async (payload: {
+  sourceKey?: string;
+  branchId: string;
+  businessDate: string;
+  operation: any;
+}) => {
+  try {
+    const res = await apiClient.post("/boxClose/pending-operation", payload);
+    return res.data;
+  } catch (error) {
+    parseError(error as AxiosError);
+    return { success: false };
+  }
+};
+
+export const deletePendingBoxCloseOperationAPI = async (sourceKey: string) => {
+  try {
+    const res = await apiClient.delete(`/boxClose/pending-operation/${encodeURIComponent(sourceKey)}`);
+    return res.data;
+  } catch (error) {
+    parseError(error as AxiosError);
+    return { success: false };
+  }
+};

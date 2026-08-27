@@ -4,6 +4,7 @@ import { ArrowDownOutlined, ArrowUpOutlined, StopOutlined } from "@ant-design/ic
 
 import { createEntryAPI } from "../../api/entry.ts";
 import { createVariantAPI, registerProductAPI, updateSubvariantStockAPI } from "../../api/product";
+import { generateVariantQRAPI } from "../../api/qr";
 import {
   clearTempProducts,
   clearTempStock,
@@ -81,6 +82,38 @@ const normalizeNumber = (value: any) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const normalizeVariantRecord = (variants: Record<string, string> | any) =>
+  Object.fromEntries(
+    Object.entries(variants || {})
+      .map(([key, value]) => [String(key).trim().toLowerCase(), String(value || "").trim().toLowerCase()] as const)
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
+
+const sameVariantRecord = (left: Record<string, string>, right: Record<string, string>) => {
+  const normalizedLeft = normalizeVariantRecord(left);
+  const normalizedRight = normalizeVariantRecord(right);
+  const leftKeys = Object.keys(normalizedLeft);
+  const rightKeys = Object.keys(normalizedRight);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => normalizedLeft[key] === normalizedRight[key]);
+};
+
+const getBranchId = (branch: any) => String(branch?.id_sucursal?._id || branch?.id_sucursal || branch?.sucursalId || "").trim();
+
+const getProductBranchCombinations = (product: any, branchId?: string) => {
+  const branches = Array.isArray(product?.sucursales) ? product.sucursales : [];
+  if (branchId) {
+    const branch = branches.find((candidate: any) => getBranchId(candidate) === String(branchId));
+    if (branch) return Array.isArray(branch.combinaciones) ? branch.combinaciones : [];
+  }
+
+  return branches.flatMap((branch: any) => (Array.isArray(branch?.combinaciones) ? branch.combinaciones : []));
+};
+
+const resolveSavedProduct = (response: any) => response?.result || response?.newProduct || response?.data || response;
+
+const buildQrItemKey = (productId: string, variantKey: string) => `${productId}::${variantKey}`;
 
 const normalizeStockDraftEntries = (items: any[] = []) =>
   items.map((item: any) => ({
@@ -358,20 +391,122 @@ const ConfirmProductsModal = ({
   const saveProducts = async () => {
     try {
       const createdProducts: any[] = [];
+      const qrItems: any[] = [];
+      const qrQuantities: Record<string, number> = {};
+      const seenQrKeys = new Set<string>();
+
+      const pushQrItem = async ({
+        productId,
+        productName,
+        sellerId,
+        variantKey,
+        variantLabel,
+        quantity,
+      }: {
+        productId: string;
+        productName: string;
+        sellerId: string;
+        variantKey: string;
+        variantLabel: string;
+        quantity: number;
+      }) => {
+        const safeQuantity = Math.max(0, Math.floor(Number(quantity || 0)));
+        const safeProductId = String(productId || "").trim();
+        const safeVariantKey = String(variantKey || "").trim();
+        if (!safeProductId || !safeVariantKey || safeQuantity <= 0) return;
+
+        const dedupeKey = buildQrItemKey(safeProductId, safeVariantKey);
+        if (seenQrKeys.has(dedupeKey)) {
+          qrQuantities[dedupeKey] = (qrQuantities[dedupeKey] || 0) + safeQuantity;
+          return;
+        }
+
+        const response = await generateVariantQRAPI({ productId: safeProductId, variantKey: safeVariantKey });
+        const qrData = response?.qrData;
+        if (!qrData?.qrImagePath) return;
+
+        const item = {
+          productId: String(qrData.productId || safeProductId),
+          productName: String(qrData.productName || productName || "Producto"),
+          sellerId: String(sellerId || selectedSeller?._id || ""),
+          variantKey: String(qrData.variantKey || safeVariantKey),
+          variantLabel: String(qrData.variantLabel || variantLabel || "Variante"),
+          qrCode: String(qrData.qrCode || ""),
+          qrImagePath: String(qrData.qrImagePath || ""),
+        };
+
+        qrItems.push(item);
+        qrQuantities[buildQrItemKey(item.productId, item.variantKey)] = safeQuantity;
+        seenQrKeys.add(buildQrItemKey(item.productId, item.variantKey));
+      };
 
       for (const variant of variantData) {
-        await createVariantAPI({
+        const response = await createVariantAPI({
           productId: variant.product._id,
           sucursalId,
           combinaciones: variant.combinaciones
         });
+
+        const savedProduct = resolveSavedProduct(response);
+        if (!savedProduct?._id) continue;
+
+        const branchId = String(variant?.sucursalId || sucursalId || "").trim();
+        const sourceCombinations = Array.isArray(variant?.combinaciones) ? variant.combinaciones : [];
+        const savedCombinations = getProductBranchCombinations(savedProduct, branchId);
+
+        for (const combination of sourceCombinations) {
+          const quantity = normalizeNumber(combination?.stock);
+          if (quantity <= 0) continue;
+
+          const match = savedCombinations.find((candidate: any) =>
+            sameVariantRecord(candidate?.variantes || {}, combination?.variantes || {})
+          );
+
+          if (!match?.variantKey) continue;
+
+          await pushQrItem({
+            productId: String(savedProduct._id),
+            productName: String(savedProduct?.nombre_producto || variant?.product?.nombre_producto || "Producto"),
+            sellerId: String(savedProduct?.id_vendedor || variant?.product?.id_vendedor || selectedSeller?._id || ""),
+            variantKey: String(match.variantKey),
+            variantLabel: String(match?.variantLabel || Object.values(combination?.variantes || {}).filter(Boolean).join(" / ") || "Variante"),
+            quantity,
+          });
+        }
       }
 
       for (const rawItem of productData) {
         const product = rawItem.productData || rawItem;
         const response = await registerProductAPI(product);
-        if (response?.newProduct) {
-          createdProducts.push(response.newProduct);
+        const savedProduct = resolveSavedProduct(response);
+        if (savedProduct?._id) {
+          createdProducts.push(savedProduct);
+        }
+
+        if (!savedProduct?._id) continue;
+
+        const branchId = String(sucursalId || product?.sucursalId || product?._idSucursal || "").trim();
+        const sourceCombinations = getProductBranchCombinations(product, branchId);
+        const savedCombinations = getProductBranchCombinations(savedProduct, branchId);
+
+        for (const combination of sourceCombinations) {
+          const quantity = normalizeNumber(combination?.stock);
+          if (quantity <= 0) continue;
+
+          const match = savedCombinations.find((candidate: any) =>
+            sameVariantRecord(candidate?.variantes || {}, combination?.variantes || {})
+          );
+
+          if (!match?.variantKey) continue;
+
+          await pushQrItem({
+            productId: String(savedProduct._id),
+            productName: String(savedProduct?.nombre_producto || product?.nombre_producto || "Producto"),
+            sellerId: String(savedProduct?.id_vendedor || product?.id_vendedor || selectedSeller?._id || ""),
+            variantKey: String(match.variantKey),
+            variantLabel: String(match?.variantLabel || Object.values(combination?.variantes || {}).filter(Boolean).join(" / ") || "Variante"),
+            quantity,
+          });
         }
       }
 
@@ -435,6 +570,17 @@ const ConfirmProductsModal = ({
           categoria: product.categoria || product.nombre_categoria || "Ropa",
           fecha: new Date().toISOString()
         });
+
+        if (delta > 0) {
+          await pushQrItem({
+            productId,
+            productName: String(product?.nombre_producto || "Producto"),
+            sellerId: String(product?.id_vendedor || selectedSeller?._id || ""),
+            variantKey: String(product?.variantKey || combination?.variantKey || product?.variant_key || ""),
+            variantLabel: String(product?.variantLabel || combination?.variantLabel || Object.values(variantes).filter(Boolean).join(" / ") || "Variante"),
+            quantity: delta,
+          });
+        }
       }
 
       clearAll();
@@ -450,7 +596,9 @@ const ConfirmProductsModal = ({
       }
 
       onSuccess?.({
-        createdProductIds
+        createdProductIds,
+        qrItems,
+        qrQuantities,
       });
     } catch (error: any) {
       console.error("Error al guardar productos:", error);

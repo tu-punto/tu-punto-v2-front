@@ -734,7 +734,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
   return (
     <div>
-      <SellerHeader name={sellerHeaderName} isSeller={isSeller} />
+      <SellerHeader name={sellerHeaderName} phone={seller.telefono} isSeller={isSeller} />
 
       <StatsCards
         pagoPendiente={pagoPendienteValue}

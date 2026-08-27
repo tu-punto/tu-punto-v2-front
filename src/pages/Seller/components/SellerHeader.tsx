@@ -1,11 +1,15 @@
 import React from 'react';
+import { PhoneOutlined } from '@ant-design/icons';
 
 interface SellerHeaderProps {
   name: string;
+  phone?: string | number;
   isSeller?: boolean;
 }
 
-const SellerHeader: React.FC<SellerHeaderProps> = ({ name, isSeller = false }) => {
+const SellerHeader: React.FC<SellerHeaderProps> = ({ name, phone, isSeller = false }) => {
+  const phoneLabel = String(phone || "").trim();
+
   if (isSeller) {
     return (
       <div
@@ -35,14 +39,28 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({ name, isSeller = false }) =
         >
           {name}
         </h2>
+        {phoneLabel && (
+          <div style={{ marginTop: 6, fontSize: 13, color: "#355b86", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <PhoneOutlined />
+            <span>{phoneLabel}</span>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <h2 className="text-mobile-sm xl:text-desktop-sm mb-2 text-center">
-      Informacion del Vendedor: {name}
-    </h2>
+    <div className="mb-2 text-center">
+      <h2 className="text-mobile-sm xl:text-desktop-sm mb-1">
+        Informacion del Vendedor: {name}
+      </h2>
+      {phoneLabel && (
+        <div style={{ fontSize: 13, color: "#64748b", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <PhoneOutlined />
+          <span>{phoneLabel}</span>
+        </div>
+      )}
+    </div>
   );
 };
 

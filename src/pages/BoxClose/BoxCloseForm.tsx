@@ -25,6 +25,8 @@ import {
 } from "../../helpers/shippingHelpers";
 import {
   getPendingBoxCloseOperationsAPI,
+  registerPendingBoxCloseOperationAPI,
+  deletePendingBoxCloseOperationAPI,
   registerBoxCloseAPI,
   updateBoxCloseAPI,
 } from "../../api/boxClose";
@@ -35,6 +37,7 @@ type Metodo = "efectivo" | "qr";
 type TipoOperacion = "ingreso" | "gasto" | "delivery" | "gasto_profit" | "pago_cliente";
 
 interface OperacionAdicional {
+  source_key?: string;
   tipo: TipoOperacion;
   descripcion: string;
   concepto?: string;
@@ -63,6 +66,9 @@ const tipoLabel = (tipo: string) => {
 };
 
 const metodoLabel = (metodo: string) => (metodo === "qr" ? "QR/Bancario" : "Efectivo");
+
+const buildOperationSourceKey = (branchId: string, businessDate: string) =>
+  `boxclose-${branchId}-${businessDate}-${window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`;
 
 interface Props {
   onSuccess: () => void;
@@ -389,6 +395,12 @@ const BoxCloseForm = ({
   const handleAddOperation = async () => {
     try {
       const newOp = await operationForm.validateFields();
+      if (!currentSucursalId) {
+        message.error("No se pudo identificar la sucursal actual.");
+        return;
+      }
+      const businessDate = (selectedDate || dayjs()).format("YYYY-MM-DD");
+      const sourceKey = buildOperationSourceKey(currentSucursalId, businessDate);
       const op: OperacionAdicional = {
         ...newOp,
         tipo: newOp.tipo || "ingreso",
@@ -398,7 +410,20 @@ const BoxCloseForm = ({
         monto: Math.abs(Number(newOp.monto || 0)), // siempre positivo
         id_sucursal: currentSucursalId || undefined,
         id_vendedor: undefined,
+        source_key: sourceKey,
       };
+
+      const response = await registerPendingBoxCloseOperationAPI({
+        sourceKey,
+        branchId: currentSucursalId,
+        businessDate,
+        operation: op,
+      });
+
+      if (!response?.success) {
+        message.error("No se pudo guardar la operación adicional.");
+        return;
+      }
 
       const updatedOperations = [...operations, op];
       setOperations(updatedOperations);
@@ -412,9 +437,27 @@ const BoxCloseForm = ({
     }
   };
   const handleDeleteOperation = (index: number) => {
+    const op = operations[index];
     const updated = operations.filter((_, i) => i !== index);
-    setOperations(updated);
-    recalcExpectedAndDiffs(updated);
+
+    const removeLocally = () => {
+      setOperations(updated);
+      recalcExpectedAndDiffs(updated);
+    };
+
+    if (mode !== "create" || !op?.source_key) {
+      removeLocally();
+      return;
+    }
+
+    void deletePendingBoxCloseOperationAPI(String(op.source_key)).then((response) => {
+      if (!response?.success) {
+        message.error("No se pudo eliminar la operación guardada.");
+        return;
+      }
+
+      removeLocally();
+    });
   };
 
   const handleSubmit = async (values: any) => {
