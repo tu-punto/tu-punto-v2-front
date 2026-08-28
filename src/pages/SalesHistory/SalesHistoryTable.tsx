@@ -86,7 +86,7 @@ const SalesHistoryTable = () => {
     const filteredSales = useMemo(() => {
         if (!normalizedProductFilter) return sales;
         return sales.filter((row: any) =>
-            includesNormalized(row?.productos_busqueda, normalizedProductFilter)
+            includesNormalized(row?.busqueda_global || row?.productos_busqueda, normalizedProductFilter)
         );
     }, [normalizedProductFilter, sales]);
 

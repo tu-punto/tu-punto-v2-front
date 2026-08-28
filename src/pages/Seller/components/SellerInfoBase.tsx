@@ -14,6 +14,7 @@ import {
   Space,
   Tag,
   Table,
+  Typography,
   Upload,
 } from "antd";
 import {
@@ -745,26 +746,48 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
       {pendingDeliveryCharges.length > 0 && (
         <Card
-          size="small"
-          className="mb-5 cursor-pointer border-amber-200 bg-amber-50/70 shadow-sm transition hover:border-amber-300 hover:bg-amber-50"
-          bodyStyle={{ padding: 16 }}
+          className="mb-5 overflow-hidden border border-amber-200 shadow-[0_10px_30px_rgba(245,158,11,0.10)] transition hover:shadow-[0_12px_36px_rgba(245,158,11,0.16)]"
+          bodyStyle={{ padding: 0 }}
           onClick={() => setDeliveryChargesModalOpen(true)}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                Cobros de delivery pendientes
+          <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-white px-5 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-[220px]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
+                  Cobros de delivery pendientes
+                </div>
+                <div className="mt-1 text-3xl font-black tracking-tight text-slate-900">
+                  Bs. {pendingDeliveryTotal.toFixed(2)}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  {pendingDeliveryCharges.length} entrega{pendingDeliveryCharges.length === 1 ? "" : "s"} por descontar
+                </div>
               </div>
-              <div className="mt-1 text-2xl font-black text-amber-950">
-                Bs. {pendingDeliveryTotal.toFixed(2)}
-              </div>
-              <div className="mt-1 text-sm text-amber-900/80">
-                {pendingDeliveryCharges.length} entrega{pendingDeliveryCharges.length === 1 ? "" : "s"} por descontar
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="gold" className="m-0 px-3 py-1 text-[11px] font-semibold">
+                  Pendiente
+                </Tag>
+                <Button type="primary" onClick={() => setDeliveryChargesModalOpen(true)}>
+                  Ver detalle
+                </Button>
               </div>
             </div>
-            <Button type="default" onClick={() => setDeliveryChargesModalOpen(true)}>
-              Ver detalle
-            </Button>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Se descuenta de</div>
+                <div className="mt-1 font-semibold text-slate-900">Saldo del cliente</div>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Se muestra hasta</div>
+                <div className="mt-1 font-semibold text-slate-900">Pago de ventas</div>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Detalle</div>
+                <div className="mt-1 font-semibold text-slate-900">Apertura rápida</div>
+              </div>
+            </div>
           </div>
         </Card>
       )}
