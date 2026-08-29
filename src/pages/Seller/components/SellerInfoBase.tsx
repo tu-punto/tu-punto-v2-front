@@ -5,6 +5,7 @@ import {
   DatePicker,
   Form,
   Alert,
+  Checkbox,
   Image,
   Input,
   InputNumber,
@@ -14,7 +15,6 @@ import {
   Space,
   Tag,
   Table,
-  Typography,
   Upload,
 } from "antd";
 import {
@@ -149,6 +149,14 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [deliveryChargesModalOpen, setDeliveryChargesModalOpen] = useState(false);
+  const [pickupReceived, setPickupReceived] = useState(Boolean(seller?.declinacion_servicio_retiro_realizado));
+  const [pickupObservations, setPickupObservations] = useState(
+    String(seller?.declinacion_servicio_retiro_observaciones || "")
+  );
+  const [pickupSavedAt, setPickupSavedAt] = useState<Date | string | null>(
+    seller?.declinacion_servicio_retiro_fecha || null
+  );
+  const [pickupSaving, setPickupSaving] = useState(false);
   const [declineServiceDate, setDeclineServiceDate] = useState(
     seller?.declinacion_servicio_fecha || null
   );
@@ -260,6 +268,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       fecha_pago_asignada: seller?.fecha_pago_asignada || null,
     });
     setDeclineServiceDate(seller?.declinacion_servicio_fecha || null);
+    setPickupReceived(Boolean(seller?.declinacion_servicio_retiro_realizado));
+    setPickupObservations(String(seller?.declinacion_servicio_retiro_observaciones || ""));
+    setPickupSavedAt(seller?.declinacion_servicio_retiro_fecha || null);
   }, [form, seller]);
 
 
@@ -596,6 +607,29 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     }
   };
 
+  const handleSavePickupInfo = async () => {
+    if (!seller?.key) return;
+
+    setPickupSaving(true);
+    try {
+      const res = await updateSellerAPI(String(seller.key), {
+        declinacion_servicio_retiro_realizado: pickupReceived,
+        declinacion_servicio_retiro_observaciones: String(pickupObservations || "").trim(),
+      });
+      if (!res?.success) throw new Error("No se pudo guardar el seguimiento");
+
+      message.success("Seguimiento actualizado");
+      setPickupSavedAt(pickupReceived ? new Date() : null);
+      setRefreshKey((prev) => prev + 1);
+      onSuccess?.();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo guardar el seguimiento.");
+    } finally {
+      setPickupSaving(false);
+    }
+  };
+
   const pendingDeliveryCharges = useMemo(() => {
     const byOrder = new Map<string, any>();
 
@@ -774,19 +808,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Se descuenta de</div>
-                <div className="mt-1 font-semibold text-slate-900">Saldo del cliente</div>
-              </div>
-              <div className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Se muestra hasta</div>
-                <div className="mt-1 font-semibold text-slate-900">Pago de ventas</div>
-              </div>
-              <div className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Detalle</div>
-                <div className="mt-1 font-semibold text-slate-900">Apertura rápida</div>
-              </div>
+            <div className="mt-3 text-sm text-slate-600">
+              Toca el bloque o usa "Ver detalle" para abrir el desglose.
             </div>
           </div>
         </Card>
@@ -822,6 +845,108 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         />
       </Modal>
 
+      {declineServiceDate ? (
+        <Card
+          className="mb-5 overflow-hidden border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-rose-100 shadow-[0_12px_32px_rgba(244,63,94,0.12)]"
+          bodyStyle={{ padding: 0 }}
+        >
+          <div className="border-b border-rose-100 px-5 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-[220px]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-700">
+                  Salida de cliente en seguimiento
+                </div>
+                <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                  {isSeller ? "Tu baja fue registrada" : "Baja registrada"}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  {serviceStockPickupDeadline?.isValid()
+                    ? `Retiro permitido hasta el ${serviceStockPickupDeadline.format("DD/MM/YYYY")}.`
+                    : "Retiro pendiente de fecha valida."}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="red" className="m-0 px-3 py-1 text-[11px] font-semibold">
+                  {declineSourceLabel || "Seguimiento activo"}
+                </Tag>
+                <Tag color={pickupReceived ? "green" : "volcano"} className="m-0 px-3 py-1 text-[11px] font-semibold">
+                  {pickupReceived ? "Retiró sus cosas: Sí" : "Retiró sus cosas: No"}
+                </Tag>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Motivo</div>
+                <div className="mt-1 font-semibold text-slate-900">{declineReasonLabel || "No especificado"}</div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Retiro de stock</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {serviceStockPickupDeadline?.isValid()
+                    ? serviceStockPickupDeadline.format("DD/MM/YYYY")
+                    : "Pendiente"}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Posibilidad de retorno</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {seller?.declinacion_servicio_probabilidad_retorno
+                    ? DECLINE_RETURN_LABELS[seller.declinacion_servicio_probabilidad_retorno] || seller.declinacion_servicio_probabilidad_retorno
+                    : "No registrada"}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Fecha de retiro</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {pickupSavedAt
+                    ? dayjs(pickupSavedAt).format("DD/MM/YYYY HH:mm")
+                    : "Pendiente"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-rose-100 px-5 pb-5 pt-4">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4">
+                <div className="grid gap-4 lg:grid-cols-[240px_1fr_auto] lg:items-start">
+                  <Checkbox
+                    checked={pickupReceived}
+                    onChange={(event) => setPickupReceived(event.target.checked)}
+                    className="font-semibold text-slate-800"
+                  >
+                    Ya recogió sus cosas
+                  </Checkbox>
+
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Observaciones
+                    </div>
+                    <Input.TextArea
+                      value={pickupObservations}
+                      onChange={(event) => setPickupObservations(event.target.value)}
+                      placeholder="Observaciones del retiro..."
+                      autoSize={{ minRows: 2, maxRows: 6 }}
+                      showCount
+                      maxLength={500}
+                    />
+                  </div>
+
+                  <Button
+                    type="primary"
+                    loading={pickupSaving}
+                    onClick={handleSavePickupInfo}
+                    className="h-12 self-start"
+                  >
+                    Guardar retiro
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       {isSeller && (
         <div className="mb-5 flex flex-col items-center gap-3">
           {hasPendingPaymentRequest && (
@@ -840,31 +965,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           >
             Solicitar cobro
           </Button>
-          {declineServiceDate ? (
-            <Card
-              size="small"
-              style={{ width: "100%", maxWidth: 620, borderColor: "#f59e0b" }}
-              bodyStyle={{ padding: 16 }}
-              title={<span className="font-semibold text-amber-900">Seguimiento de salida</span>}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <Tag color="gold">Pendiente de retiro</Tag>
-                {serviceStockPickupDeadline?.isValid() ? (
-                  <Tag color="orange">Hasta {serviceStockPickupDeadline.format("DD/MM/YYYY")}</Tag>
-                ) : null}
-              </div>
-              <div className="mt-3 space-y-1 text-sm text-slate-700">
-                <div>Recoge tu stock y pedidos antes del plazo indicado.</div>
-                {declineSourceLabel ? <div>Registrado por: {declineSourceLabel}</div> : null}
-                {declineReasonLabel ? <div>Motivo: {declineReasonLabel}</div> : null}
-                {seller?.declinacion_servicio_probabilidad_retorno ? (
-                  <div>
-                    Probabilidad de retorno: {DECLINE_RETURN_LABELS[seller.declinacion_servicio_probabilidad_retorno] || seller.declinacion_servicio_probabilidad_retorno}
-                  </div>
-                ) : null}
-              </div>
-            </Card>
-          ) : (
+          {!declineServiceDate ? (
             <Button
               danger
               size="large"
@@ -873,7 +974,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             >
               Declinar servicio
             </Button>
-          )}
+          ) : null}
           {!canDeclineService && !declineServiceDate ? (
             <Tag color="default">{serviceDeclineDisabledReason}</Tag>
           ) : null}

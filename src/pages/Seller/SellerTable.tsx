@@ -11,6 +11,7 @@ import {
   Spin,
   Table,
   Tooltip,
+  Tag,
 } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
@@ -91,6 +92,7 @@ export default function SellerTable({
   const [sellers, setSellers] = useState<SellerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPendingPayment, setTotalPendingPayment] = useState(0);
+  const [decliningCount, setDecliningCount] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -108,6 +110,13 @@ export default function SellerTable({
   const isMobile = !screens.md;
 
   const refresh = () => setRefreshKey((key) => key + 1);
+
+  const decliningBadge =
+    decliningCount > 0 ? (
+      <Tag color="red" className="m-0">
+        {decliningCount}
+      </Tag>
+    ) : null;
 
   const getEstadoVendedor = (
     row: Pick<ISeller, "fecha_vigencia" | "declinacion_servicio_fecha">
@@ -471,6 +480,25 @@ export default function SellerTable({
     })();
   }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, tableSort, isFactura, page, pageSize]);
 
+  useEffect(() => {
+    let canceled = false;
+
+    (async () => {
+      try {
+        const response = await getSellersAPI({ status: "declinando_servicio" });
+        if (canceled) return;
+
+        setDecliningCount(Array.isArray(response) ? response.length : Number(response?.total || 0));
+      } catch {
+        if (!canceled) setDecliningCount(0);
+      }
+    })();
+
+    return () => {
+      canceled = true;
+    };
+  }, [refreshKey]);
+
   return (
     <>
       <Space direction="horizontal" size="middle" className="seller-filters mb-4">
@@ -486,9 +514,25 @@ export default function SellerTable({
           value={estadoFilter}
           onChange={setEstadoFilter}
           options={[
-            { value: "todos", label: "Todos" },
+            {
+              value: "todos",
+              label: (
+                <Space size={6}>
+                  <span>Todos</span>
+                  {decliningBadge}
+                </Space>
+              ),
+            },
             { value: "Activo", label: "Activos" },
-            { value: "Declinando el servicio", label: "Declinando el servicio" },
+            {
+              value: "Declinando el servicio",
+              label: (
+                <Space size={6}>
+                  <span>Declinando el servicio</span>
+                  {decliningBadge}
+                </Space>
+              ),
+            },
             { value: "Debe renovar", label: "Debe renovar" },
             { value: "Ya no es cliente", label: "Ya no es cliente" },
           ]}
