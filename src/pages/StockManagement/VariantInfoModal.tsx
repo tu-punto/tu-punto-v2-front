@@ -352,8 +352,9 @@ const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: Var
                 return;
             }
 
-            message.success(response?.message || "Variante actualizada correctamente.");
+            message.success(response?.message || "Variante eliminada correctamente.");
             setDeleteModalOpen(false);
+            setDeleteScope("branch");
             await onUpdateProducts?.();
             onClose();
         } catch (error) {
@@ -414,7 +415,10 @@ const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: Var
             <Modal
                 open={deleteModalOpen}
                 title="Eliminar variante"
-                onCancel={() => setDeleteModalOpen(false)}
+                onCancel={() => {
+                    setDeleteModalOpen(false);
+                    setDeleteScope("branch");
+                }}
                 onOk={() => void handleDeleteVariant()}
                 okButtonProps={{ danger: true, loading: deleting }}
                 okText="Eliminar"

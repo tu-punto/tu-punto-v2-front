@@ -36,7 +36,7 @@ const ShippingGuide = () => {
                 <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md" data-tour-id="shipping-guide-header">
                     <img src="/box-icon.png" alt="Pedidos" className="w-8 h-8" />
                     <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
-                        Guías de Envío
+                        Guías y listas de ingresos
                     </h1>
                 </div>
             </div>

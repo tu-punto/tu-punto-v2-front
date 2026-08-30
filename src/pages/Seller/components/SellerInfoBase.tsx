@@ -845,7 +845,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         />
       </Modal>
 
-      {declineServiceDate ? (
+      {!isSeller && declineServiceDate ? (
         <Card
           className="mb-5 overflow-hidden border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-rose-100 shadow-[0_12px_32px_rgba(244,63,94,0.12)]"
           bodyStyle={{ padding: 0 }}

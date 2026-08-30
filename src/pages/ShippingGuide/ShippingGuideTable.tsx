@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
-import { Button, Card, Empty, message, Modal, Select, Spin, Table, Tabs, Tooltip, Typography } from "antd";
-import { CheckCircleOutlined, FileImageOutlined, LinkOutlined } from '@ant-design/icons';
+import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered, updateShippingGuideObservationsAPI } from "../../api/shippingGuide";
+import { Button, Card, Empty, Input, message, Modal, Select, Spin, Table, Tabs, Tooltip, Typography } from "antd";
+import { CheckCircleOutlined, FileImageOutlined, LinkOutlined, MessageOutlined } from '@ant-design/icons';
 import { getSignedURL } from "../../helpers/s3Helper";
 import moment from "moment-timezone";
 
@@ -42,6 +42,10 @@ const ShippingGuideTable = (
     const [activePreviewTab, setActivePreviewTab] = useState("photo");
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [pickupFilter, setPickupFilter] = useState<PickupFilter>("all");
+    const [observationsModalOpen, setObservationsModalOpen] = useState(false);
+    const [observationsSaving, setObservationsSaving] = useState(false);
+    const [observationsValue, setObservationsValue] = useState("");
+    const [observationsTarget, setObservationsTarget] = useState<any | null>(null);
 
     const normalizedRole = String(user?.role || "").toLowerCase();
     const isAdmin = normalizedRole === "admin";
@@ -170,9 +174,44 @@ const ShippingGuideTable = (
         }
     }
 
+    const handleOpenObservations = (record: any) => {
+        setObservationsTarget(record);
+        setObservationsValue(String(record?.observaciones || ""));
+        setObservationsModalOpen(true);
+    };
+
+    const handleSaveObservations = async () => {
+        if (!observationsTarget?._id) return;
+
+        setObservationsSaving(true);
+        try {
+            const res = await updateShippingGuideObservationsAPI(String(observationsTarget._id), observationsValue);
+            if (!res.success) {
+                message.error(res.message || "No se pudieron guardar las observaciones");
+                return;
+            }
+
+            message.success("Observaciones actualizadas");
+            setGuidesList((current: any[]) =>
+                current.map((item) =>
+                    String(item._id) === String(observationsTarget._id)
+                        ? { ...item, observaciones: observationsValue }
+                        : item
+                )
+            );
+            setObservationsModalOpen(false);
+            setObservationsTarget(null);
+        } catch (error) {
+            console.error("Error al guardar observaciones de la guía:", error);
+            message.error("No se pudieron guardar las observaciones");
+        } finally {
+            setObservationsSaving(false);
+        }
+    };
+
     const columns = [
         {
-            title: 'Â¿Recogido?',
+            title: '¿Recogido?',
             dataIndex: 'isRecogido',
             key: 'isRecogido',
             width: 100,
@@ -244,6 +283,14 @@ const ShippingGuideTable = (
                                     size="small"
                                     icon={<CheckCircleOutlined />}
                                     onClick={() => { handleCheckShipping(record) }} />
+                            </Tooltip>
+                        )}
+                        {(isAdmin || isOperator || isSuperadmin) && (
+                            <Tooltip title="Observaciones">
+                                <Button
+                                    size="small"
+                                    icon={<MessageOutlined />}
+                                    onClick={() => { handleOpenObservations(record) }} />
                             </Tooltip>
                         )}
                     </>
@@ -349,6 +396,34 @@ const ShippingGuideTable = (
                     ]}
                 />
 
+            </Modal>
+
+            <Modal
+                title="Observaciones de la guía"
+                open={observationsModalOpen}
+                onCancel={() => {
+                    setObservationsModalOpen(false);
+                    setObservationsTarget(null);
+                    setObservationsValue("");
+                }}
+                onOk={handleSaveObservations}
+                okText="Guardar"
+                cancelText="Cancelar"
+                confirmLoading={observationsSaving}
+            >
+                <div className="space-y-3">
+                    <div className="text-sm text-slate-600">
+                        {observationsTarget ? `${observationsTarget.vendedor?.nombre || ""} ${observationsTarget.vendedor?.apellido || ""}`.trim() : ""}
+                    </div>
+                    <Input.TextArea
+                        value={observationsValue}
+                        onChange={(event) => setObservationsValue(event.target.value)}
+                        placeholder="Escribe las observaciones..."
+                        autoSize={{ minRows: 3, maxRows: 8 }}
+                        maxLength={1000}
+                        showCount
+                    />
+                </div>
             </Modal>
         </>
     )

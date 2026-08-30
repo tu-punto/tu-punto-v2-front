@@ -113,7 +113,8 @@ const getProductBranchCombinations = (product: any, branchId?: string) => {
 
 const resolveSavedProduct = (response: any) => response?.result || response?.newProduct || response?.data || response;
 
-const buildQrItemKey = (productId: string, variantKey: string) => `${productId}::${variantKey}`;
+const buildQrItemKey = (productId: string, variantKey?: string, variantLabel?: string, qrCode?: string) =>
+  `${productId}::${String(variantKey || variantLabel || qrCode || "").trim()}`;
 
 const normalizeStockDraftEntries = (items: any[] = []) =>
   items.map((item: any) => ({
@@ -418,6 +419,12 @@ const ConfirmProductsModal = ({
         const dedupeKey = buildQrItemKey(safeProductId, safeVariantKey);
         if (seenQrKeys.has(dedupeKey)) {
           qrQuantities[dedupeKey] = (qrQuantities[dedupeKey] || 0) + safeQuantity;
+          const existingItem = qrItems.find((item) =>
+            buildQrItemKey(item.productId, item.variantKey, item.variantLabel, item.qrCode) === dedupeKey
+          );
+          if (existingItem) {
+            existingItem.quantity = (Number(existingItem.quantity || 0) || 0) + safeQuantity;
+          }
           return;
         }
 
@@ -429,15 +436,17 @@ const ConfirmProductsModal = ({
           productId: String(qrData.productId || safeProductId),
           productName: String(qrData.productName || productName || "Producto"),
           sellerId: String(sellerId || selectedSeller?._id || ""),
-          variantKey: String(qrData.variantKey || safeVariantKey),
+          variantKey: String(qrData.variantKey || safeVariantKey || variantLabel || qrData.qrCode || ""),
           variantLabel: String(qrData.variantLabel || variantLabel || "Variante"),
           qrCode: String(qrData.qrCode || ""),
           qrImagePath: String(qrData.qrImagePath || ""),
+          quantity: safeQuantity,
         };
 
         qrItems.push(item);
-        qrQuantities[buildQrItemKey(item.productId, item.variantKey)] = safeQuantity;
-        seenQrKeys.add(buildQrItemKey(item.productId, item.variantKey));
+        const itemKey = buildQrItemKey(item.productId, item.variantKey, item.variantLabel, item.qrCode);
+        qrQuantities[itemKey] = safeQuantity;
+        seenQrKeys.add(itemKey);
       };
 
       for (const variant of variantData) {

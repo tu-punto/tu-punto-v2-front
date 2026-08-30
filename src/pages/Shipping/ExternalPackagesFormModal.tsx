@@ -165,8 +165,20 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       (sum, row) => sum + getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0)),
       0
     );
-    const sellerDebt = rows.reduce((sum, row) => sum + roundCurrency(Number(row?.monto_paga_vendedor || 0)), 0);
-    const buyerDebt = rows.reduce((sum, row) => sum + roundCurrency(Number(row?.monto_paga_comprador || 0)), 0);
+    const sellerDebt = rows.reduce((sum, row) => {
+      const rowTotal = getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0));
+      const mode = String(row?.esta_pagado || "no").trim().toLowerCase();
+      if (mode === "si") return sum + rowTotal;
+      if (mode === "mixto") return sum + roundCurrency(Number(row?.monto_paga_vendedor || 0));
+      return sum;
+    }, 0);
+    const buyerDebt = rows.reduce((sum, row) => {
+      const rowTotal = getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0));
+      const mode = String(row?.esta_pagado || "no").trim().toLowerCase();
+      if (mode === "no") return sum + rowTotal;
+      if (mode === "mixto") return sum + roundCurrency(Number(row?.monto_paga_comprador || 0));
+      return sum;
+    }, 0);
 
     return { delivery, total, sellerDebt, buyerDebt };
   }, [packageCount, watchedPackages]);
@@ -273,7 +285,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       const half = roundCurrency(totalAmount / 2);
       return { ...row, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
     }
-    return { ...row, monto_paga_vendedor: 0, monto_paga_comprador: 0 };
+    return { ...row, monto_paga_vendedor: 0, monto_paga_comprador: totalAmount };
   };
 
   const recalculateRowsByDeliverySpaces = (sourceRows: any[], count = packageCount) => {
@@ -484,7 +496,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
     if (mode === "no") {
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], totalAmount);
       return;
     }
 
@@ -515,6 +527,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     if (mode === "si") {
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], totalAmount);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
+      return;
+    }
+
+    if (mode === "no") {
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], totalAmount);
       return;
     }
 
@@ -843,7 +861,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         buyerAmount = 0;
       } else if (paidStatus === "no") {
         sellerAmount = 0;
-        buyerAmount = 0;
+        buyerAmount = totalAmount;
       }
 
       return {
