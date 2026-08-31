@@ -129,7 +129,7 @@ const annulExternalSaleAPI = async (saleId: string, reason: string) => {
 
 const sendExternalGuideWhatsappAPI = async (id: string) => {
     try {
-        const res = await apiClient.post(`/external/${id}/send-guide-whatsapp`);
+        const res = await apiClient.post(`/external/${id}/send-guide-whatsapp`, { target: "buyer", mode: "single" });
         const response = { success: true, ...res.data };
         console.log("[external-whatsapp] send-guide:response", response);
         return response;
@@ -147,6 +147,37 @@ const sendExternalGuideWhatsappAPI = async (id: string) => {
     }
 }
 
+const getExternalGuideWhatsappPreviewAPI = async (id: string, params?: { target?: "seller" | "buyer"; mode?: "single" | "grouped" }) => {
+    try {
+        const res = await apiClient.get(`/external/${id}/send-guide-whatsapp/preview`, {
+            params: {
+                target: params?.target || "buyer",
+                mode: params?.mode || "single",
+            }
+        });
+        return { success: true, ...res.data };
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false };
+    }
+}
+
+const sendExternalGuideWhatsappWithTargetAPI = async (id: string, params: { target: "seller" | "buyer"; mode?: "single" | "grouped"; selectedGuideIds?: string[] }) => {
+    try {
+        const res = await apiClient.post(`/external/${id}/send-guide-whatsapp`, params);
+        return { success: true, ...res.data };
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return { success: false, ...err.response.data };
+        }
+        return { success: false };
+    }
+}
+
 export {
     getExternalSalesAPI,
     getExternalSalesListAPI,
@@ -156,5 +187,7 @@ export {
     registerExternalPackagesAPI,
     annulExternalSaleAPI,
     sendExternalGuideWhatsappAPI,
+    getExternalGuideWhatsappPreviewAPI,
+    sendExternalGuideWhatsappWithTargetAPI,
     updateExternalSaleAPI,
 }

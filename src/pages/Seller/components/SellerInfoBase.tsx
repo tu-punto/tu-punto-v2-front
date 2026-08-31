@@ -170,6 +170,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     hasCommissionService: false,
     hasSimplePackageServiceEnabled: false,
   });
+  const showBranchCommission = Form.useWatch("comision_diferente_por_sucursal", form);
 
   const syncServiceFlags = (branches: any[] = []) => {
     setServiceFlags({
@@ -194,6 +195,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       fecha_vigencia: sellerData?.fecha_vigencia ? dayjs(sellerData.fecha_vigencia, "D-M-YYYY") : null,
       mail: sellerData?.mail || "",
       comision_porcentual: sellerData?.comision_porcentual || 0,
+      comision_diferente_por_sucursal: sellerData?.comision_diferente_por_sucursal === true,
       amortizacion: sellerData?.amortizacion ?? null,
       precio_paquete: sellerData?.precio_paquete ?? null,
       sucursales: branches,
@@ -703,10 +705,13 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       /* 1) seller */
       const resSeller = await updateSellerAPI(seller.key, {
         ...formValues,
+        comision_diferente_por_sucursal: formValues.comision_diferente_por_sucursal === true,
         pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
           ...sucursal,
           alquiler: sucursal.almacenamiento,
           delivery: 0,
+          comision_porcentual: formValues.comision_diferente_por_sucursal ? Number(sucursal.comision_porcentual || 0) : 0,
+          comision_fija: formValues.comision_diferente_por_sucursal ? Number(sucursal.comision_fija || 0) : 0,
         })),
       });
       if (!resSeller?.success) {
@@ -1130,6 +1135,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
           mail: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
+          comision_diferente_por_sucursal: seller.comision_diferente_por_sucursal === true,
           amortizacion: seller.amortizacion ?? null,
           precio_paquete: seller.precio_paquete ?? null,
           sucursales: seller.pago_sucursales.length
@@ -1187,16 +1193,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             </Col>
 
             <Col xs={24} sm={12} md={6}>
-              <Form.Item name="comision_porcentual" label="Comisión">
+                <Form.Item name="comision_porcentual" label="Comisión">
                 <InputNumber
                   prefix={<PercentageOutlined />}
                   min={0}
                   max={100}
-                  disabled={isSeller || !serviceFlags.hasCommissionService}
+                  disabled={isSeller || !serviceFlags.hasCommissionService || Boolean(showBranchCommission)}
                   style={{ width: "100%" }}
                   placeholder="0"
                   addonAfter="%"
                 />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="comision_diferente_por_sucursal" valuePropName="checked" label="Comisión por sucursal">
+                <Checkbox disabled={isSeller}>Usar comisión distinta por sucursal</Checkbox>
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={6}>
@@ -1303,6 +1314,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                       sucursalOptions={sucursales}
                       form={form}
                       isSeller={isSeller}
+                      showBranchCommission={Boolean(showBranchCommission)}
                     />
                   </Card>
                 ))}

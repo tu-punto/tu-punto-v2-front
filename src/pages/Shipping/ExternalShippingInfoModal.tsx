@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { EditOutlined, PrinterOutlined, SaveOutlined, WhatsAppOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Form, Input, InputNumber, Modal, Radio, Row, Select, Space, message } from "antd";
+import { CloseOutlined, EditOutlined, PrinterOutlined, SaveOutlined, WhatsAppOutlined } from "@ant-design/icons";
+import { Button, Card, Col, Form, Input, InputNumber, List, Modal, Radio, Row, Select, Space, message } from "antd";
 import moment from "moment-timezone";
-import { annulExternalSaleAPI, sendExternalGuideWhatsappAPI, updateExternalSaleAPI } from "../../api/externalSale";
+import { annulExternalSaleAPI, getExternalGuideWhatsappPreviewAPI, sendExternalGuideWhatsappWithTargetAPI, updateExternalSaleAPI } from "../../api/externalSale";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
 import {
@@ -133,7 +133,13 @@ const ExternalShippingInfoModal = ({
   const [chargeEditing, setChargeEditing] = useState(false);
   const [chargeOverride, setChargeOverride] = useState<any>(null);
   const [printingQr, setPrintingQr] = useState(false);
-  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
+  const [sendingBuyerWhatsapp, setSendingBuyerWhatsapp] = useState(false);
+  const [sendingSellerWhatsapp, setSendingSellerWhatsapp] = useState(false);
+  const [sellerWhatsappModalVisible, setSellerWhatsappModalVisible] = useState(false);
+  const [sellerWhatsappMode, setSellerWhatsappMode] = useState<"single" | "grouped">("single");
+  const [sellerWhatsappPreview, setSellerWhatsappPreview] = useState<any>(null);
+  const [sellerWhatsappLoading, setSellerWhatsappLoading] = useState(false);
+  const [sellerWhatsappExcludedIds, setSellerWhatsappExcludedIds] = useState<string[]>([]);
   const [annulling, setAnnulling] = useState(false);
   const [annulModalVisible, setAnnulModalVisible] = useState(false);
   const [annulReason, setAnnulReason] = useState("");
@@ -265,6 +271,140 @@ const ExternalShippingInfoModal = ({
     ? roundCurrency(chargePreview.buyerDebt + (chargeSource?.estado_pedido === "Entregado" ? 0 : latePickupFee))
     : buyerDebt;
 
+  const loadSellerWhatsappPreview = async (mode: "single" | "grouped") => {
+    if (!externalShipping?._id) return;
+
+    setSellerWhatsappLoading(true);
+    try {
+      const response = await getExternalGuideWhatsappPreviewAPI(String(externalShipping._id), {
+        target: "seller",
+        mode,
+      });
+      if (!response?.success) {
+        message.error(response?.message || "No se pudo cargar la vista previa");
+        return;
+      }
+
+      setSellerWhatsappPreview(response);
+      setSellerWhatsappMode(mode);
+      setSellerWhatsappExcludedIds([]);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo cargar la vista previa");
+    } finally {
+      setSellerWhatsappLoading(false);
+    }
+  };
+
+  const handleSendBuyerGuideWhatsapp = async () => {
+    if (!canSendGuideWhatsapp) {
+      message.warning("Solo superadmins pueden enviar la guia por WhatsApp");
+      return;
+    }
+    if (!externalShipping?._id) {
+      message.warning("No se pudo identificar el pedido");
+      return;
+    }
+    if (!externalShipping?.numero_guia) {
+      message.warning("El pedido debe tener numero de guia antes de enviar WhatsApp");
+      return;
+    }
+
+    setSendingBuyerWhatsapp(true);
+    try {
+      const response = await sendExternalGuideWhatsappWithTargetAPI(String(externalShipping._id), {
+        target: "buyer",
+        mode: "single",
+      });
+      if (!response?.success) {
+        message.error(response.message || "No se pudo enviar WhatsApp");
+        return;
+      }
+
+      const sentCount = Number(response.sentCount || 0);
+      const failedCount = Number(response.failedCount || 0);
+      const skippedCount = Number(response.skippedCount || 0);
+      if (failedCount || skippedCount) {
+        message.warning(`WhatsApp enviados: ${sentCount}. Fallidos/omitidos: ${failedCount + skippedCount}`);
+        return;
+      }
+      message.success(`WhatsApp enviados: ${sentCount}`);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo enviar WhatsApp");
+    } finally {
+      setSendingBuyerWhatsapp(false);
+    }
+  };
+
+  const handleOpenSellerWhatsappModal = async () => {
+    if (!canSendGuideWhatsapp) {
+      message.warning("Solo superadmins pueden enviar la guia por WhatsApp");
+      return;
+    }
+    if (!externalShipping?._id) {
+      message.warning("No se pudo identificar el pedido");
+      return;
+    }
+    if (!externalShipping?.numero_guia) {
+      message.warning("El pedido debe tener numero de guia antes de enviar WhatsApp");
+      return;
+    }
+
+    setSellerWhatsappModalVisible(true);
+    setSellerWhatsappExcludedIds([]);
+    await loadSellerWhatsappPreview("single");
+  };
+
+  const handleSendSellerGuideWhatsapp = async () => {
+    if (!externalShipping?._id) return;
+
+    setSendingSellerWhatsapp(true);
+    try {
+      const selectedGuideIds = sellerWhatsappVisibleRows.map((item: any) => String(item?._id || item?.id || "").trim()).filter(Boolean);
+      if (selectedGuideIds.length === 0) {
+        message.warning("No hay guias seleccionadas para enviar");
+        return;
+      }
+
+      const response = await sendExternalGuideWhatsappWithTargetAPI(String(externalShipping._id), {
+        target: "seller",
+        mode: sellerWhatsappMode,
+        selectedGuideIds,
+      });
+      if (!response?.success) {
+        message.error(response.message || "No se pudo enviar WhatsApp");
+        return;
+      }
+
+      const sentCount = Number(response.sentCount || 0);
+      const failedCount = Number(response.failedCount || 0);
+      const skippedCount = Number(response.skippedCount || 0);
+      if (failedCount || skippedCount) {
+        message.warning(`WhatsApp enviados: ${sentCount}. Fallidos/omitidos: ${failedCount + skippedCount}`);
+        return;
+      }
+      message.success(`WhatsApp enviados: ${sentCount}`);
+      setSellerWhatsappModalVisible(false);
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo enviar WhatsApp");
+    } finally {
+      setSendingSellerWhatsapp(false);
+    }
+  };
+
+  const sellerWhatsappPreviewRows = Array.isArray(sellerWhatsappPreview?.rows)
+    ? sellerWhatsappPreview.rows
+    : Array.isArray(sellerWhatsappPreview?.data)
+      ? sellerWhatsappPreview.data
+      : [];
+
+  const sellerWhatsappVisibleRows = sellerWhatsappPreviewRows.filter((item: any) => {
+    const id = String(item?._id || item?.id || "").trim();
+    return id && !sellerWhatsappExcludedIds.includes(id);
+  });
+
   const handleBuyerPaymentTypeChange = (nextType: "1" | "2" | "4") => {
     form.setFieldValue("tipo_de_pago", nextType);
 
@@ -358,44 +498,6 @@ const ExternalShippingInfoModal = ({
       message.error("Error actualizando el resumen del cobro");
     } finally {
       setChargeSaving(false);
-    }
-  };
-
-  const handleSendGuideWhatsapp = async () => {
-    if (!canSendGuideWhatsapp) {
-      message.warning("Solo superadmins pueden enviar la guia por WhatsApp");
-      return;
-    }
-    if (!externalShipping?._id) {
-      message.warning("No se pudo identificar el pedido");
-      return;
-    }
-    if (!externalShipping?.numero_guia) {
-      message.warning("El pedido debe tener numero de guia antes de enviar WhatsApp");
-      return;
-    }
-
-    setSendingWhatsapp(true);
-    try {
-      const response = await sendExternalGuideWhatsappAPI(String(externalShipping._id));
-      if (!response?.success) {
-        message.error(response.message || "No se pudo enviar WhatsApp");
-        return;
-      }
-
-      const sentCount = Number(response.sentCount || 0);
-      const failedCount = Number(response.failedCount || 0);
-      const skippedCount = Number(response.skippedCount || 0);
-      if (failedCount || skippedCount) {
-        message.warning(`WhatsApp enviados: ${sentCount}. Fallidos/omitidos: ${failedCount + skippedCount}`);
-        return;
-      }
-      message.success(`WhatsApp enviados: ${sentCount}`);
-    } catch (error) {
-      console.error(error);
-      message.error("No se pudo enviar WhatsApp");
-    } finally {
-      setSendingWhatsapp(false);
     }
   };
 
@@ -696,27 +798,37 @@ const ExternalShippingInfoModal = ({
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
           <Space wrap>
           {canAnnulExternal && (
-            <Button danger disabled={printingQr || sendingWhatsapp || loading} onClick={() => setAnnulModalVisible(true)}>
+            <Button danger disabled={printingQr || sendingBuyerWhatsapp || sendingSellerWhatsapp || loading} onClick={() => setAnnulModalVisible(true)}>
               Anular pedido
             </Button>
           )}
           <Button
             icon={<PrinterOutlined />}
             loading={printingQr}
-            disabled={!externalShipping?.numero_guia || sendingWhatsapp}
+            disabled={!externalShipping?.numero_guia || sendingBuyerWhatsapp || sendingSellerWhatsapp}
             onClick={handleOpenPrintOptions}
           >
             Imprimir etiqueta
           </Button>
           {canSendGuideWhatsapp && (
-            <Button
-              icon={<WhatsAppOutlined />}
-              loading={sendingWhatsapp}
-              disabled={!externalShipping?.numero_guia || printingQr}
-              onClick={() => void handleSendGuideWhatsapp()}
-            >
-              WhatsApp guia
-            </Button>
+            <>
+              <Button
+                icon={<WhatsAppOutlined />}
+                loading={sendingBuyerWhatsapp}
+                disabled={!externalShipping?.numero_guia || printingQr || sendingSellerWhatsapp}
+                onClick={() => void handleSendBuyerGuideWhatsapp()}
+              >
+                WhatsApp comprador
+              </Button>
+              <Button
+                icon={<WhatsAppOutlined />}
+                loading={sendingSellerWhatsapp}
+                disabled={!externalShipping?.numero_guia || printingQr || sendingBuyerWhatsapp}
+                onClick={() => void handleOpenSellerWhatsappModal()}
+              >
+                WhatsApp vendedor
+              </Button>
+            </>
           )}
           </Space>
         </div>
@@ -1071,6 +1183,63 @@ const ExternalShippingInfoModal = ({
           )}
         </div>
         </Form>
+      </Modal>
+      <Modal
+        title="Enviar guia al vendedor"
+        open={sellerWhatsappModalVisible}
+        onCancel={() => setSellerWhatsappModalVisible(false)}
+        onOk={() => void handleSendSellerGuideWhatsapp()}
+        okText="Enviar WhatsApp"
+        confirmLoading={sendingSellerWhatsapp || sellerWhatsappLoading}
+        destroyOnClose
+        width={720}
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+          <Radio.Group
+            value={sellerWhatsappMode}
+            onChange={(event) => {
+              void loadSellerWhatsappPreview(event.target.value as "single" | "grouped");
+            }}
+          >
+            <Radio.Button value="single">Solo esta</Radio.Button>
+            <Radio.Button value="grouped">Agrupadas del dia</Radio.Button>
+          </Radio.Group>
+
+          <Card size="small" style={{ background: "#fafafa" }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>
+              {sellerWhatsappMode === "grouped" ? "Guias que se enviaran" : "Guia que se enviara"}
+            </div>
+            <List
+              loading={sellerWhatsappLoading}
+              dataSource={sellerWhatsappVisibleRows}
+              locale={{ emptyText: "No hay guias para mostrar" }}
+              renderItem={(item: any) => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={`Guia ${item?.guia || item?.numero_guia || "Sin guia"}`}
+                    description={[
+                      item?.comprador || item?.nombre_comprador || "Sin comprador",
+                      item?.telefono_comprador || item?.telefono || "Sin telefono",
+                      item?.fecha_pedido ? moment(item.fecha_pedido).format("DD/MM/YYYY HH:mm") : "Sin fecha",
+                    ].join(" · ")}
+                  />
+                  {sellerWhatsappMode === "grouped" && (
+                    <Button
+                      danger
+                      type="text"
+                      icon={<CloseOutlined />}
+                      onClick={() => {
+                        const id = String(item?._id || item?.id || "").trim();
+                        if (!id) return;
+                        setSellerWhatsappExcludedIds((current) => (current.includes(id) ? current : [...current, id]));
+                      }}
+                    />
+                  )}
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Space>
       </Modal>
       <Modal
         title="Anular pedido externo"

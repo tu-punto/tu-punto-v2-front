@@ -15,6 +15,25 @@ import { applySellerCommissionCap } from '../../utils/commissionCap';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const getSellerBranchCommission = (seller: any, branchId?: string) => {
+    const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
+    const branch = Array.isArray(seller?.pago_sucursales)
+        ? seller.pago_sucursales.find((item: any) => String(item?.id_sucursal?._id || item?.id_sucursal || "").trim() === String(branchId || "").trim())
+        : null;
+
+    if (useBranchCommission && branch) {
+        return {
+            percent: Number(branch?.comision_porcentual || 0),
+            fixed: Number(branch?.comision_fija || 0),
+        };
+    }
+
+    return {
+        percent: Number(seller?.comision_porcentual || 0),
+        fixed: Number(seller?.comision_fija || 0),
+    };
+};
+
 const normalizeDeliveryPayer = (value: unknown): "comprador" | "vendedor" =>
     value === "vendedor" ? "vendedor" : "comprador";
 
@@ -319,11 +338,12 @@ function ShippingFormModal({
 
             const ventas = selectedProducts.map((p: any) => {
                 const vendedor = p.id_vendedor || p.vendedor;
-                const comision = sellers?.find((s: any) => s._id === vendedor)?.comision_porcentual || 0;
+                const sellerData = sellers?.find((s: any) => s._id === vendedor);
+                const branchCommission = getSellerBranchCommission(sellerData, paymentBranchId);
                 const utilidad = parseFloat(p.utilidad);
                 const utilidadCalculada = applySellerCommissionCap(
                     vendedor,
-                    parseFloat(((p.precio_unitario * p.cantidad * comision) / 100).toFixed(2))
+                    parseFloat((((p.precio_unitario * p.cantidad * branchCommission.percent) / 100) + branchCommission.fixed).toFixed(2))
                 );
 
                 return {

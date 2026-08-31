@@ -20,6 +20,7 @@ const BranchFields = ({
   sucursalOptions,
   form,
   isSeller = false,
+  showBranchCommission = false,
 }: any) => {
   const sucursales = form.getFieldValue("sucursales") || [];
   const currentBranch = sucursales[field.name] || {};
@@ -113,6 +114,45 @@ const BranchFields = ({
             />
           </Form.Item>
         </Col>
+
+        {showBranchCommission && (
+          <>
+            <Col xs={12} sm={6} md={4}>
+              <Form.Item
+                {...field}
+                name={[field.name, "comision_porcentual"]}
+                label="Comisión %"
+                initialValue={currentBranch.comision_porcentual ?? 0}
+              >
+                <InputNumber
+                  min={0}
+                  max={100}
+                  placeholder="0"
+                  className="w-full"
+                  disabled={isSeller}
+                  addonAfter="%"
+                />
+              </Form.Item>
+            </Col>
+
+            <Col xs={12} sm={6} md={4}>
+              <Form.Item
+                {...field}
+                name={[field.name, "comision_fija"]}
+                label="Comisión fija"
+                initialValue={currentBranch.comision_fija ?? 0}
+              >
+                <InputNumber
+                  min={0}
+                  placeholder="0"
+                  className="w-full"
+                  disabled={isSeller}
+                  addonBefore="Bs."
+                />
+              </Form.Item>
+            </Col>
+          </>
+        )}
 
         {/* Botón eliminar */}
         {!isSeller && (

@@ -1,18 +1,18 @@
 import { Alert, Button, Card, Modal, Radio, Space, Table, message } from "antd";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import moment from "moment-timezone";
 
 import { getProductsEntryAmount } from "../../api/entry";
 import { deleteSellerVariantAPI, getProductByIdAPI } from "../../api/product";
 import { getSalesBySellerIdAPI } from "../../api/sales";
 import { getSucursalsAPI } from "../../api/sucursal";
-import { UserContext } from "../../context/userContext";
 
 type VariantInfoModalProps = {
     visible: boolean;
     onClose: () => void;
     rowRecord?: any;
     onUpdateProducts?: () => Promise<void>;
+    showDeleteButton?: boolean;
 };
 
 const normalizeText = (value: unknown) => String(value ?? "").trim();
@@ -119,8 +119,7 @@ const areVariantsEqual = (left: any, right: any) => {
     return keysA.every((key) => normalizeLabel(a[key]) === normalizeLabel(b[key]));
 };
 
-const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: VariantInfoModalProps) => {
-    const { user }: any = useContext(UserContext);
+const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts, showDeleteButton = true }: VariantInfoModalProps) => {
     const [loading, setLoading] = useState(false);
     const [productName, setProductName] = useState("");
     const [variantName, setVariantName] = useState("");
@@ -137,7 +136,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: Var
     );
 
     useEffect(() => {
-        if (!visible || !rowRecord?._id || !user?.id_vendedor) {
+        if (!visible || !rowRecord?._id || !rowRecord?.id_vendedor) {
             if (!visible) {
                 setStockData([]);
                 setSalesData([]);
@@ -162,8 +161,8 @@ const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: Var
 
                 const [branchesResponse, salesResponse, entriesResponse, productResponse] = await Promise.all([
                     getSucursalsAPI(),
-                    getSalesBySellerIdAPI(user.id_vendedor),
-                    getProductsEntryAmount(user.id_vendedor),
+                    getSalesBySellerIdAPI(String(rowRecord?.id_vendedor)),
+                    getProductsEntryAmount(String(rowRecord?.id_vendedor)),
                     getProductByIdAPI(rowRecord._id)
                 ]);
 
@@ -262,7 +261,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: Var
         return () => {
             cancelled = true;
         };
-    }, [visible, rowRecord, user?.id_vendedor, normalizedVariant]);
+    }, [visible, rowRecord, normalizedVariant]);
 
     const stockColumns = [
         {
@@ -379,12 +378,13 @@ const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts }: Var
             width={1000}
             destroyOnClose
         >
-            <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
-                
-                <Button danger onClick={() => setDeleteModalOpen(true)}>
-                    Eliminar
-                </Button>
-            </Space>
+            {showDeleteButton && (
+                <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+                    <Button danger onClick={() => setDeleteModalOpen(true)}>
+                        Eliminar
+                    </Button>
+                </Space>
+            )}
             <Card title="Stock por sucursal" bordered={false}>
                 <Table
                     columns={stockColumns}
