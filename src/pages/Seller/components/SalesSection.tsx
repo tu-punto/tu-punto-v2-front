@@ -52,7 +52,7 @@ const SalesSection: React.FC<Props> = ({
   }, [salesData]);
 
   // const sucursalId = localStorage.getItem("sucursalId");
-  const ventasNoPagadas = salesData.filter((s) => !s.deposito_realizado);
+  const ventasNoPagadas = salesData.filter((s) => !s.deposito_realizado && !s.historyOnly);
 
   return (
     <>

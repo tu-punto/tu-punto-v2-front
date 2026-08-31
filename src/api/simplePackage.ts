@@ -59,6 +59,15 @@ export const getSellerAccountingSimplePackagesAPI = async (params?: { sellerId?:
   }
 };
 
+export const getSellerHistorySimplePackagesAPI = async (params?: { sellerId?: string }) => {
+  try {
+    const res = await apiClient.get("/simple-packages/seller-history", { params });
+    return res.data;
+  } catch (error) {
+    return parseAxiosError(error);
+  }
+};
+
 export const upsertSimplePackageBranchPriceAPI = async (payload: {
   originBranchId: string;
   destinationBranchId: string;
