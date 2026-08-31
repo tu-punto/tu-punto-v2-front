@@ -53,7 +53,10 @@ import {
 } from "../../../api/seller";
 import { getSucursalsAPI } from "../../../api/sucursal";
 import { getShipingByIdsAPI } from "../../../api/shipping";
-import { getSellerAccountingSimplePackagesAPI } from "../../../api/simplePackage";
+import {
+  getSellerAccountingSimplePackagesAPI,
+  getSellerHistorySimplePackagesAPI,
+} from "../../../api/simplePackage";
 import { resetSellerPasswordAPI } from "../../../api/user";
 
 import { UserContext } from "../../../context/userContext";
@@ -297,13 +300,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
   const fetchSales = async () => {
     try {
-      const [res, simpleRes] = await Promise.all([
+      const [res, simpleRes, simpleHistoryRes] = await Promise.all([
         getSalesBySellerIdAPI(seller.key),
         getSellerAccountingSimplePackagesAPI({ sellerId: String(seller.key) }),
+        getSellerHistorySimplePackagesAPI({ sellerId: String(seller.key) }),
       ]);
+      const simpleAccountingRows = Array.isArray(simpleRes?.rows) ? simpleRes.rows : [];
+      const simpleHistoryRows = Array.isArray(simpleHistoryRes?.rows) ? simpleHistoryRes.rows : [];
       const simplePackagePedidoIds = new Set(
-        (Array.isArray(simpleRes?.rows) ? simpleRes.rows : [])
+        simpleAccountingRows
           .map((row: any) => String(row?.pedido_ref?._id || row?.pedido_ref || row?._id || "").trim())
+          .filter(Boolean)
+      );
+      const simplePackageIds = new Set(
+        simpleAccountingRows
+          .map((row: any) => String(row?._id || "").trim())
           .filter(Boolean)
       );
       const regularSales: any[] = Array.isArray(res)
@@ -314,40 +325,49 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               !simplePackagePedidoIds.has(String(sale?.id_pedido?._id || sale?.id_pedido || "").trim())
           )
         : [];
-      const simpleSales: any[] = Array.isArray(simpleRes?.rows)
-        ? simpleRes.rows
-            .map((row: any) => ({
-              key: `simple-${row._id}`,
-              producto: "Entrega simple",
-              nombre_variante: row.descripcion_paquete || "Paquete simple",
-              precio_unitario: Number(
-                row.saldo_por_paquete ??
-                Math.max(
-                  0,
-                  Number(row.saldo_cobrar ?? 0) - Number(row.amortizacion_vendedor ?? 0)
-                )
-              ),
-              cantidad: 1,
-              utilidad: 0,
-              id_venta: `simple-${row._id}`,
-              id_vendedor: seller.key,
-              id_pedido: {
-                _id: `simple-${row._id}`,
-                estado_pedido: row.estado_pedido || "Entregado",
-                pagado_al_vendedor: false,
-                cargo_delivery: 0,
-                adelanto_cliente: 0,
-              },
-              id_sucursal:
-                String(row?.origen_sucursal?._id || row?.origen_sucursal || row?.sucursal || ""),
-              deposito_realizado: !!row.deposito_realizado,
-              cliente: row.comprador || "",
-              fecha_pedido: row.fecha_pedido,
-              tipo: "Simple",
-              es_entrega_simple: true,
-              sucursal: row?.origen_sucursal?.nombre || "Sucursal no encontrada",
-            }))
-        : [];
+      const mapSimplePackageRow = (row: any, options?: { historyOnly?: boolean }) => ({
+        key: `simple-${row._id}`,
+        producto: "Entrega simple",
+        nombre_variante: row.descripcion_paquete || "Paquete simple",
+        precio_unitario: Number(
+          row.saldo_por_paquete ??
+          Math.max(
+            0,
+            Number(row.saldo_cobrar ?? 0) - Number(row.amortizacion_vendedor ?? 0)
+          )
+        ),
+        cantidad: 1,
+        utilidad: 0,
+        id_venta: `simple-${row._id}`,
+        id_vendedor: seller.key,
+        id_pedido: {
+          _id: `simple-${row._id}`,
+          estado_pedido: row.estado_pedido || "Entregado",
+          pagado_al_vendedor: false,
+          cargo_delivery: 0,
+          adelanto_cliente: 0,
+        },
+        id_sucursal:
+          String(row?.origen_sucursal?._id || row?.origen_sucursal || row?.sucursal || ""),
+        deposito_realizado: !!row.deposito_realizado,
+        cliente: row.comprador || "",
+        fecha_pedido: row.fecha_pedido,
+        tipo: "Simple",
+        es_entrega_simple: true,
+        historyOnly: options?.historyOnly === true,
+        sucursal: row?.origen_sucursal?.nombre || "Sucursal no encontrada",
+      });
+      const simpleSales: any[] = simpleAccountingRows.map((row: any) =>
+        mapSimplePackageRow(row)
+      );
+      const simpleHistorySales: any[] = simpleHistoryRows
+        .filter((row: any) => !simplePackageIds.has(String(row?._id || "").trim()))
+        .map((row: any) => ({
+          ...mapSimplePackageRow(row, { historyOnly: true }),
+          key: `simple-history-${row._id}`,
+          id_venta: `simple-history-${row._id}`,
+          deposito_realizado: true,
+        }));
       const pedidosIds = regularSales.map((s) => s.id_pedido);
       const uniquePedidos = Array.from(new Set(pedidosIds));
 
@@ -380,7 +400,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         };
       });
 
-      setSalesData([...finalRegular, ...simpleSales]);
+      setSalesData([...finalRegular, ...simpleSales, ...simpleHistorySales]);
     } catch (e) {
       console.error("Error ventas", e);
     }
@@ -722,7 +742,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       setRefreshKey((prev) => prev + 1);
 
       /* 2) ventas */
-      await updateSale(salesData);
+      await updateSale(salesData.filter((sale) => !sale?.historyOnly));
       if (deletedSales.length) await deleteSalesAPI(deletedSales);
 
       /* 3) ingresos */
