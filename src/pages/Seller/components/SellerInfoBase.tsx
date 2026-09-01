@@ -143,7 +143,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     fecha_pago_asignada: seller?.fecha_pago_asignada || null,
   });
   const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
-  const [visiblePaymentLimit, setVisiblePaymentLimit] = useState<number | null>(null);
+  const [paymentAvailability, setPaymentAvailability] = useState<{ amount: number | null; nextDate?: string | null; occupiedDates: string[] } | null>(null);
   const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
   const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
   const [adminDeclineServiceModalOpen, setAdminDeclineServiceModalOpen] = useState(false);
@@ -991,8 +991,12 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             onClick={async () => {
               try {
                 const response = await getSellerPaymentLimitAPI();
-                setVisiblePaymentLimit(typeof response?.data?.visibleLimit === "number" ? response.data.visibleLimit : null);
-              } catch { setVisiblePaymentLimit(null); }
+                setPaymentAvailability({
+                  amount: typeof response?.data?.visibleAvailableAmount === "number" ? response.data.visibleAvailableAmount : null,
+                  nextDate: response?.data?.nextAvailableDate || null,
+                  occupiedDates: Array.isArray(response?.data?.occupiedDates) ? response.data.occupiedDates : [],
+                });
+              } catch { setPaymentAvailability(null); }
               setPaymentRequestModalOpen(true);
             }}
           >
@@ -1082,8 +1086,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         confirmLoading={paymentRequestLoading}
       >
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-          {visiblePaymentLimit !== null && (
-            <Alert type="info" showIcon message={`Cupo disponible para pagos: Bs. ${visiblePaymentLimit.toFixed(2)}.`} description="Tu fecha de pago se asignara automaticamente segun la disponibilidad." />
+          {paymentAvailability?.amount !== null && paymentAvailability && (
+            <Alert
+              type="info"
+              showIcon
+              message={<div>Cupo disponible para pagos<div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: "#0958d9" }}>Bs. {paymentAvailability.amount.toFixed(2)}</div></div>}
+              description={<div style={{ marginTop: 8 }}>
+                <div>Tu fecha de pago se asignará automáticamente según la disponibilidad.</div>
+                <div style={{ marginTop: 6 }}><strong>Siguiente fecha disponible:</strong> {paymentAvailability.nextDate ? dayjs(paymentAvailability.nextDate).format("DD/MM/YYYY") : "Por definir"}</div>
+                {paymentAvailability.occupiedDates.length > 0 && <div style={{ marginTop: 4 }}><strong>Fechas ocupadas:</strong> {paymentAvailability.occupiedDates.map((date) => dayjs(date).format("DD/MM/YYYY")).join(", ")}</div>}
+                <div style={{ marginTop: 10 }}>En caso de que requieras tu cobro en otra fecha, puedes pasar a la tienda a recoger en efectivo.</div>
+              </div>}
+            />
           )}
           <Alert
             type="warning"
