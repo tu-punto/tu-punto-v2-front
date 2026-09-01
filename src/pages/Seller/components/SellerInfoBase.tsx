@@ -1092,9 +1092,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
               showIcon
               message={<div>Cupo disponible para pagos<div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: "#0958d9" }}>Bs. {paymentAvailability.amount.toFixed(2)}</div></div>}
               description={<div style={{ marginTop: 8 }}>
-                <div>Tu fecha de pago se asignará automáticamente según la disponibilidad.</div>
-                <div style={{ marginTop: 6 }}><strong>Siguiente fecha disponible:</strong> {paymentAvailability.nextDate ? dayjs(paymentAvailability.nextDate).format("DD/MM/YYYY") : "Por definir"}</div>
+                <div><strong>Siguiente fecha disponible:</strong> {paymentAvailability.nextDate ? dayjs(paymentAvailability.nextDate).format("DD/MM/YYYY") : "Por definir"}</div>
                 {paymentAvailability.occupiedDates.length > 0 && <div style={{ marginTop: 4 }}><strong>Fechas ocupadas:</strong> {paymentAvailability.occupiedDates.map((date) => dayjs(date).format("DD/MM/YYYY")).join(", ")}</div>}
+                <div style={{ marginTop: 10 }}>Tu fecha de pago se asignará automáticamente según la disponibilidad.</div>
                 <div style={{ marginTop: 10 }}>En caso de que requieras tu cobro en otra fecha, puedes pasar a la tienda a recoger en efectivo.</div>
               </div>}
             />
