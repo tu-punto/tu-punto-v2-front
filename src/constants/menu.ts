@@ -121,7 +121,7 @@ export const menu = [
   },
   {
     path: "/shipping-guide",
-    label: "Guias de Envio",
+    label: "Guías y Listas de ingresos",
     icon: paperNoteIcon,
     roles: getAllowedRoles("/shipping-guide"),
   },

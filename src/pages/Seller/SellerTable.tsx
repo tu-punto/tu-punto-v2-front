@@ -89,7 +89,7 @@ export default function SellerTable({
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
-  const [fechaPagoFilter, setFechaPagoFilter] = useState<"todos" | "sin_solicitud" | "8" | "18" | "28">("todos");
+  const [fechaPagoFilter, setFechaPagoFilter] = useState<string>("todos");
   const [tableSort, setTableSort] = useState<SellerSortState>({});
   const [sellers, setSellers] = useState<SellerRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -109,7 +109,7 @@ export default function SellerTable({
   const [loading, setLoading] = useState(false);
   const [paymentLimitOpen, setPaymentLimitOpen] = useState(false);
   const [paymentLimit, setPaymentLimit] = useState<number | null>(null);
-  const [availablePaymentDays, setAvailablePaymentDays] = useState<number[]>([]);
+  const [availablePaymentDates, setAvailablePaymentDates] = useState<string[]>([]);
   const [paymentLimitLoading, setPaymentLimitLoading] = useState(false);
   const sellersRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
@@ -121,7 +121,7 @@ export default function SellerTable({
     try {
       const response = await getSellerPaymentLimitAPI();
       const data = response?.data || {};
-      setAvailablePaymentDays(Array.isArray(data.availableDays) ? data.availableDays : []);
+      setAvailablePaymentDates(Array.isArray(data.dates) ? data.dates.map((item: any) => String(item?.date || "")).filter(Boolean) : []);
       if (typeof data.limit === "number") setPaymentLimit(data.limit);
     } catch (error) {
       console.error("No se pudo obtener el cupo de pagos", error);
@@ -455,7 +455,8 @@ export default function SellerTable({
           q: debouncedSearch || undefined,
           status: statusParam,
           pendingPayment: pendingPaymentParam,
-          assignedPaymentDay: fechaPagoFilter === "todos" ? undefined : fechaPagoFilter,
+          assignedPaymentDay: fechaPagoFilter === "sin_solicitud" ? "sin_solicitud" : undefined,
+          assignedPaymentDate: fechaPagoFilter !== "todos" && fechaPagoFilter !== "sin_solicitud" ? fechaPagoFilter : undefined,
           sortBy: tableSort.sortBy,
           sortOrder: tableSort.order === "descend" ? "desc" : "asc",
           page,
@@ -591,9 +592,7 @@ export default function SellerTable({
           options={[
             { value: "todos", label: "Fecha pago: todos" },
             { value: "sin_solicitud", label: "Sin solicitud" },
-            ...(availablePaymentDays.includes(8) ? [{ value: "8", label: "Dia 8" }] : []),
-            ...(availablePaymentDays.includes(18) ? [{ value: "18", label: "Dia 18" }] : []),
-            ...(availablePaymentDays.includes(28) ? [{ value: "28", label: "Dia 28" }] : []),
+            ...availablePaymentDates.sort().map((date) => ({ value: date, label: dayjs(date).format("DD/MM/YYYY") })),
           ]}
         />
       </Space>
