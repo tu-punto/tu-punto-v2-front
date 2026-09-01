@@ -120,7 +120,7 @@ function SalesFormModal({
 
     const response = await registerShippingAPI(apiShippingData);
     if (!response.success) {
-      message.error("Error al registrar pedido interno");
+      message.error(response?.error || response?.msg || "Error al registrar pedido interno");
       setLoading(false);
       return;
     }
