@@ -42,6 +42,7 @@ import {
 } from "../../../api/sales";
 import {
   getPaymentProofsBySellerIdAPI,
+  getSellerPaymentLimitAPI,
   getSellerAPI,
   getSellerDebtsAPI,
   declineSellerServiceAPI,
@@ -142,6 +143,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     fecha_pago_asignada: seller?.fecha_pago_asignada || null,
   });
   const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
+  const [visiblePaymentLimit, setVisiblePaymentLimit] = useState<number | null>(null);
   const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
   const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
   const [adminDeclineServiceModalOpen, setAdminDeclineServiceModalOpen] = useState(false);
@@ -986,7 +988,13 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             type="primary"
             size="large"
             disabled={hasPendingPaymentRequest}
-            onClick={() => setPaymentRequestModalOpen(true)}
+            onClick={async () => {
+              try {
+                const response = await getSellerPaymentLimitAPI();
+                setVisiblePaymentLimit(typeof response?.data?.visibleLimit === "number" ? response.data.visibleLimit : null);
+              } catch { setVisiblePaymentLimit(null); }
+              setPaymentRequestModalOpen(true);
+            }}
           >
             Solicitar cobro
           </Button>
@@ -1074,6 +1082,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         confirmLoading={paymentRequestLoading}
       >
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+          {visiblePaymentLimit !== null && (
+            <Alert type="info" showIcon message={`Cupo disponible para pagos: Bs. ${visiblePaymentLimit.toFixed(2)}.`} description="Tu fecha de pago se asignara automaticamente segun la disponibilidad." />
+          )}
           <Alert
             type="warning"
             showIcon

@@ -530,6 +530,7 @@ export const Sales = () => {
   const handleAddProduct = (newProduct: any) => {
     const vendedor = sellers.find((v: any) => String(v._id) === String(newProduct.id_vendedor));
     const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
+    const comision = branchCommission.percent;
     const cantidadSolicitada = Number(newProduct.cantidad || 1);
     const pricing = getSalePricing(newProduct, cantidadSolicitada);
     const precio = Number(newProduct.precio_unitario ?? pricing.unitPrice ?? 0);

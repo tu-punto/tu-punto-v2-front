@@ -25,7 +25,9 @@ import DeclineServiceReasonModal from "../../components/DeclineServiceReasonModa
 import {
   adminDeclineSellerServiceAPI,
   cancelSellerServiceDeclineAPI,
+  getSellerPaymentLimitAPI,
   getSellersAPI,
+  updateSellerPaymentLimitAPI,
 } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
@@ -105,11 +107,47 @@ export default function SellerTable({
   const [declineReasonTarget, setDeclineReasonTarget] = useState<SellerRow | null>(null);
   const [declineLoading, setDeclineLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [paymentLimitOpen, setPaymentLimitOpen] = useState(false);
+  const [paymentLimit, setPaymentLimit] = useState<number | null>(null);
+  const [availablePaymentDays, setAvailablePaymentDays] = useState<number[]>([]);
+  const [paymentLimitLoading, setPaymentLimitLoading] = useState(false);
   const sellersRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
 
   const refresh = () => setRefreshKey((key) => key + 1);
+
+  const loadPaymentLimit = async () => {
+    try {
+      const response = await getSellerPaymentLimitAPI();
+      const data = response?.data || {};
+      setAvailablePaymentDays(Array.isArray(data.availableDays) ? data.availableDays : []);
+      if (typeof data.limit === "number") setPaymentLimit(data.limit);
+    } catch (error) {
+      console.error("No se pudo obtener el cupo de pagos", error);
+    }
+  };
+
+  useEffect(() => { loadPaymentLimit(); }, []);
+
+  useEffect(() => {
+    const open = () => setPaymentLimitOpen(true);
+    window.addEventListener("tp-open-payment-limit", open);
+    return () => window.removeEventListener("tp-open-payment-limit", open);
+  }, []);
+
+  const savePaymentLimit = async () => {
+    if (paymentLimit === null || paymentLimit < 0) return message.warning("Ingresa un limite valido");
+    setPaymentLimitLoading(true);
+    try {
+      await updateSellerPaymentLimitAPI(paymentLimit);
+      message.success("Limite de pagos actualizado");
+      setPaymentLimitOpen(false);
+      await loadPaymentLimit();
+    } catch (error) {
+      message.error("No se pudo actualizar el limite");
+    } finally { setPaymentLimitLoading(false); }
+  };
 
   const decliningBadge =
     decliningCount > 0 ? (
@@ -553,9 +591,9 @@ export default function SellerTable({
           options={[
             { value: "todos", label: "Fecha pago: todos" },
             { value: "sin_solicitud", label: "Sin solicitud" },
-            { value: "8", label: "Dia 8" },
-            { value: "18", label: "Dia 18" },
-            { value: "28", label: "Dia 28" },
+            ...(availablePaymentDays.includes(8) ? [{ value: "8", label: "Dia 8" }] : []),
+            ...(availablePaymentDays.includes(18) ? [{ value: "18", label: "Dia 18" }] : []),
+            ...(availablePaymentDays.includes(28) ? [{ value: "28", label: "Dia 28" }] : []),
           ]}
         />
       </Space>
@@ -702,6 +740,24 @@ export default function SellerTable({
         }}
         onConfirm={handleSubmitDeclineReason}
       />
+      <Modal
+        open={paymentLimitOpen}
+        title="Limite global por fecha de pago"
+        okText="Guardar"
+        confirmLoading={paymentLimitLoading}
+        onOk={savePaymentLimit}
+        onCancel={() => setPaymentLimitOpen(false)}
+      >
+        <p>Este limite real se aplica de forma independiente a los dias 8, 18 y 28.</p>
+        <Input
+          type="number"
+          min={0}
+          prefix="Bs."
+          value={paymentLimit ?? undefined}
+          onChange={(event) => setPaymentLimit(event.target.value === "" ? null : Number(event.target.value))}
+        />
+        <p className="mt-3 text-gray-500">Los vendedores veran Bs. {Number(paymentLimit || 0) + 20000} como limite visual.</p>
+      </Modal>
     </>
   );
 }

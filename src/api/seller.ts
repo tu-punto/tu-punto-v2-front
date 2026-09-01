@@ -20,6 +20,16 @@ export const getSellersAPI = async (params?: {
     }
 }
 
+export const getSellerPaymentLimitAPI = async () => {
+    const res = await apiClient.get(`/seller/payment-limit`)
+    return res.data
+}
+
+export const updateSellerPaymentLimitAPI = async (limit: number) => {
+    const res = await apiClient.put(`/seller/payment-limit`, { limit })
+    return res.data
+}
+
 export const renewSellerAPI = async (id: string | number, data: any) => {
     try {
         const res = await apiClient.put(`/seller/renew/${id}`, data);
