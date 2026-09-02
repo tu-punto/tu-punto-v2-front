@@ -118,7 +118,7 @@ export default function SellerTable({
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
   const serviceOptions = [
-    { value: "alquiler", label: "Alquiler" },
+    { value: "alquiler", label: "Almacenamiento" },
     { value: "exhibicion", label: "Exhibición" },
     { value: "entrega_simple", label: "Entrega simple" },
   ];
