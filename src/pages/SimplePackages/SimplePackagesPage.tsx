@@ -753,6 +753,7 @@ const SimplePackagesPage = () => {
               width: 140,
               render: (_: any, row: any) => (
                 <PhoneCountryInput
+                  compact
                   value={row.telefono_comprador}
                   onChange={(value) => patchPendingRow(String(row._id), { telefono_comprador: value })}
                 />
@@ -961,6 +962,7 @@ const SimplePackagesPage = () => {
                       </td>
                       <td style={tableCellStyle}>
                         <PhoneCountryInput
+                          compact
                           value={row.telefono_comprador}
                           placeholder="Celular"
                           onChange={(value) => updateRow(index, { telefono_comprador: value })}

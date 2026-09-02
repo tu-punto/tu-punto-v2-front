@@ -1622,7 +1622,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                               />
                             </td>
                             <td style={tableCellStyle}>
-                                <PhoneCountryInput value={row.telefono_comprador} placeholder="Celular" onChange={(value) => updateCreateRow(index, { telefono_comprador: value })} />
+                                <PhoneCountryInput compact value={row.telefono_comprador} placeholder="Celular" onChange={(value) => updateCreateRow(index, { telefono_comprador: value })} />
                               </td>
                             <td style={tableCellStyle}>
                               <Select

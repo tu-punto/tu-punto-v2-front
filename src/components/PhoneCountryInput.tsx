@@ -10,6 +10,7 @@ type PhoneCountryInputProps = {
   placeholder?: string;
   disabled?: boolean;
   style?: CSSProperties;
+  compact?: boolean;
 };
 
 const DEFAULT_CODE = COUNTRY_CODES[0]?.code || "+591";
@@ -34,7 +35,7 @@ const parsePhoneValue = (value?: string) => {
   return { code: DEFAULT_CODE, number: raw.replace(/\D/g, "") };
 };
 
-const PhoneCountryInput = ({ value, onChange, placeholder = "Celular", disabled, style }: PhoneCountryInputProps) => {
+const PhoneCountryInput = ({ value, onChange, placeholder = "Celular", disabled, style, compact = false }: PhoneCountryInputProps) => {
   const parsed = useMemo(() => parsePhoneValue(value), [value]);
 
   const handleCodeChange = (nextCode: string) => {
@@ -48,11 +49,12 @@ const PhoneCountryInput = ({ value, onChange, placeholder = "Celular", disabled,
   };
 
   return (
-    <div style={{ display: "flex", gap: 8, width: "100%", ...style }}>
+    <div style={{ display: "flex", gap: compact ? 4 : 8, width: "100%", minWidth: 0, ...style }}>
       <Select
         value={parsed.code}
         disabled={disabled}
-        style={{ width: 132, flexShrink: 0 }}
+        style={{ width: compact ? 42 : 110, flexShrink: 0 }}
+        suffixIcon={compact ? null : undefined}
         options={COUNTRY_CODES.map((item) => ({
           value: item.code,
           label: (
@@ -60,10 +62,10 @@ const PhoneCountryInput = ({ value, onChange, placeholder = "Celular", disabled,
               <ReactCountryFlag
                 countryCode={item.flag}
                 svg
-                style={{ width: 18, height: 18 }}
+                style={{ width: compact ? 23 : 18, height: compact ? 23 : 18 }}
                 aria-label={item.name}
               />
-              {item.code}
+              {!compact && item.code}
             </span>
           ),
         }))}
