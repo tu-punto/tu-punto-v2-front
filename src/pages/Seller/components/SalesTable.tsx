@@ -75,19 +75,27 @@ const CustomTable = ({
     return acc + precio * cantidad;
   }, 0);
 
+  const formatTableDate = (value: any) => (value ? dayjs(value).format("DD/MM/YYYY") : "-");
+
   const columns = [
     {
-      title: "Fecha",
-      dataIndex: "fecha_pedido",
-      key: "fecha_pedido",
-      render: (text: string) => {
-        return dayjs(text).format("DD/MM/YYYY");
-      },
+      title: "Fecha de creacion",
+      dataIndex: "fecha_creacion",
+      key: "fecha_creacion",
+      render: (_: any, record: any) => formatTableDate(record.fecha_creacion || record.fecha_pedido),
       className: "text-mobile-sm xl:text-desktop-sm",
-      sorter: (a: any, b: any) => {
-        return dayjs(a.fecha_pedido).unix() - dayjs(b.fecha_pedido).unix();
-      },
+      sorter: (a: any, b: any) => dayjs(a.fecha_creacion || a.fecha_pedido).unix() - dayjs(b.fecha_creacion || b.fecha_pedido).unix(),
       defaultSortOrder: 'descend' as const, 
+    },
+    {
+      title: "Fecha de entrega",
+      dataIndex: "fecha_entrega",
+      key: "fecha_entrega",
+      render: (_: any, record: any) => formatTableDate(record.fecha_entrega || record.id_pedido?.hora_entrega_real || record.hora_entrega_real),
+      className: "text-mobile-sm xl:text-desktop-sm",
+      sorter: (a: any, b: any) =>
+        dayjs(a.fecha_entrega || a.id_pedido?.hora_entrega_real || a.hora_entrega_real || 0).unix() -
+        dayjs(b.fecha_entrega || b.id_pedido?.hora_entrega_real || b.hora_entrega_real || 0).unix(),
     },
     {
       title: "Producto",
@@ -96,6 +104,22 @@ const CustomTable = ({
       className: "text-mobile-sm xl:text-desktop-sm",
       sorter: (a: any, b: any) => {
         return a.nombre_variante.localeCompare(b.nombre_variante);
+      },
+      render: (_: any, record: any) => {
+        const producto = String(record.nombre_variante || record.producto || "");
+        const esTemporal = Boolean(
+          record.esTemporal ||
+          record?.producto?.esTemporal ||
+          record?.id_producto?.esTemporal ||
+          record?.product?.esTemporal
+        );
+
+        return (
+          <>
+            {producto}
+            {esTemporal ? <span className="text-orange-500"> (Temporal)</span> : null}
+          </>
+        );
       },
     },
     {

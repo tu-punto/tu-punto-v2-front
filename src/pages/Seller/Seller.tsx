@@ -1,4 +1,4 @@
-import { Badge, Button, message, Modal } from "antd";
+import { Alert, Badge, Button, List, message, Modal, Space } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
 import { useContext, useEffect, useState } from "react";
@@ -22,6 +22,13 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   const [leadCounterLoading, setLeadCounterLoading] = useState(false);
   const [declineResponsesOpen, setDeclineResponsesOpen] = useState(false);
   const [declineResponsesCount, setDeclineResponsesCount] = useState(0);
+  const [noSalesSellers, setNoSalesSellers] = useState<any[]>([]);
+  const [debtAlertSellers, setDebtAlertSellers] = useState<any[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<{ noSales: boolean; debt: boolean }>({
+    noSales: false,
+    debt: false,
+  });
+  const [alertModal, setAlertModal] = useState<{ title: string; rows: any[] } | null>(null);
 
   const refreshLeadCounter = async () => {
     setLeadCounterLoading(true);
@@ -36,22 +43,60 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     }
   };
 
-  const refreshDeclineResponsesCounter = async () => {
+  const refreshSellerAlerts = async () => {
     try {
       const response = await getSellersAPI();
       const rows = Array.isArray(response) ? response : Array.isArray((response as any)?.data) ? (response as any).data : [];
-      setDeclineResponsesCount(
-        rows.filter((row: any) => Boolean(row?.declinacion_servicio_fecha)).length
+      setDeclineResponsesCount(rows.filter((row: any) => Boolean(row?.declinacion_servicio_fecha)).length);
+      setNoSalesSellers(rows.filter((row: any) => Number(row?.activity_last_30_days_count || 0) === 0));
+      setDebtAlertSellers(
+        rows.filter((row: any) => {
+          const pagoMensual = Number(row?.pago_mensual || 0);
+          const pagoPendiente = Number(row?.pago_pendiente ?? row?.pagoTotalInt ?? 0);
+          return pagoMensual > 0 && pagoPendiente <= -1.5 * pagoMensual;
+        })
       );
     } catch {
       setDeclineResponsesCount(0);
+      setNoSalesSellers([]);
+      setDebtAlertSellers([]);
     }
   };
 
   useEffect(() => {
     void refreshLeadCounter();
-    void refreshDeclineResponsesCounter();
-  }, []);
+    void refreshSellerAlerts();
+  }, [refreshKey]);
+
+  const renderAlert = (title: string, rows: any[], dismissKey: "noSales" | "debt") => {
+    if (dismissedAlerts[dismissKey] || rows.length === 0) return null;
+
+    const singular = rows.length === 1;
+    const fullName = (row: any) => `${row?.nombre || ""} ${row?.apellido || ""}`.trim();
+    const summary = singular
+      ? `${fullName(rows[0]) || "Una persona"}`
+      : `${rows.length} personas`;
+
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        closable
+        onClose={() => setDismissedAlerts((prev) => ({ ...prev, [dismissKey]: true }))}
+        message={title}
+        description={
+          <Space size={8} wrap>
+            <span>{summary}</span>
+            {!singular && (
+              <Button type="link" size="small" onClick={() => setAlertModal({ title, rows })}>
+                Ver más
+              </Button>
+            )}
+          </Space>
+        }
+      />
+    );
+  };
 
   const showModal = () => {
     setIsModalVisible(true);
@@ -142,6 +187,11 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         </div>
       </div>
 
+      <div className="mb-4 grid gap-3 xl:grid-cols-2">
+        {renderAlert("Esta o estas personas no hicieron una venta este mes", noSalesSellers, "noSales")}
+        {renderAlert("Revisar pago pendiente de esta o estas personas", debtAlertSellers, "debt")}
+      </div>
+
       <SellerTable
         refreshKey={refreshKey}
         setRefreshKey={setRefreshKey}
@@ -163,6 +213,26 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         onClose={() => setDeclineResponsesOpen(false)}
         onCountChange={setDeclineResponsesCount}
       />
+
+      <Modal
+        open={Boolean(alertModal)}
+        onCancel={() => setAlertModal(null)}
+        footer={null}
+        title={alertModal?.title || "Alerta"}
+        destroyOnClose
+      >
+        <List
+          dataSource={alertModal?.rows || []}
+          renderItem={(row: any) => (
+            <List.Item>
+              <List.Item.Meta
+                title={`${row?.nombre || "Sin nombre"} ${row?.apellido || ""}`.trim()}
+                description={row?.mail || row?.email || ""}
+              />
+            </List.Item>
+          )}
+        />
+      </Modal>
     </div>
   );
 };

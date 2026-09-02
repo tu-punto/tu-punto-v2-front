@@ -1,7 +1,8 @@
-import { Button, Table, Space, Popconfirm, Tag } from "antd";
+import { Button, Table, Space, Popconfirm, Tag, Input, Select } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUserStore } from "../../stores/userStore";
+import { includesNormalized } from "../../utils/search";
 
 interface UsersTableProps {
   onEdit: (user: any) => void;
@@ -12,6 +13,9 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
   const loading = useUserStore((state) => state.loading);
   const fetchUsers = useUserStore((state) => state.fetchUsers);
   const deleteUser = useUserStore((state) => state.deleteUser);
+  const [emailSearch, setEmailSearch] = useState("");
+  const [roleFilters, setRoleFilters] = useState<string[]>([]);
+  const [branchFilters, setBranchFilters] = useState<string[]>([]);
 
   useEffect(() => {
     if (users.length === 0) {
@@ -22,6 +26,47 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
   const handleDelete = async (id: string) => {
     await deleteUser(id);
   };
+
+  const roleOptions = useMemo(
+    () => Array.from(new Set(users.map((user: any) => String(user?.role || "").trim()).filter(Boolean))).sort().map((role) => ({
+      label: role,
+      value: role,
+    })),
+    [users]
+  );
+
+  const branchOptions = useMemo(() => {
+    const labels = new Set<string>();
+    users.forEach((user: any) => {
+      const branchLabel = user?.role === "admin" || user?.is_superadmin
+        ? "Todas"
+        : user?.role === "seller"
+          ? "-"
+          : String(user?.sucursal?.nombre || "Sin asignar").trim();
+      if (branchLabel) labels.add(branchLabel);
+    });
+
+    return Array.from(labels).sort().map((label) => ({ label, value: label }));
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = emailSearch.trim();
+    return users.filter((user: any) => {
+      if (normalizedSearch && !includesNormalized(user?.email || "", normalizedSearch)) return false;
+      if (roleFilters.length > 0 && !roleFilters.includes(String(user?.role || ""))) return false;
+
+      if (branchFilters.length > 0) {
+        const branchLabel = user?.role === "admin" || user?.is_superadmin
+          ? "Todas"
+          : user?.role === "seller"
+            ? "-"
+            : String(user?.sucursal?.nombre || "Sin asignar").trim();
+        if (!branchFilters.includes(branchLabel)) return false;
+      }
+
+      return true;
+    });
+  }, [branchFilters, emailSearch, roleFilters, users]);
 
   const columns = [
     {
@@ -95,14 +140,44 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
   ];
 
   return (
-    <Table
-      columns={columns}
-      dataSource={users}
-      loading={loading}
-      rowKey="_id"
-      pagination={{ pageSize: 10 }}
-      scroll={{ x: "max-content" }}
-    />
+    <>
+      <Space wrap className="mb-4" style={{ width: "100%" }}>
+        <Input.Search
+          allowClear
+          placeholder="Buscar por email"
+          value={emailSearch}
+          onChange={(event) => setEmailSearch(event.target.value)}
+          style={{ width: 260 }}
+        />
+        <Select
+          mode="multiple"
+          allowClear
+          placeholder="Filtrar por rol"
+          value={roleFilters}
+          onChange={setRoleFilters}
+          options={roleOptions}
+          style={{ minWidth: 220 }}
+        />
+        <Select
+          mode="multiple"
+          allowClear
+          placeholder="Filtrar por sucursal"
+          value={branchFilters}
+          onChange={setBranchFilters}
+          options={branchOptions}
+          style={{ minWidth: 240 }}
+        />
+      </Space>
+
+      <Table
+        columns={columns}
+        dataSource={filteredUsers}
+        loading={loading}
+        rowKey="_id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: "max-content" }}
+      />
+    </>
   );
 };
 

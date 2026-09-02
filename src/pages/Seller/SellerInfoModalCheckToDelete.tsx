@@ -77,6 +77,9 @@ const SellerInfoModal = ({ visible, onSuccess, onCancel, seller }: any) => {
                         ...product,
                         tipo: esVenta ? "Venta" : "Pedido",
                         key: `${product.id_producto}-${product.fecha_pedido}`,
+                        esTemporal: Boolean(product?.esTemporal || product?.producto?.esTemporal),
+                        fecha_creacion: product?.id_pedido?.fecha_pedido || product.fecha_pedido,
+                        fecha_entrega: product?.id_pedido?.hora_entrega_real || product?.id_pedido?.hora_entrega_acordada || product.hora_entrega_real,
                     };
                 });
                 setProducts(productosConTipo);

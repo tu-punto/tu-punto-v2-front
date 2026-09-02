@@ -331,6 +331,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         key: `simple-${row._id}`,
         producto: "Entrega simple",
         nombre_variante: row.descripcion_paquete || "Paquete simple",
+        esTemporal: false,
         precio_unitario: Number(
           row.saldo_por_paquete ??
           Math.max(
@@ -354,6 +355,8 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         deposito_realizado: !!row.deposito_realizado,
         cliente: row.comprador || "",
         fecha_pedido: row.fecha_pedido,
+        fecha_creacion: row.fecha_pedido,
+        fecha_entrega: row.hora_entrega_real || row.fecha_entrega || row.fecha_pedido,
         tipo: "Simple",
         es_entrega_simple: true,
         historyOnly: options?.historyOnly === true,
@@ -395,10 +398,13 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           tipo: esVenta ? "Venta" : "Pedido",
           subtotal: sale.precio_unitario * sale.cantidad,
           comision_porcentual: seller.comision_porcentual || 0,
+          esTemporal: Boolean(sale?.esTemporal || sale?.producto?.esTemporal),
           sucursal:
             sucursales.find((s) => s._id === sale.id_sucursal)?.nombre ||
             "Sucursal no encontrada",
           key: `${sale.id_producto}-${sale.fecha_pedido}`,
+          fecha_creacion: sale?.id_pedido?.fecha_pedido || sale.fecha_pedido,
+          fecha_entrega: sale?.id_pedido?.hora_entrega_real || sale?.id_pedido?.hora_entrega_acordada || sale.hora_entrega_real,
         };
       });
 

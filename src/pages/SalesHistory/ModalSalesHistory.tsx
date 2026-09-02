@@ -85,6 +85,9 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       key: p._id || `${p.id_producto}-${Object.values(p.variantes || {}).join("-") || "default"}`,
       producto: p.nombre_variante || p.nombre_producto || p.producto || "Sin nombre",
       precio_original: p.precio_original ?? p.precio_unitario,
+      esTemporal: Boolean(p?.esTemporal || p?.producto?.esTemporal),
+      fecha_creacion: p?.id_pedido?.fecha_pedido || p.fecha_pedido || shipping?.fecha_pedido,
+      fecha_entrega: p?.id_pedido?.hora_entrega_real || p?.id_pedido?.hora_entrega_acordada || p.hora_entrega_real || shipping?.hora_entrega_real,
     }));
 
     setProducts(ventasNormales);
@@ -168,6 +171,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           variantes: combo.variantes,
           sucursalId,
           id_vendedor: p.id_vendedor, // Asegurar que esté disponible
+          fecha_creacion: shipping?.fecha_pedido,
+          fecha_entrega: shipping?.hora_entrega_real || shipping?.hora_entrega_acordada,
         };
       });
     });

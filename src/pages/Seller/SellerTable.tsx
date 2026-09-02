@@ -29,6 +29,7 @@ import {
   getSellersAPI,
   updateSellerPaymentLimitAPI,
 } from "../../api/seller";
+import { getSucursalsAPI } from "../../api/sucursal";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
 
@@ -88,7 +89,8 @@ export default function SellerTable({
 }) {
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
-  const [pagoFilter, setPagoFilter] = useState("todos");
+  const [branchFilters, setBranchFilters] = useState<string[]>([]);
+  const [serviceFilters, setServiceFilters] = useState<Array<"alquiler" | "exhibicion" | "entrega_simple">>([]);
   const [fechaPagoFilter, setFechaPagoFilter] = useState<string>("todos");
   const [tableSort, setTableSort] = useState<SellerSortState>({});
   const [sellers, setSellers] = useState<SellerRow[]>([]);
@@ -111,9 +113,15 @@ export default function SellerTable({
   const [paymentLimit, setPaymentLimit] = useState<number | null>(null);
   const [availablePaymentDates, setAvailablePaymentDates] = useState<string[]>([]);
   const [paymentLimitLoading, setPaymentLimitLoading] = useState(false);
+  const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([]);
   const sellersRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
+  const serviceOptions = [
+    { value: "alquiler", label: "Alquiler" },
+    { value: "exhibicion", label: "Exhibición" },
+    { value: "entrega_simple", label: "Entrega simple" },
+  ];
 
   const refresh = () => setRefreshKey((key) => key + 1);
 
@@ -129,6 +137,35 @@ export default function SellerTable({
   };
 
   useEffect(() => { loadPaymentLimit(); }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const response = await getSucursalsAPI();
+        const rows = Array.isArray(response) ? response : [];
+        if (!mounted) return;
+
+        setBranchOptions(
+          rows
+            .filter((branch: any) => branch?.activo !== false)
+            .map((branch: any) => ({
+              value: String(branch?._id || ""),
+              label: String(branch?.nombre || "Sin nombre"),
+            }))
+            .filter((branch: { value: string; label: string }) => Boolean(branch.value))
+        );
+      } catch (error) {
+        console.error("No se pudieron cargar las sucursales", error);
+        if (mounted) setBranchOptions([]);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const open = () => setPaymentLimitOpen(true);
@@ -426,7 +463,7 @@ export default function SellerTable({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, tableSort, isFactura]);
+  }, [debouncedSearch, estadoFilter, branchFilters, serviceFilters, fechaPagoFilter, tableSort, isFactura]);
 
   useEffect(() => {
     const requestSeq = sellersRequestSeq.current + 1;
@@ -445,16 +482,11 @@ export default function SellerTable({
             : estadoFilter === "Declinando el servicio"
             ? "declinando_servicio"
             : undefined;
-        const pendingPaymentParam =
-          pagoFilter === "con deuda"
-            ? "con_deuda"
-            : pagoFilter === "sin deuda"
-            ? "sin_deuda"
-            : undefined;
         const res = await getSellersAPI({
           q: debouncedSearch || undefined,
           status: statusParam,
-          pendingPayment: pendingPaymentParam,
+          branchIds: branchFilters.length ? branchFilters : undefined,
+          serviceTypes: serviceFilters.length ? serviceFilters : undefined,
           assignedPaymentDay: fechaPagoFilter === "sin_solicitud" ? "sin_solicitud" : undefined,
           assignedPaymentDate: fechaPagoFilter !== "todos" && fechaPagoFilter !== "sin_solicitud" ? fechaPagoFilter : undefined,
           sortBy: tableSort.sortBy,
@@ -517,7 +549,7 @@ export default function SellerTable({
         }
       }
     })();
-  }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, tableSort, isFactura, page, pageSize]);
+  }, [refreshKey, debouncedSearch, estadoFilter, branchFilters, serviceFilters, fechaPagoFilter, tableSort, isFactura, page, pageSize]);
 
   useEffect(() => {
     let canceled = false;
@@ -577,13 +609,24 @@ export default function SellerTable({
           ]}
         />
         <Select
-          value={pagoFilter}
-          onChange={setPagoFilter}
-          options={[
-            { value: "todos", label: "Todos" },
-            { value: "con deuda", label: "Pago Pendiente" },
-            { value: "sin deuda", label: "Sin Pago Pendiente" },
-          ]}
+          mode="multiple"
+          allowClear
+          value={branchFilters}
+          onChange={setBranchFilters}
+          style={{ minWidth: 220 }}
+          placeholder="Sucursales activas"
+          options={branchOptions}
+          optionFilterProp="label"
+        />
+        <Select
+          mode="multiple"
+          allowClear
+          value={serviceFilters}
+          onChange={(values) => setServiceFilters(values)}
+          style={{ minWidth: 220 }}
+          placeholder="Servicios activos"
+          options={serviceOptions}
+          optionFilterProp="label"
         />
         <Select
           value={fechaPagoFilter}
