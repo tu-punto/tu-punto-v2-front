@@ -1,5 +1,5 @@
 import { Modal, Form, Input, InputNumber, Radio, Col, Row, DatePicker, Card, Button, Select, message} from 'antd';
-import { UserOutlined, PhoneOutlined, HomeOutlined, CarFilled} from '@ant-design/icons';
+import { UserOutlined, HomeOutlined, CarFilled} from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { registerExternalSaleAPI, updateExternalSaleAPI } from '../../api/externalSale';
 import { getSucursalsAPI } from "../../api/sucursal";
@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
+import PhoneCountryInput from '../../components/PhoneCountryInput';
 
 interface ExternalSalesModalProps {
     visible: boolean, 
@@ -221,14 +222,7 @@ function ExternalSalesModal({visible, onCancel, onClose, externalSale}: External
                         </Col>
                         <Col span={8}>
                             <Form.Item name='telefono_vendedor' label='Celular'>
-                                <Input
-                                    prefix={<PhoneOutlined />}
-                                    onKeyDown={(e) => {
-                                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'].includes(e.key)) {
-                                            e.preventDefault();
-                                        }
-                                    }}
-                                />
+                                <PhoneCountryInput />
                             </Form.Item>
                         </Col>
                     </Row>
@@ -242,14 +236,7 @@ function ExternalSalesModal({visible, onCancel, onClose, externalSale}: External
                         </Col>
                         <Col span={8}>
                             <Form.Item name='telefono_comprador' label='Celular'>
-                                <Input
-                                    prefix={<PhoneOutlined />}
-                                    onKeyDown={(e) => {
-                                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'].includes(e.key)) {
-                                            e.preventDefault();
-                                        }
-                                    }}
-                                />
+                                <PhoneCountryInput />
                             </Form.Item>
                         </Col>
                     </Row>

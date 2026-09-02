@@ -18,6 +18,7 @@ import {
   resizeDraftRows,
   SimplePackageDraftRow,
 } from "./simplePackageHelpers";
+import PhoneCountryInput from "../../components/PhoneCountryInput";
 
 const MIN_PACKAGES = 1;
 const DEFAULT_DELIVERY_RANGES: PackageEscalationRange[] = [
@@ -751,13 +752,9 @@ const SimplePackagesPage = () => {
               dataIndex: "telefono_comprador",
               width: 140,
               render: (_: any, row: any) => (
-                <Input
+                <PhoneCountryInput
                   value={row.telefono_comprador}
-                  onChange={(event) =>
-                    patchPendingRow(String(row._id), {
-                      telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
-                    })
-                  }
+                  onChange={(value) => patchPendingRow(String(row._id), { telefono_comprador: value })}
                 />
               ),
             },
@@ -963,14 +960,10 @@ const SimplePackagesPage = () => {
                         />
                       </td>
                       <td style={tableCellStyle}>
-                        <Input
+                        <PhoneCountryInput
                           value={row.telefono_comprador}
                           placeholder="Celular"
-                          onChange={(event) =>
-                            updateRow(index, {
-                              telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
-                            })
-                          }
+                          onChange={(value) => updateRow(index, { telefono_comprador: value })}
                         />
                       </td>
                       <td style={tableCellStyle}>
@@ -1070,15 +1063,11 @@ const SimplePackagesPage = () => {
                     </div>
                     <div>
                       <Typography.Text strong>Celular</Typography.Text>
-                      <Input
-                        className="mt-1"
+                      <PhoneCountryInput
                         value={row.telefono_comprador}
                         placeholder="Celular"
-                        onChange={(event) =>
-                          updateRow(index, {
-                            telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
-                          })
-                        }
+                        style={{ marginTop: 4 }}
+                        onChange={(value) => updateRow(index, { telefono_comprador: value })}
                       />
                     </div>
                     <div>

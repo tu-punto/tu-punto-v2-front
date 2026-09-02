@@ -1,9 +1,14 @@
 import { Table , message} from 'antd';
+import { useContext } from 'react';
 import PromotionPrice from '../../components/PromotionPrice';
+import { UserContext } from '../../context/userContext';
+import { normalizeRole } from '../../utils/role';
 
 const CRITICAL_STOCK_THRESHOLD = 1;
 
 const ProductTable = ({ data, onSelectProduct }: any) => {
+    const { user } = useContext(UserContext) || {};
+    const isSeller = normalizeRole(user?.role) === 'seller';
     const columns = [
         {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Producto</span>,
@@ -18,9 +23,9 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                 const stock = Number(stockActual || 0);
                 const critical = stock <= CRITICAL_STOCK_THRESHOLD;
                 return (
-                    <span className={stock === 0 ? 'text-red-700 font-semibold' : critical ? 'text-amber-700 font-semibold' : ''}>
+                    <span className={isSeller && stock === 0 ? 'text-red-700 font-semibold' : isSeller && critical ? 'text-amber-700 font-semibold' : ''}>
                         {stock}
-                        {stock === 0 ? ' (agotado)' : critical ? ' (critico)' : ''}
+                        {isSeller && (stock === 0 ? ' (agotado)' : critical ? ' (crítico)' : '')}
                     </span>
                 );
             }
@@ -58,7 +63,7 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                 pagination={{ pageSize: 10, pageSizeOptions: [] }}
                 scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
-                    className: `text-mobile-sm xl:text-desktop-sm ${record.stockActual === 0 ? 'bg-red-100 text-red-700' : record.stockActual <= CRITICAL_STOCK_THRESHOLD ? 'bg-amber-100 text-amber-900' : ''}`,
+                    className: `text-mobile-sm xl:text-desktop-sm ${isSeller ? (record.stockActual === 0 ? 'bg-red-100 text-red-700' : record.stockActual <= CRITICAL_STOCK_THRESHOLD ? 'bg-amber-100 text-amber-900' : '') : ''}`,
                     onClick: () => {
                         if (record.stockActual === 0) {
                             message.error(`El producto "${record.producto}" no tiene stock disponible.`);
