@@ -11,6 +11,7 @@ import {
   Spin,
   Table,
   Tooltip,
+  Tag,
 } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
@@ -24,7 +25,9 @@ import DeclineServiceReasonModal from "../../components/DeclineServiceReasonModa
 import {
   adminDeclineSellerServiceAPI,
   cancelSellerServiceDeclineAPI,
+  getSellerPaymentLimitAPI,
   getSellersAPI,
+  updateSellerPaymentLimitAPI,
 } from "../../api/seller";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
@@ -86,11 +89,12 @@ export default function SellerTable({
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [pagoFilter, setPagoFilter] = useState("todos");
-  const [fechaPagoFilter, setFechaPagoFilter] = useState<"todos" | "sin_solicitud" | "8" | "18" | "28">("todos");
+  const [fechaPagoFilter, setFechaPagoFilter] = useState<string>("todos");
   const [tableSort, setTableSort] = useState<SellerSortState>({});
   const [sellers, setSellers] = useState<SellerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPendingPayment, setTotalPendingPayment] = useState(0);
+  const [decliningCount, setDecliningCount] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -103,11 +107,54 @@ export default function SellerTable({
   const [declineReasonTarget, setDeclineReasonTarget] = useState<SellerRow | null>(null);
   const [declineLoading, setDeclineLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [paymentLimitOpen, setPaymentLimitOpen] = useState(false);
+  const [paymentLimit, setPaymentLimit] = useState<number | null>(null);
+  const [availablePaymentDates, setAvailablePaymentDates] = useState<string[]>([]);
+  const [paymentLimitLoading, setPaymentLimitLoading] = useState(false);
   const sellersRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
 
   const refresh = () => setRefreshKey((key) => key + 1);
+
+  const loadPaymentLimit = async () => {
+    try {
+      const response = await getSellerPaymentLimitAPI();
+      const data = response?.data || {};
+      setAvailablePaymentDates(Array.isArray(data.dates) ? data.dates.map((item: any) => String(item?.date || "")).filter(Boolean) : []);
+      if (typeof data.limit === "number") setPaymentLimit(data.limit);
+    } catch (error) {
+      console.error("No se pudo obtener el cupo de pagos", error);
+    }
+  };
+
+  useEffect(() => { loadPaymentLimit(); }, []);
+
+  useEffect(() => {
+    const open = () => setPaymentLimitOpen(true);
+    window.addEventListener("tp-open-payment-limit", open);
+    return () => window.removeEventListener("tp-open-payment-limit", open);
+  }, []);
+
+  const savePaymentLimit = async () => {
+    if (paymentLimit === null || paymentLimit < 0) return message.warning("Ingresa un limite valido");
+    setPaymentLimitLoading(true);
+    try {
+      await updateSellerPaymentLimitAPI(paymentLimit);
+      message.success("Limite de pagos actualizado");
+      setPaymentLimitOpen(false);
+      await loadPaymentLimit();
+    } catch (error) {
+      message.error("No se pudo actualizar el limite");
+    } finally { setPaymentLimitLoading(false); }
+  };
+
+  const decliningBadge =
+    decliningCount > 0 ? (
+      <Tag color="red" className="m-0">
+        {decliningCount}
+      </Tag>
+    ) : null;
 
   const getEstadoVendedor = (
     row: Pick<ISeller, "fecha_vigencia" | "declinacion_servicio_fecha">
@@ -408,7 +455,8 @@ export default function SellerTable({
           q: debouncedSearch || undefined,
           status: statusParam,
           pendingPayment: pendingPaymentParam,
-          assignedPaymentDay: fechaPagoFilter === "todos" ? undefined : fechaPagoFilter,
+          assignedPaymentDay: fechaPagoFilter === "sin_solicitud" ? "sin_solicitud" : undefined,
+          assignedPaymentDate: fechaPagoFilter !== "todos" && fechaPagoFilter !== "sin_solicitud" ? fechaPagoFilter : undefined,
           sortBy: tableSort.sortBy,
           sortOrder: tableSort.order === "descend" ? "desc" : "asc",
           page,
@@ -471,6 +519,25 @@ export default function SellerTable({
     })();
   }, [refreshKey, debouncedSearch, estadoFilter, pagoFilter, fechaPagoFilter, tableSort, isFactura, page, pageSize]);
 
+  useEffect(() => {
+    let canceled = false;
+
+    (async () => {
+      try {
+        const response = await getSellersAPI({ status: "declinando_servicio" });
+        if (canceled) return;
+
+        setDecliningCount(Array.isArray(response) ? response.length : Number(response?.total || 0));
+      } catch {
+        if (!canceled) setDecliningCount(0);
+      }
+    })();
+
+    return () => {
+      canceled = true;
+    };
+  }, [refreshKey]);
+
   return (
     <>
       <Space direction="horizontal" size="middle" className="seller-filters mb-4">
@@ -486,9 +553,25 @@ export default function SellerTable({
           value={estadoFilter}
           onChange={setEstadoFilter}
           options={[
-            { value: "todos", label: "Todos" },
+            {
+              value: "todos",
+              label: (
+                <Space size={6}>
+                  <span>Todos</span>
+                  {decliningBadge}
+                </Space>
+              ),
+            },
             { value: "Activo", label: "Activos" },
-            { value: "Declinando el servicio", label: "Declinando el servicio" },
+            {
+              value: "Declinando el servicio",
+              label: (
+                <Space size={6}>
+                  <span>Declinando el servicio</span>
+                  {decliningBadge}
+                </Space>
+              ),
+            },
             { value: "Debe renovar", label: "Debe renovar" },
             { value: "Ya no es cliente", label: "Ya no es cliente" },
           ]}
@@ -509,9 +592,7 @@ export default function SellerTable({
           options={[
             { value: "todos", label: "Fecha pago: todos" },
             { value: "sin_solicitud", label: "Sin solicitud" },
-            { value: "8", label: "Dia 8" },
-            { value: "18", label: "Dia 18" },
-            { value: "28", label: "Dia 28" },
+            ...availablePaymentDates.sort().map((date) => ({ value: date, label: dayjs(date).format("DD/MM/YYYY") })),
           ]}
         />
       </Space>
@@ -658,6 +739,24 @@ export default function SellerTable({
         }}
         onConfirm={handleSubmitDeclineReason}
       />
+      <Modal
+        open={paymentLimitOpen}
+        title="Limite global por fecha de pago"
+        okText="Guardar"
+        confirmLoading={paymentLimitLoading}
+        onOk={savePaymentLimit}
+        onCancel={() => setPaymentLimitOpen(false)}
+      >
+        <p>Este limite real se aplica de forma independiente a los dias 8, 18 y 28.</p>
+        <Input
+          type="number"
+          min={0}
+          prefix="Bs."
+          value={paymentLimit ?? undefined}
+          onChange={(event) => setPaymentLimit(event.target.value === "" ? null : Number(event.target.value))}
+        />
+        <p className="mt-3 text-gray-500">Los vendedores veran Bs. {Number(paymentLimit || 0) + 20000} como limite visual.</p>
+      </Modal>
     </>
   );
 }

@@ -5,6 +5,7 @@ import {
   DatePicker,
   Form,
   Alert,
+  Checkbox,
   Image,
   Input,
   InputNumber,
@@ -13,6 +14,7 @@ import {
   Row,
   Space,
   Tag,
+  Table,
   Upload,
 } from "antd";
 import {
@@ -23,7 +25,7 @@ import {
   DeleteOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 
 import {
@@ -40,6 +42,7 @@ import {
 } from "../../../api/sales";
 import {
   getPaymentProofsBySellerIdAPI,
+  getSellerPaymentLimitAPI,
   getSellerAPI,
   getSellerDebtsAPI,
   declineSellerServiceAPI,
@@ -123,9 +126,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
 
   /* datos agregados de sub-componentes */
   const [salesData, setSalesData] = useState<any[]>([]);
-  const [deletedSales, setDeletedSales] = useState<any[]>([]);
+  const [deletedSales] = useState<any[]>([]);
   const [entryData, setEntryData] = useState<any[]>([]);
-  const [deletedEntryData, setDeletedEntryData] = useState<any[]>([]);
+  const [deletedEntryData] = useState<any[]>([]);
   const [paymentProofs, setPaymentProofs] = useState<any[]>([]);
   const [sellerDebts, setSellerDebts] = useState<any[]>([]);
   const [sellerMetrics, setSellerMetrics] = useState<{
@@ -133,12 +136,14 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     deuda: number;
     pago_pendiente: number;
   } | null>(null);
+  const [sellerDetail, setSellerDetail] = useState<any>(null);
   const [paymentRequest, setPaymentRequest] = useState({
     qr_pago_url: seller?.qr_pago_url || "",
     fecha_solicitud_pago: seller?.fecha_solicitud_pago || null,
     fecha_pago_asignada: seller?.fecha_pago_asignada || null,
   });
   const [paymentRequestModalOpen, setPaymentRequestModalOpen] = useState(false);
+  const [paymentAvailability, setPaymentAvailability] = useState<{ amount: number | null; nextDate?: string | null; occupiedDates: string[] } | null>(null);
   const [paymentRequestLoading, setPaymentRequestLoading] = useState(false);
   const [declineServiceModalOpen, setDeclineServiceModalOpen] = useState(false);
   const [adminDeclineServiceModalOpen, setAdminDeclineServiceModalOpen] = useState(false);
@@ -148,6 +153,15 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
   const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [deliveryChargesModalOpen, setDeliveryChargesModalOpen] = useState(false);
+  const [pickupReceived, setPickupReceived] = useState(Boolean(seller?.declinacion_servicio_retiro_realizado));
+  const [pickupObservations, setPickupObservations] = useState(
+    String(seller?.declinacion_servicio_retiro_observaciones || "")
+  );
+  const [pickupSavedAt, setPickupSavedAt] = useState<Date | string | null>(
+    seller?.declinacion_servicio_retiro_fecha || null
+  );
+  const [pickupSaving, setPickupSaving] = useState(false);
   const [declineServiceDate, setDeclineServiceDate] = useState(
     seller?.declinacion_servicio_fecha || null
   );
@@ -161,6 +175,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     hasCommissionService: false,
     hasSimplePackageServiceEnabled: false,
   });
+  const showBranchCommission = Form.useWatch("comision_diferente_por_sucursal", form);
 
   const syncServiceFlags = (branches: any[] = []) => {
     setServiceFlags({
@@ -185,6 +200,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       fecha_vigencia: sellerData?.fecha_vigencia ? dayjs(sellerData.fecha_vigencia, "D-M-YYYY") : null,
       mail: sellerData?.mail || "",
       comision_porcentual: sellerData?.comision_porcentual || 0,
+      comision_diferente_por_sucursal: sellerData?.comision_diferente_por_sucursal === true,
       amortizacion: sellerData?.amortizacion ?? null,
       precio_paquete: sellerData?.precio_paquete ?? null,
       sucursales: branches,
@@ -212,8 +228,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         const detail = await getSellerAPI(String(seller.key));
         if (!detail) {
           setSellerMetrics(null);
+          setSellerDetail(null);
           return;
         }
+
+        setSellerDetail(detail);
 
         const saldoPendiente = Number(detail.saldo_pendiente ?? 0);
         const deuda = Number(detail.deuda ?? 0);
@@ -256,6 +275,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       fecha_pago_asignada: seller?.fecha_pago_asignada || null,
     });
     setDeclineServiceDate(seller?.declinacion_servicio_fecha || null);
+    setPickupReceived(Boolean(seller?.declinacion_servicio_retiro_realizado));
+    setPickupObservations(String(seller?.declinacion_servicio_retiro_observaciones || ""));
+    setPickupSavedAt(seller?.declinacion_servicio_retiro_fecha || null);
   }, [form, seller]);
 
 
@@ -609,6 +631,62 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     }
   };
 
+  const handleSavePickupInfo = async () => {
+    if (!seller?.key) return;
+
+    setPickupSaving(true);
+    try {
+      const res = await updateSellerAPI(String(seller.key), {
+        declinacion_servicio_retiro_realizado: pickupReceived,
+        declinacion_servicio_retiro_observaciones: String(pickupObservations || "").trim(),
+      });
+      if (!res?.success) throw new Error("No se pudo guardar el seguimiento");
+
+      message.success("Seguimiento actualizado");
+      setPickupSavedAt(pickupReceived ? new Date() : null);
+      setRefreshKey((prev) => prev + 1);
+      onSuccess?.();
+    } catch (error) {
+      console.error(error);
+      message.error("No se pudo guardar el seguimiento.");
+    } finally {
+      setPickupSaving(false);
+    }
+  };
+
+  const pendingDeliveryCharges = useMemo(() => {
+    const byOrder = new Map<string, any>();
+
+    (Array.isArray(salesData) ? salesData : []).forEach((sale: any) => {
+      const deliveryAmount = Number(sale?.id_pedido?.cargo_delivery ?? sale?.cargo_delivery ?? 0);
+      const deposited = sale?.id_pedido?.deposito_realizado === true || sale?.deposito_realizado === true;
+
+      if (!Number.isFinite(deliveryAmount) || deliveryAmount <= 0 || deposited) return;
+
+      const orderId = String(sale?.id_pedido?._id || sale?.id_pedido || sale?.key || sale?.id_venta || "").trim();
+      if (!orderId || byOrder.has(orderId)) return;
+
+      byOrder.set(orderId, {
+        key: orderId,
+        fecha: sale?.fecha_pedido || sale?.id_pedido?.fecha_pedido || null,
+        cliente: String(sale?.cliente || sale?.id_pedido?.cliente || "").trim() || "Sin cliente",
+        sucursal: String(sale?.sucursal || sale?.id_pedido?.lugar_entrega || "").trim() || "Sin sucursal",
+        estado: String(sale?.id_pedido?.estado_pedido || sale?.tipo || "").trim() || "Sin estado",
+        monto: Number(deliveryAmount.toFixed(2)),
+      });
+    });
+
+    return Array.from(byOrder.values()).sort((a, b) => {
+      const left = new Date(a.fecha || 0).getTime();
+      const right = new Date(b.fecha || 0).getTime();
+      return right - left;
+    });
+  }, [salesData]);
+
+  const pendingDeliveryTotal = Number(
+    pendingDeliveryCharges.reduce((sum, item) => sum + Number(item.monto || 0), 0).toFixed(2)
+  );
+
   const openResetPasswordModal = () => {
     setResetPasswordValue("");
     setResetPasswordModalOpen(true);
@@ -649,10 +727,13 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       /* 1) seller */
       const resSeller = await updateSellerAPI(seller.key, {
         ...formValues,
+        comision_diferente_por_sucursal: formValues.comision_diferente_por_sucursal === true,
         pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
           ...sucursal,
           alquiler: sucursal.almacenamiento,
           delivery: 0,
+          comision_porcentual: formValues.comision_diferente_por_sucursal ? Number(sucursal.comision_porcentual || 0) : 0,
+          comision_fija: formValues.comision_diferente_por_sucursal ? Number(sucursal.comision_fija || 0) : 0,
         })),
       });
       if (!resSeller?.success) {
@@ -724,6 +805,175 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         ultimaFechaPago={ultimaFechaPagoLabel}
       />
 
+      {pendingDeliveryCharges.length > 0 && (
+        <Card
+          className="mb-5 overflow-hidden border border-amber-200 shadow-[0_10px_30px_rgba(245,158,11,0.10)] transition hover:shadow-[0_12px_36px_rgba(245,158,11,0.16)]"
+          bodyStyle={{ padding: 0 }}
+          onClick={() => setDeliveryChargesModalOpen(true)}
+        >
+          <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-white px-5 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-[220px]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
+                  Cobros de delivery pendientes
+                </div>
+                <div className="mt-1 text-3xl font-black tracking-tight text-slate-900">
+                  Bs. {pendingDeliveryTotal.toFixed(2)}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  {pendingDeliveryCharges.length} entrega{pendingDeliveryCharges.length === 1 ? "" : "s"} por descontar
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="gold" className="m-0 px-3 py-1 text-[11px] font-semibold">
+                  Pendiente
+                </Tag>
+                <Button type="primary" onClick={() => setDeliveryChargesModalOpen(true)}>
+                  Ver detalle
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 text-sm text-slate-600">
+              Toca el bloque o usa "Ver detalle" para abrir el desglose.
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Modal
+        title="Detalle de cobros de delivery"
+        open={deliveryChargesModalOpen}
+        onCancel={() => setDeliveryChargesModalOpen(false)}
+        footer={null}
+        width={760}
+      >
+        <Table
+          size="small"
+          pagination={false}
+          dataSource={pendingDeliveryCharges}
+          columns={[
+            {
+              title: "Fecha",
+              dataIndex: "fecha",
+              render: (value: any) => (value ? dayjs(value).format("DD/MM/YYYY") : "-"),
+            },
+            { title: "Cliente", dataIndex: "cliente" },
+            { title: "Sucursal", dataIndex: "sucursal" },
+            { title: "Estado", dataIndex: "estado" },
+            {
+              title: "Delivery",
+              dataIndex: "monto",
+              align: "right" as const,
+              render: (value: number) => `Bs. ${Number(value || 0).toFixed(2)}`,
+            },
+          ]}
+        />
+      </Modal>
+
+      {!isSeller && declineServiceDate ? (
+        <Card
+          className="mb-5 overflow-hidden border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-rose-100 shadow-[0_12px_32px_rgba(244,63,94,0.12)]"
+          bodyStyle={{ padding: 0 }}
+        >
+          <div className="border-b border-rose-100 px-5 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-[220px]">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-700">
+                  Salida de cliente en seguimiento
+                </div>
+                <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                  {isSeller ? "Tu baja fue registrada" : "Baja registrada"}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  {serviceStockPickupDeadline?.isValid()
+                    ? `Retiro permitido hasta el ${serviceStockPickupDeadline.format("DD/MM/YYYY")}.`
+                    : "Retiro pendiente de fecha valida."}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag color="red" className="m-0 px-3 py-1 text-[11px] font-semibold">
+                  {declineSourceLabel || "Seguimiento activo"}
+                </Tag>
+                <Tag color={pickupReceived ? "green" : "volcano"} className="m-0 px-3 py-1 text-[11px] font-semibold">
+                  {pickupReceived ? "Retiró sus cosas: Sí" : "Retiró sus cosas: No"}
+                </Tag>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Motivo</div>
+                <div className="mt-1 font-semibold text-slate-900">{declineReasonLabel || "No especificado"}</div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Retiro de stock</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {serviceStockPickupDeadline?.isValid()
+                    ? serviceStockPickupDeadline.format("DD/MM/YYYY")
+                    : "Pendiente"}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Posibilidad de retorno</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {seller?.declinacion_servicio_probabilidad_retorno
+                    ? DECLINE_RETURN_LABELS[seller.declinacion_servicio_probabilidad_retorno] || seller.declinacion_servicio_probabilidad_retorno
+                    : "No registrada"}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Fecha de retiro</div>
+                <div className="mt-1 font-semibold text-slate-900">
+                  {pickupSavedAt
+                    ? dayjs(pickupSavedAt).format("DD/MM/YYYY HH:mm")
+                    : "Pendiente"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-rose-100 px-5 pb-5 pt-4">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4">
+                <div className="grid gap-4 lg:grid-cols-[240px_1fr_auto] lg:items-start">
+                  <Checkbox
+                    checked={pickupReceived}
+                    onChange={(event) => setPickupReceived(event.target.checked)}
+                    className="font-semibold text-slate-800"
+                  >
+                    Ya recogió sus cosas
+                  </Checkbox>
+
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Observaciones
+                    </div>
+                    <Input.TextArea
+                      value={pickupObservations}
+                      onChange={(event) => setPickupObservations(event.target.value)}
+                      placeholder="Observaciones del retiro..."
+                      autoSize={{ minRows: 2, maxRows: 6 }}
+                      showCount
+                      maxLength={500}
+                    />
+                  </div>
+
+                  <Button
+                    type="primary"
+                    loading={pickupSaving}
+                    onClick={handleSavePickupInfo}
+                    className="h-12 self-start"
+                  >
+                    Guardar retiro
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       {isSeller && (
         <div className="mb-5 flex flex-col items-center gap-3">
           {hasPendingPaymentRequest && (
@@ -738,34 +988,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             type="primary"
             size="large"
             disabled={hasPendingPaymentRequest}
-            onClick={() => setPaymentRequestModalOpen(true)}
+            onClick={async () => {
+              try {
+                const response = await getSellerPaymentLimitAPI();
+                setPaymentAvailability({
+                  amount: typeof response?.data?.visibleAvailableAmount === "number" ? response.data.visibleAvailableAmount : null,
+                  nextDate: response?.data?.nextAvailableDate || null,
+                  occupiedDates: Array.isArray(response?.data?.occupiedDates) ? response.data.occupiedDates : [],
+                });
+              } catch { setPaymentAvailability(null); }
+              setPaymentRequestModalOpen(true);
+            }}
           >
             Solicitar cobro
           </Button>
-          {declineServiceDate ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="Informaste que declinaras el servicio."
-              description={
-                <div className="space-y-1">
-                  <div>
-                    {serviceStockPickupDeadline?.isValid()
-                      ? `Recoge tu stock y pedidos hasta el ${serviceStockPickupDeadline.format("DD/MM/YYYY")}.`
-                      : undefined}
-                  </div>
-                  {declineSourceLabel ? <div>Registrado por: {declineSourceLabel}</div> : null}
-                  {declineReasonLabel ? <div>Motivo: {declineReasonLabel}</div> : null}
-                  {seller?.declinacion_servicio_probabilidad_retorno ? (
-                    <div>
-                      Probabilidad de retorno: {DECLINE_RETURN_LABELS[seller.declinacion_servicio_probabilidad_retorno] || seller.declinacion_servicio_probabilidad_retorno}
-                    </div>
-                  ) : null}
-                </div>
-              }
-              style={{ width: "100%", maxWidth: 620 }}
-            />
-          ) : (
+          {!declineServiceDate ? (
             <Button
               danger
               size="large"
@@ -774,7 +1011,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             >
               Declinar servicio
             </Button>
-          )}
+          ) : null}
           {!canDeclineService && !declineServiceDate ? (
             <Tag color="default">{serviceDeclineDisabledReason}</Tag>
           ) : null}
@@ -849,6 +1086,19 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         confirmLoading={paymentRequestLoading}
       >
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+          {paymentAvailability?.amount !== null && paymentAvailability && (
+            <Alert
+              type="info"
+              showIcon
+              message={<div>Cupo disponible para pagos<div style={{ marginTop: 8, fontSize: 24, fontWeight: 800, color: "#0958d9" }}>Bs. {paymentAvailability.amount.toFixed(2)}</div></div>}
+              description={<div style={{ marginTop: 8 }}>
+                <div><strong>Siguiente fecha disponible:</strong> {paymentAvailability.nextDate ? dayjs(paymentAvailability.nextDate).format("DD/MM/YYYY") : "Por definir"}</div>
+                {paymentAvailability.occupiedDates.length > 0 && <div style={{ marginTop: 4 }}><strong>Fechas ocupadas:</strong> {paymentAvailability.occupiedDates.map((date) => dayjs(date).format("DD/MM/YYYY")).join(", ")}</div>}
+                <div style={{ marginTop: 10 }}>Tu fecha de pago se asignará automáticamente según la disponibilidad.</div>
+                <div style={{ marginTop: 10 }}>En caso de que requieras tu cobro en otra fecha, puedes pasar a la tienda a recoger en efectivo.</div>
+              </div>}
+            />
+          )}
           <Alert
             type="warning"
             showIcon
@@ -930,6 +1180,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           fecha_vigencia: dayjs(seller.fecha_vigencia, "D-M-YYYY"),
           mail: seller.mail || "",
           comision_porcentual: seller.comision_porcentual || 0,
+          comision_diferente_por_sucursal: seller.comision_diferente_por_sucursal === true,
           amortizacion: seller.amortizacion ?? null,
           precio_paquete: seller.precio_paquete ?? null,
           sucursales: seller.pago_sucursales.length
@@ -959,6 +1210,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                   type="email"
                 />
               </Form.Item>
+              {isSuperadmin && (
+                <div style={{ marginTop: -8, marginBottom: 16, color: "#6b7280" }}>
+                  Ultimo login: <span style={{ fontWeight: 600 }}>{(sellerDetail?.last_login_at || seller?.last_login_at) ? dayjs(sellerDetail?.last_login_at || seller?.last_login_at).format("DD/MM/YYYY HH:mm") : "Sin registro"}</span>
+                </div>
+              )}
             </Col>
             <Col xs={24} sm={12} md={6}>
               <Form.Item name="telefono" label="Teléfono">
@@ -982,16 +1238,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             </Col>
 
             <Col xs={24} sm={12} md={6}>
-              <Form.Item name="comision_porcentual" label="Comisión">
+                <Form.Item name="comision_porcentual" label="Comisión">
                 <InputNumber
                   prefix={<PercentageOutlined />}
                   min={0}
                   max={100}
-                  disabled={isSeller || !serviceFlags.hasCommissionService}
+                  disabled={isSeller || !serviceFlags.hasCommissionService || Boolean(showBranchCommission)}
                   style={{ width: "100%" }}
                   placeholder="0"
                   addonAfter="%"
                 />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="comision_diferente_por_sucursal" valuePropName="checked" label="Comisión por sucursal">
+                <Checkbox disabled={isSeller}>Usar comisión distinta por sucursal</Checkbox>
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={6}>
@@ -1098,6 +1359,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                       sucursalOptions={sucursales}
                       form={form}
                       isSeller={isSeller}
+                      showBranchCommission={Boolean(showBranchCommission)}
                     />
                   </Card>
                 ))}

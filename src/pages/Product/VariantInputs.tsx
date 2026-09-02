@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AutoComplete, InputNumber, Table, Button, Tag, Typography, Space } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { includesNormalized } from '../../utils/search';
 
 const VariantInputs = ({
     combinations,
@@ -349,9 +350,7 @@ const VariantInputs = ({
                                 disabled={variant.readOnly}
                                 placeholder="Nombre de la variante (ej: Color)"
                                 data-testid={`stock-variant-name-input-${index}`}
-                                filterOption={(inputValue, option) =>
-                                    String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
-                                }
+                                filterOption={(inputValue, option) => includesNormalized(option?.value, inputValue)}
                             />
                             {!variant.readOnly && (
                                 <>
@@ -459,7 +458,7 @@ const VariantInputs = ({
                                 disabled={!variant.name}
                                 data-testid={`stock-subvariant-input-${index}`}
                                 filterOption={(inputValue, option) =>
-                                    String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
+                                    includesNormalized(option?.value, inputValue)
                                 }
                                 onKeyDown={(event) => {
                                     if (event.key !== 'Enter') return;

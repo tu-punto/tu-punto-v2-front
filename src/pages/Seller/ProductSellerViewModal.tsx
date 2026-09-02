@@ -5,6 +5,7 @@ import { UserContext } from "../../context/userContext";
 import { registerVariantAPI } from "../../api/product";
 import { createEntryAPI } from "../../api/entry";
 import { registerProductAPI } from "../../api/product";
+import { includesNormalized } from "../../utils/search";
 
 const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller, openFromEditProductsModal = false, sellers = [] , sucursalId }: any) => {
     const { user }: any = useContext(UserContext);
@@ -125,9 +126,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                                 label: `${s.nombre} ${s.apellido}`
                             }))}
                             showSearch
-                            filterOption={(input, option: any) =>
-                                option.label.toLowerCase().includes(input.toLowerCase())
-                            }
+                            filterOption={(input, option: any) => includesNormalized(option?.label, input)}
                         />
                     </Form.Item>
                 ) : (
@@ -187,7 +186,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                         }))}
                         showSearch
                         filterOption={(input, option: any) =>
-                            option.label.toLocaleLowerCase().includes(input.toLocaleLowerCase())}
+                            includesNormalized(option?.label, input)}
                     />
 
                 </Form.Item> */}
@@ -204,7 +203,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                         }))}
                         showSearch
                         filterOption={(input, option: any) =>
-                            option.label.toLowerCase().includes(input.toLowerCase())
+                            includesNormalized(option?.label, input)
                         }
                     />
                 </Form.Item> */}
@@ -232,9 +231,7 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                             label: category.categoria,
                         }))}
                         showSearch
-                        filterOption={(input, option: any) =>
-                            option.label.toLowerCase().includes(input.toLowerCase())
-                        }
+                        filterOption={(input, option: any) => includesNormalized(option?.label, input)}
                     />
                 </Form.Item>
         

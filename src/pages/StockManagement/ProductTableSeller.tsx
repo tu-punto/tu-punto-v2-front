@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { Table, Select, Input, Switch } from "antd";
 import VariantInfoModal from "./VariantInfoModal.tsx";
 import PromotionPrice from "../../components/PromotionPrice";
+import { includesNormalized } from "../../utils/search";
+
+const CRITICAL_STOCK_THRESHOLD = 1;
 
 type BranchOption = {
     _id: string;
@@ -32,7 +35,8 @@ const ProductTableSeller = ({
     searchText,
     setSearchText,
     selectedCategory,
-    setSelectedCategory
+    setSelectedCategory,
+    onUpdateProducts
 }: Props) => {
     const [filterAvailableStock, setFilterAvailableStock] = useState(false);
     const [selectedProductForList, setSelectedProductForList] = useState<string>("all");
@@ -63,16 +67,12 @@ const ProductTableSeller = ({
     }, [normalizedRows]);
 
     const tableRows = useMemo(() => {
-        const text = searchText.trim().toLowerCase();
         const filtered = normalizedRows.filter((row: any) => {
             if (sucursalId !== "all" && String(row.sucursalId) !== String(sucursalId)) return false;
             if (selectedCategory !== "all" && String(row.id_categoria) !== String(selectedCategory)) return false;
             if (selectedProductForList !== "all" && String(row._id) !== String(selectedProductForList)) return false;
             if (filterAvailableStock && Number(row.stock || 0) <= 0) return false;
-            if (!text) return true;
-            const nombre = String(row.nombre_producto || "").toLowerCase();
-            const variante = String(row.variant || "").toLowerCase();
-            return nombre.includes(text) || variante.includes(text);
+            return includesNormalized(row.nombre_producto, searchText) || includesNormalized(row.variant, searchText);
         });
 
         const grouped = new Map<string, any[]>();
@@ -111,7 +111,8 @@ const ProductTableSeller = ({
             width: 40,
             render: (_: any, record: any) => {
                 if (record.esCabecera) return { props: { colSpan: 0 } };
-                const color = Number(record.stock || 0) > 0 ? "bg-green-500" : "bg-red-500";
+                const stock = Number(record.stock || 0);
+                const color = stock > CRITICAL_STOCK_THRESHOLD ? "bg-green-500" : stock > 0 ? "bg-amber-500" : "bg-red-500";
                 return {
                     children: <div className={`w-4 h-4 rounded-full ${color}`} />
                 };
@@ -137,8 +138,16 @@ const ProductTableSeller = ({
         {
             title: "Stock actual",
             key: "stock",
-            render: (_: any, record: any) =>
-                record.esCabecera ? { children: null, props: { colSpan: 0 } } : <span>{record.stock}</span>
+            render: (_: any, record: any) => {
+                if (record.esCabecera) return { children: null, props: { colSpan: 0 } };
+                const stock = Number(record.stock || 0);
+                return (
+                    <span className={stock === 0 ? "text-red-700 font-semibold" : stock <= CRITICAL_STOCK_THRESHOLD ? "text-amber-700 font-semibold" : ""}>
+                        {stock}
+                        {stock === 0 ? " (agotado)" : stock <= CRITICAL_STOCK_THRESHOLD ? " (critico)" : ""}
+                    </span>
+                );
+            }
         },
         {
             title: "Precio Unitario",
@@ -243,6 +252,7 @@ const ProductTableSeller = ({
                 visible={showProductInfoModal}
                 onClose={() => setShowProductInfoModal(false)}
                 rowRecord={selectedRecord}
+                onUpdateProducts={onUpdateProducts}
             />
         </>
     );

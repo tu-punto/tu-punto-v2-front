@@ -39,12 +39,13 @@ const guard = (path: string, element: JSX.Element) => (
 
 const SellerProductInfoRoute = () => {
   const { user } = useContext(UserContext);
+  const role = normalizeRole(user?.role);
 
-  if (!canAccessSellerProductInfo(user)) {
+  if (role === "seller" && !canAccessSellerProductInfo(user)) {
     return <Navigate to="/shop" replace />;
   }
 
-  return <SellerProductInfoPage mode="seller" />;
+  return <SellerProductInfoPage mode={role === "seller" ? "seller" : "admin"} />;
 };
 
 const sellerAccessDeniedState = (reason: string) => ({

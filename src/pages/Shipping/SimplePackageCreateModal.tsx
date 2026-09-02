@@ -2,6 +2,7 @@ import { Button, Card, Input, InputNumber, Modal, Select, Space, Spin, Typograph
 import { useEffect, useMemo, useState } from "react";
 import { getSellersBasicAPI, getSellerAPI } from "../../api/seller";
 import { getSimplePackageBranchPricesAPI, registerSimplePackagesAPI } from "../../api/simplePackage";
+import PhoneCountryInput from "../../components/PhoneCountryInput";
 import { branchesEnableSimplePackageService } from "../../utils/sellerServiceAccess";
 import { calculateSimplePackageTotals, createDraftRow, resizeDraftRows, SimplePackageDraftRow } from "../SimplePackages/simplePackageHelpers";
 
@@ -433,7 +434,7 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                   {rows.map((row, index) => (
                     <tr key={row.key}>
                       <td style={tableCellStyle}>
-                        <Input
+                        <PhoneCountryInput
                           value={row.comprador}
                           onChange={(event) => updateRow(index, { comprador: event.target.value })}
                         />
@@ -446,13 +447,9 @@ const SimplePackageCreateModal = ({ visible, initialSellerId, onClose, onCreated
                         />
                       </td>
                       <td style={tableCellStyle}>
-                        <Input
+                        <PhoneCountryInput
                           value={row.telefono_comprador}
-                          onChange={(event) =>
-                            updateRow(index, {
-                              telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
-                            })
-                          }
+                          onChange={(value) => updateRow(index, { telefono_comprador: value })}
                         />
                       </td>
                       <td style={tableCellStyle}>

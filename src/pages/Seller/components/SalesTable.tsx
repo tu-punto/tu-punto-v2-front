@@ -4,9 +4,11 @@ import dayjs from "dayjs";
 import { useEffect, useState, useMemo } from "react";
 import { EditableCellInputNumber } from "../../components/editableCell";
 import PromotionPrice from "../../../components/PromotionPrice";
+import { includesNormalized } from "../../../utils/search";
 
 interface CustomTableProps {
   data: any[];
+  searchText?: string;
   onDeleteProduct: (rowKey: string, id: string) => void;
   onUpdateProduct: (id: string, fields: any) => void;
   handleValueChange: (key: any, field: any, value: any) => void;
@@ -18,6 +20,7 @@ interface CustomTableProps {
 
 const CustomTable = ({
   data,
+  searchText = "",
   onDeleteProduct,
   onUpdateProduct,
   onUpdateTotalAmount,
@@ -30,10 +33,30 @@ const CustomTable = ({
 
   // Filtrar datos
   const filteredData = useMemo(() => {
-    return selectedSucursal === "todos"
-      ? data
-      : data.filter((sale) => sale.sucursal === selectedSucursal);
-  }, [data, selectedSucursal]);
+    const words = String(searchText || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    return data.filter((sale) => {
+      if (selectedSucursal !== "todos" && sale.sucursal !== selectedSucursal) return false;
+      if (words.length === 0) return true;
+
+      const haystack = [
+        sale.nombre_variante,
+        sale.producto,
+        sale.cliente,
+        sale.sucursal,
+        sale.tipo,
+        sale.fecha_pedido,
+        sale.nombre_producto,
+      ]
+        .map((value) => String(value ?? ""))
+        .join(" ");
+
+      return words.every((word) => includesNormalized(haystack, word));
+    });
+  }, [data, searchText, selectedSucursal]);
 
   // Sucursales únicas
   const sucursales = useMemo(() => {

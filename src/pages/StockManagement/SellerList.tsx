@@ -1,5 +1,6 @@
 import React from "react";
 import { Select } from "antd";
+import { includesNormalized } from "../../utils/search";
 
 type SellerListProps = {
     sellers: any[];
@@ -18,9 +19,7 @@ const SellerList = ({ sellers, selectedSeller, onSelectSeller }: SellerListProps
                 showSearch
                 data-testid="stock-seller-selector"
                 optionFilterProp="children"
-                filterOption={(input, option) =>
-                    option?.children?.toString().toLowerCase().includes(input.toLowerCase())
-                }
+                filterOption={(input, option) => includesNormalized(option?.children, input)}
             >
                 {(Array.isArray(sellers) ? sellers : []).map((item: any) => (
                     <Select.Option key={item._id ?? "all"} value={item._id ?? null}>

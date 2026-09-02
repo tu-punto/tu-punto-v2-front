@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AutoComplete, Button, Collapse, Form, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Upload, message } from "antd";
+import { AutoComplete, Button, Card, Collapse, Form, Grid, Input, InputNumber, Modal, Segmented, Select, Space, Tag, Upload, message } from "antd";
 import {
   ExternalContactSuggestion,
   getExternalContactSuggestionsAPI,
@@ -21,6 +21,7 @@ import {
   toBase64Png,
 } from "./shippingQrLabel";
 import { DownloadOutlined, InboxOutlined, UploadOutlined } from "@ant-design/icons";
+import PhoneCountryInput from "../../components/PhoneCountryInput";
 import {
   downloadExternalPackagesTemplate,
   parseExternalPackagesFile,
@@ -121,7 +122,12 @@ const getSuggestionValue = (contact: ExternalContactSuggestion, field: Suggestio
   return contact.nombre || "";
 };
 
-const normalizeSearchText = (value: string) => String(value || "").trim().toLowerCase();
+const normalizeSearchText = (value: string) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 
 const buildSuggestionLabel = (contact: ExternalContactSuggestion) => (
   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -137,6 +143,8 @@ const buildSuggestionLabel = (contact: ExternalContactSuggestion) => (
 
 const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursal }: ExternalPackagesFormModalProps) => {
   const [form] = Form.useForm();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const [loading, setLoading] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [packageCount, setPackageCount] = useState<number>(MIN_PACKAGES);
@@ -153,6 +161,30 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
 
   const packageRows = useMemo(() => Array.from({ length: packageCount }, (_, i) => i), [packageCount]);
   const watchedPackages = Form.useWatch("paquetes", form) || [];
+  const totalsSummary = useMemo(() => {
+    const rows = buildPackages(packageCount, watchedPackages).slice(0, packageCount);
+    const delivery = rows.reduce((sum, row) => sum + roundCurrency(Number(row?.precio_entre_sucursal || 0)), 0);
+    const total = rows.reduce(
+      (sum, row) => sum + getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0)),
+      0
+    );
+    const sellerDebt = rows.reduce((sum, row) => {
+      const rowTotal = getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0));
+      const mode = String(row?.esta_pagado || "no").trim().toLowerCase();
+      if (mode === "si") return sum + rowTotal;
+      if (mode === "mixto") return sum + roundCurrency(Number(row?.monto_paga_vendedor || 0));
+      return sum;
+    }, 0);
+    const buyerDebt = rows.reduce((sum, row) => {
+      const rowTotal = getTotalPaymentAmount(Number(row?.precio_paquete || 0), Number(row?.precio_entre_sucursal || 0));
+      const mode = String(row?.esta_pagado || "no").trim().toLowerCase();
+      if (mode === "no") return sum + rowTotal;
+      if (mode === "mixto") return sum + roundCurrency(Number(row?.monto_paga_comprador || 0));
+      return sum;
+    }, 0);
+
+    return { delivery, total, sellerDebt, buyerDebt };
+  }, [packageCount, watchedPackages]);
   const hasSellerPayment = useMemo(
     () =>
       watchedPackages
@@ -256,7 +288,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
       const half = roundCurrency(totalAmount / 2);
       return { ...row, monto_paga_vendedor: half, monto_paga_comprador: roundCurrency(totalAmount - half) };
     }
-    return { ...row, monto_paga_vendedor: 0, monto_paga_comprador: 0 };
+    return { ...row, monto_paga_vendedor: 0, monto_paga_comprador: totalAmount };
   };
 
   const recalculateRowsByDeliverySpaces = (sourceRows: any[], count = packageCount) => {
@@ -467,7 +499,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     }
     if (mode === "no") {
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
-      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], totalAmount);
       return;
     }
 
@@ -498,6 +530,12 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     if (mode === "si") {
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], totalAmount);
       form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], 0);
+      return;
+    }
+
+    if (mode === "no") {
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_vendedor"], 0);
+      form.setFieldValue(["paquetes", rowIndex, "monto_paga_comprador"], totalAmount);
       return;
     }
 
@@ -826,7 +864,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         buyerAmount = 0;
       } else if (paidStatus === "no") {
         sellerAmount = 0;
-        buyerAmount = 0;
+        buyerAmount = totalAmount;
       }
 
       return {
@@ -1023,8 +1061,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         onClose();
       }}
       footer={null}
-      width={1120}
-      style={{ maxWidth: "96vw" }}
+      width={1320}
+      style={{ maxWidth: "98vw" }}
       destroyOnClose
     >
       <div data-tour-id="shipping-external-delivery-modal">
@@ -1073,20 +1111,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             name="telefono_vendedor"
             label="Celular del vendedor"
           >
-            <AutoComplete
-              options={suggestionOptions.sellerPhone || []}
-              onSearch={(value) => searchContactSuggestions("sellerPhone", "phone", value)}
-              onSelect={(_, option) => applySellerSuggestion((option as SuggestionOption).contact)}
-            >
-              <Input
-                placeholder="Ej: 7XXXXXXX"
-                onKeyDown={(e) => {
-                  if (!/[0-9]/.test(e.key) && !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
-              />
-            </AutoComplete>
+            <PhoneCountryInput placeholder="Ej: 7XXXXXXX" />
           </Form.Item>
           <Form.Item
             name="numero_paquetes"
@@ -1170,7 +1195,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
         </Space>
 
         <div style={{ overflowX: "auto", marginTop: 8 }} data-tour-id="external-delivery-packages">
-          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <table style={{ width: "100%", minWidth: isMobile ? 1140 : 1260, borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead>
               <tr>
                 <th style={{ border: "1px solid #d9d9d9", padding: 8 }}>Nombre del comprador</th>
@@ -1244,24 +1269,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
                           ]}
                           style={{ marginBottom: 0 }}
                         >
-                          <AutoComplete
-                            options={suggestionOptions[`buyerPhone-${rowIndex}`] || []}
-                            onSearch={(value) => searchContactSuggestions(`buyerPhone-${rowIndex}`, "phone", value)}
-                            onSelect={(_, option) => applyBuyerSuggestion(rowIndex, (option as SuggestionOption).contact)}
-                          >
-                            <Input
-                              placeholder="Celular"
-                              onKeyDown={(e) => {
-                                if (e.ctrlKey || e.metaKey) return;
-                                if (
-                                  !/[0-9]/.test(e.key) &&
-                                  !["Backspace", "Tab", "ArrowLeft", "ArrowRight", "Delete"].includes(e.key)
-                                ) {
-                                  e.preventDefault();
-                                }
-                              }}
-                            />
-                          </AutoComplete>
+                          <PhoneCountryInput compact placeholder="Celular" />
                         </Form.Item>
                       </td>
                       <td style={{ border: "1px solid #d9d9d9", padding: 6 }}>
@@ -1385,6 +1393,15 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
             </tbody>
           </table>
         </div>
+
+        <Card size="small" style={{ marginTop: 16, background: "#fafafa" }} title="Totales">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div><strong>Delivery:</strong> Bs. {totalsSummary.delivery.toFixed(2)}</div>
+            <div><strong>Monto total:</strong> Bs. {totalsSummary.total.toFixed(2)}</div>
+            <div><strong>Deuda vendedor:</strong> Bs. {totalsSummary.sellerDebt.toFixed(2)}</div>
+            <div><strong>Deuda comprador:</strong> Bs. {totalsSummary.buyerDebt.toFixed(2)}</div>
+          </div>
+        </Card>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
           <Button

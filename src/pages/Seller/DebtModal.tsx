@@ -9,6 +9,7 @@ import {
   message,
   Radio,
   Card,
+  Switch,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
@@ -44,6 +45,7 @@ export default function DebtModal({
   const [loading, setLoading] = useState(false);
   const [sucursalOptions, setSucursalOptions] = useState<any[]>([]);
   const [form] = Form.useForm();
+  const showBranchCommission = Form.useWatch("comision_diferente_por_sucursal", form);
 
   useEffect(() => {
     if (!visible) return;
@@ -80,6 +82,7 @@ export default function DebtModal({
         descuento_porcentaje: 0,
         comision_porcentual: seller.comision_porcentual,
         comision_fija: seller.comision_fija,
+        comision_diferente_por_sucursal: seller.comision_diferente_por_sucursal === true,
         isDebt: true,
         sucursales: initSucursales.length ? initSucursales : [{ delivery: 0 }],
       });
@@ -114,10 +117,13 @@ export default function DebtModal({
         fecha_vigencia: values.fecha_vigencia.toISOString(),
         meses_renovacion: Number(values.meses_renovacion || 1),
         descuento_porcentaje: Number(values.descuento_porcentaje || 0),
+        comision_diferente_por_sucursal: values.comision_diferente_por_sucursal === true,
         pago_sucursales: values.sucursales.map((formSucursal: any) => ({
           ...formSucursal,
           alquiler: formSucursal.almacenamiento,
           delivery: 0,
+          comision_porcentual: values.comision_diferente_por_sucursal ? Number(formSucursal.comision_porcentual || 0) : 0,
+          comision_fija: values.comision_diferente_por_sucursal ? Number(formSucursal.comision_fija || 0) : 0,
           sucursalName: sucursalOptions.find(
             (optionSucursal) => optionSucursal._id === formSucursal.id_sucursal
           )?.nombre,
@@ -195,6 +201,10 @@ export default function DebtModal({
           </Col>
         </Row>
 
+        <Form.Item name="comision_diferente_por_sucursal" valuePropName="checked">
+          <Switch checkedChildren="Comisión por sucursal" unCheckedChildren="Comisión general" />
+        </Form.Item>
+
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -242,6 +252,7 @@ export default function DebtModal({
                     remove={remove}
                     sucursalOptions={sucursalOptions}
                     form={form}
+                    showBranchCommission={Boolean(showBranchCommission)}
                   />
                 </Card>
               ))}

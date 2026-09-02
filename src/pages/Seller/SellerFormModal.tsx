@@ -10,6 +10,7 @@ import {
   Col,
   Radio,
   Card,
+  Switch,
   message,
 } from "antd";
 import {
@@ -47,6 +48,7 @@ export default function SellerFormModal({
     hasCommissionService: false,
     hasSimplePackageService: false,
   });
+  const showBranchCommission = Form.useWatch("comision_diferente_por_sucursal", form);
 
   const syncServiceFlags = (branches: any[] = []) => {
     setServiceFlags({
@@ -86,6 +88,7 @@ export default function SellerFormModal({
       // 2· mapear payload para backend
       const payload = {
         ...values,
+        comision_diferente_por_sucursal: values.comision_diferente_por_sucursal === true,
         saldo_pendiente: 0,
         fecha_vigencia: dayjs(values.fecha_vigencia).toISOString(),
         descuento_porcentaje: Number(values.descuento_porcentaje || 0),
@@ -98,6 +101,8 @@ export default function SellerFormModal({
           exhibicion: s.exhibicion ?? 0,
           delivery: 0,
           entrega_simple: s.entrega_simple ?? 0,
+          comision_porcentual: values.comision_diferente_por_sucursal ? Number(s.comision_porcentual || 0) : 0,
+          comision_fija: values.comision_diferente_por_sucursal ? Number(s.comision_fija || 0) : 0,
           fecha_ingreso: s.fecha_ingreso
             ? s.fecha_ingreso.toISOString()
             : new Date().toISOString(),
@@ -214,6 +219,14 @@ export default function SellerFormModal({
               rules={[{ required: true, type: "email" }]}
             >
               <Input prefix={<MailOutlined />} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={24}>
+            <Form.Item name="comision_diferente_por_sucursal" valuePropName="checked">
+              <Switch checkedChildren="Comisión por sucursal" unCheckedChildren="Comisión general" />
             </Form.Item>
           </Col>
         </Row>
@@ -351,6 +364,7 @@ export default function SellerFormModal({
                     remove={remove}
                     sucursalOptions={sucursalOptions}
                     form={form}
+                    showBranchCommission={Boolean(showBranchCommission)}
                   />
                 </Card>
               ))}

@@ -1,11 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
-import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered } from "../../api/shippingGuide";
-import { Button, Card, Col, message, Modal, Row, Select, Table, Tooltip } from "antd";
-import { FileImageOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { getShippingByBranchAPI, getShippingGuidesAPI, getShippingGuidesBySellerAPI, markAsDelivered, updateShippingGuideObservationsAPI } from "../../api/shippingGuide";
+import { Button, Card, Empty, Input, message, Modal, Select, Spin, Table, Tabs, Tooltip, Typography } from "antd";
+import { CheckCircleOutlined, FileImageOutlined, LinkOutlined, MessageOutlined } from '@ant-design/icons';
 import { getSignedURL } from "../../helpers/s3Helper";
 import moment from "moment-timezone";
 
 type PickupFilter = "all" | "picked_up" | "pending";
+
+type GuideAttachment = {
+    key: string;
+    name: string;
+    url: string;
+    type: "image" | "pdf" | "other";
+};
+
+const getAttachmentName = (key: string) => {
+    const raw = String(key || "").split("/").pop() || key;
+    try {
+        return decodeURIComponent(raw);
+    } catch {
+        return raw;
+    }
+};
+
+const getAttachmentType = (key: string): GuideAttachment["type"] => {
+    const ext = String(key || "").split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
+    if (ext === "pdf") return "pdf";
+    return "other";
+};
 
 const ShippingGuideTable = (
     { refreshKey, user, isFilterBySeller, isFilterByBranch, search_id }:
@@ -14,8 +37,15 @@ const ShippingGuideTable = (
     const [imageUrl, setImageUrl] = useState<string | null>();
     const [imageDesc, setImageDesc] = useState<string | null>();
     const [isImageVisible, setIsImageVisible] = useState(false);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [guideAttachments, setGuideAttachments] = useState<GuideAttachment[]>([]);
+    const [activePreviewTab, setActivePreviewTab] = useState("photo");
     const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend');
     const [pickupFilter, setPickupFilter] = useState<PickupFilter>("all");
+    const [observationsModalOpen, setObservationsModalOpen] = useState(false);
+    const [observationsSaving, setObservationsSaving] = useState(false);
+    const [observationsValue, setObservationsValue] = useState("");
+    const [observationsTarget, setObservationsTarget] = useState<any | null>(null);
 
     const normalizedRole = String(user?.role || "").toLowerCase();
     const isAdmin = normalizedRole === "admin";
@@ -82,11 +112,40 @@ const ShippingGuideTable = (
     }, [guidesList, pickupFilter]);
 
     const handleShowImage = async (record: any) => {
-        if (record.imagen_key) {
-            const image_url = await getSignedURL(record.imagen_key);
+        const documentKeys = Array.isArray(record.lista_productos_keys) ? record.lista_productos_keys : [];
+
+        if (!record.imagen_key && !documentKeys.length) {
+            message.info("Esta guía no tiene archivos adjuntos");
+            return;
+        }
+
+        setIsImageVisible(true);
+        setPreviewLoading(true);
+        setImageUrl(null);
+        setImageDesc(record.descripcion);
+        setGuideAttachments([]);
+        setActivePreviewTab(record.imagen_key ? "photo" : "documents");
+
+        try {
+            const [image_url, docs] = await Promise.all([
+                record.imagen_key ? getSignedURL(record.imagen_key) : Promise.resolve(null),
+                Promise.all(
+                    documentKeys.map(async (key: string) => ({
+                        key,
+                        name: getAttachmentName(key),
+                        url: await getSignedURL(key),
+                        type: getAttachmentType(key),
+                    }))
+                ),
+            ]);
+
             setImageUrl(image_url);
-            setIsImageVisible(true);
-            setImageDesc(record.descripcion)
+            setGuideAttachments(docs);
+        } catch (error) {
+            console.error("Error al preparar la vista previa de la guía:", error);
+            message.error("No se pudo cargar la vista previa de la guía");
+        } finally {
+            setPreviewLoading(false);
         }
     }
 
@@ -115,9 +174,44 @@ const ShippingGuideTable = (
         }
     }
 
+    const handleOpenObservations = (record: any) => {
+        setObservationsTarget(record);
+        setObservationsValue(String(record?.observaciones || ""));
+        setObservationsModalOpen(true);
+    };
+
+    const handleSaveObservations = async () => {
+        if (!observationsTarget?._id) return;
+
+        setObservationsSaving(true);
+        try {
+            const res = await updateShippingGuideObservationsAPI(String(observationsTarget._id), observationsValue);
+            if (!res.success) {
+                message.error(res.message || "No se pudieron guardar las observaciones");
+                return;
+            }
+
+            message.success("Observaciones actualizadas");
+            setGuidesList((current: any[]) =>
+                current.map((item) =>
+                    String(item._id) === String(observationsTarget._id)
+                        ? { ...item, observaciones: observationsValue }
+                        : item
+                )
+            );
+            setObservationsModalOpen(false);
+            setObservationsTarget(null);
+        } catch (error) {
+            console.error("Error al guardar observaciones de la guía:", error);
+            message.error("No se pudieron guardar las observaciones");
+        } finally {
+            setObservationsSaving(false);
+        }
+    };
+
     const columns = [
         {
-            title: 'Â¿Recogido?',
+            title: '¿Recogido?',
             dataIndex: 'isRecogido',
             key: 'isRecogido',
             width: 100,
@@ -174,7 +268,7 @@ const ShippingGuideTable = (
             render: (_: any, record: any) => {
                 return (
                     <>
-                        {record.imagen_key && (
+                        {(record.imagen_key || (Array.isArray(record.lista_productos_keys) && record.lista_productos_keys.length > 0)) && (
                             <Tooltip title="Ver foto">
                                 <Button
                                     size="small"
@@ -189,6 +283,14 @@ const ShippingGuideTable = (
                                     size="small"
                                     icon={<CheckCircleOutlined />}
                                     onClick={() => { handleCheckShipping(record) }} />
+                            </Tooltip>
+                        )}
+                        {(isAdmin || isOperator || isSuperadmin) && (
+                            <Tooltip title="Observaciones">
+                                <Button
+                                    size="small"
+                                    icon={<MessageOutlined />}
+                                    onClick={() => { handleOpenObservations(record) }} />
                             </Tooltip>
                         )}
                     </>
@@ -226,22 +328,102 @@ const ShippingGuideTable = (
                     setIsImageVisible(false)
                     setImageUrl(null)
                     setImageDesc(null)
+                    setGuideAttachments([])
+                    setPreviewLoading(false)
                 }}
                 footer={null}
+                width={920}
             >
-                <Card title="Foto - Guí­a de Enví­o" bordered={false}>
-                    <Row gutter={16}>
-                        {imageUrl && <img src={imageUrl} alt="Imagen" style={{ width: '100%' }} />}
-                    </Row>
-                    <div className="py-4">
-                        <Row gutter={16}>
-                            <Col>
-                                {imageDesc}
-                            </Col>
-                        </Row>
-                    </div>
-                </Card>
+                <Tabs
+                    activeKey={activePreviewTab}
+                    onChange={setActivePreviewTab}
+                    items={[
+                        {
+                            key: "photo",
+                            label: "Foto",
+                            children: previewLoading ? (
+                                <div className="py-8 flex justify-center"><Spin /></div>
+                            ) : imageUrl ? (
+                                <div>
+                                    <img src={imageUrl} alt="Imagen" style={{ width: "100%", maxHeight: 520, objectFit: "contain" }} />
+                                    <div className="py-4 text-gray-600">{imageDesc}</div>
+                                </div>
+                            ) : (
+                                <Empty description="Esta guía no tiene foto" />
+                            ),
+                        },
+                        {
+                            key: "documents",
+                            label: `Documentos (${guideAttachments.length})`,
+                            children: previewLoading ? (
+                                <div className="py-8 flex justify-center"><Spin /></div>
+                            ) : guideAttachments.length ? (
+                                <div className="space-y-4">
+                                    {guideAttachments.map((attachment) => (
+                                        <Card
+                                            key={attachment.key}
+                                            size="small"
+                                            title={attachment.name}
+                                            extra={
+                                                <Button
+                                                    icon={<LinkOutlined />}
+                                                    onClick={() => window.open(attachment.url, "_blank", "noopener,noreferrer")}
+                                                >
+                                                    Abrir
+                                                </Button>
+                                            }
+                                        >
+                                            {attachment.type === "image" ? (
+                                                <img src={attachment.url} alt={attachment.name} style={{ width: "100%", maxHeight: 420, objectFit: "contain" }} />
+                                            ) : attachment.type === "pdf" ? (
+                                                <iframe
+                                                    src={attachment.url}
+                                                    title={attachment.name}
+                                                    style={{ width: "100%", height: 500, border: 0 }}
+                                                />
+                                            ) : (
+                                                <Typography.Text type="secondary">
+                                                    Vista previa no disponible para este formato. Usa Abrir para verlo.
+                                                </Typography.Text>
+                                            )}
+                                        </Card>
+                                    ))}
+                                </div>
+                            ) : (
+                                <Empty description="Esta guía no tiene documentos" />
+                            ),
+                        },
+                    ]}
+                />
 
+            </Modal>
+
+            <Modal
+                title="Observaciones de la guía"
+                open={observationsModalOpen}
+                onCancel={() => {
+                    setObservationsModalOpen(false);
+                    setObservationsTarget(null);
+                    setObservationsValue("");
+                }}
+                onOk={handleSaveObservations}
+                okText="Guardar"
+                cancelText="Cancelar"
+                confirmLoading={observationsSaving}
+            >
+                <div className="space-y-3">
+                    <div className="text-sm text-slate-600">
+                        {observationsTarget ? `${observationsTarget.vendedor?.nombre || ""} ${observationsTarget.vendedor?.apellido || ""}`.trim() : ""}
+                    </div>
+                    <Input.TextArea
+                        value={observationsValue}
+                        onChange={(event) => setObservationsValue(event.target.value)}
+                        placeholder="Escribe las observaciones..."
+                        autoSize={{ minRows: 3, maxRows: 8 }}
+                        maxLength={1000}
+                        showCount
+                    />
+                </div>
             </Modal>
         </>
     )

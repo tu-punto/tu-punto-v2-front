@@ -18,6 +18,7 @@ import {
   isQzConnected,
   qzPrint
 } from "../../utils/qzTray";
+import { includesNormalized, normalizeSearchText } from "../../utils/search";
 
 const { Text } = Typography;
 
@@ -29,6 +30,7 @@ interface QRItem {
   variantLabel?: string;
   qrCode: string;
   qrImagePath: string;
+  quantity?: number;
 }
 
 interface Props {
@@ -38,6 +40,8 @@ interface Props {
   selectedSellerId?: string | null;
   initialProductIds?: string[];
   autoGenerateOnOpen?: boolean;
+  initialGeneratedItems?: QRItem[];
+  initialPrintQuantities?: Record<string, number>;
 }
 
 interface DirectPreviewItem {
@@ -315,6 +319,25 @@ const wrapByWidth = (ctx: CanvasRenderingContext2D, text: string, maxWidthPx: nu
   return lines;
 };
 
+const normalizeVariantSearchText = (value: unknown) =>
+  normalizeSearchText(value)
+    .replace(/[\-_/\\|,.;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const matchesVariantSearch = (value: unknown, query: unknown) => {
+  const normalizedQuery = normalizeVariantSearchText(query);
+  if (!normalizedQuery) return true;
+
+  const normalizedValue = normalizeVariantSearchText(value);
+  if (!normalizedValue) return false;
+
+  if (normalizedValue.includes(normalizedQuery)) return true;
+
+  const tokens = normalizedQuery.split(" ").filter(Boolean);
+  return tokens.every((token) => normalizedValue.includes(token));
+};
+
 const buildQrDownloadUrl = (qrImagePath: string) => {
   const serverBase = String(SERVER_URL || "").replace(/\/+$/, "");
   const raw = String(qrImagePath || "").trim();
@@ -438,7 +461,9 @@ const VariantQRBatchModal = ({
   sellers,
   selectedSellerId,
   initialProductIds = [],
-  autoGenerateOnOpen = false
+  autoGenerateOnOpen = false,
+  initialGeneratedItems = [],
+  initialPrintQuantities = {}
 }: Props) => {
   const [sellerId, setSellerId] = useState<string | undefined>(
     selectedSellerId ? String(selectedSellerId) : undefined
@@ -511,14 +536,22 @@ const VariantQRBatchModal = ({
   const listedItems: QRItem[] = (result?.items || []) as QRItem[];
   const printableItems: QRItem[] = listedItems.length > 0 ? listedItems : generatedItems;
   const filteredPrintableItems = useMemo(() => {
-    const query = resultSearchText.trim().toLowerCase();
+    const query = resultSearchText.trim();
     if (!query) return printableItems;
-    return printableItems.filter((item) =>
-      String(item.productName || item.productId || "")
-        .trim()
-        .toLowerCase()
-        .includes(query)
-    );
+
+    return printableItems.filter((item) => {
+      const searchableText = [
+        item.productName,
+        item.productId,
+        item.variantLabel,
+        item.variantKey,
+        item.qrCode,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      return matchesVariantSearch(searchableText, query);
+    });
   }, [printableItems, resultSearchText]);
   const visiblePrintableItems = useMemo(
     () => filteredPrintableItems.slice(0, visibleResultCount),
@@ -539,7 +572,7 @@ const VariantQRBatchModal = ({
     },
     [qzPrinters, selectedQzPrinter]
   );
-  const itemPrintKey = (item: QRItem) => `${item.productId}::${item.variantKey}`;
+  const itemPrintKey = (item: QRItem) => `${item.productId}::${String(item.variantKey || item.qrCode || item.variantLabel || "").trim()}`;
   const getItemSystemStock = (item: QRItem) => {
     const value = stockByItemKey[itemPrintKey(item)];
     return Number.isFinite(value) ? Math.max(0, Number(value)) : 0;
@@ -547,6 +580,7 @@ const VariantQRBatchModal = ({
   const getItemPrintQuantity = (item: QRItem) => {
     const stored = printQuantities[itemPrintKey(item)];
     if (Number.isFinite(stored)) return Math.max(0, Number(stored));
+    if (Number.isFinite(Number(item.quantity))) return Math.max(0, Number(item.quantity));
     return undefined;
   };
   const printableQueue = useMemo(
@@ -1017,6 +1051,32 @@ const VariantQRBatchModal = ({
       setSellerId(String(selectedSellerId));
     }
 
+    if (initialGeneratedItems.length > 0) {
+      autoRunDoneRef.current = true;
+      setOnlyMissing(true);
+      setForceRegenerate(false);
+      setResult({
+        products: initialGeneratedItems.length,
+        variantsProcessed: initialGeneratedItems.length,
+        generated: initialGeneratedItems.length,
+        skipped: 0,
+        generatedItems: initialGeneratedItems,
+        errors: [],
+      });
+      setResultSearchText("");
+      setVisibleResultCount(RESULT_PAGE_SIZE);
+      setPrintQuantities((current) => {
+        const next = { ...current };
+        for (const item of initialGeneratedItems) {
+          const key = itemPrintKey(item);
+          const quantity = Number(initialPrintQuantities[key] ?? item.quantity ?? current[key] ?? 0);
+          next[key] = Math.max(0, Math.floor(quantity));
+        }
+        return next;
+      });
+      return;
+    }
+
     if (!autoGenerateOnOpen || autoRunDoneRef.current) return;
     autoRunDoneRef.current = true;
 
@@ -1027,7 +1087,7 @@ const VariantQRBatchModal = ({
       forceRegenerate: false,
       skipConfirm: true
     });
-  }, [visible, autoGenerateOnOpen, selectedSellerId]);
+  }, [visible, autoGenerateOnOpen, selectedSellerId, initialGeneratedItems, initialPrintQuantities]);
 
   useEffect(() => {
     if (!visible) return;
@@ -1137,11 +1197,7 @@ const VariantQRBatchModal = ({
                 onChange={(value) => setSellerId(value)}
                 options={sellerOptions}
                 placeholder="Buscar vendedor"
-                filterOption={(input, option) =>
-                  String(option?.label || "")
-                    .toLowerCase()
-                    .includes(String(input || "").toLowerCase())
-                }
+                filterOption={(input, option) => includesNormalized(option?.label, input)}
               />
             </div>
             <div>

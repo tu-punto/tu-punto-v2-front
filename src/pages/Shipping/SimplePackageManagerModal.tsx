@@ -33,6 +33,7 @@ import {
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 import QzPrinterSelector from "./QzPrinterSelector";
 import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
+import PhoneCountryInput from "../../components/PhoneCountryInput";
 
 interface SimplePackageManagerModalProps {
   visible: boolean;
@@ -1621,16 +1622,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                               />
                             </td>
                             <td style={tableCellStyle}>
-                              <Input
-                                value={row.telefono_comprador}
-                                placeholder="Celular"
-                                onChange={(event) =>
-                                  updateCreateRow(index, {
-                                    telefono_comprador: event.target.value.replace(/[^\d]/g, ""),
-                                  })
-                                }
-                              />
-                            </td>
+                                <PhoneCountryInput compact value={row.telefono_comprador} placeholder="Celular" onChange={(value) => updateCreateRow(index, { telefono_comprador: value })} />
+                              </td>
                             <td style={tableCellStyle}>
                               <Select
                                 style={{ width: "100%" }}

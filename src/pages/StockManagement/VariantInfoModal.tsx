@@ -1,17 +1,18 @@
-import { Card, Modal, Table, message } from "antd";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { Alert, Button, Card, Modal, Radio, Space, Table, message } from "antd";
+import { useEffect, useMemo, useState } from "react";
 import moment from "moment-timezone";
 
 import { getProductsEntryAmount } from "../../api/entry";
-import { getProductByIdAPI } from "../../api/product";
+import { deleteSellerVariantAPI, getProductByIdAPI } from "../../api/product";
 import { getSalesBySellerIdAPI } from "../../api/sales";
 import { getSucursalsAPI } from "../../api/sucursal";
-import { UserContext } from "../../context/userContext";
 
 type VariantInfoModalProps = {
     visible: boolean;
     onClose: () => void;
     rowRecord?: any;
+    onUpdateProducts?: () => Promise<void>;
+    showDeleteButton?: boolean;
 };
 
 const normalizeText = (value: unknown) => String(value ?? "").trim();
@@ -118,14 +119,16 @@ const areVariantsEqual = (left: any, right: any) => {
     return keysA.every((key) => normalizeLabel(a[key]) === normalizeLabel(b[key]));
 };
 
-const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps) => {
-    const { user }: any = useContext(UserContext);
+const VariantInfoModal = ({ visible, onClose, rowRecord, onUpdateProducts, showDeleteButton = true }: VariantInfoModalProps) => {
     const [loading, setLoading] = useState(false);
     const [productName, setProductName] = useState("");
     const [variantName, setVariantName] = useState("");
     const [stockData, setStockData] = useState<any[]>([]);
     const [salesData, setSalesData] = useState<any[]>([]);
     const [entryData, setEntryData] = useState<any[]>([]);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deleteScope, setDeleteScope] = useState<"branch" | "all">("branch");
+    const [deleting, setDeleting] = useState(false);
 
     const normalizedVariant = useMemo(
         () => toVariantRecord(rowRecord?.variantes_obj || rowRecord?.variantes || {}),
@@ -133,7 +136,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps
     );
 
     useEffect(() => {
-        if (!visible || !rowRecord?._id || !user?.id_vendedor) {
+        if (!visible || !rowRecord?._id || !rowRecord?.id_vendedor) {
             if (!visible) {
                 setStockData([]);
                 setSalesData([]);
@@ -158,8 +161,8 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps
 
                 const [branchesResponse, salesResponse, entriesResponse, productResponse] = await Promise.all([
                     getSucursalsAPI(),
-                    getSalesBySellerIdAPI(user.id_vendedor),
-                    getProductsEntryAmount(user.id_vendedor),
+                    getSalesBySellerIdAPI(String(rowRecord?.id_vendedor)),
+                    getProductsEntryAmount(String(rowRecord?.id_vendedor)),
                     getProductByIdAPI(rowRecord._id)
                 ]);
 
@@ -258,7 +261,7 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps
         return () => {
             cancelled = true;
         };
-    }, [visible, rowRecord, user?.id_vendedor, normalizedVariant]);
+    }, [visible, rowRecord, normalizedVariant]);
 
     const stockColumns = [
         {
@@ -331,6 +334,36 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps
         }
     ];
 
+    const handleDeleteVariant = async () => {
+        if (!rowRecord?._id || !rowRecord?.variantKey) return;
+
+        setDeleting(true);
+        try {
+            const response = await deleteSellerVariantAPI({
+                productId: rowRecord._id,
+                variantKey: rowRecord.variantKey,
+                sucursalId: deleteScope === "branch" ? rowRecord?.sucursalId : undefined,
+                scope: deleteScope,
+            });
+
+            if (!response?.success) {
+                message.error(response?.message || response?.msg || "No se pudo eliminar la variante.");
+                return;
+            }
+
+            message.success(response?.message || "Variante eliminada correctamente.");
+            setDeleteModalOpen(false);
+            setDeleteScope("branch");
+            await onUpdateProducts?.();
+            onClose();
+        } catch (error) {
+            console.error("Error eliminando variante de vendedor:", error);
+            message.error("No se pudo eliminar la variante.");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     return (
         <Modal
             title={
@@ -345,6 +378,13 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps
             width={1000}
             destroyOnClose
         >
+            {showDeleteButton && (
+                <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
+                    <Button danger onClick={() => setDeleteModalOpen(true)}>
+                        Eliminar
+                    </Button>
+                </Space>
+            )}
             <Card title="Stock por sucursal" bordered={false}>
                 <Table
                     columns={stockColumns}
@@ -372,6 +412,34 @@ const VariantInfoModal = ({ visible, onClose, rowRecord }: VariantInfoModalProps
                     locale={{ emptyText: "No hay ingresos registrados para esta variante." }}
                 />
             </Card>
+            <Modal
+                open={deleteModalOpen}
+                title="Eliminar variante"
+                onCancel={() => {
+                    setDeleteModalOpen(false);
+                    setDeleteScope("branch");
+                }}
+                onOk={() => void handleDeleteVariant()}
+                okButtonProps={{ danger: true, loading: deleting }}
+                okText="Eliminar"
+                cancelText="Cancelar"
+            >
+                <Alert
+                    type="warning"
+                    showIcon
+                    message="Esta acción no borra el historial"
+                    description={
+                        deleteScope === "branch"
+                            ? "Se eliminará solo en esta sucursal. Podrás seguir viendo el historial."
+                            : `Se eliminará en todas las sucursales. Sucursales actuales: ${stockData.map((item) => item.nombre_sucursal).join(", ") || "Ninguna"}.`
+                    }
+                    style={{ marginBottom: 16 }}
+                />
+                <Radio.Group value={deleteScope} onChange={(e) => setDeleteScope(e.target.value)} buttonStyle="solid">
+                    <Radio.Button value="branch" disabled={!rowRecord?.sucursalId}>Solo esta sucursal</Radio.Button>
+                    <Radio.Button value="all">Todas las sucursales</Radio.Button>
+                </Radio.Group>
+            </Modal>
         </Modal>
     );
 };

@@ -18,6 +18,26 @@ import { normalizeRole } from "../../utils/role";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import { resolvePromotionPricing } from "../../utils/promotionPricing";
 import { useNavigate } from "react-router-dom";
+import { includesNormalized } from "../../utils/search";
+
+const getSellerBranchCommission = (seller: any, branchId?: string) => {
+  const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
+  const branch = Array.isArray(seller?.pago_sucursales)
+    ? seller.pago_sucursales.find((item: any) => String(item?.id_sucursal?._id || item?.id_sucursal || "").trim() === String(branchId || "").trim())
+    : null;
+
+  if (useBranchCommission && branch) {
+    return {
+      percent: Number(branch?.comision_porcentual || 0),
+      fixed: Number(branch?.comision_fija || 0),
+    };
+  }
+
+  return {
+    percent: Number(seller?.comision_porcentual || 0),
+    fixed: Number(seller?.comision_fija || 0),
+  };
+};
 
 export const Sales = () => {
   const navigate = useNavigate();
@@ -49,6 +69,7 @@ export const Sales = () => {
   const [cartLoading, setCartLoading] = useState(false);
   const normalizeId = (id: any) => String(id?._id ?? id?.$oid ?? id ?? "");
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const effectiveSalesBranchId = branchIdForFetch || selectedBranchId || localStorage.getItem("sucursalId") || undefined;
   const getStockActual = (p: any, sucursalId?: string | null) => {
     // Caso 1: viene "flat" (lo ideal)
     const direct =
@@ -152,8 +173,7 @@ export const Sales = () => {
     }
 
     if (searchText.trim()) {
-      const lower = searchText.trim().toLowerCase();
-      const words = lower.split(" ");
+      const words = searchText.trim().toLowerCase().split(" ");
       const specialChars = /[!@#$%^&*?:{}|<>]/
 
       const filterWords = (p: any, words: string[]) => {
@@ -161,7 +181,7 @@ export const Sales = () => {
         for (const word of words) {
           if (!match) return false;
           if (specialChars.test(word)) continue;
-          match = match && (p.producto ?? '').toString().toLowerCase().includes(word);
+          match = match && includesNormalized(p.producto, word);
         }
         return match;
       };
@@ -412,7 +432,7 @@ export const Sales = () => {
       if (searchText.trim()) {
           const lowerSearch = searchText.toLowerCase();
           filteredData = filteredData.filter(product =>
-              product.producto.toLowerCase().includes(lowerSearch)
+              includesNormalized(product.producto, lowerSearch)
           );
       }
       filteredData = filteredData.filter(product => product.stockActual > 0);
@@ -431,10 +451,10 @@ export const Sales = () => {
       const pricing = getSalePricing(product, cantidad);
       const precio = pricing.unitPrice;
       const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
-      const comision = Number(vendedor?.comision_porcentual || 0);
+      const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
       const utilidad = applySellerCommissionCap(
         product.id_vendedor,
-        parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+        parseFloat((((precio * cantidad * branchCommission.percent) / 100) + branchCommission.fixed).toFixed(2))
       );
 
       return [
@@ -492,12 +512,12 @@ export const Sales = () => {
 
         if (field === 'cantidad' || field === 'precio_unitario') {
           const vendedor = sellers.find((v: any) => v._id === p.id_vendedor);
-          const comision = Number(vendedor?.comision_porcentual || 0);
+          const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
           const cantidad = Number(updated.cantidad || 0);
           const precio = Number(updated.precio_unitario || 0);
           updated.utilidad = applySellerCommissionCap(
             p.id_vendedor,
-            parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+            parseFloat((((precio * cantidad * branchCommission.percent) / 100) + branchCommission.fixed).toFixed(2))
           );
         }
 
@@ -509,7 +529,8 @@ export const Sales = () => {
 
   const handleAddProduct = (newProduct: any) => {
     const vendedor = sellers.find((v: any) => String(v._id) === String(newProduct.id_vendedor));
-    const comision = Number(vendedor?.comision_porcentual || 0);
+    const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
+    const comision = branchCommission.percent;
     const cantidadSolicitada = Number(newProduct.cantidad || 1);
     const pricing = getSalePricing(newProduct, cantidadSolicitada);
     const precio = Number(newProduct.precio_unitario ?? pricing.unitPrice ?? 0);
@@ -674,7 +695,7 @@ export const Sales = () => {
                         showSearch
                         optionFilterProp="label"
                         filterOption={(input, option) =>
-                          String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                          includesNormalized(option?.label, input)
                         }
                         style={{ minWidth: 200 }}
                         value={selectedSellerId}
@@ -762,6 +783,7 @@ export const Sales = () => {
                 key={refreshKey}
                 sellers={sellers}
                 isAdmin={isAdmin || isOperator}
+                branchId={effectiveSalesBranchId}
               />
             </Spin>
           </Card>
@@ -771,7 +793,7 @@ export const Sales = () => {
                 onClose={() => setShowQRScanner(false)}
                 onProductScanned={(item) => {
                   const vendedor = sellers.find((v: any) => v._id === item.id_vendedor);
-                  const comision = Number(vendedor?.comision_porcentual || 0);
+                  const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
 
                   const nombre = item.nombre_producto || "Producto sin nombre";
                   const variantLabel = item.variantLabel || "";
@@ -781,7 +803,7 @@ export const Sales = () => {
                   const cantidad = 1;
                   const utilidad = applySellerCommissionCap(
                     item.id_vendedor,
-                    parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+                    parseFloat((((precio * cantidad * branchCommission.percent) / 100) + branchCommission.fixed).toFixed(2))
                   );
 
                   handleAddProduct({

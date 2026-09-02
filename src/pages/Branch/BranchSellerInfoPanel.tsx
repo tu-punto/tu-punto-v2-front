@@ -1,12 +1,15 @@
 import { Card, Empty, Select, Space, Tag, Typography } from "antd";
+import { PhoneOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { getSellersBasicAPI } from "../../api/seller";
+import { includesNormalized } from "../../utils/search";
 
 type BranchSeller = {
   _id: string;
   nombre: string;
   apellido: string;
+  telefono?: string | number;
   fecha_vigencia: string | Date;
   pago_sucursales?: Array<{
     id_sucursal: string;
@@ -93,7 +96,7 @@ export default function BranchSellerInfoPanel({
             value: seller._id,
             label: `${seller.nombre} ${seller.apellido}`,
           }))}
-          filterOption={(input, option: any) => String(option?.label || "").toLowerCase().includes(input.toLowerCase())}
+          filterOption={(input, option: any) => includesNormalized(option?.label, input)}
         />
 
         {!selectedSeller ? (
@@ -108,6 +111,12 @@ export default function BranchSellerInfoPanel({
                 {currentPayment?.activo === false ? "Inactivo" : "Activo"}
               </Tag>
             </div>
+            {selectedSeller.telefono && (
+              <p className="mb-2 flex items-center gap-2 text-sm text-gray-500">
+                <PhoneOutlined />
+                <span>{selectedSeller.telefono}</span>
+              </p>
+            )}
             <p className="mb-2 text-sm text-gray-600">
               <strong>Comentario:</strong> {currentPayment?.comentario || "Sin comentario"}
             </p>

@@ -9,8 +9,10 @@ import { IProduct } from "../../models/productModel.ts";
 import { getCategoryByIdAPI } from '../../api/category';
 import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
 import ProductPriceMatrixModal from "./ProductPriceMatrixModal.tsx";
+import VariantInfoModal from "./VariantInfoModal";
 import { saveTempStock } from "../../utils/storageHelpers";
 import { reconstructProductFromFlat, fetchFullProductById } from "../../utils/storageHelpers";
+import { includesNormalized } from "../../utils/search";
 
 
 interface ProductTableProps {
@@ -267,8 +269,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             let varianteMatch = true;
             for (const word of searchWords) {
                 if (specialChars.test(word)) continue
-                nombreMatch = nombreMatch && baseName?.toLowerCase().includes(word.toLowerCase());
-                varianteMatch = varianteMatch && product.variant?.toLowerCase().includes(word.toLowerCase());
+                nombreMatch = nombreMatch && includesNormalized(baseName, word);
+                varianteMatch = varianteMatch && includesNormalized(product.variant, word);
             }
 
             if (searchText && !nombreMatch && !varianteMatch) return;
@@ -354,6 +356,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                         data-testid="stock-income-input"
                         value={ingresoData[record.key] ?? ''}
                         onChange={(e) => handleIngresoChange(record.key, Number(e.target.value))}
+                        onClick={(event) => event.stopPropagation()}
                         placeholder="Ingresar cantidad"
                         type="number"
                         disabled={!selectedSeller}
@@ -468,12 +471,10 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         const lowerSearch = searchText.toLowerCase();
 
         const filteredProducts = updatedProducts.filter(product => {
-            const nombre = product.nombre_producto?.toLowerCase() || "";
-            const variante = product.variant?.toLowerCase() || "";
             return (
                 lowerSearch === "" ||
-                nombre.includes(lowerSearch) ||
-                variante.includes(lowerSearch)
+                includesNormalized(product.nombre_producto, lowerSearch) ||
+                includesNormalized(product.variant, lowerSearch)
             );
         });
 
@@ -575,6 +576,14 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                                     }}
                                     scroll={{ x: 820 }}
                                     rowKey="key"
+                                    onRow={(record) => ({
+                                        onClick: () => {
+                                            if (record?.variant) {
+                                                openInfoModal(record);
+                                            }
+                                        },
+                                        style: record?.variant ? { cursor: "pointer" } : undefined,
+                                    })}
                                 />
                             </div>
                         </div>
@@ -615,6 +624,13 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 onClose={closePriceMatrixModal}
                 producto={selectedProductForPriceMatrix}
                 onRefresh={onUpdateProducts}
+            />
+            <VariantInfoModal
+                visible={infoModalOpen}
+                onClose={closeInfoModal}
+                rowRecord={selectedProductInfo}
+                onUpdateProducts={onUpdateProducts}
+                showDeleteButton={false}
             />
         </Spin>
     );

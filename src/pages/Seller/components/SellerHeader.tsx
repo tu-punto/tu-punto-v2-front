@@ -40,9 +40,11 @@ const SellerHeader: React.FC<SellerHeaderProps> = ({ name, isSeller = false }) =
   }
 
   return (
-    <h2 className="text-mobile-sm xl:text-desktop-sm mb-2 text-center">
-      Informacion del Vendedor: {name}
-    </h2>
+    <div className="mb-2 text-center">
+      <h2 className="text-mobile-sm xl:text-desktop-sm mb-1">
+        Informacion del Vendedor: {name}
+      </h2>
+    </div>
   );
 };
 

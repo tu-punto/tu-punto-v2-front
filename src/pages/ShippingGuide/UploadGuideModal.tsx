@@ -14,6 +14,8 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
     const [form] = Form.useForm();
     const { user } = useContext(UserContext);
     const [loading, setLoading] = useState(false);
+    const [guideFiles, setGuideFiles] = useState<any[]>([]);
+    const [listFiles, setListFiles] = useState<any[]>([]);
 
     useEffect(() => {
         if (visible) {
@@ -67,8 +69,15 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
         try {
             const sucursal = selectedBranch;
             const vendedor_id = user.id_vendedor;
-            const descripcion = values.description;
-            const imagen = values.image && values.image[0] ? values.image[0].originFileObj : null;
+            const descripcion = values.description || "";
+            const imagen = guideFiles[0]?.originFileObj || null;
+            const productFiles = listFiles.slice(0, 3).map((file) => file.originFileObj).filter(Boolean);
+
+            if (!productFiles.length) {
+                message.error("Debes subir al menos un archivo con la lista de productos");
+                setLoading(false);
+                return;
+            }
 
             const formData = new FormData();
             formData.append('vendedor', vendedor_id);
@@ -77,6 +86,9 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
             if (imagen) {
                 formData.append('imagen', imagen);
             }
+            productFiles.forEach((file) => {
+                formData.append('lista_productos', file);
+            });
 
             const response = await registerShippingGuideAPI(formData);
 
@@ -94,17 +106,23 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
         }
         setLoading(false);
         form.resetFields();
+        setSelectedBranch("");
+        setGuideFiles([]);
+        setListFiles([]);
         onFinish();
     };
 
 
     const handleCancel = () => {
         form.resetFields();
+        setSelectedBranch("");
+        setGuideFiles([]);
+        setListFiles([]);
         onCancel();
     };
 
     return (
-        <Modal title="Guía de Envío" open={visible} onCancel={handleCancel} width={700} footer={null}>
+        <Modal title="Lista y/o Guía" open={visible} onCancel={handleCancel} width={700} footer={null}>
             <div data-tour-id="shipping-guide-upload-modal">
             <Form form={form} name="uploadGuideForm" onFinish={handleFinish} layout='vertical'>
                 <Card title="Información Básica" bordered={false}>
@@ -135,7 +153,7 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
                         </Col>
                     </Row>
                 </Card>
-                <Card title="Datos Opcionales" bordered={false}>
+                <Card bordered={false}>
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item name='description' label='Descripción' rules={[{ required: false }]}>
@@ -147,14 +165,55 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
                     </Row>
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name='image' label='Foto de la Guía' valuePropName="fileList" getValueFromEvent={e => Array.isArray(e) ? e : e && e.fileList} rules={[{ required: false }]}>
+                            <Form.Item name='image' label='Foto de la Guía' valuePropName="fileList" getValueFromEvent={e => Array.isArray(e) ? e : e && e.fileList} rules={[{ required: false }]}> 
                                 <Upload
                                     name="image"
                                     accept="image/*"
                                     beforeUpload={() => false}
-                                    onChange={handleUploadChange}
+                                    fileList={guideFiles}
+                                    maxCount={1}
+                                    onChange={(info) => {
+                                        const next = info.fileList.slice(-1);
+                                        setGuideFiles(next);
+                                        form.setFieldValue("image", next);
+                                        handleUploadChange(info);
+                                    }}
+                                    onRemove={() => {
+                                        setGuideFiles([]);
+                                        form.setFieldValue("image", []);
+                                    }}
                                 >
                                     <Button icon={<UploadOutlined />}>Seleccionar Imagen</Button>
+                                </Upload>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                name='lista_productos'
+                                label='Lista de productos (obligatoria)'
+                                valuePropName="fileList"
+                                getValueFromEvent={e => Array.isArray(e) ? e : e && e.fileList}
+                                rules={[{ required: true, message: 'Adjunta al menos un archivo' }]}
+                            >
+                                <Upload
+                                    multiple
+                                    beforeUpload={() => false}
+                                    accept=".pdf,.xls,.xlsx,.csv,image/*"
+                                    fileList={listFiles}
+                                    maxCount={3}
+                                    onChange={(info) => {
+                                        const next = info.fileList.slice(0, 3);
+                                        setListFiles(next);
+                                        form.setFieldValue("lista_productos", next);
+                                        handleUploadChange(info);
+                                    }}
+                                    onRemove={(file) => {
+                                        const next = listFiles.filter((item) => item.uid !== file.uid);
+                                        setListFiles(next);
+                                        form.setFieldValue("lista_productos", next);
+                                    }}
+                                >
+                                    <Button icon={<UploadOutlined />}>Subir lista</Button>
                                 </Upload>
                             </Form.Item>
                         </Col>

@@ -57,6 +57,8 @@ const StockManagement = () => {
     const [isQRBatchModalVisible, setIsQRBatchModalVisible] = useState(false);
     const [qrModalProductIds, setQrModalProductIds] = useState<string[]>([]);
     const [qrModalAutoGenerate, setQrModalAutoGenerate] = useState(false);
+    const [qrBootstrapItems, setQrBootstrapItems] = useState<any[]>([]);
+    const [qrBootstrapQuantities, setQrBootstrapQuantities] = useState<Record<string, number>>({});
     const [isInventoryQRModalVisible, setIsInventoryQRModalVisible] = useState(false);
     const [isStockQRInfoModalVisible, setIsStockQRInfoModalVisible] = useState(false);
     const [isWithdrawalRequestModalVisible, setIsWithdrawalRequestModalVisible] = useState(false);
@@ -919,10 +921,26 @@ const StockManagement = () => {
                         setResetSignal(true);
                         setTimeout(() => setResetSignal(false), 100);
 
+                        const qrItems = Array.isArray(context?.qrItems) ? context.qrItems.filter(Boolean) : [];
+                        const qrQuantities = context?.qrQuantities && typeof context.qrQuantities === "object"
+                            ? context.qrQuantities
+                            : {};
                         const createdProductIds = (context?.createdProductIds || []).filter(Boolean);
+
+                        if (qrItems.length > 0) {
+                            setQrBootstrapItems(qrItems);
+                            setQrBootstrapQuantities(qrQuantities);
+                            setQrModalProductIds([]);
+                            setQrModalAutoGenerate(false);
+                            setIsQRBatchModalVisible(true);
+                            return;
+                        }
+
                         if (createdProductIds.length > 0) {
                             setQrModalProductIds(createdProductIds);
                             setQrModalAutoGenerate(true);
+                            setQrBootstrapItems([]);
+                            setQrBootstrapQuantities({});
                             setIsQRBatchModalVisible(true);
                         }
                     }}
@@ -964,11 +982,15 @@ const StockManagement = () => {
                     setIsQRBatchModalVisible(false);
                     setQrModalAutoGenerate(false);
                     setQrModalProductIds([]);
+                    setQrBootstrapItems([]);
+                    setQrBootstrapQuantities({});
                 }}
                 sellers={sellers}
                 selectedSellerId={selectedSeller ? String(selectedSeller) : undefined}
                 initialProductIds={qrModalProductIds}
                 autoGenerateOnOpen={qrModalAutoGenerate}
+                initialGeneratedItems={qrBootstrapItems}
+                initialPrintQuantities={qrBootstrapQuantities}
             />
             <SellerWithdrawalRequestModal
                 visible={isWithdrawalRequestModalVisible}

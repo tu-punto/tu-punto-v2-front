@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Input } from "antd";
 import useEditableTable from "../../../hooks/useEditableTable";
 import SalesTable from "./SalesTable";
 
@@ -23,6 +24,8 @@ const SalesSection: React.FC<Props> = ({
   onDeleteOneSale,
   isSeller,
 }) => {
+  const [searchText, setSearchText] = useState("");
+
   // 1) Asignamos key = id_venta a cada objeto
   const salesConKey = initialSales.map((sale) => ({
     ...sale,
@@ -60,8 +63,17 @@ const SalesSection: React.FC<Props> = ({
         <h4 className="font-bold text-mobile-sm xl:text-desktop-sm">
           Ventas no pagadas
         </h4>
+        <div className="mb-3 max-w-md">
+          <Input.Search
+            allowClear
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Buscar por producto, variante, cliente o sucursal"
+          />
+        </div>
         <SalesTable
           data={ventasNoPagadas}
+          searchText={searchText}
           onUpdateTotalAmount={onUpdateNoPagadasTotal}
           onDeleteProduct={(key, id) => {
             onDeleteOneSale(id);
@@ -83,6 +95,7 @@ const SalesSection: React.FC<Props> = ({
         </h4>
         <SalesTable
           data={salesData}
+          searchText={searchText}
           onUpdateTotalAmount={onUpdateHistorialTotal}
           onDeleteProduct={() => {}}
           onUpdateProduct={() => {}}

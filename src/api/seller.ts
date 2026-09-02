@@ -7,6 +7,7 @@ export const getSellersAPI = async (params?: {
     status?: "activo" | "debe_renovar" | "ya_no_es_cliente" | "declinando_servicio";
     pendingPayment?: "con_deuda" | "sin_deuda";
     assignedPaymentDay?: "sin_solicitud" | "8" | "18" | "28";
+    assignedPaymentDate?: string;
     sortBy?: "nombre" | "estado" | "pago_pendiente" | "fecha_vigencia" | "fecha_pago_asignada" | "pago_mensual" | "comision_porcentual" | "emite_factura";
     sortOrder?: "asc" | "desc";
     page?: number;
@@ -18,6 +19,16 @@ export const getSellersAPI = async (params?: {
     } catch (error) {
         parseError(error as AxiosError)
     }
+}
+
+export const getSellerPaymentLimitAPI = async () => {
+    const res = await apiClient.get(`/seller/payment-limit`)
+    return res.data
+}
+
+export const updateSellerPaymentLimitAPI = async (limit: number) => {
+    const res = await apiClient.put(`/seller/payment-limit`, { limit })
+    return res.data
 }
 
 export const renewSellerAPI = async (id: string | number, data: any) => {

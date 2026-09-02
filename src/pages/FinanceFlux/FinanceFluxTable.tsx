@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getFinancesFluxAPI } from "../../api/financeFlux";
 import { FLUX_TYPES } from "../../constants/fluxes";
 import ServiceDetailDrawer from "./ServiceDetailDrawer";
+import { includesNormalized } from "../../utils/search";
 
 const { RangePicker } = DatePicker;
 
@@ -82,21 +83,15 @@ function FinanceFluxTable({ refreshKey, onEdit, onRefresh }: any) {
 
         const matchesVendedor =
           !searchVendedor ||
-          financeFlux.vendedor
-            .toLowerCase()
-            .includes(searchVendedor.toLowerCase());
+          includesNormalized(financeFlux.vendedor, searchVendedor);
 
         const matchesCategoria =
           !searchCategoria ||
-          financeFlux.categoria
-            .toLowerCase()
-            .includes(searchCategoria.toLowerCase());
+          includesNormalized(financeFlux.categoria, searchCategoria);
 
         const matchesConcepto =
           !searchConcepto ||
-          financeFlux.concepto
-            .toLowerCase()
-            .includes(searchConcepto.toLowerCase());
+          includesNormalized(financeFlux.concepto, searchConcepto);
 
         return (
           matchesType &&

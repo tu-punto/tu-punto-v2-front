@@ -284,6 +284,38 @@ export const deleteSuperadminVariantAPI = async (payload: {
     }
 };
 
+export const duplicateSuperadminVariantAPI = async (payload: {
+    productId: string;
+    sellerId: string;
+    sourceVariantKey: string;
+    sucursalId?: string;
+    scope: "branch" | "all";
+    variantAttributes: Record<string, string>;
+    price?: number;
+    stock?: number;
+}) => {
+    try {
+        const res = await apiClient.post("/product/superadmin/variant-duplicate", payload);
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
+export const deleteSellerVariantAPI = async (payload: {
+    productId: string;
+    variantKey: string;
+    sucursalId?: string;
+    scope: "branch" | "all";
+}) => {
+    try {
+        const res = await apiClient.delete("/product/seller/variant", { data: payload });
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
 export const updateVariantExtrasBySellerAPI = async ({
     productId,
     sucursalId,

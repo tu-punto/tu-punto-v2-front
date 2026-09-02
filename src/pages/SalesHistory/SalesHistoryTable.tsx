@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
-import { Table, DatePicker, message, Tag } from "antd";
+import { useState, useEffect, useMemo } from "react";
+import { Table, DatePicker, message, Tag, Input, Space } from "antd";
 import dayjs from "dayjs";
 import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
 import { getShippingByIdAPI } from "../../api/shipping";
 import { getExternalSaleByIdAPI } from "../../api/externalSale";
 import ModalSalesHistory from "./ModalSalesHistory";
 import ExternalShippingInfoModal from "../Shipping/ExternalShippingInfoModal";
+import { includesNormalized } from "../../utils/search";
 
 const SalesHistoryTable = () => {
     const [sales, setSales] = useState([]);
     const [totales, setTotales] = useState({ efectivo: 0, qr: 0 });
     const [selectedDate, setSelectedDate] = useState(dayjs());
+    const [productFilter, setProductFilter] = useState("");
     const [loading, setLoading] = useState(false);
 
     const sucursalId = localStorage.getItem("sucursalId");
@@ -79,11 +81,20 @@ const SalesHistoryTable = () => {
     useEffect(() => {
         fetchSales();
     }, [selectedDate]);
+    const normalizedProductFilter = productFilter.trim().toLowerCase();
+
+    const filteredSales = useMemo(() => {
+        if (!normalizedProductFilter) return sales;
+        return sales.filter((row: any) =>
+            includesNormalized(row?.busqueda_global || row?.productos_busqueda, normalizedProductFilter)
+        );
+    }, [normalizedProductFilter, sales]);
+
     const getGroupedData = () => {
-        if (selectedDate) return sales;
+        if (selectedDate) return filteredSales;
 
         const grouped: Record<string, any[]> = {};
-        sales.forEach(item => {
+        filteredSales.forEach(item => {
             const fecha = dayjs(item.fecha).add(4, "hour").format("DD/MM/YYYY");
             if (!grouped[fecha]) grouped[fecha] = [];
             grouped[fecha].push(item);
@@ -189,7 +200,7 @@ const SalesHistoryTable = () => {
 
     return (
         <>
-            <div className="flex justify-center mb-6">
+            <Space className="mb-6 w-full flex-wrap justify-center" align="center">
                 <DatePicker
                     value={selectedDate}
                     onChange={(v) => setSelectedDate(v)}
@@ -197,7 +208,14 @@ const SalesHistoryTable = () => {
                     format="DD/MM/YYYY"
                     className="rounded-md px-3 py-2 shadow border border-gray-300"
                 />
-            </div>
+                <Input.Search
+                    allowClear
+                    value={productFilter}
+                    onChange={(e) => setProductFilter(e.target.value)}
+                    placeholder="Filtrar por producto"
+                    style={{ width: 280 }}
+                />
+            </Space>
 
             <div className="w-full max-w-4xl mx-auto border border-gray-300 rounded-xl px-6 py-4 bg-white mb-8 shadow-sm">
                 <div className="flex flex-wrap justify-center items-center gap-8 text-lg font-semibold text-gray-700 text-center">

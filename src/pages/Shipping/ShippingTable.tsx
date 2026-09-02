@@ -22,6 +22,7 @@ import {
     resolvePickupStatus,
 } from "./shippingStatus";
 import moment from "moment-timezone";
+import { includesNormalized } from "../../utils/search";
 
 const { Option } = Select;
 const EXTERNAL_VENDOR_FILTER = "__EXTERNO__";
@@ -815,7 +816,7 @@ const ShippingTable = ({
                 pedido.telefono_cliente,
                 pedido.carnet_cliente,
                 pedido.numero_guia,
-            ].some((value: any) => String(value || "").toLowerCase().includes(searchValue));
+            ].some((value: any) => includesNormalized(value, searchValue));
 
             return matchesLocation && matchesDateRange && matchesVendedor && matchesCliente;
         });
@@ -1371,17 +1372,7 @@ const ShippingTable = ({
                             }}
                             allowClear
                             showSearch
-                            filterOption={(input, option) => {
-                                const label =
-                                    (option?.children ??
-                                        // por si en algún momento usas `options` en vez de `<Option>`
-                                        (option as any)?.label ??
-                                        "");
-
-                                return String(label)
-                                    .toLowerCase()
-                                    .includes(input.toLowerCase());
-                            }}
+                            filterOption={(input, option) => includesNormalized(option?.children ?? (option as any)?.label, input)}
                         >
                             {hasExternalInCurrentStatus() && (
                                 <Option value={EXTERNAL_VENDOR_FILTER}>Externo</Option>

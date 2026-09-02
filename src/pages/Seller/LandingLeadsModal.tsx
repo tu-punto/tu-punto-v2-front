@@ -3,6 +3,7 @@ import { MessageOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { getLandingLeadsAPI, updateLandingLeadContactStatusAPI } from "../../api/landingLeads";
+import { includesNormalized } from "../../utils/search";
 
 type LandingLeadRow = {
   _id: string;
@@ -17,8 +18,6 @@ type LandingLeadRow = {
   contactado_at?: string;
   createdAt: string;
 };
-
-const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
 
 const normalizeWhatsappPhone = (value: unknown) => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -75,16 +74,11 @@ export default function LandingLeadsModal({
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
-    const query = normalizeText(searchText);
-
     return leads.filter((lead) => {
       if (statusFilter === "nuevos" && lead.contactado) return false;
       if (statusFilter === "contactados" && !lead.contactado) return false;
       if (cityFilter !== "todas" && String(lead.ciudad || "").trim() !== cityFilter) return false;
-      if (!query) return true;
-
-      const haystack = `${lead.nombre} ${lead.telefono}`.toLowerCase();
-      return haystack.includes(query);
+      return includesNormalized(`${lead.nombre} ${lead.telefono}`, searchText);
     });
   }, [cityFilter, leads, searchText, statusFilter]);
 

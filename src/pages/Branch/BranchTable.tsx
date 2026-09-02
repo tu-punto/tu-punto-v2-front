@@ -201,7 +201,7 @@ const BranchTable: React.FC<BranchTableProps> = ({
       />
       {showGuideModal && (
         <Modal 
-          title='Guías de Envío'
+          title='Guías y listas de ingresos'
           footer={false} 
           open={showGuideModal}
           width={1000}

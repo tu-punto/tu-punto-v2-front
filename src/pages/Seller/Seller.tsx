@@ -1,16 +1,19 @@
 import { Badge, Button, message, Modal } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { autoRenewSellersAPI, getSellersAPI } from "../../api/seller";
 import "./SellerTable.css";
 import LandingLeadsModal from "./LandingLeadsModal";
 import { getLandingLeadsAPI } from "../../api/landingLeads";
 import DeclineResponsesModal from "./DeclineResponsesModal";
+import { UserContext } from "../../context/userContext";
+import { isSuperadminUser } from "../../utils/role";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
 }) => {
+  const { user } = useContext(UserContext) || {};
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [autoRenewing, setAutoRenewing] = useState(false);
@@ -102,6 +105,11 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         </div>
 
         <div className="seller-page-actions flex gap-2">
+          {isSuperadminUser(user) && (
+            <Button onClick={() => window.dispatchEvent(new Event("tp-open-payment-limit"))} className="text-mobile-sm xl:text-desktop-sm">
+              Configurar limite de pagos
+            </Button>
+          )}
           <Button
             onClick={() => setDeclineResponsesOpen(true)}
             className="text-mobile-sm xl:text-desktop-sm"

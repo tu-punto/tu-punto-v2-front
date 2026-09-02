@@ -3,18 +3,37 @@ import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import PromotionPrice from "../../components/PromotionPrice";
 
-const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin,readonly = false, }: any) => {
+const getSellerBranchCommission = (seller: any, branchId?: string) => {
+    const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
+    const branch = Array.isArray(seller?.pago_sucursales)
+        ? seller.pago_sucursales.find((item: any) => String(item?.id_sucursal?._id || item?.id_sucursal || "").trim() === String(branchId || "").trim())
+        : null;
+
+    if (useBranchCommission && branch) {
+        return {
+            percent: Number(branch?.comision_porcentual || 0),
+            fixed: Number(branch?.comision_fija || 0),
+        };
+    }
+
+    return {
+        percent: Number(seller?.comision_porcentual || 0),
+        fixed: Number(seller?.comision_fija || 0),
+    };
+};
+
+const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin, branchId, readonly = false, }: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
 
     useEffect(() => {
         const withUtilidades = products.map((product: any) => {
             const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
-            const comision = Number(vendedor?.comision_porcentual || 0);
+            const branchCommission = getSellerBranchCommission(vendedor, branchId);
             const cantidad = Number(product.cantidad || 0);
             const precio = Number(product.precio_unitario || 0);
             const utilidadCalculada = applySellerCommissionCap(
                 product.id_vendedor,
-                parseFloat(((precio * cantidad * comision) / 100).toFixed(2))
+                parseFloat((((precio * cantidad * branchCommission.percent) / 100) + branchCommission.fixed).toFixed(2))
             );
 
             return {

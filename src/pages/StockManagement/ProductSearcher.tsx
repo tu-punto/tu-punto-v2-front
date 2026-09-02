@@ -5,6 +5,7 @@ import { getCategoriesAPI } from '../../api/category';
 import { getSucursalsAPI } from '../../api/sucursal';
 import { Option } from 'antd/es/mentions';
 import { getFeaturesAPI } from '../../api/feature';
+import { includesNormalized } from '../../utils/search';
 const { Panel } = Collapse;
 
 const ProductSearcher = ( {applySearcher} ) => {
@@ -77,8 +78,7 @@ const ProductSearcher = ( {applySearcher} ) => {
                         <Col xs={24} sm={12} lg={8}>
                         <Form.Item name="category" label="Categoría">
                             <Select showSearch placeholder="Selecciona una categoría"
-                                    filterOption={(input, option: any) =>
-                                        option.key.toLocaleLowerCase().includes(input.toLocaleLowerCase())}
+                                    filterOption={(input, option: any) => includesNormalized(option?.key, input)}
                                     >
                                 {
                                     cateogries.map((category) => (
@@ -96,8 +96,7 @@ const ProductSearcher = ( {applySearcher} ) => {
                         <Col xs={24} sm={12} lg={8}>
                         <Form.Item name="sucursal" label="Sucursal">
                             <Select showSearch placeholder="Selecciona una sucursal"
-                                    filterOption={(input, option: any) =>
-                                        option.key.toLocaleLowerCase().includes(input.toLocaleLowerCase())}
+                                    filterOption={(input, option: any) => includesNormalized(option?.key, input)}
                             >
                                 {
                                     sucursals.map((sucursal) => (
@@ -141,9 +140,8 @@ const ProductSearcher = ( {applySearcher} ) => {
                                     newAttributes[index].key = value;
                                     setAttributes(newAttributes);
                                 }}
-                                filterOption={(input, option: any) =>
-                                    option.value.toLocaleLowerCase().includes(input.toLocaleLowerCase())}
-                                >
+                                 filterOption={(input, option: any) => includesNormalized(option?.value, input)}
+                                 >
                                     {
                                         available.map((feature, index) => (
                                             <Option key={index} 

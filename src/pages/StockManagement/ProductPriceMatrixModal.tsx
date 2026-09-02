@@ -1,6 +1,7 @@
 import { Button, Input, InputNumber, Modal, Space, Table, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { updateProductPriceAPI } from '../../api/product';
+import { includesNormalized } from '../../utils/search';
 
 const PRICE_MATRIX_PAGE_SIZE = 25;
 
@@ -139,9 +140,7 @@ const ProductPriceMatrixModal = ({
     const hasRows = rows.length > 0;
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
     const filteredRows = useMemo(() => {
-        if (!normalizedSearchTerm) return rows;
-
-        return rows.filter((row) => row.label.toLowerCase().includes(normalizedSearchTerm));
+        return rows.filter((row) => includesNormalized(row.label, normalizedSearchTerm));
     }, [normalizedSearchTerm, rows]);
     const visibleRowKeys = useMemo(() => new Set(filteredRows.map((row) => row.key)), [filteredRows]);
     const hasVisibleRows = filteredRows.length > 0;
