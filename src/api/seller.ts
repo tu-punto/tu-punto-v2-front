@@ -6,6 +6,8 @@ export const getSellersAPI = async (params?: {
     q?: string;
     status?: "activo" | "debe_renovar" | "ya_no_es_cliente" | "declinando_servicio";
     pendingPayment?: "con_deuda" | "sin_deuda";
+    branchIds?: string[];
+    serviceTypes?: Array<"alquiler" | "exhibicion" | "entrega_simple">;
     assignedPaymentDay?: "sin_solicitud" | "8" | "18" | "28";
     assignedPaymentDate?: string;
     sortBy?: "nombre" | "estado" | "pago_pendiente" | "fecha_vigencia" | "fecha_pago_asignada" | "pago_mensual" | "comision_porcentual" | "emite_factura";
@@ -14,7 +16,13 @@ export const getSellersAPI = async (params?: {
     pageSize?: number;
 }) => {
     try {
-        const res = await apiClient.get(`/seller`, { params })
+        const res = await apiClient.get(`/seller`, {
+            params: {
+                ...params,
+                branchIds: params?.branchIds?.length ? params.branchIds.join(",") : undefined,
+                serviceTypes: params?.serviceTypes?.length ? params.serviceTypes.join(",") : undefined,
+            }
+        })
         return res.data
     } catch (error) {
         parseError(error as AxiosError)
