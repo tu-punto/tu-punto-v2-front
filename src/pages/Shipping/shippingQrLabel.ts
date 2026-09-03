@@ -98,14 +98,19 @@ export const buildDirectShippingLabelImageData = async (params: {
   const leftWidthPx = Math.max(44, Math.round(innerWidthPx * 0.4));
   const rightWidthPx = Math.max(44, innerWidthPx - leftWidthPx);
   const codeFontPx = Math.round(26 * sizeScale);
-  const detailFontPx = Math.round(13.2 * sizeScale);
+  const phoneFontPx = Math.round(20 * sizeScale);
+  const nameFontPx = Math.round(16 * sizeScale);
   const codeLineHeight = mmToPx(6.2 * sizeScale);
-  const detailLineHeight = mmToPx(4.8 * sizeScale);
+  const phoneLineHeight = mmToPx(5.4 * sizeScale);
+  const nameLineHeight = mmToPx(4.6 * sizeScale);
 
   const guideNumber = cleanLabelValue(params.guideNumber, "Sin guia");
   const clientPhone = cleanLabelValue(params.clientPhone);
   const clientName = cleanLabelValue(params.clientName);
-  const details = [clientPhone ? `T: ${clientPhone}` : "", clientName ? `N: ${clientName}` : ""].filter(Boolean);
+  const detailItems = [
+    clientPhone ? { text: `T: ${clientPhone}`, fontPx: phoneFontPx, lineHeight: phoneLineHeight } : null,
+    clientName ? { text: `N: ${clientName}`, fontPx: nameFontPx, lineHeight: nameLineHeight } : null,
+  ].filter(Boolean) as Array<{ text: string; fontPx: number; lineHeight: number }>;
 
   const measureCanvas = document.createElement("canvas");
   const measureCtx = measureCanvas.getContext("2d");
@@ -116,11 +121,16 @@ export const buildDirectShippingLabelImageData = async (params: {
   const codeLines = codeParts
     ? [codeParts[1].toUpperCase(), codeParts[2]]
     : wrapByWidth(measureCtx, guideNumber, leftWidthPx).slice(0, 2);
-  measureCtx.font = `bold ${detailFontPx}px Arial`;
-  const detailLines = details.flatMap((line) => wrapByWidth(measureCtx, line, rightWidthPx)).slice(0, 3);
+  const detailLines = detailItems.flatMap((item) => {
+    measureCtx.font = `bold ${item.fontPx}px Arial`;
+    return wrapByWidth(measureCtx, item.text, rightWidthPx).map((line) => ({
+      ...item,
+      text: line,
+    }));
+  }).slice(0, 3);
   const verticalPaddingPx = mmToPx(0.85 * sizeScale);
   const codeBlockHeight = codeLines.length * codeLineHeight;
-  const detailBlockHeight = detailLines.length * detailLineHeight;
+  const detailBlockHeight = detailLines.reduce((sum, item) => sum + item.lineHeight, 0);
   const heightPx = Math.max(mmToPx(20), Math.max(codeBlockHeight, detailBlockHeight) + verticalPaddingPx * 2 + mmToPx(1.2));
 
   const canvas = document.createElement("canvas");
@@ -134,7 +144,7 @@ export const buildDirectShippingLabelImageData = async (params: {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const codeStartY = verticalPaddingPx + Math.round(codeLineHeight * 0.86);
-  const detailStartY = verticalPaddingPx + Math.round(detailLineHeight * 0.94);
+  const detailStartY = verticalPaddingPx + mmToPx(0.8 * sizeScale);
   const leftCenterX = sidePaddingPx + leftWidthPx / 2;
   const rightStartX = sidePaddingPx + leftWidthPx + columnGapPx;
   ctx.fillStyle = "#111111";
@@ -144,9 +154,11 @@ export const buildDirectShippingLabelImageData = async (params: {
     ctx.fillText(line, leftCenterX, codeStartY + index * codeLineHeight);
   });
   ctx.textAlign = "left";
-  detailLines.forEach((line, index) => {
-    ctx.font = `bold ${detailFontPx}px Arial`;
-    ctx.fillText(line, rightStartX, detailStartY + index * detailLineHeight);
+  let currentDetailY = detailStartY;
+  detailLines.forEach((item) => {
+    ctx.font = `bold ${item.fontPx}px Arial`;
+    ctx.fillText(item.text, rightStartX, currentDetailY + item.lineHeight * 0.9);
+    currentDetailY += item.lineHeight;
   });
 
   return {
