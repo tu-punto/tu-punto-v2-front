@@ -92,14 +92,15 @@ export const buildDirectShippingLabelImageData = async (params: {
   const sizeScale = clamp(qrSizeMm / 16, 0.96, 1.28);
 
   const widthPx = mmToPx(ticketWidthMm);
-  const sidePaddingPx = mmToPx(ticketWidthMm <= 40 ? 0.9 : 1.15);
+  const sidePaddingPx = mmToPx(ticketWidthMm <= 40 ? 0.8 : 1.05);
   const columnGapPx = mmToPx(1.1);
-  const leftWidthPx = Math.max(40, Math.round((widthPx - sidePaddingPx * 2 - columnGapPx) * 0.48));
-  const rightWidthPx = Math.max(34, widthPx - sidePaddingPx * 2 - columnGapPx - leftWidthPx);
-  const codeFontPx = Math.round(24 * sizeScale);
-  const detailFontPx = Math.round(11.8 * sizeScale);
-  const codeLineHeight = mmToPx(6.3 * sizeScale);
-  const detailLineHeight = mmToPx(4.2 * sizeScale);
+  const innerWidthPx = widthPx - sidePaddingPx * 2 - columnGapPx;
+  const leftWidthPx = Math.max(44, Math.round(innerWidthPx * 0.4));
+  const rightWidthPx = Math.max(44, innerWidthPx - leftWidthPx);
+  const codeFontPx = Math.round(26 * sizeScale);
+  const detailFontPx = Math.round(13.2 * sizeScale);
+  const codeLineHeight = mmToPx(6.2 * sizeScale);
+  const detailLineHeight = mmToPx(4.8 * sizeScale);
 
   const guideNumber = cleanLabelValue(params.guideNumber, "Sin guia");
   const clientPhone = cleanLabelValue(params.clientPhone);
@@ -110,8 +111,11 @@ export const buildDirectShippingLabelImageData = async (params: {
   const measureCtx = measureCanvas.getContext("2d");
   if (!measureCtx) throw new Error("No se pudo inicializar canvas");
 
+  const codeParts = guideNumber.match(/^([A-Z]+-)(\d+-?.*)$/i);
   measureCtx.font = `bold ${codeFontPx}px Arial`;
-  const codeLines = wrapByWidth(measureCtx, guideNumber, leftWidthPx).slice(0, 2);
+  const codeLines = codeParts
+    ? [codeParts[1].toUpperCase(), codeParts[2]]
+    : wrapByWidth(measureCtx, guideNumber, leftWidthPx).slice(0, 2);
   measureCtx.font = `bold ${detailFontPx}px Arial`;
   const detailLines = details.flatMap((line) => wrapByWidth(measureCtx, line, rightWidthPx)).slice(0, 3);
   const verticalPaddingPx = mmToPx(0.85 * sizeScale);
@@ -130,7 +134,7 @@ export const buildDirectShippingLabelImageData = async (params: {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const codeStartY = verticalPaddingPx + Math.round(codeLineHeight * 0.86);
-  const detailStartY = verticalPaddingPx + Math.round(detailLineHeight * 0.92);
+  const detailStartY = verticalPaddingPx + Math.round(detailLineHeight * 0.94);
   const leftCenterX = sidePaddingPx + leftWidthPx / 2;
   const rightStartX = sidePaddingPx + leftWidthPx + columnGapPx;
   ctx.fillStyle = "#111111";
