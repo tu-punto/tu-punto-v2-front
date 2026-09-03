@@ -9,6 +9,7 @@ import { getLandingLeadsAPI } from "../../api/landingLeads";
 import DeclineResponsesModal from "./DeclineResponsesModal";
 import { UserContext } from "../../context/userContext";
 import { isSuperadminUser } from "../../utils/role";
+import dayjs from "dayjs";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -30,6 +31,22 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   });
   const [alertModal, setAlertModal] = useState<{ title: string; rows: any[] } | null>(null);
 
+  const isActiveSellerForAlert = (seller: any) => {
+    const fechaVigencia = dayjs(seller?.fecha_vigencia);
+    if (!fechaVigencia.isValid()) return false;
+
+    const today = dayjs().startOf("day");
+    const declinacion = seller?.declinacion_servicio_fecha ? dayjs(seller.declinacion_servicio_fecha) : null;
+    if (declinacion?.isValid()) {
+      const retiroHasta = fechaVigencia.endOf("day").add(5, "day");
+      if (!today.isAfter(retiroHasta)) return true;
+      return false;
+    }
+
+    const diasVencido = today.diff(fechaVigencia.endOf("day"), "day");
+    return diasVencido <= 20;
+  };
+
   const refreshLeadCounter = async () => {
     setLeadCounterLoading(true);
     try {
@@ -48,7 +65,9 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
       const response = await getSellersAPI();
       const rows = Array.isArray(response) ? response : Array.isArray((response as any)?.data) ? (response as any).data : [];
       setDeclineResponsesCount(rows.filter((row: any) => Boolean(row?.declinacion_servicio_fecha)).length);
-      setNoSalesSellers(rows.filter((row: any) => Number(row?.activity_last_30_days_count || 0) === 0));
+      setNoSalesSellers(
+        rows.filter((row: any) => isActiveSellerForAlert(row) && Number(row?.activity_last_30_days_count || 0) === 0)
+      );
       setDebtAlertSellers(
         rows.filter((row: any) => {
           const pagoMensual = Number(row?.pago_mensual || 0);
