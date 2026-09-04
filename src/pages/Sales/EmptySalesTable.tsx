@@ -1,4 +1,4 @@
-import { Button, InputNumber, Table } from "antd";
+import { Button, InputNumber, Popover, Space, Table, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import PromotionPrice from "../../components/PromotionPrice";
@@ -22,7 +22,19 @@ const getSellerBranchCommission = (seller: any, branchId?: string) => {
     };
 };
 
-const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handleValueChange, sellers, isAdmin, branchId, readonly = false, }: any) => {
+const formatMoney = (value: number) => `Bs. ${Number(value || 0).toFixed(2)}`;
+
+const EmptySalesTable = ({
+    products,
+    onDeleteProduct,
+    onUpdateTotalAmount,
+    handleValueChange,
+    onConditionalPromotionDecision,
+    sellers,
+    isAdmin,
+    branchId,
+    readonly = false,
+}: any) => {
     const [updatedProducts, setUpdatedProducts] = useState(products);
 
     useEffect(() => {
@@ -93,24 +105,57 @@ const EmptySalesTable = ({ products, onDeleteProduct, onUpdateTotalAmount, handl
             key: 'precio_unitario',
             render: (_: any, record: any) =>
                 readonly ? (
-                    <PromotionPrice
-                        price={record.precio_unitario}
-                        basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
-                        promotion={record.pricingPromotion}
-                        quantity={record.cantidad}
-                        compact
-                        showTierBadge
-                    />
+                    <Space direction="vertical" size={4}>
+                        <Typography.Text strong>{formatMoney(record.precio_unitario)}</Typography.Text>
+                        {record.pricingPromotion?.pricingMode === "conditional" && (
+                          <Tag color={record.promoAccepted ? "green" : "magenta"} bordered={false}>
+                            {record.promoAccepted ? "Promo aplicada" : "Promo"}
+                          </Tag>
+                        )}
+                    </Space>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <PromotionPrice
-                            price={record.precio_unitario}
-                            basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
-                            promotion={record.pricingPromotion}
-                            quantity={record.cantidad}
-                            compact
-                            showTierBadge
-                        />
+                        {record.pricingPromotion?.pricingMode === "conditional" && (
+                          <>
+                            <Typography.Text strong>{formatMoney(record.precio_unitario)}</Typography.Text>
+                            <Popover
+                              trigger={["hover", "click"]}
+                              placement="topLeft"
+                              content={
+                                <div style={{ minWidth: 220 }}>
+                                  <Typography.Text strong style={{ display: "block", marginBottom: 8 }}>
+                                    Promocion condicional
+                                  </Typography.Text>
+                                  <Typography.Text style={{ fontSize: 12, display: "block", marginBottom: 12 }}>
+                                    {record.pricingPromotion?.conditionalQuestion || "Confirma si aplica la promo."}
+                                  </Typography.Text>
+                                  <Space>
+                                    <Button type="primary" size="small" onClick={() => onConditionalPromotionDecision?.(record.key, true)}>
+                                      Si aplica
+                                    </Button>
+                                    <Button size="small" onClick={() => onConditionalPromotionDecision?.(record.key, false)}>
+                                      No aplica
+                                    </Button>
+                                  </Space>
+                                </div>
+                              }
+                            >
+                              <Tag color={record.promoAccepted ? "green" : "magenta"} bordered={false} style={{ width: "fit-content", cursor: "pointer" }}>
+                                {record.promoAccepted ? "Promo aplicada" : "Promo"}
+                              </Tag>
+                            </Popover>
+                          </>
+                        )}
+                        {record.pricingPromotion?.pricingMode !== "conditional" && (
+                          <PromotionPrice
+                              price={record.precio_unitario}
+                              basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                              promotion={record.pricingPromotion}
+                              quantity={record.cantidad}
+                              compact
+                              showTierBadge
+                          />
+                        )}
                         <InputNumber
                             min={0}
                             value={record.precio_unitario}

@@ -97,6 +97,21 @@ export const Sales = () => {
       product?.precio_original ?? product?.originalPrice ?? product?.basePrice ?? product?.precio ?? 0
     );
     const promotion = product?.pricingPromotion || product?.promotionPricing || null;
+    if (promotion?.pricingMode === "conditional") {
+      const simplePrice = Number(promotion?.simplePrice ?? basePrice ?? 0);
+      const accepted = Boolean(product?.promoAccepted);
+      return {
+        basePrice,
+        unitPrice: accepted ? simplePrice : basePrice,
+        promotion,
+        pricing: {
+          basePrice,
+          effectivePrice: accepted ? simplePrice : basePrice,
+          conditionalQuestion: promotion?.conditionalQuestion || null,
+          conditionalAccepted: accepted,
+        }
+      };
+    }
     const pricing = resolvePromotionPricing(basePrice, promotion, quantity);
 
     return {
@@ -104,6 +119,37 @@ export const Sales = () => {
       unitPrice: pricing.effectivePrice,
       promotion,
       pricing
+    };
+  };
+
+  const applyConditionalPromotion = (item: any, accepted: boolean) => {
+    const promotion = item?.pricingPromotion;
+    if (!promotion || promotion?.pricingMode !== "conditional") return item;
+
+    const basePrice = Number(item?.precio_original ?? item?.originalPrice ?? item?.basePrice ?? item?.precio ?? item?.precio_unitario ?? 0);
+    const promoPrice = Number(promotion?.simplePrice ?? basePrice ?? 0);
+    const nextPrecio = accepted ? promoPrice : basePrice;
+    const cantidad = Number(item?.cantidad || 0);
+    const vendedor = sellers.find((v: any) => String(v._id) === String(item?.id_vendedor));
+    const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
+    const utilidad = applySellerCommissionCap(
+      item?.id_vendedor,
+      parseFloat((((nextPrecio * cantidad * branchCommission.percent) / 100) + branchCommission.fixed).toFixed(2))
+    );
+
+    return {
+      ...item,
+      promoAccepted: accepted,
+      precio_unitario: nextPrecio,
+      precio_original: basePrice,
+      utilidad,
+      pricingPromotion: accepted
+        ? {
+            ...promotion,
+            conditionalAccepted: accepted,
+            effectivePrice: nextPrecio,
+          }
+        : null,
     };
   };
 
@@ -450,6 +496,11 @@ export const Sales = () => {
       const cantidad = 1;
       const pricing = getSalePricing(product, cantidad);
       const precio = pricing.unitPrice;
+      const isConditional = pricing.promotion?.pricingMode === "conditional";
+      const conditionalAccepted = isConditional ? Boolean(product?.promoAccepted) : false;
+      const pricingPromotion = isConditional
+        ? (conditionalAccepted ? { ...pricing.promotion, conditionalAccepted: true, effectivePrice: precio } : null)
+        : pricing.promotion;
       const vendedor = sellers.find((v: any) => v._id === product.id_vendedor);
       const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
       const utilidad = applySellerCommissionCap(
@@ -464,7 +515,8 @@ export const Sales = () => {
           cantidad,
           precio_unitario: precio,
           precio_original: pricing.basePrice,
-          pricingPromotion: pricing.promotion,
+          pricingPromotion,
+          promoAccepted: isConditional ? conditionalAccepted : Boolean(pricing.promotion),
           utilidad,
         }
       ];
@@ -497,6 +549,7 @@ export const Sales = () => {
     setSelectedProducts((prev: any[]) => {
       return prev.map((p) => {
         if (p.key !== key) return p;
+        const isConditional = p.pricingPromotion?.pricingMode === "conditional";
         const updated = {
           ...p,
           [field]: field === 'utilidad'
@@ -505,9 +558,16 @@ export const Sales = () => {
         };
 
         if (field === 'cantidad') {
-          const pricing = getSalePricing(updated, value);
-          updated.precio_original = pricing.basePrice;
-          updated.precio_unitario = pricing.unitPrice;
+          if (isConditional) {
+            const basePrice = Number(updated.precio_original ?? updated.precio_unitario ?? 0);
+            const promoPrice = Number(updated.pricingPromotion?.simplePrice ?? basePrice);
+            updated.precio_original = basePrice;
+            updated.precio_unitario = updated.promoAccepted ? promoPrice : basePrice;
+          } else {
+            const pricing = getSalePricing(updated, value);
+            updated.precio_original = pricing.basePrice;
+            updated.precio_unitario = pricing.unitPrice;
+          }
         }
 
         if (field === 'cantidad' || field === 'precio_unitario') {
@@ -534,6 +594,7 @@ export const Sales = () => {
     const cantidadSolicitada = Number(newProduct.cantidad || 1);
     const pricing = getSalePricing(newProduct, cantidadSolicitada);
     const precio = Number(newProduct.precio_unitario ?? pricing.unitPrice ?? 0);
+    const isConditional = pricing.promotion?.pricingMode === "conditional";
     const stockActual = Number(newProduct.stockActual ?? newProduct.stock ?? 0);
     const stableKey = String(
       newProduct.key ||
@@ -566,9 +627,14 @@ export const Sales = () => {
         const existingPricing = getSalePricing(existing, nextCantidad);
         existing.precio_original = existingPricing.basePrice;
         existing.pricingPromotion = existing.pricingPromotion || pricing.promotion || newProduct.pricingPromotion || null;
-        const effectivePrecio = existing.pricingPromotion
-          ? existingPricing.unitPrice
-          : precio;
+        let effectivePrecio = precio;
+        if (existing.pricingPromotion?.pricingMode === "conditional") {
+          effectivePrecio = existing.promoAccepted
+            ? Number(existing.pricingPromotion?.simplePrice ?? existing.precio_original ?? 0)
+            : Number(existing.precio_original ?? stockActual ?? 0);
+        } else if (existing.pricingPromotion) {
+          effectivePrecio = existingPricing.unitPrice;
+        }
         existing.precio_unitario = effectivePrecio;
         existing.utilidad = applySellerCommissionCap(
           existing.id_vendedor,
@@ -579,24 +645,38 @@ export const Sales = () => {
       }
 
       const effectivePrecio = newProduct.pricingPromotion ? pricing.unitPrice : precio;
+      const nextPrecio = isConditional ? precio : effectivePrecio;
       const utilidad = applySellerCommissionCap(
         newProduct.id_vendedor,
-        parseFloat(((effectivePrecio * cantidadSolicitada * comision) / 100).toFixed(2))
+        parseFloat(((nextPrecio * cantidadSolicitada * comision) / 100).toFixed(2))
       );
+      const conditionalAccepted = isConditional ? Boolean(newProduct.promoAccepted) : false;
       return [
         ...prevProducts,
         {
           ...newProduct,
           key: stableKey,
           cantidad: cantidadSolicitada,
-          precio_unitario: effectivePrecio,
+          precio_unitario: nextPrecio,
           precio_original: pricing.basePrice,
-          pricingPromotion: newProduct.pricingPromotion || pricing.promotion,
+          pricingPromotion: isConditional
+            ? (conditionalAccepted ? { ...(newProduct.pricingPromotion || pricing.promotion), conditionalAccepted: true, effectivePrice: nextPrecio } : null)
+            : (newProduct.pricingPromotion || pricing.promotion),
+          promoAccepted: isConditional ? conditionalAccepted : Boolean(newProduct.pricingPromotion || pricing.promotion),
           utilidad,
           stockActual
         }
       ];
     });
+  };
+
+  const handleConditionalPromotionDecision = (key: string, accepted: boolean) => {
+    setSelectedProducts((prevProducts: any[]) =>
+      prevProducts.map((product: any) => {
+        if (product.key !== key) return product;
+        return applyConditionalPromotion(product, accepted);
+      })
+    );
   };
   //console.log("🚀 Productos pasados a ProductTable", handleProductSelect);
 
@@ -775,15 +855,16 @@ export const Sales = () => {
             bordered={false}
           >
             <Spin spinning={cartLoading} tip="Cargando carrito...">
-              <EmptySalesTable
-                products={selectedProducts}
-                onDeleteProduct={handleDeleteProduct}
-                handleValueChange={handleEnhancedValueChange}
-                onUpdateTotalAmount={updateTotalAmount}
-                key={refreshKey}
-                sellers={sellers}
-                isAdmin={isAdmin || isOperator}
-                branchId={effectiveSalesBranchId}
+                <EmptySalesTable
+                  products={selectedProducts}
+                  onDeleteProduct={handleDeleteProduct}
+                  handleValueChange={handleEnhancedValueChange}
+                  onConditionalPromotionDecision={handleConditionalPromotionDecision}
+                  onUpdateTotalAmount={updateTotalAmount}
+                  key={refreshKey}
+                  sellers={sellers}
+                  isAdmin={isAdmin || isOperator}
+                  branchId={effectiveSalesBranchId}
               />
             </Spin>
           </Card>

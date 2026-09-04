@@ -361,6 +361,10 @@ function ShippingFormModal({
                         isNaN(utilidad) || utilidad === 1 ? utilidadCalculada : utilidad
                     ),
                     deposito_realizado: false,
+                    pricingPromotion: p.pricingPromotion ?? null,
+                    promoAccepted: Boolean(p.promoAccepted),
+                    promoLabel: p.pricingPromotion?.label || p.pricingPromotion?.title || null,
+                    promoQuestion: p.pricingPromotion?.conditionalQuestion || null,
                     variantes: p.variantes,
                     variantKey: p.variantKey,
                     nombre_variante: `${p.producto}`,

@@ -6,6 +6,9 @@ export type PromotionTier = {
 export type PromotionPricingLike = {
   label?: string | null;
   title?: string | null;
+  pricingMode?: "simple" | "tiers" | "conditional";
+  conditionalQuestion?: string | null;
+  conditionalAccepted?: boolean | null;
   simplePrice?: number | null;
   tiers?: PromotionTier[] | null;
   effectivePrice?: number | null;
@@ -49,6 +52,8 @@ export const resolvePromotionPricing = (
     typeof promotionOrPrice === "number" ? Number(toNumber(promotionOrPrice).toFixed(2)) : null;
   const normalizedBase = Number(toNumber(basePrice || 0).toFixed(2));
   const normalizedTiers = normalizePromotionTiers((promotion?.tiers || []) as PromotionTier[]);
+  const isConditional = promotion?.pricingMode === "conditional" || Boolean(promotion?.conditionalQuestion);
+  const conditionalAccepted = Boolean(promotion?.conditionalAccepted);
   const simplePrice =
     promotion?.simplePrice === undefined || promotion?.simplePrice === null
       ? null
@@ -60,7 +65,7 @@ export const resolvePromotionPricing = (
   const effectivePrice = Number(
     (
       explicitPrice ??
-      matchedTier?.unitPrice ??
+      (isConditional ? (conditionalAccepted ? simplePrice ?? normalizedBase : normalizedBase) : matchedTier?.unitPrice) ??
       simplePrice ??
       promotion?.effectivePrice ??
       normalizedBase
@@ -79,8 +84,11 @@ export const resolvePromotionPricing = (
     tiers: normalizedTiers,
     matchedTier,
     title: String(promotion?.label || promotion?.title || "").trim() || null,
+    conditionalQuestion: String(promotion?.conditionalQuestion || "").trim() || null,
+    conditionalAccepted,
+    pricingMode: promotion?.pricingMode || (isConditional ? "conditional" : normalizedTiers.length > 0 ? "tiers" : "simple"),
     hasPromotion:
       inferredPromotionFromPriceOnly ||
-      (Boolean(promotion) && (normalizedTiers.length > 0 || simplePrice !== null || effectivePrice < normalizedBase))
+      (Boolean(promotion) && (isConditional || normalizedTiers.length > 0 || simplePrice !== null || effectivePrice < normalizedBase))
   };
 };

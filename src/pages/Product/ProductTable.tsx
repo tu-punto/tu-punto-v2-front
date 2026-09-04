@@ -1,4 +1,4 @@
-import { Table , message} from 'antd';
+import { Space, Table, message } from 'antd';
 import { useContext } from 'react';
 import PromotionPrice from '../../components/PromotionPrice';
 import { UserContext } from '../../context/userContext';
@@ -35,13 +35,18 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
             dataIndex: 'precio',
             key: 'precio',
             render: (_: any, record: any) => (
-                <PromotionPrice
-                    price={record.precio}
-                    basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
-                    promotion={record.pricingPromotion}
-                    compact
-                    showTierBadge
-                />
+                <Space direction="vertical" size={4}>
+                    <PromotionPrice
+                        price={record.precio}
+                        basePrice={record.precio_original ?? record.originalPrice ?? record.precio_base}
+                        promotion={record.pricingPromotion}
+                        compact
+                        showTierBadge
+                        onConditionalAccept={(accepted) => {
+                            onSelectProduct(accepted ? { ...record, promoAccepted: true } : record);
+                        }}
+                    />
+                </Space>
             ),
         },
         {
