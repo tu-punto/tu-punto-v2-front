@@ -8,6 +8,7 @@ type Props = {
   quantity?: number;
   compact?: boolean;
   showTierBadge?: boolean;
+  onConditionalAccept?: (accepted: boolean) => void;
 };
 
 const PromotionPrice = ({
@@ -17,10 +18,12 @@ const PromotionPrice = ({
   quantity = 1,
   compact = false,
   showTierBadge = false,
+  onConditionalAccept,
 }: Props) => {
   const pricing = resolvePromotionPricing(basePrice ?? price ?? 0, promotion ?? price ?? null, quantity);
   const showBase = pricing.hasPromotion && pricing.basePrice > pricing.effectivePrice;
   const showScaleBadge = showTierBadge && pricing.tiers.length > 0;
+  const isConditional = pricing.pricingMode === "conditional";
   const matchedTierKey = pricing.matchedTier
     ? `${pricing.matchedTier.minQuantity}-${pricing.matchedTier.unitPrice}`
     : null;
@@ -28,9 +31,27 @@ const PromotionPrice = ({
   const tierPopoverContent = (
     <div style={{ minWidth: 180 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", marginBottom: 8 }}>
-        Escalas de promoción
+        {isConditional ? "Promocion condicional" : "Escalas de promocion"}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {isConditional ? (
+        <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.45 }}>
+          <div style={{ marginBottom: 8 }}>{pricing.conditionalQuestion || "Esta promo requiere confirmacion manual."}</div>
+          <div style={{ fontWeight: 700, color: pricing.conditionalAccepted ? "#0f766e" : "#7c3aed" }}>
+            {pricing.conditionalAccepted ? "Confirmada" : "Pendiente de confirmar"}
+          </div>
+          {onConditionalAccept && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <Tag color="green" bordered={false} style={{ cursor: "pointer" }} onClick={() => onConditionalAccept(true)}>
+                Si
+              </Tag>
+              <Tag color="default" bordered={false} style={{ cursor: "pointer" }} onClick={() => onConditionalAccept(false)}>
+                No
+              </Tag>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {pricing.tiers.map((tier) => {
           const tierKey = `${tier.minQuantity}-${tier.unitPrice}`;
           const isActiveTier = tierKey === matchedTierKey;
@@ -57,8 +78,9 @@ const PromotionPrice = ({
             </div>
           );
         })}
-      </div>
-      {pricing.matchedTier && (
+        </div>
+      )}
+      {!isConditional && pricing.matchedTier && (
         <div style={{ marginTop: 8, fontSize: 11, color: "#0f766e" }}>
           Se aplica con {quantity} unidad{quantity === 1 ? "" : "es"} en el carrito.
         </div>
@@ -96,6 +118,28 @@ const PromotionPrice = ({
               }}
             >
               {pricing.matchedTier ? `Escala ${pricing.matchedTier.minQuantity}+` : "Promo por cantidad"}
+            </Tag>
+          </Popover>
+        )}
+        {isConditional && (
+          <Popover
+            content={tierPopoverContent}
+            trigger={["hover", "click"]}
+            placement="topLeft"
+            overlayStyle={{ maxWidth: 240 }}
+          >
+            <Tag
+              bordered={false}
+              color="magenta"
+              style={{
+                marginInlineEnd: 0,
+                cursor: "pointer",
+                borderRadius: 999,
+                paddingInline: 10,
+                fontSize: 11,
+              }}
+            >
+              Promo
             </Tag>
           </Popover>
         )}

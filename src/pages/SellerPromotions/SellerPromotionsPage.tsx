@@ -62,7 +62,8 @@ type PromotionRow = {
   title?: string;
   simplePrice?: number | null;
   tiers: PromotionTier[];
-  pricingMode?: "simple" | "tiers" | "invalid";
+  pricingMode?: "simple" | "tiers" | "conditional" | "invalid";
+  conditionalQuestion?: string | null;
   isInvalid?: boolean;
   startsAt: string;
   endsAt: string;
@@ -86,8 +87,9 @@ type PromotionFormValues = {
   productId?: string;
   variantKey?: string;
   scope: "interno" | "catalogo" | "ambos";
-  pricingMode: "simple" | "tiers";
+  pricingMode: "simple" | "tiers" | "conditional";
   title?: string;
+  conditionalQuestion?: string;
   simplePrice?: number | null;
   tiers?: PromotionTier[];
   startsDate?: Dayjs | null;
@@ -170,6 +172,9 @@ const SellerPromotionsPage = () => {
   const canUseCatalogScopes = isManager || canAccessSellerProductInfo(user);
   const effectiveSellerId = isManager ? (selectedSellerId === ALL_SELLERS ? undefined : selectedSellerId) : undefined;
   const canCreatePromotion = !isManager || Boolean(effectiveSellerId);
+  const resolvedSellerId = isManager
+    ? (selectedSellerId === ALL_SELLERS ? undefined : selectedSellerId)
+    : String(user?.id_vendedor || "").trim() || undefined;
 
   const scopeOptions = useMemo(
     () =>
@@ -211,7 +216,7 @@ const SellerPromotionsPage = () => {
   const loadPromotions = async () => {
     setLoading(true);
     const response = await getSellerPromotionsAPI({
-      sellerId: effectiveSellerId,
+      sellerId: resolvedSellerId,
       q: debouncedSearch || undefined,
       scope: canUseCatalogScopes ? scope : "interno",
       state,
@@ -231,7 +236,7 @@ const SellerPromotionsPage = () => {
     setVariantOptionsLoading(true);
     const response = await getSellerPromotionVariantOptionsAPI({
       q: query || undefined,
-      sellerId: effectiveSellerId,
+      sellerId: resolvedSellerId,
     });
     setVariantOptions(Array.isArray(response?.rows) ? response.rows : []);
     setVariantOptionsLoading(false);
@@ -249,7 +254,7 @@ const SellerPromotionsPage = () => {
 
   useEffect(() => {
     void loadPromotions();
-  }, [debouncedSearch, scope, state, page, limit, canUseCatalogScopes, effectiveSellerId]);
+  }, [debouncedSearch, scope, state, page, limit, canUseCatalogScopes, effectiveSellerId, resolvedSellerId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -260,7 +265,7 @@ const SellerPromotionsPage = () => {
 
   useEffect(() => {
     void loadVariantOptions();
-  }, [effectiveSellerId, isManager]);
+  }, [resolvedSellerId, isManager]);
 
   const summary = useMemo(() => {
     return rows.reduce(
@@ -298,6 +303,7 @@ const SellerPromotionsPage = () => {
       scope: canUseCatalogScopes ? "ambos" : "interno",
       state: "active",
       pricingMode: "simple",
+      conditionalQuestion: undefined,
       startsDate: dayjs().startOf("day"),
       startsTime: dayjs().startOf("day"),
       endsTime: dayjs().startOf("day"),
@@ -314,6 +320,7 @@ const SellerPromotionsPage = () => {
         scope: canUseCatalogScopes ? "ambos" : "interno",
         state: "active",
         pricingMode: "simple",
+        conditionalQuestion: undefined,
         startsDate: dayjs().startOf("day"),
         startsTime: dayjs().startOf("day"),
         endsTime: dayjs().startOf("day"),
@@ -347,8 +354,9 @@ const SellerPromotionsPage = () => {
       productId: row.productId,
       variantKey: row.variantKey,
       scope: canUseCatalogScopes ? row.scope : "interno",
-      pricingMode: row.pricingMode === "tiers" ? "tiers" : "simple",
+      pricingMode: row.pricingMode === "tiers" ? "tiers" : row.pricingMode === "conditional" ? "conditional" : "simple",
       title: row.title,
+      conditionalQuestion: row.conditionalQuestion || undefined,
       simplePrice: row.simplePrice ?? undefined,
       tiers: row.tiers?.length ? row.tiers : undefined,
       startsDate: row.startsAt ? dayjs(row.startsAt) : dayjs().startOf("day"),
@@ -380,8 +388,12 @@ const SellerPromotionsPage = () => {
     setPreviewData(null);
   };
 
-  const handlePricingModeChange = (value: "simple" | "tiers") => {
+  const handlePricingModeChange = (value: "simple" | "tiers" | "conditional") => {
     form.setFieldValue("pricingMode", value);
+    if (value === "conditional") {
+      form.setFieldValue("scope", "interno");
+      form.setFieldValue("tiers", []);
+    }
   };
 
   const handlePreview = async () => {
@@ -389,9 +401,9 @@ const SellerPromotionsPage = () => {
     const startsAt = combineDateTime(values.startsDate, values.startsTime);
     const endsAt = combineDateTime(values.endsDate, values.endsTime);
     const simplePrice = values.pricingMode === "tiers" ? null : values.simplePrice;
-    const tiers = values.pricingMode === "simple" ? [] : values.tiers || [];
+    const tiers = values.pricingMode === "simple" || values.pricingMode === "conditional" ? [] : values.tiers || [];
 
-    if (values.pricingMode === "simple" && (simplePrice === undefined || simplePrice === null)) {
+    if ((values.pricingMode === "simple" || values.pricingMode === "conditional") && (simplePrice === undefined || simplePrice === null)) {
       messageApi.error("Define un precio fijo promocional");
       return;
     }
@@ -406,6 +418,7 @@ const SellerPromotionsPage = () => {
       variantKey: values.variantKey,
       scope: canUseCatalogScopes ? values.scope : "interno",
       pricingMode: values.pricingMode,
+      conditionalQuestion: values.conditionalQuestion,
       quantity: tiers?.[0]?.minQuantity || 1,
       simplePrice,
       tiers,
@@ -425,9 +438,9 @@ const SellerPromotionsPage = () => {
     const startsAt = combineDateTime(values.startsDate, values.startsTime);
     const endsAt = combineDateTime(values.endsDate, values.endsTime);
     const simplePrice = values.pricingMode === "tiers" ? null : values.simplePrice;
-    const tiers = values.pricingMode === "simple" ? [] : values.tiers || [];
+    const tiers = values.pricingMode === "simple" || values.pricingMode === "conditional" ? [] : values.tiers || [];
 
-    if (values.pricingMode === "simple" && (simplePrice === undefined || simplePrice === null)) {
+    if ((values.pricingMode === "simple" || values.pricingMode === "conditional") && (simplePrice === undefined || simplePrice === null)) {
       messageApi.error("Define un precio fijo promocional");
       return;
     }
@@ -443,6 +456,7 @@ const SellerPromotionsPage = () => {
       scope: canUseCatalogScopes ? values.scope : "interno",
       pricingMode: values.pricingMode,
       title: values.title,
+      conditionalQuestion: values.conditionalQuestion,
       simplePrice,
       tiers,
       startsAt,
@@ -504,7 +518,14 @@ const SellerPromotionsPage = () => {
       key: "pricing",
       render: (_, row) => (
         <div>
-          <Typography.Text>{row.simplePrice ? formatMoney(row.simplePrice) : "Por escalas"}</Typography.Text>
+          <Typography.Text>
+            {row.pricingMode === "conditional"
+              ? `Condicional ${row.simplePrice ? formatMoney(row.simplePrice) : ""}`
+              : row.simplePrice ? formatMoney(row.simplePrice) : "Por escalas"}
+          </Typography.Text>
+          {row.pricingMode === "conditional" && row.conditionalQuestion && (
+            <div style={{ color: "#7c3aed", fontSize: 12, marginTop: 4 }}>{row.conditionalQuestion}</div>
+          )}
           {row.isInvalid && (
             <div style={{ marginTop: 6 }}>
               <Tag color="red">Invalida: mezcla precio fijo y escalas</Tag>
@@ -778,6 +799,10 @@ const SellerPromotionsPage = () => {
                     <Form.Item name="scope" hidden>
                       <Input />
                     </Form.Item>
+                  ) : pricingMode === "conditional" ? (
+                    <Form.Item name="scope" hidden>
+                      <Input />
+                    </Form.Item>
                   ) : (
                     <Form.Item name="scope" label="Aplica a" rules={[{ required: true }]}>
                       <Select options={scopeOptions.filter((option) => option.value !== "all")} />
@@ -801,6 +826,7 @@ const SellerPromotionsPage = () => {
                 <Radio.Group optionType="button" buttonStyle="solid" onChange={(event) => handlePricingModeChange(event.target.value)}>
                   <Radio.Button value="simple">Precio fijo</Radio.Button>
                   <Radio.Button value="tiers">Por cantidad</Radio.Button>
+                  <Radio.Button value="conditional">Condicional</Radio.Button>
                 </Radio.Group>
               </Form.Item>
 
@@ -808,10 +834,21 @@ const SellerPromotionsPage = () => {
                 <Input placeholder="Ej. Rebaja de fin de mes" maxLength={90} />
               </Form.Item>
 
-              {pricingMode === "simple" && (
+              {pricingMode === "conditional" && (
+                <>
+                  <Form.Item name="conditionalQuestion" label="Pregunta condicional" rules={[{ required: true, message: "Escribe la pregunta" }]}>
+                    <Input placeholder="Ej. ¿Trae envase retornable?" maxLength={120} />
+                  </Form.Item>
+                  <Form.Item name="scope" hidden>
+                    <Input />
+                  </Form.Item>
+                </>
+              )}
+
+              {(pricingMode === "simple" || pricingMode === "conditional") && (
                 <Row gutter={12}>
                   <Col span={16}>
-                    <Form.Item name="simplePrice" label="Precio fijo promocional">
+                    <Form.Item name="simplePrice" label={pricingMode === "conditional" ? "Precio si responde si" : "Precio fijo promocional"}>
                       <InputNumber min={0} style={{ width: "100%" }} controls={false} />
                     </Form.Item>
                   </Col>
