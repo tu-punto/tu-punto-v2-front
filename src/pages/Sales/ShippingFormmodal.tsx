@@ -192,10 +192,16 @@ function ShippingFormModal({
 
     useEffect(() => {
         if (visible) {
+            const now = dayjs().tz("America/La_Paz");
             setCodigoCelular(COUNTRY_CODES[0]?.code || null);
-            form.setFieldValue("celular_cliente", COUNTRY_CODES[0]?.code);
+            setIsRangeHour(false);
+            form.setFieldsValue({
+                celular_cliente: COUNTRY_CODES[0]?.code,
+                fecha_pedido: now,
+                hora_entrega_acordada: now,
+            });
         }
-    }, [visible]);
+    }, [visible, form]);
 
     const hideDeliveryCosts = !isAdmin;
     const hayMultiplesVendedores = useMemo(() => {
@@ -454,11 +460,63 @@ function ShippingFormModal({
                     estado_pedido: "En Espera"
                 }}
             >
+                {/* El destino se define antes de solicitar los datos del cliente. */}
+                <Card title="Destino de la Entrega" bordered={false} data-tour-id="delivery-form-destination">
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item name="tipo_destino" label="Destino de la entrega" rules={[{ required: true }]}>
+                                <Radio.Group
+                                    onChange={(e) => {
+                                        const nextType = e.target.value;
+                                        if (nextType === "otro_lugar") {
+                                            form.setFieldsValue({ destino_sucursal_id: undefined });
+                                        } else if (nextType === "esta_sucursal") {
+                                            form.setFieldsValue({ destino_sucursal_id: branchIdFromProps, lugar_entrega_input: undefined, ubicacion_link: undefined });
+                                        }
+                                    }}
+                                >
+                                    <Radio.Button value="esta_sucursal">Esta sucursal</Radio.Button>
+                                    <Radio.Button value="otro_lugar">Otro lugar</Radio.Button>
+                                    <Radio.Button value="sucursal" disabled style={{ color: "rgba(0,0,0,0.25)", background: "#f5f5f5", borderColor: "#d9d9d9" }}>
+                                        Otra sucursal
+                                    </Radio.Button>
+                                </Radio.Group>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    {tipoDestino === "otro_lugar" ? (
+                        <>
+                            <Form.Item name="lugar_entrega_input" label="Dirección o referencia de entrega" rules={[{ required: true, message: "Escribe la dirección o referencia" }]}>
+                                <Input placeholder="Ej. Av. Busch #123, frente a la plaza" />
+                            </Form.Item>
+                            <Row gutter={16}>
+                                <Col span={18}>
+                                    <Form.Item name="ubicacion_link" label="Link de ubicación">
+                                        <Input placeholder="Pega aquí el link de Google Maps o Waze" />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                    <Button style={{ marginTop: 30, width: "100%" }} onClick={() => {
+                                        if (!mapsPreviewUrl) { message.warning("Escribe primero la dirección para abrir Maps."); return; }
+                                        window.open(mapsPreviewUrl, "_blank", "noopener,noreferrer");
+                                    }}>
+                                        Abrir Maps
+                                    </Button>
+                                </Col>
+                            </Row>
+                        </>
+                    ) : (
+                        <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+                            El pedido quedará asignado a <strong>{nombreSucursal || "esta sucursal"}</strong> y el stock se descontará de esta sucursal.
+                        </div>
+                    )}
+                </Card>
+
                 {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false} data-tour-id="delivery-form-client">
                     <Row gutter={16}>
                         <Col span={18}>
-                            <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true }]}>
+                            <Form.Item name="cliente" label="Nombre Cliente" rules={[{ required: true, message: "Escribe el nombre del cliente" }]}>
                                 <Input prefix={<UserOutlined />} />
                             </Form.Item>
                         </Col>
@@ -490,7 +548,11 @@ function ShippingFormModal({
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item name="telefono_cliente" label>
+                            <Form.Item
+                                name="telefono_cliente"
+                                label
+                                rules={tipoDestino === "otro_lugar" ? [{ required: true, message: "Escribe el celular del cliente" }] : []}
+                            >
                                 <Input
                                     prefix={<PhoneOutlined />}
                                     onKeyDown={(e) => {
@@ -508,7 +570,11 @@ function ShippingFormModal({
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }} data-tour-id="delivery-form-order">
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name='fecha_pedido' label='Fecha de la Entrega' rules={[{ required: true }]}> 
+                            <Form.Item
+                                name='fecha_pedido'
+                                label='Fecha de la Entrega'
+                                rules={tipoDestino === "otro_lugar" ? [{ required: true, message: "Selecciona la fecha de entrega" }] : []}
+                            >
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
                             {deliveryCutoffConfig.enabled && (deliveryCutoffConfig.registrationTime || deliveryCutoffConfig.closingTime) && (
@@ -534,6 +600,7 @@ function ShippingFormModal({
                             <Form.Item 
                                 name="hora_entrega_acordada" 
                                 label={isRangeHour? "Inicio del Rango Horario":"Hora de Entrega"}
+                                rules={tipoDestino === "otro_lugar" ? [{ required: true, message: "Selecciona la hora de entrega" }] : []}
                             >
                                 <TimePicker format='HH:mm' style={{ width: '100%' }} />
                             </Form.Item>
@@ -546,7 +613,8 @@ function ShippingFormModal({
                             </Col>
                         )}
                     </Row>
-                    <Row gutter={16} data-tour-id="delivery-form-destination">
+                    {false && (<>
+                    <Row gutter={16} data-tour-id="legacy-delivery-form-destination">
                         <Col span={24}>
                             <Form.Item
                                 name="tipo_destino"
@@ -677,6 +745,7 @@ function ShippingFormModal({
                             </Col>
                         </Row>
                     )}
+                    </>)}
                     <Row gutter={16}>
                         <Col span={24}>
                             <Form.Item name="observaciones" label="Observaciones">
