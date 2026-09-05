@@ -27,7 +27,7 @@ import {
 } from "./shippingQrLabel";
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
-import { resolvePickupStatus } from "./shippingStatus";
+import { PICKED_UP_BY_VENDOR_LABEL, isDeliveredLikeStatus, resolvePickupStatus } from "./shippingStatus";
 
 const TZ = "America/La_Paz";
 const LATE_PICKUP_GRACE_DAYS = 200;
@@ -312,8 +312,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
     useEffect(() => {
         if (
-            estadoPedidoForm === "Entregado" &&
-            estadoInicialPedido !== "Entregado"
+            isDeliveredLikeStatus(estadoPedidoForm) &&
+            !isDeliveredLikeStatus(estadoInicialPedido)
         ) {
             const ahora = dayjs().tz("America/La_Paz");
             internalForm.setFieldsValue({
@@ -325,7 +325,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     }, [estadoPedidoForm, estadoInicialPedido]);
 
     useEffect(() => {
-        if (estadoPedidoForm === "Entregado") {
+        if (isDeliveredLikeStatus(estadoPedidoForm)) {
             const paidStatus = internalForm.getFieldValue("esta_pagado");
             if (paidStatus === "si") {
                 setTipoPago("3");
@@ -405,6 +405,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             inferredDestinationType === "sucursal" && String(inferredDestinationBranchId || "") === String(originId || "")
                 ? "esta_sucursal"
                 : inferredDestinationType;
+        const normalizedStatus = resolvePickupStatus(shipping.estado_pedido || "LISTO PARA RECOGER", shipping);
 
         internalForm.setFieldsValue({
             cliente: shipping.cliente,
@@ -421,7 +422,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ? dayjs(originalHoraRangoUTC.format("HH:mm:ss"), "HH:mm:ss")
                 : null,
             observaciones: shipping.observaciones,
-            estado_pedido: shipping.estado_pedido,
+            estado_pedido: normalizedStatus,
             quien_paga_delivery: quienPagaDeVenta,
             cargo_delivery: shipping.cargo_delivery,
             costo_delivery: shipping.costo_delivery,
@@ -432,7 +433,6 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
-        const normalizedStatus = resolvePickupStatus(shipping.estado_pedido || "LISTO PARA RECOGER", shipping);
         setEstadoPedido(normalizedStatus || "LISTO PARA RECOGER");
         setEstadoInicialPedido(normalizedStatus || "LISTO PARA RECOGER");
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
@@ -674,10 +674,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ? `${fechaEntrega.format("YYYY-MM-DD")} ${horaRango}`
                 : null;
             const selectedStatus = String(estadoPedido || internalForm.getFieldValue("estado_pedido") || values.estado_pedido || shipping?.estado_pedido || "LISTO PARA RECOGER");
+            const pickedUpBySeller = selectedStatus === PICKED_UP_BY_VENDOR_LABEL;
+            const effectiveStatus = pickedUpBySeller ? "Entregado" : selectedStatus;
             const effectivePaidStatus = String(estaPagado || internalForm.getFieldValue("esta_pagado") || values.esta_pagado || "no");
             const selectedPaymentType = String(tipoPago || internalForm.getFieldValue("tipo_de_pago") || values.tipo_de_pago || "");
             const effectivePaymentType =
-                selectedStatus === "Entregado" && effectivePaidStatus === "si"
+                isDeliveredLikeStatus(selectedStatus) && effectivePaidStatus === "si"
                     ? "3"
                     : selectedPaymentType;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
@@ -705,21 +707,22 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ? effectiveDestinationBranchId
                 : origenBranchId;
 
-            let horaEntregaReal = selectedStatus === "Entregado"
+            let horaEntregaReal = isDeliveredLikeStatus(selectedStatus)
                 ? moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss")
                 : fechaHoraEntregaAcordada;
 
             //console.log("🕒 Hora de entrega acordada:", fechaHoraEntregaAcordada);
             const updateShippingInfo: any = {
                 ...values,
-                estado_pedido: selectedStatus,
+                estado_pedido: effectiveStatus,
+                mostrar_recogido_por_vendedor: pickedUpBySeller,
                 tipo_destino: effectiveDestinationType,
                 sucursal: paymentBranchIdForUpdate,
                 lugar_entrega: lugarEntregaFinal,
                 ubicacion_link: ubicacionLinkFinal,
                 //fecha_pedido: moment(values.fecha_pedido).tz("America/La_Paz").format('YYYY-MM-DD HH:mm:ss'),
                 hora_entrega_acordada: fechaHoraEntregaAcordada,
-                hora_entrega_real: selectedStatus === "Entregado" ? horaEntregaReal : undefined,
+                hora_entrega_real: isDeliveredLikeStatus(selectedStatus) ? horaEntregaReal : undefined,
                 pagado_al_vendedor: effectivePaymentType === '3',
                 hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: effectivePaidStatus,
@@ -1279,6 +1282,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                                     <Radio.Button value="En camino">En camino</Radio.Button>
                                     <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
+                                    {(isSimplePackageOrder || shipping?.is_external) && (
+                                        <Radio.Button value={PICKED_UP_BY_VENDOR_LABEL} disabled={!canMarkAsDelivered}>{PICKED_UP_BY_VENDOR_LABEL}</Radio.Button>
+                                    )}
                                 </Radio.Group>
                             </Form.Item>
                             {!canMarkAsDelivered && (
@@ -1370,7 +1376,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     </Row>
 
                     {/* Tipo de pago */}
-                    {estadoPedidoForm === "Entregado" && (
+                    {isDeliveredLikeStatus(estadoPedidoForm) && (
                         <>
                             <Row gutter={16}>
                                 <Col span={24}>

@@ -12,7 +12,7 @@ import {
   toBase64Png,
 } from "./shippingQrLabel";
 import QzPrinterSelector from "./QzPrinterSelector";
-import { resolvePickupStatus } from "./shippingStatus";
+import { PICKED_UP_BY_VENDOR_LABEL, isDeliveredLikeStatus, resolvePickupStatus } from "./shippingStatus";
 
 interface ExternalShippingInfoModalProps {
   visible: boolean;
@@ -229,7 +229,7 @@ const ExternalShippingInfoModal = ({
     !isAnnulled &&
     !isDeliveredExternal &&
     isSameBusinessDay(externalShipping?.fecha_pedido);
-  const shouldAskBuyerPayment = estadoPedido === "Entregado" && buyerDebt > 0;
+  const shouldAskBuyerPayment = isDeliveredLikeStatus(estadoPedido) && buyerDebt > 0;
 
   const externalPaidStatus = String(chargeSource?.esta_pagado || "no").trim().toLowerCase();
   const sellerPaymentLabel =
@@ -655,7 +655,7 @@ const ExternalShippingInfoModal = ({
     let nextSubtotalQr = initialQr;
     let nextSubtotalEfectivo = initialEfectivo;
 
-    if ((externalShipping.estado_pedido || "En Espera") === "Entregado" && buyerDebt > 0) {
+    if (isDeliveredLikeStatus(externalShipping.estado_pedido || "En Espera") && buyerDebt > 0) {
       if (initialDeliveryType === "1") {
         nextSubtotalQr = buyerDebt;
         nextSubtotalEfectivo = 0;
@@ -686,6 +686,7 @@ const ExternalShippingInfoModal = ({
       comprador: externalShipping.comprador || "",
       telefono_comprador: externalShipping.telefono_comprador || "",
       destino_sucursal_id:
+        getBranchId(externalShipping?.destino_sucursal_id) ||
         getBranchId(externalShipping?.destino_sucursal) ||
         getBranchId(externalShipping?.sucursal) ||
         undefined,
@@ -713,7 +714,7 @@ const ExternalShippingInfoModal = ({
     }
     setLoading(true);
     try {
-      if (values.estado_pedido === "Entregado" && buyerDebt > 0) {
+      if (isDeliveredLikeStatus(values.estado_pedido) && buyerDebt > 0) {
         const deliveryType = normalizeDeliveryPaymentCode(values.tipo_de_pago);
         const qrAmount = roundCurrency(Number(form.getFieldValue("subtotal_qr") || 0));
         const efectivoAmount = roundCurrency(Number(form.getFieldValue("subtotal_efectivo") || 0));
@@ -744,27 +745,31 @@ const ExternalShippingInfoModal = ({
       const normalizedType = normalizeDeliveryPaymentCode(values.tipo_de_pago);
       const nextDestinationBranchId = String(values.destino_sucursal_id || "").trim();
       const currentDestinationBranchId = String(
+        externalShipping?.destino_sucursal_id ||
         getBranchId(externalShipping?.destino_sucursal) ||
         getBranchId(externalShipping?.sucursal) ||
         ""
       ).trim();
+      const pickedUpBySeller = values.estado_pedido === PICKED_UP_BY_VENDOR_LABEL;
+      const deliveredLikeStatus = isDeliveredLikeStatus(values.estado_pedido);
       const payload = {
         ...(canEditBuyerName ? { comprador: String(values.comprador || "").trim() } : {}),
         ...(canEditDestination && nextDestinationBranchId && nextDestinationBranchId !== currentDestinationBranchId
           ? { destino_sucursal_id: nextDestinationBranchId }
           : {}),
-        estado_pedido: values.estado_pedido,
-        delivered: values.estado_pedido === "Entregado",
+        estado_pedido: deliveredLikeStatus ? "Entregado" : values.estado_pedido,
+        mostrar_recogido_por_vendedor: pickedUpBySeller,
+        delivered: deliveredLikeStatus,
         tipo_de_pago:
-          values.estado_pedido === "Entregado" && buyerDebt > 0 && normalizedType
+          deliveredLikeStatus && buyerDebt > 0 && normalizedType
             ? DELIVERY_PAYMENT_LABEL_BY_CODE[normalizedType]
             : "",
         subtotal_qr:
-          values.estado_pedido === "Entregado" && buyerDebt > 0
+          deliveredLikeStatus && buyerDebt > 0
             ? Number(form.getFieldValue("subtotal_qr") || 0)
             : 0,
         subtotal_efectivo:
-          values.estado_pedido === "Entregado" && buyerDebt > 0
+          deliveredLikeStatus && buyerDebt > 0
             ? Number(form.getFieldValue("subtotal_efectivo") || 0)
             : 0,
       };
@@ -1081,6 +1086,9 @@ const ExternalShippingInfoModal = ({
                   <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                   <Radio.Button value="En camino">En camino</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>
+                  {(isSimplePackage || externalShipping?.is_external) && (
+                    <Radio.Button value={PICKED_UP_BY_VENDOR_LABEL}>{PICKED_UP_BY_VENDOR_LABEL}</Radio.Button>
+                  )}
                 </Radio.Group>
               </Form.Item>
             </Col>
