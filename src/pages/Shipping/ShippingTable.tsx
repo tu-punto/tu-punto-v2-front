@@ -19,6 +19,7 @@ import {
     READY_FOR_PICKUP_STATUS,
     SEND_TO_BRANCH_STATUS,
     WAITING_RAW_STATUS,
+    isPickedUpByVendorVisualStatus,
     resolvePickupStatus,
 } from "./shippingStatus";
 import moment from "moment-timezone";
@@ -140,14 +141,14 @@ const getVisualStatusMeta = (pedido: any, now: moment.Moment, allowVisualInTrans
         };
     }
 
-    if (estadoReal === "Entregado" && pedido?.retirado_por_vendedor === true) {
+    if (isPickedUpByVendorVisualStatus(estadoReal, pedido)) {
         return {
-            label: "Vendedor retiro el paquete",
+            label: "Recogido por vendedor",
             tone: {
-                text: "#ad4e00",
-                border: "#ffd591",
-                background: "#fff7e6",
-                dot: "#fa8c16",
+                text: "#6f19ff",
+                border: "#d3adf7",
+                background: "#f9f0ff",
+                dot: "#9254de",
             },
             tooltip: undefined,
             isVisualOnly: false,

@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { updateShippingAPI } from '../../api/shipping';
 import { isDeliveryEditLockedAfterFiveDays } from '../../utils/deliveryEditGuard';
-import { resolvePickupStatus } from './shippingStatus';
+import { PICKED_UP_BY_VENDOR_LABEL, isDeliveredLikeStatus, resolvePickupStatus } from './shippingStatus';
 
 dayjs.extend(utc);
 
@@ -23,10 +23,12 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
 
     useEffect(() => {
         if (shipping) {
-            setEstadoPedido(resolvePickupStatus(shipping.estado_pedido?.toString(), shipping));
+            const visualStatus = resolvePickupStatus(shipping.estado_pedido?.toString(), shipping);
+            setEstadoPedido(visualStatus);
             setSubmitError('');
             form.setFieldsValue({
                 ...shipping,
+                estado_pedido: visualStatus,
                 fecha_pedido: shipping.fecha_pedido ? dayjs(shipping.fecha_pedido, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
                 hora_entrega_acordada: shipping.hora_entrega_acordada ? dayjs(shipping.hora_entrega_acordada, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
                 hora_entrega_real: shipping.hora_entrega_real ? dayjs(shipping.hora_entrega_real, 'YYYY-MM-DD HH:mm:ss.SSS') : null,
@@ -50,6 +52,8 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
         setLoading(true);
         setSubmitError('');
         const selectedStatus = resolvePickupStatus(shippingStateData.estado_pedido || estadoPedido, shipping);
+        const pickedUpBySeller = selectedStatus === PICKED_UP_BY_VENDOR_LABEL;
+        const deliveredStatus = isDeliveredLikeStatus(selectedStatus);
 
         let updateShippingInfo: any = {
             sucursal_id: localStorage.getItem("sucursalId")
@@ -69,7 +73,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
             };
         }
 
-        if (selectedStatus === 'Entregado') {
+        if (deliveredStatus) {
             updateShippingInfo = {
                 ...updateShippingInfo,
                 hora_entrega_acordada: shippingStateData.hora_entrega_acordada,
@@ -77,6 +81,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
                 cargo_delivery: parseFloat(shippingStateData.cargo_delivery),
                 costo_delivery: parseFloat(shippingStateData.costo_delivery),
                 estado_pedido: 'Entregado',
+                mostrar_recogido_por_vendedor: pickedUpBySeller,
                 tipo_de_pago: shippingStateData.tipo_de_pago,
             };
         }
@@ -106,11 +111,21 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
     };
 
     const renderEstadoOptions = () => {
+        const canShowPickedUpBySeller = Boolean(
+            shipping?.simple_package_order ||
+            shipping?.simple_package_source_id ||
+            shipping?.is_external ||
+            String(shipping?.service_origin || '').trim() === 'simple_package' ||
+            String(shipping?.service_origin || '').trim() === 'external'
+        );
         const opciones = [
             { value: READY_FOR_PICKUP_STATUS, label: 'Listo para recoger' },
             { value: 'En camino', label: 'En camino' },
             { value: 'Entregado', label: 'Entregado' }
         ];
+        if (canShowPickedUpBySeller) {
+            opciones.push({ value: PICKED_UP_BY_VENDOR_LABEL, label: PICKED_UP_BY_VENDOR_LABEL });
+        }
         return opciones;
     };
 
@@ -187,7 +202,7 @@ const ShippingStateModal = ({ visible, onClose, onSave, shipping }: any) => {
                     </Row>
                 )}
 
-                {estadoPedido === 'Entregado' && (
+                {isDeliveredLikeStatus(estadoPedido) && (
                     <>
                         <Row gutter={16}>
                             <Col span={12}>
