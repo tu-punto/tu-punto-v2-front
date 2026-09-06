@@ -469,9 +469,24 @@ function ShippingFormModal({
                                     onChange={(e) => {
                                         const nextType = e.target.value;
                                         if (nextType === "otro_lugar") {
-                                            form.setFieldsValue({ destino_sucursal_id: undefined });
+                                            form.setFieldsValue({
+                                                destino_sucursal_id: undefined,
+                                                fecha_pedido: undefined,
+                                                hora_entrega_acordada: undefined,
+                                                hora_entrega_rango_final: undefined,
+                                            });
+                                            setIsRangeHour(false);
                                         } else if (nextType === "esta_sucursal") {
-                                            form.setFieldsValue({ destino_sucursal_id: branchIdFromProps, lugar_entrega_input: undefined, ubicacion_link: undefined });
+                                            const now = dayjs().tz("America/La_Paz");
+                                            form.setFieldsValue({
+                                                destino_sucursal_id: branchIdFromProps,
+                                                lugar_entrega_input: undefined,
+                                                ubicacion_link: undefined,
+                                                fecha_pedido: now,
+                                                hora_entrega_acordada: now,
+                                                hora_entrega_rango_final: undefined,
+                                            });
+                                            setIsRangeHour(false);
                                         }
                                     }}
                                 >
@@ -568,6 +583,7 @@ function ShippingFormModal({
 
                 {/* DATOS DEL PEDIDO */}
                 <Card title="Datos del Pedido" bordered={false} style={{ marginTop: 16 }} data-tour-id="delivery-form-order">
+                    {tipoDestino === "otro_lugar" && <>
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item
@@ -613,6 +629,7 @@ function ShippingFormModal({
                             </Col>
                         )}
                     </Row>
+                    </>}
                     {false && (<>
                     <Row gutter={16} data-tour-id="legacy-delivery-form-destination">
                         <Col span={24}>
