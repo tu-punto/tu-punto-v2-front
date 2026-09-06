@@ -1,4 +1,4 @@
-import { Button, Card, Col, Input, message, Row, Select, Space, Typography, Spin } from "antd";
+import { Button, Card, Col, Input, message, Modal, Row, Select, Space, Typography, Spin } from "antd";
 import { GiftOutlined, HistoryOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { useContext, useEffect, useState } from "react";
 import SalesFormModal from "./SalesFormmodal";
@@ -19,6 +19,7 @@ import { applySellerCommissionCap } from "../../utils/commissionCap";
 import { resolvePromotionPricing } from "../../utils/promotionPricing";
 import { useNavigate } from "react-router-dom";
 import { includesNormalized } from "../../utils/search";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
   const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -41,6 +42,7 @@ const getSellerBranchCommission = (seller: any, branchId?: string) => {
 
 export const Sales = () => {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showInfoQRScanner, setShowInfoQRScanner] = useState(false);
   const { user }: any = useContext(UserContext);
@@ -61,6 +63,7 @@ export const Sales = () => {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [branchIdForFetch, setBranchIdForFetch] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
+  const [pendingConditionalProduct, setPendingConditionalProduct] = useState<any>(null);
   const { data, fetchProducts } = useProductsFlat(
     branchIdForFetch && branchIdForFetch !== "undefined" ? branchIdForFetch : undefined
   );
@@ -670,6 +673,20 @@ export const Sales = () => {
     });
   };
 
+  const openConditionalPromotionPrompt = (product: any) => {
+    setPendingConditionalProduct(product);
+  };
+
+  const closeConditionalPromotionPrompt = () => {
+    setPendingConditionalProduct(null);
+  };
+
+  const resolvePendingConditionalPromotion = (accepted: boolean) => {
+    if (!pendingConditionalProduct) return;
+    handleProductSelect({ ...pendingConditionalProduct, promoAccepted: accepted });
+    closeConditionalPromotionPrompt();
+  };
+
   const handleConditionalPromotionDecision = (key: string, accepted: boolean) => {
     setSelectedProducts((prevProducts: any[]) =>
       prevProducts.map((product: any) => {
@@ -795,6 +812,8 @@ export const Sales = () => {
               <div data-tour-id="sales-products-list">
                 <ProductTable
                   onSelectProduct={handleProductSelect}
+                  onConditionalPromotionRequest={openConditionalPromotionPrompt}
+                  isMobile={isMobile}
                   refreshKey={refreshKey}
                   data={filteredBySeller}
                 />
@@ -924,6 +943,32 @@ export const Sales = () => {
         }
         sellers={sellers}
         sucursalId={fallbackSucursalId} />
+      <Modal
+        open={Boolean(pendingConditionalProduct)}
+        title="Promocion condicional"
+        onCancel={closeConditionalPromotionPrompt}
+        footer={null}
+        destroyOnClose
+        centered
+        width="calc(100vw - 24px)"
+      >
+        <div className="space-y-3">
+          <Typography.Text className="block text-sm text-gray-700">
+            {pendingConditionalProduct?.pricingPromotion?.conditionalQuestion || "Esta promo requiere confirmacion manual."}
+          </Typography.Text>
+          <Typography.Text className="block text-sm font-semibold text-violet-600">
+            {pendingConditionalProduct?.promoAccepted ? "Confirmada" : "Pendiente de confirmar"}
+          </Typography.Text>
+          <Space>
+            <Button type="primary" onClick={() => resolvePendingConditionalPromotion(true)}>
+              Si
+            </Button>
+            <Button onClick={() => resolvePendingConditionalPromotion(false)}>
+              No
+            </Button>
+          </Space>
+        </div>
+      </Modal>
       <SalesFormModal
         visible={modalType === "sales"}
         onCancel={handleCancel}

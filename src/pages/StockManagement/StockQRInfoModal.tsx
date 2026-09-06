@@ -181,6 +181,7 @@ const StockQRInfoModal = ({ open, onClose, sellerLabel, sucursalId, sucursalLabe
                   groupSuccessLabel="Variante del grupo encontrada"
                   appearance="simple"
                   simpleVideoMinHeight={240}
+                  sucursalId={sucursalId}
                 />
               </div>
             )}

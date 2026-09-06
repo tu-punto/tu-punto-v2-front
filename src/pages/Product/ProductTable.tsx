@@ -6,7 +6,7 @@ import { normalizeRole } from '../../utils/role';
 
 const CRITICAL_STOCK_THRESHOLD = 1;
 
-const ProductTable = ({ data, onSelectProduct }: any) => {
+const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, isMobile = false }: any) => {
     const { user } = useContext(UserContext) || {};
     const isSeller = normalizeRole(user?.role) === 'seller';
     const columns = [
@@ -42,9 +42,6 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                         promotion={record.pricingPromotion}
                         compact
                         showTierBadge
-                        onConditionalAccept={(accepted) => {
-                            onSelectProduct(accepted ? { ...record, promoAccepted: true } : record);
-                        }}
                     />
                 </Space>
             ),
@@ -61,7 +58,7 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
 
     return (
         <div className="flex">
-            <Table
+                <Table
                 className="flex-1"
                 columns={columns}
                 dataSource={data}
@@ -74,6 +71,12 @@ const ProductTable = ({ data, onSelectProduct }: any) => {
                             message.error(`El producto "${record.producto}" no tiene stock disponible.`);
                             return;
                         }
+
+                        if (isMobile && record.pricingPromotion?.pricingMode === "conditional") {
+                            onConditionalPromotionRequest?.(record);
+                            return;
+                        }
+
                         onSelectProduct(record);
                     },
                 })}

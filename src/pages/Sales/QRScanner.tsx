@@ -36,6 +36,8 @@ interface ScannedVariantItem {
   stock: number;
   sucursalId?: string;
   source?: string;
+  qrPayload?: string;
+  qrCode?: string;
   groupId?: string;
   groupCode?: string;
   groupName?: string;
@@ -110,6 +112,8 @@ const normalizeVariantItem = (
   stock: Number(item.stock ?? 0),
   sucursalId: item.sucursalId ? String(item.sucursalId) : undefined,
   source: String(item.source ?? extra?.source ?? ""),
+  qrPayload: String(item.qrPayload ?? ""),
+  qrCode: String(item.qrCode ?? ""),
   groupId: extra?.groupId,
   groupCode: extra?.groupCode,
   groupName: extra?.groupName
