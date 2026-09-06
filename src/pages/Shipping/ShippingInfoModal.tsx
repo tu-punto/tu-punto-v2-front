@@ -279,6 +279,20 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             return prev.filter((p: any) => p.key !== key);
         });
     };
+    const applyPaidStatus = (value: string) => {
+        internalForm.setFieldValue("esta_pagado", value);
+        setEstaPagado(value);
+        setAdelantoVisible(value === 'adelanto');
+
+        if (value !== 'adelanto') {
+            internalForm.setFieldsValue({ adelanto_cliente: 0 });
+        }
+
+        if (value === 'si') {
+            setTipoPago("3");
+            internalForm.setFieldValue("tipo_de_pago", "3");
+        }
+    };
     // useEffect para cargarlos si no lo estás haciendo ya
     useEffect(() => {
         const fetchSellers = async () => {
@@ -1230,19 +1244,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             <Form.Item name="esta_pagado" label="¿Está ya pagado?" rules={[{ required: true }]}>
                                 <Radio.Group
                                     onChange={(e) => {
-                                        const value = e.target.value;
-                                        internalForm.setFieldValue("esta_pagado", value);
-                                        setEstaPagado(value);
-                                        setAdelantoVisible(value === 'adelanto');
-
-                                        if (value !== 'adelanto') {
-                                            internalForm.setFieldsValue({ adelanto_cliente: 0 }); // << OBLIGATORIO para el form
-                                        }
-
-                                        if (value === 'si') {
-                                            setTipoPago("3");
-                                            internalForm.setFieldValue("tipo_de_pago", "3");
-                                        }
+                                        applyPaidStatus(e.target.value);
                                     }}
                                 >
                                     <Radio.Button value="si">Sí</Radio.Button>
@@ -1276,6 +1278,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                         const nextStatus = e.target.value.toString();
                                         setEstadoPedido(nextStatus);
                                         internalForm.setFieldValue("estado_pedido", nextStatus);
+                                        if (nextStatus === PICKED_UP_BY_VENDOR_LABEL) {
+                                            applyPaidStatus('si');
+                                        }
                                     }}
                                     value={estadoPedido || "LISTO PARA RECOGER"}
                                 >

@@ -1,7 +1,7 @@
-import { Button, InputNumber, Popover, Space, Table, Tag, Typography } from "antd";
+import { Button, InputNumber, Space, Table, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
-import PromotionPrice from "../../components/PromotionPrice";
+import PromotionPrice, { ConditionalPromotionDetails } from "../../components/PromotionPrice";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
     const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -58,7 +58,7 @@ const EmptySalesTable = ({
             };
         });
         setUpdatedProducts(withUtilidades);
-    }, [products, sellers]);
+    }, [products, sellers, branchId]);
 
     const totalAmount = updatedProducts.reduce((acc: number, product: any) => {
         return acc + (product.precio_unitario * product.cantidad);
@@ -118,32 +118,17 @@ const EmptySalesTable = ({
                         {record.pricingPromotion?.pricingMode === "conditional" && (
                           <>
                             <Typography.Text strong>{formatMoney(record.precio_unitario)}</Typography.Text>
-                            <Popover
-                              trigger={["hover", "click"]}
-                              placement="topLeft"
-                              content={
-                                <div style={{ minWidth: 220 }}>
-                                  <Typography.Text strong style={{ display: "block", marginBottom: 8 }}>
-                                    Promocion condicional
-                                  </Typography.Text>
-                                  <Typography.Text style={{ fontSize: 12, display: "block", marginBottom: 12 }}>
-                                    {record.pricingPromotion?.conditionalQuestion || "Confirma si aplica la promo."}
-                                  </Typography.Text>
-                                  <Space>
-                                    <Button type="primary" size="small" onClick={() => onConditionalPromotionDecision?.(record.key, true)}>
-                                      Si aplica
-                                    </Button>
-                                    <Button size="small" onClick={() => onConditionalPromotionDecision?.(record.key, false)}>
-                                      No aplica
-                                    </Button>
-                                  </Space>
-                                </div>
-                              }
-                            >
-                              <Tag color={record.promoAccepted ? "green" : "magenta"} bordered={false} style={{ width: "fit-content", cursor: "pointer" }}>
-                                {record.promoAccepted ? "Promo aplicada" : "Promo"}
-                              </Tag>
-                            </Popover>
+                            <ConditionalPromotionDetails
+                              accepted={record.promoAccepted}
+                              question={record.pricingPromotion?.conditionalQuestion || "Confirma si aplica la promo."}
+                              onDecision={(accepted) => onConditionalPromotionDecision?.(record.key, accepted)}
+                              color={record.promoAccepted ? "green" : "magenta"}
+                              label={record.promoAccepted ? "Promo aplicada" : "Promo"}
+                              confirmedText="Promo aplicada"
+                              pendingText="Promo"
+                              acceptText="Si aplica"
+                              rejectText="No aplica"
+                            />
                           </>
                         )}
                         {record.pricingPromotion?.pricingMode !== "conditional" && (
