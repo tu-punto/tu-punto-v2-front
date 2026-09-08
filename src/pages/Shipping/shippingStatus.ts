@@ -10,9 +10,7 @@ export const WAITING_RAW_STATUS = "En Espera";
 const isPickedUpEligibleOrder = (order?: any) => Boolean(
   order?.simple_package_order ||
   order?.simple_package_source_id ||
-  order?.is_external ||
-  String(order?.service_origin || "").trim() === "simple_package" ||
-  String(order?.service_origin || "").trim() === "external"
+  String(order?.service_origin || "").trim() === "simple_package"
 );
 
 export const isPickedUpByVendorVisualStatus = (status: unknown, order?: any) =>

@@ -1086,7 +1086,7 @@ const ExternalShippingInfoModal = ({
                   <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                   <Radio.Button value="En camino">En camino</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>
-                  {(isSimplePackage || externalShipping?.is_external) && (
+                  {isSimplePackage && (
                     <Radio.Button value={PICKED_UP_BY_VENDOR_LABEL}>{PICKED_UP_BY_VENDOR_LABEL}</Radio.Button>
                   )}
                 </Radio.Group>

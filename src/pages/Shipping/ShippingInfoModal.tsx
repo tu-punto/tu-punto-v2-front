@@ -1319,7 +1319,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                                     <Radio.Button value="En camino">En camino</Radio.Button>
                                     <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
-                                    {(isSimplePackageOrder || shipping?.is_external) && (
+                                    {isSimplePackageOrder && (
                                         <Radio.Button value={PICKED_UP_BY_VENDOR_LABEL} disabled={!canMarkAsDelivered}>{PICKED_UP_BY_VENDOR_LABEL}</Radio.Button>
                                     )}
                                 </Radio.Group>
