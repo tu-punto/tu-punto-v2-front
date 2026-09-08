@@ -115,6 +115,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const { rawProducts: data } = useRawProducts(); const [editProductsModalVisible, setEditProductsModalVisible] = useState(false);
     const adelantoCliente = useWatch('adelanto_cliente', internalForm);
     const [estaPagado, setEstaPagado] = useState<string | null>(null);
+    const [productCoveredByVendorPickup, setProductCoveredByVendorPickup] = useState(false);
     const [confirmDeleteAdelanto, setConfirmDeleteAdelanto] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [clickedOnce, setClickedOnce] = useState(false);
@@ -268,8 +269,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
         const adelanto = adelantoCliente || 0;
         const buyerDebt = isSimplePackageOrder ? simplePackageBuyerDebt : 0;
-        return parseFloat((totalAmount + buyerDebt - adelanto + deliveryAdicional).toFixed(2));
-    }, [totalAmount, simplePackageBuyerDebt, isSimplePackageOrder, adelantoCliente, cargoDelivery, quienPagaDelivery, estaPagado]);
+        const productCharge = productCoveredByVendorPickup && isSimplePackageOrder ? 0 : totalAmount;
+        return parseFloat((productCharge + buyerDebt - adelanto + deliveryAdicional).toFixed(2));
+    }, [totalAmount, simplePackageBuyerDebt, isSimplePackageOrder, adelantoCliente, cargoDelivery, quienPagaDelivery, estaPagado, productCoveredByVendorPickup]);
     const handleDeleteProduct = (key: any) => {
         if (isDeliveryLocked) {
             message.warning("Esta entrega ya supero los 5 dias como entregada y solo se puede ver");
@@ -451,6 +453,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
         setEstadoPedido(normalizedStatus || "LISTO PARA RECOGER");
         setEstadoInicialPedido(normalizedStatus || "LISTO PARA RECOGER");
+        setProductCoveredByVendorPickup(Boolean(shipping?.producto_cubierto_por_recojo_vendedor));
         const ventasNormales = (shipping.venta || []).map((p: any) => ({
             ...p,
             id_venta: p._id ?? null,
@@ -517,6 +520,12 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }, 0);
         setTotalAmount(parseFloat(recalculated.toFixed(2)));
     }, [products]);
+    const displayedProducts = useMemo(
+        () => productCoveredByVendorPickup && isSimplePackageOrder
+            ? products.map((product: any) => ({ ...product, precio_unitario: 0 }))
+            : products,
+        [products, productCoveredByVendorPickup, isSimplePackageOrder]
+    );
     const enrichedProducts = useMemo(() => {
         const sucursalId = origenBranchId || localStorage.getItem("sucursalId");
         if (!data) return [];
@@ -732,6 +741,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 ...values,
                 estado_pedido: effectiveStatus,
                 mostrar_recogido_por_vendedor: pickedUpBySeller,
+                producto_cubierto_por_recojo_vendedor: isSimplePackageOrder && productCoveredByVendorPickup,
                 tipo_destino: effectiveDestinationType,
                 sucursal: paymentBranchIdForUpdate,
                 lugar_entrega: lugarEntregaFinal,
@@ -1214,7 +1224,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     }
                 >
                     <EmptySalesTable
-                        products={products}
+                        products={displayedProducts}
                         onDeleteProduct={canEditShipping ? handleDeleteProduct : undefined}
                         onUpdateTotalAmount={setTotalAmount}
                         handleValueChange={handleValueChange}
@@ -1278,10 +1288,25 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 <Radio.Group
                                     onChange={(e) => {
                                         const nextStatus = e.target.value.toString();
+                                        if (nextStatus === PICKED_UP_BY_VENDOR_LABEL && isSimplePackageOrder && !productCoveredByVendorPickup) {
+                                            Modal.confirm({
+                                                title: "Confirmar recojo por vendedor",
+                                                content: `Los productos pasarán a Bs. 0.00 y se descontarán Bs. ${totalAmount.toFixed(2)} del saldo a cobrar. El estado de pago y el método de pago no cambiarán.`,
+                                                okText: "Confirmar",
+                                                cancelText: "Cancelar",
+                                                onOk: () => {
+                                                    setProductCoveredByVendorPickup(true);
+                                                    setEstadoPedido(nextStatus);
+                                                    internalForm.setFieldValue("estado_pedido", nextStatus);
+                                                },
+                                            });
+                                            return;
+                                        }
+
                                         setEstadoPedido(nextStatus);
                                         internalForm.setFieldValue("estado_pedido", nextStatus);
-                                        if (nextStatus === PICKED_UP_BY_VENDOR_LABEL) {
-                                            applyPaidStatus('si');
+                                        if (nextStatus !== PICKED_UP_BY_VENDOR_LABEL) {
+                                            setProductCoveredByVendorPickup(false);
                                         }
                                     }}
                                     value={estadoPedido || "LISTO PARA RECOGER"}
