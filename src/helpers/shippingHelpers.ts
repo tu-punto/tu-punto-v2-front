@@ -38,7 +38,7 @@ export const getDailySummary = async (
   let qrTotal = 0;
 
   if (response.success) {
-    const { efectivo, qr } = response.totales;
+    const { efectivo, qr } = response.totales_cierre || response.totales;
     efectivoTotal = efectivo;
     qrTotal = qr;
   }
