@@ -1284,7 +1284,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     {/* Estado del Pedido */}
                     <Row gutter={16}>
                         <Col span={24}>
-                            <Form.Item name="estado_pedido" label="Estado del Pedido" rules={[{ required: true }]}>
+                            <Form.Item label="Estado del Pedido" required>
                                 <Radio.Group
                                     onChange={(e) => {
                                         const nextStatus = e.target.value.toString();
