@@ -7,6 +7,7 @@ import ShippingTable from "./ShippingTable";
 import ShippingQRScannerModal from "./ShippingQRScannerModal.tsx";
 import PackageEscalationControlModal from "./PackageEscalationControlModal";
 import TrackingFreezeControlModal from "./TrackingFreezeControlModal";
+import CatalogOrdersModal from "./CatalogOrdersModal";
 import "./ShippingTable.css";
 import { isSuperadminUser } from "../../utils/role";
 
@@ -21,10 +22,11 @@ type ShippingHeaderAction = {
 };
 
 const Shipping = () => {
-	const refreshKey = 0;
+	const [refreshKey, setRefreshKey] = useState(0);
 	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 	const [isEscalationControlVisible, setIsEscalationControlVisible] = useState(false);
 	const [isTrackingFreezeVisible, setIsTrackingFreezeVisible] = useState(false);
+	const [isCatalogOrdersVisible, setIsCatalogOrdersVisible] = useState(false);
 	const [headerAction, setHeaderAction] = useState<ShippingHeaderAction | null>(null);
 
 	const { user }: any = useContext(UserContext);
@@ -33,6 +35,10 @@ const Shipping = () => {
 		user?.role?.toLowerCase() === 'admin' ||
 		user?.role?.toLowerCase() === 'operator' ||
 		user?.role?.toLowerCase() === 'seller';
+	const canManageCatalogOrders =
+		user?.role?.toLowerCase() === 'admin' ||
+		user?.role?.toLowerCase() === 'operator' ||
+		isSuperadmin;
 
 
 	return (
@@ -57,6 +63,15 @@ const Shipping = () => {
 					</h1>
 				</div>
 				<div className="shipping-page-actions flex items-center gap-3">
+					{canManageCatalogOrders && (
+						<Button
+							type="primary"
+							onClick={() => setIsCatalogOrdersVisible(true)}
+							style={{ height: 42, borderRadius: 10, fontWeight: 700 }}
+						>
+							Pedidos catálogo
+						</Button>
+					)}
 					{headerAction?.visible && (
 						<Button
 							data-tour-id="shipping-transfer-action"
@@ -110,6 +125,11 @@ const Shipping = () => {
 			<TrackingFreezeControlModal
 				visible={isTrackingFreezeVisible}
 				onClose={() => setIsTrackingFreezeVisible(false)}
+			/>
+			<CatalogOrdersModal
+				open={isCatalogOrdersVisible}
+				onClose={() => setIsCatalogOrdersVisible(false)}
+				onChanged={() => setRefreshKey((value) => value + 1)}
 			/>
 		</div >
 	);
