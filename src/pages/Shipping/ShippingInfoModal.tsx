@@ -258,7 +258,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
 
 
     const saldoACobrar = useMemo(() => {
-        if (estaPagado === 'si') return 0;
+        if (estaPagado === 'si') {
+            return isSimplePackageOrder ? simplePackageBuyerDebt : 0;
+        }
 
         const deliveryAdicional = internalForm.getFieldValue("quien_paga_delivery") === "comprador"
             ? (cargoDelivery ?? 0)
