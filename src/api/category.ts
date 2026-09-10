@@ -39,3 +39,15 @@ export const getCategoryByIdAPI = async (id: string) => {
         return { success: false };
     }
 }
+
+export const updateCategoryAPI = async (id: string, data: FormData) => {
+    try {
+        const res = await apiClient.put(`/category/${id}`, data, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return res.data;
+    } catch (error) {
+        const err = error as AxiosError;
+        return { success: false, ...((err.response?.data as object) || {}) };
+    }
+};

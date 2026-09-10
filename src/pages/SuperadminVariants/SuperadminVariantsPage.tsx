@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -31,6 +31,9 @@ import {
   updateSuperadminVariantStockAPI,
 } from "../../api/product";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { UserContext } from "../../context/userContext";
+import { isSuperadminUser } from "../../utils/role";
+import CategoryManagementModal from "./CategoryManagementModal";
 
 import "./SuperadminVariantsPage.css";
 
@@ -145,6 +148,8 @@ const SuperadminVariantsPage = () => {
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [duplicatingRow, setDuplicatingRow] = useState<VariantRow | null>(null);
   const [duplicateForm] = Form.useForm();
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const { user } = useContext(UserContext);
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   useEffect(() => {
@@ -582,9 +587,10 @@ const SuperadminVariantsPage = () => {
             Gestiona stock, nombres y borrado físico por vendedor y sucursal.
           </Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
-          Limpiar filtros
-        </Button>
+        <Space>
+          {isSuperadminUser(user) && <Button onClick={() => setCategoriesOpen(true)}>Administrar categorias</Button>}
+          <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>Limpiar filtros</Button>
+        </Space>
       </div>
 
       <div className="superadmin-variants-top-grid">
@@ -783,6 +789,7 @@ const SuperadminVariantsPage = () => {
           </Form>
         )}
       </Modal>
+      <CategoryManagementModal open={categoriesOpen} onClose={() => setCategoriesOpen(false)} />
 
       <Modal
         open={duplicateModalOpen}
