@@ -29,6 +29,32 @@ export const getSellersAPI = async (params?: {
     }
 }
 
+export const getSellerMetricsAPI = async (sellerIds: string[]) => {
+    const res = await apiClient.get(`/seller/metrics`, { params: { ids: sellerIds.join(",") } });
+    return res.data as { data: Array<{ sellerId: string; pago_pendiente: number }> };
+}
+
+export const getSellersSummaryAPI = async (params?: Parameters<typeof getSellersAPI>[0]) => {
+    const res = await apiClient.get(`/seller/summary`, {
+        params: {
+            ...params,
+            branchIds: params?.branchIds?.length ? params.branchIds.join(",") : undefined,
+            serviceTypes: params?.serviceTypes?.length ? params.serviceTypes.join(",") : undefined,
+        }
+    });
+    return res.data as { totalPendingPayment: number };
+}
+
+export const getSellerAlertsAPI = async (includeRows = false) => {
+    const res = await apiClient.get(`/seller/alerts`, { params: includeRows ? { includeRows: "true" } : undefined });
+    return res.data as {
+        noSalesCount: number;
+        debtCount: number;
+        noSales?: any[];
+        debt?: any[];
+    };
+}
+
 export const getSellerPaymentLimitAPI = async () => {
     const res = await apiClient.get(`/seller/payment-limit`)
     return res.data
@@ -99,6 +125,15 @@ export const paySellerDebtAPI = async (sellerId: string,
 export const requestSellerPaymentAPI = async (sellerId: string, payload: FormData) => {
     try {
         const res = await apiClientNoJSON.post(`/seller/${sellerId}/payment-request`, payload)
+        return { success: true, data: res.data }
+    } catch (error) {
+        parseError(error as AxiosError)
+    }
+}
+
+export const cancelSellerPaymentRequestAPI = async (sellerId: string) => {
+    try {
+        const res = await apiClient.post(`/seller/${sellerId}/cancel-payment-request`)
         return { success: true, data: res.data }
     } catch (error) {
         parseError(error as AxiosError)

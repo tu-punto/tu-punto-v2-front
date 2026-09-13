@@ -13,7 +13,7 @@ import {
   Tooltip,
   Tag,
 } from "antd";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { EditOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import PayDebtButton from "./components/PayDebtButton";
@@ -24,14 +24,18 @@ import DeclineServiceReasonModal from "../../components/DeclineServiceReasonModa
 
 import {
   adminDeclineSellerServiceAPI,
+  cancelSellerPaymentRequestAPI,
   cancelSellerServiceDeclineAPI,
   getSellerPaymentLimitAPI,
+  getSellerMetricsAPI,
   getSellersAPI,
+  getSellersSummaryAPI,
   updateSellerPaymentLimitAPI,
 } from "../../api/seller";
 import { getSucursalsAPI } from "../../api/sucursal";
 
 import { ISeller, ISucursalPago } from "../../models/sellerModels";
+import { UserContext } from "../../context/userContext";
 
 type SellerRow = ISeller & {
   key: string;
@@ -39,6 +43,7 @@ type SellerRow = ISeller & {
   pagoTotalInt: number;
   pago_mensual: string;
   fecha_pago_asignada_label: string;
+  metricsReady: boolean;
 };
 
 type SellerListResponse = {
@@ -87,6 +92,7 @@ export default function SellerTable({
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   isFactura: boolean;
 }) {
+  const { user } = useContext(UserContext);
   const [selected, setSelected] = useState<SellerRow | null>(null);
   const [estadoFilter, setEstadoFilter] = useState("todos");
   const [branchFilters, setBranchFilters] = useState<string[]>([]);
@@ -115,6 +121,7 @@ export default function SellerTable({
   const [paymentLimitLoading, setPaymentLimitLoading] = useState(false);
   const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([]);
   const sellersRequestSeq = useRef(0);
+  const summaryRequestSeq = useRef(0);
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
   const serviceOptions = [
@@ -253,6 +260,10 @@ export default function SellerTable({
   const canRenewSeller = (row: SellerRow) =>
     getEstadoVendedor(row) !== "Ya no es cliente";
 
+  const canManagePaymentRequests = ["admin", "superadmin"].includes(
+    String(user?.role || "").toLowerCase()
+  );
+
   const handleAdminDecline = (row: SellerRow) => {
     setDeclineReasonTarget(row);
     setDeclineReasonOpen(true);
@@ -273,6 +284,23 @@ export default function SellerTable({
     });
   };
 
+  const handleCancelPaymentRequest = (row: SellerRow) => {
+    Modal.confirm({
+      title: "Cancelar solicitud de cobro",
+      content: `Se eliminara la solicitud y la fecha de pago asignada de ${row.nombre}. No se registrara ningun pago.`,
+      okText: "Cancelar solicitud",
+      okButtonProps: { danger: true },
+      cancelText: "Volver",
+      onOk: async () => {
+        const res = await cancelSellerPaymentRequestAPI(row.key);
+        if (!res?.success) throw new Error("No se pudo cancelar la solicitud");
+        message.success("Solicitud de cobro cancelada");
+        refresh();
+        await loadPaymentLimit();
+      },
+    });
+  };
+
   const openDrawer = (row: SellerRow) => {
     setSelected(row);
     setDrawerOpen(true);
@@ -288,6 +316,20 @@ export default function SellerTable({
   const renderSellerActions = (row: SellerRow) => (
     <div className="seller-actions">
       <PayDebtButton seller={row} onSuccess={refresh} />
+      {canManagePaymentRequests && row.fecha_pago_asignada ? (
+        <Tooltip title="Cancelar solicitud de cobro">
+          <Button
+            danger
+            size="small"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleCancelPaymentRequest(row);
+            }}
+          >
+            Cancelar cobro
+          </Button>
+        </Tooltip>
+      ) : null}
       {row.declinacion_servicio_fecha ? (
         <Tooltip title="Anular declinacion">
           <Button
@@ -389,8 +431,9 @@ export default function SellerTable({
       },
       {
         title: "Pago pendiente",
-        dataIndex: "pagoTotal",
         key: "pago_pendiente",
+        render: (_: unknown, row: SellerRow) =>
+          row.metricsReady ? row.pagoTotal : <Spin size="small" />,
         sorter: true,
         sortOrder: tableSort.sortBy === "pago_pendiente" ? tableSort.order : null,
       },
@@ -446,11 +489,11 @@ export default function SellerTable({
         title: "Acciones",
         key: "acciones",
         render: (_: unknown, row: SellerRow) => renderSellerActions(row),
-        width: 150,
+        width: 250,
         fixed: "right" as const,
       },
     ],
-    [tableSort]
+    [tableSort, canManagePaymentRequests]
   );
 
   useEffect(() => {
@@ -513,9 +556,8 @@ export default function SellerTable({
           const saldoPendiente = Number((seller as any).saldo_pendiente ?? 0);
           const deuda = Number((seller as any).deuda ?? 0);
           const pagoPendienteFromApi = Number((seller as any).pago_pendiente);
-          const pagoPendiente = Number.isFinite(pagoPendienteFromApi)
-            ? pagoPendienteFromApi
-            : saldoPendiente - deuda;
+          const metricsReady = Number.isFinite(pagoPendienteFromApi);
+          const pagoPendiente = metricsReady ? pagoPendienteFromApi : 0;
 
           return {
             ...seller,
@@ -529,16 +571,40 @@ export default function SellerTable({
             pagoTotalInt: Number.isFinite(pagoPendiente) ? pagoPendiente : 0,
             pago_mensual: `Bs. ${mensual.toFixed(2)}`,
             saldo_pendiente: saldoPendiente,
+            metricsReady,
           };
         });
 
         setSellers(rows);
         setTotal(Array.isArray(response) ? rows.length : Number(response?.total || 0));
-        setTotalPendingPayment(
-          Array.isArray(response)
-            ? rows.reduce((sum, row) => sum + row.pagoTotalInt, 0)
-            : Number(response?.totalPendingPayment || 0)
-        );
+
+        const sellerIdsWithoutMetrics = rows.filter((row) => !row.metricsReady).map((row) => row.key);
+        if (sellerIdsWithoutMetrics.length > 0) {
+          void getSellerMetricsAPI(sellerIdsWithoutMetrics)
+            .then((metricsResponse) => {
+              if (requestSeq !== sellersRequestSeq.current) return;
+              const pendingBySellerId = new Map(
+                (metricsResponse?.data || []).map((metric) => [metric.sellerId, Number(metric.pago_pendiente || 0)])
+              );
+              setSellers((currentRows) =>
+                currentRows.map((row) => {
+                  const pending = pendingBySellerId.get(row.key);
+                  if (pending === undefined) return row;
+                  return {
+                    ...row,
+                    pagoTotal: `Bs. ${pending.toFixed(2)}`,
+                    pagoTotalInt: pending,
+                    metricsReady: true,
+                  };
+                })
+              );
+            })
+            .catch(() => {
+              if (requestSeq === sellersRequestSeq.current) {
+                message.error("No se pudieron cargar los pagos pendientes de esta página");
+              }
+            });
+        }
       } catch {
         if (requestSeq === sellersRequestSeq.current) {
           message.error("Error al cargar vendedores");
@@ -550,6 +616,42 @@ export default function SellerTable({
       }
     })();
   }, [refreshKey, debouncedSearch, estadoFilter, branchFilters, serviceFilters, fechaPagoFilter, tableSort, isFactura, page, pageSize]);
+
+  useEffect(() => {
+    const requestSeq = summaryRequestSeq.current + 1;
+    summaryRequestSeq.current = requestSeq;
+    setTotalPendingPayment(Number.NaN);
+    const statusParam =
+      estadoFilter === "Activo"
+        ? "activo"
+        : estadoFilter === "Debe renovar"
+        ? "debe_renovar"
+        : estadoFilter === "Ya no es cliente"
+        ? "ya_no_es_cliente"
+        : estadoFilter === "Declinando el servicio"
+        ? "declinando_servicio"
+        : undefined;
+
+    void getSellersSummaryAPI({
+      q: debouncedSearch || undefined,
+      status: statusParam,
+      branchIds: branchFilters.length ? branchFilters : undefined,
+      serviceTypes: serviceFilters.length ? serviceFilters : undefined,
+      assignedPaymentDay: fechaPagoFilter === "sin_solicitud" ? "sin_solicitud" : undefined,
+      assignedPaymentDate: fechaPagoFilter !== "todos" && fechaPagoFilter !== "sin_solicitud" ? fechaPagoFilter : undefined,
+    })
+      .then((summary) => {
+        if (requestSeq === summaryRequestSeq.current) {
+          setTotalPendingPayment(Number(summary?.totalPendingPayment || 0));
+        }
+      })
+      .catch(() => {
+        if (requestSeq === summaryRequestSeq.current) {
+          message.error("No se pudo cargar el total de pagos pendientes");
+          setTotalPendingPayment(0);
+        }
+      });
+  }, [refreshKey, debouncedSearch, estadoFilter, branchFilters, serviceFilters, fechaPagoFilter]);
 
   useEffect(() => {
     let canceled = false;
@@ -642,7 +744,7 @@ export default function SellerTable({
 
       <div className="seller-total-title">
         Pago pendiente{" "}
-        {loading ? <Spin size="small" /> : `Bs. ${totalPendingPayment.toFixed(2)}`}
+        {!Number.isFinite(totalPendingPayment) ? <Spin size="small" /> : `Bs. ${totalPendingPayment.toFixed(2)}`}
       </div>
 
       {isMobile ? (
@@ -666,7 +768,7 @@ export default function SellerTable({
                 </div>
                 <div className="seller-mobile-grid">
                   <span>Pago pendiente</span>
-                  <strong>{row.pagoTotal}</strong>
+                  <strong>{row.metricsReady ? row.pagoTotal : <Spin size="small" />}</strong>
                   <span>Vigencia</span>
                   <strong>{String(row.fecha_vigencia)}</strong>
                   <span>Pago asignado</span>
@@ -723,8 +825,9 @@ export default function SellerTable({
                 ? activeSorter.order
                 : undefined;
             const nextSortBy = String(activeSorter?.columnKey || "") as SellerSortBy;
-            if (nextOrder) {
-              setTableSort({ sortBy: nextSortBy, order: nextOrder });
+            const nextSort = nextOrder ? { sortBy: nextSortBy, order: nextOrder } : {};
+            if (nextSort.sortBy !== tableSort.sortBy || nextSort.order !== tableSort.order) {
+              setTableSort(nextSort);
             }
             setPage(pagination.current || 1);
             setPageSize(pagination.pageSize || 10);
