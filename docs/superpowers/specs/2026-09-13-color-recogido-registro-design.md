@@ -15,4 +15,4 @@ El estado y filtro de registro no cambian. El cambio se limita a la tabla de enc
 
 ## Registros antiguos
 
-No habrá migración de base de datos. Las guías antiguas que no posean `isRegistrado` se consideran visualmente registradas y se muestran en verde. Las nuevas guías persistirán explícitamente `isRegistrado: false`, por lo que inician rojas hasta que un encargado las marque. El filtro seguirá la misma interpretación.
+No habrá migración de base de datos. Las guías antiguas que no posean `isRegistrado` se interpretan a partir de su estado histórico `isRecogido`: si fue recogida, ambos indicadores se muestran como registrados/recogidos en verde; si no fue recogida, ambos se muestran rojos. Los filtros siguen esta misma interpretación. Las nuevas guías persistirán explícitamente `isRegistrado: false`, por lo que conservan la secuencia rojo, amarillo y verde definida arriba.
