@@ -54,7 +54,9 @@ const EditProductsModal = ({
         return {
           ...p,
           cantidadMaximaEditable,
-          precio_original: p.precio_original ?? p.precio_unitario,
+          precio_original: p.precio_antes_recogido !== undefined && p.precio_antes_recogido !== null
+            ? p.precio_unitario
+            : (p.precio_original ?? p.precio_unitario),
         };
       })
     );

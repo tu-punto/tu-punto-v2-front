@@ -9,7 +9,7 @@ const ShippingGuide = () => {
     const [refreshKey, setRefreshKey] = useState(0)
 
     const { user } = useContext(UserContext);
-    const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isSeller = String(user?.role || "").toLowerCase() === "seller";
 
     const handleFinish = () => {
         setRefreshKey(prevKey => prevKey + 1);
@@ -40,7 +40,7 @@ const ShippingGuide = () => {
                     </h1>
                 </div>
             </div>
-            {!isAdmin && (
+            {isSeller && (
                 <Button
                     data-tour-id="shipping-guide-upload-button"
                     type="primary"
@@ -52,8 +52,8 @@ const ShippingGuide = () => {
                 <ShippingGuideTable
                     refreshKey={refreshKey}
                     user={user}
-                    isFilterBySeller
-                    search_id={user.id_vendedor}
+                    isFilterBySeller={isSeller}
+                    search_id={user?.id_vendedor || ""}
                 />
             </div>
             

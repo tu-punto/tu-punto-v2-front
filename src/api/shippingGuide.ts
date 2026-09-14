@@ -66,6 +66,19 @@ const markAsDelivered = async (shippingGuideID: string) => {
     }
 }
 
+const markAsRegistered = async (shippingGuideID: string) => {
+    try {
+        await apiClient.put(`/shippingGuide/mark-registered/${shippingGuideID}`)
+        return {success: true}
+    } catch (error) {
+        const err = error as AxiosError;
+        if (err && err.response && err.response.data) {
+            return {success: false, ...err.response.data};
+        }
+        return {success: false}
+    }
+}
+
 const updateShippingGuideObservationsAPI = async (shippingGuideID: string, observaciones: string) => {
     try {
         const res = await apiClient.put(`/shippingGuide/observations/${shippingGuideID}`, { observaciones });
@@ -85,5 +98,6 @@ export {
     getShippingByBranchAPI,
     registerShippingGuideAPI,
     markAsDelivered,
+    markAsRegistered,
     updateShippingGuideObservationsAPI,
 }

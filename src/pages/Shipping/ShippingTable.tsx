@@ -33,12 +33,6 @@ const WAITING_STATUSES = new Set([WAITING_RAW_STATUS, READY_FOR_PICKUP_STATUS]);
 const FILTER_ALL = "todos";
 const FILTER_PENDING_SEND = "para_enviar";
 const FILTER_DELIVERIES = "deliverys";
-const GENERAL_VENDOR_SCOPE_TABS: Array<"todos" | "En Espera" | "para_enviar" | "en_camino"> = [
-    "todos",
-    "En Espera",
-    "para_enviar",
-    "en_camino",
-];
 
 type ShippingHeaderAction = {
     label: string;
@@ -51,24 +45,6 @@ type ShippingHeaderAction = {
 } | null;
 
 const normalizeText = (value: unknown) => String(value || "").trim().toLowerCase();
-const collectSellerIdsFromShippingRow = (row: any) => {
-    const sellerIds = new Set<string>();
-
-    (row?.venta || []).forEach((sale: any) => {
-        const sellerId = String(sale?.vendedor?._id || sale?.vendedor || sale?.id_vendedor || "").trim();
-        if (sellerId) sellerIds.add(sellerId);
-    });
-
-    (row?.productos_temporales || []).forEach((product: any) => {
-        const sellerId = String(product?.id_vendedor || "").trim();
-        if (sellerId) sellerIds.add(sellerId);
-    });
-
-    const directSellerId = String(row?.id_vendedor || row?.sellerId || row?.vendedor?._id || "").trim();
-    if (directSellerId) sellerIds.add(directSellerId);
-
-    return Array.from(sellerIds);
-};
 
 const normalizeStatus = (value: unknown) => String(value || "").trim();
 const isWaitingStatus = (value: unknown) => WAITING_STATUSES.has(normalizeStatus(value));
@@ -257,8 +233,7 @@ const ShippingTable = ({
     const [otherLocation, setOtherLocation] = useState('');
     const [sucursal, setSucursal] = useState([] as any[]);
     const [vendedores, setVendedores] = useState<any[]>([]);
-    const [generalVendorIds, setGeneralVendorIds] = useState<string[]>([]);
-    const [deliveredVendorIds, setDeliveredVendorIds] = useState<string[]>([]);
+    const [globalVendorIds, setGlobalVendorIds] = useState<string[]>([]);
     const [selectedVendedor, setSelectedVendedor] = useState("");
     const [externalSellerSearch, setExternalSellerSearch] = useState("");
     const [searchCliente, setSearchCliente] = useState(""); // Nuevo estado para búsqueda de cliente
@@ -759,12 +734,8 @@ const ShippingTable = ({
             setLoadingTable(false);
         }
     };
-    const activeVendorIds = useMemo(
-        () => (selectedStatus === "entregado" ? deliveredVendorIds : generalVendorIds),
-        [deliveredVendorIds, generalVendorIds, selectedStatus]
-    );
     const getFilteredVendedores = () => {
-        const vendedoresDisponiblesSet = new Set(activeVendorIds.map(String));
+        const vendedoresDisponiblesSet = new Set(globalVendorIds.map(String));
         return vendedores.filter((vendedor: any) => vendedoresDisponiblesSet.has(String(vendedor._id)));
     };
     const hasExternalInCurrentStatus = () => canManageExternal;
@@ -1135,90 +1106,28 @@ const ShippingTable = ({
 
         let cancelled = false;
 
-        const fetchVendorScopes = async () => {
+        const fetchGlobalVendorIds = async () => {
             try {
-                const from = dateRange[0] ? moment(dateRange[0]).startOf("day").toISOString() : undefined;
-                const to = dateRange[1] ? moment(dateRange[1]).endOf("day").toISOString() : undefined;
-                const destinationMode =
-                    selectedLocation === "other"
-                        ? "other"
-                        : selectedLocation
-                            ? "branch"
-                            : "any";
-                const destinationQuery =
-                    selectedLocation === "other"
-                        ? otherLocation.trim() || undefined
-                        : selectedLocation || undefined;
-                const baseParams = {
+                const response = await getShippingDashboardListAPI({
                     page: 1,
-                    limit: 3000,
-                    from,
-                    to,
-                    currentBranchId: currentSucursalId || undefined,
-                    client: searchCliente.trim() || undefined,
-                    externalSellerSearch:
-                        selectedVendedor === EXTERNAL_VENDOR_FILTER
-                            ? externalSellerSearch.trim() || undefined
-                            : undefined,
-                    destinationMode: destinationMode as "any" | "branch" | "other",
-                    destinationQuery,
-                };
-
-                const scopeResponses = await Promise.all([
-                    ...GENERAL_VENDOR_SCOPE_TABS.map((tab) =>
-                        getShippingDashboardListAPI({
-                            ...baseParams,
-                            tab,
-                        })
-                    ),
-                    getShippingDashboardListAPI({
-                        ...baseParams,
-                        tab: "entregado",
-                    }),
-                ]);
+                    limit: 1,
+                    tab: FILTER_ALL,
+                    includeGlobalVendorIds: true,
+                });
 
                 if (cancelled) return;
 
-                const nextGeneralVendorIds = Array.from(
-                    new Set(
-                        scopeResponses
-                            .slice(0, GENERAL_VENDOR_SCOPE_TABS.length)
-                            .flatMap((response: any) => {
-                                const vendorIdsFromResponse = Array.isArray(response?.vendorIds)
-                                    ? response.vendorIds.map((value: any) => String(value))
-                                    : [];
-                                const vendorIdsFromRows = Array.isArray(response?.rows)
-                                    ? response.rows.flatMap((row: any) => collectSellerIdsFromShippingRow(row))
-                                    : [];
-                                return [...vendorIdsFromResponse, ...vendorIdsFromRows];
-                            })
-                    )
+                setGlobalVendorIds(
+                    Array.isArray(response?.globalVendorIds)
+                        ? response.globalVendorIds.map((value: any) => String(value))
+                        : []
                 );
-                const nextDeliveredVendorIds = Array.from(
-                    new Set(
-                        [
-                            ...(Array.isArray(scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length]?.vendorIds)
-                                ? scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length].vendorIds.map((value: any) =>
-                                    String(value)
-                                )
-                                : []),
-                            ...(Array.isArray(scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length]?.rows)
-                                ? scopeResponses[GENERAL_VENDOR_SCOPE_TABS.length].rows.flatMap((row: any) =>
-                                    collectSellerIdsFromShippingRow(row)
-                                )
-                                : []),
-                        ]
-                    )
-                );
-
-                setGeneralVendorIds(nextGeneralVendorIds);
-                setDeliveredVendorIds(nextDeliveredVendorIds);
             } catch (error) {
-                console.error("Error al obtener vendedores filtrados:", error);
+                console.error("Error al obtener vendedores globales:", error);
             }
         };
 
-        void fetchVendorScopes();
+        void fetchGlobalVendorIds();
 
         return () => {
             cancelled = true;
@@ -1226,21 +1135,8 @@ const ShippingTable = ({
     }, [
         isAdmin,
         isOperator,
-        dateRange,
-        selectedLocation,
-        otherLocation,
-        currentSucursalId,
-        selectedVendedor,
-        searchCliente,
-        externalSellerSearch,
         refreshKey,
     ]);
-
-    useEffect(() => {
-        if (!selectedVendedor || selectedVendedor === EXTERNAL_VENDOR_FILTER) return;
-        if (activeVendorIds.includes(String(selectedVendedor))) return;
-        setSelectedVendedor("");
-    }, [activeVendorIds, selectedVendedor]);
 
     useEffect(() => {
         if (!onHeaderActionChange) return;

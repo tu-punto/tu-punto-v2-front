@@ -307,6 +307,12 @@ const StockManagement = () => {
     }, [isSeller]);
 
     useEffect(() => {
+        return () => {
+            clearTempStock();
+        };
+    }, []);
+
+    useEffect(() => {
         if (isSeller) {
             if (sellerSucursales.length === 0) return;
             const current = String(sucursalId || "");
@@ -390,6 +396,12 @@ const StockManagement = () => {
     };
 
     const handleSelectSeller = (sellerId: string | null) => {
+        if (String(sellerId || "") !== String(selectedSeller || "")) {
+            clearTempStock();
+            setStockListForConfirmModal([]);
+            setResetSignal(true);
+            setTimeout(() => setResetSignal(false), 100);
+        }
         setSelectedSeller(sellerId);
     };
     const saveNewProducts = async (productData, combinations, selectedFeatures, features) => {

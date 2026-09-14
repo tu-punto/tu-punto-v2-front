@@ -12,6 +12,7 @@ import {
   toBase64Png,
 } from "./shippingQrLabel";
 import QzPrinterSelector from "./QzPrinterSelector";
+import DeliveryDateMetadata from "./DeliveryDateMetadata";
 import { PICKED_UP_BY_VENDOR_LABEL, isDeliveredLikeStatus, resolvePickupStatus } from "./shippingStatus";
 
 interface ExternalShippingInfoModalProps {
@@ -858,6 +859,10 @@ const ExternalShippingInfoModal = ({
           </div>
         )}
         <Form form={form} layout="vertical" onFinish={handleSave}>
+        <DeliveryDateMetadata
+          createdAt={externalShipping?.fecha_pedido}
+          pickedUpAt={externalShipping?.hora_entrega_real}
+        />
         <Card title="Informacion del Vendedor" bordered={false}>
           <Row gutter={16}>
             <Col span={12}>
@@ -1086,7 +1091,7 @@ const ExternalShippingInfoModal = ({
                   <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                   <Radio.Button value="En camino">En camino</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>
-                  {(isSimplePackage || externalShipping?.is_external) && (
+                  {isSimplePackage && (
                     <Radio.Button value={PICKED_UP_BY_VENDOR_LABEL}>{PICKED_UP_BY_VENDOR_LABEL}</Radio.Button>
                   )}
                 </Radio.Group>

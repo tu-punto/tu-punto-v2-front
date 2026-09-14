@@ -2,14 +2,13 @@ import { Alert, Badge, Button, List, message, Modal, Space } from "antd";
 import SellerTable from "./SellerTable";
 import SellerForm from "./SellerFormModal";
 import { useContext, useEffect, useState } from "react";
-import { autoRenewSellersAPI, getSellersAPI } from "../../api/seller";
+import { autoRenewSellersAPI, getSellerAlertsAPI } from "../../api/seller";
 import "./SellerTable.css";
 import LandingLeadsModal from "./LandingLeadsModal";
 import { getLandingLeadsAPI } from "../../api/landingLeads";
 import DeclineResponsesModal from "./DeclineResponsesModal";
 import { UserContext } from "../../context/userContext";
 import { isSuperadminUser } from "../../utils/role";
-import dayjs from "dayjs";
 
 export const Seller: React.FC<{ isFactura: boolean }> = ({
   isFactura = false,
@@ -23,29 +22,14 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   const [leadCounterLoading, setLeadCounterLoading] = useState(false);
   const [declineResponsesOpen, setDeclineResponsesOpen] = useState(false);
   const [declineResponsesCount, setDeclineResponsesCount] = useState(0);
-  const [noSalesSellers, setNoSalesSellers] = useState<any[]>([]);
-  const [debtAlertSellers, setDebtAlertSellers] = useState<any[]>([]);
+  const [noSalesCount, setNoSalesCount] = useState(0);
+  const [debtAlertCount, setDebtAlertCount] = useState(0);
+  const [alertsLoading, setAlertsLoading] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<{ noSales: boolean; debt: boolean }>({
     noSales: false,
     debt: false,
   });
   const [alertModal, setAlertModal] = useState<{ title: string; rows: any[] } | null>(null);
-
-  const isActiveSellerForAlert = (seller: any) => {
-    const fechaVigencia = dayjs(seller?.fecha_vigencia);
-    if (!fechaVigencia.isValid()) return false;
-
-    const today = dayjs().startOf("day");
-    const declinacion = seller?.declinacion_servicio_fecha ? dayjs(seller.declinacion_servicio_fecha) : null;
-    if (declinacion?.isValid()) {
-      const retiroHasta = fechaVigencia.endOf("day").add(5, "day");
-      if (!today.isAfter(retiroHasta)) return true;
-      return false;
-    }
-
-    const diasVencido = today.diff(fechaVigencia.endOf("day"), "day");
-    return diasVencido <= 20;
-  };
 
   const refreshLeadCounter = async () => {
     setLeadCounterLoading(true);
@@ -61,24 +45,16 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
   };
 
   const refreshSellerAlerts = async () => {
+    setAlertsLoading(true);
     try {
-      const response = await getSellersAPI();
-      const rows = Array.isArray(response) ? response : Array.isArray((response as any)?.data) ? (response as any).data : [];
-      setDeclineResponsesCount(rows.filter((row: any) => Boolean(row?.declinacion_servicio_fecha)).length);
-      setNoSalesSellers(
-        rows.filter((row: any) => isActiveSellerForAlert(row) && Number(row?.activity_last_30_days_count || 0) === 0)
-      );
-      setDebtAlertSellers(
-        rows.filter((row: any) => {
-          const pagoMensual = Number(row?.pago_mensual || 0);
-          const pagoPendiente = Number(row?.pago_pendiente ?? row?.pagoTotalInt ?? 0);
-          return pagoMensual > 0 && pagoPendiente <= -1.5 * pagoMensual;
-        })
-      );
+      const response = await getSellerAlertsAPI();
+      setNoSalesCount(Number(response?.noSalesCount || 0));
+      setDebtAlertCount(Number(response?.debtCount || 0));
     } catch {
-      setDeclineResponsesCount(0);
-      setNoSalesSellers([]);
-      setDebtAlertSellers([]);
+      setNoSalesCount(0);
+      setDebtAlertCount(0);
+    } finally {
+      setAlertsLoading(false);
     }
   };
 
@@ -87,14 +63,20 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
     void refreshSellerAlerts();
   }, [refreshKey]);
 
-  const renderAlert = (title: string, rows: any[], dismissKey: "noSales" | "debt") => {
-    if (dismissedAlerts[dismissKey] || rows.length === 0) return null;
+  const openAlertDetails = async (type: "noSales" | "debt", title: string) => {
+    try {
+      const response = await getSellerAlertsAPI(true);
+      setAlertModal({ title, rows: type === "noSales" ? response.noSales || [] : response.debt || [] });
+    } catch {
+      message.error("No se pudo cargar el detalle de la alerta");
+    }
+  };
 
-    const singular = rows.length === 1;
-    const fullName = (row: any) => `${row?.nombre || ""} ${row?.apellido || ""}`.trim();
-    const summary = singular
-      ? `${fullName(rows[0]) || "Una persona"}`
-      : `${rows.length} personas`;
+  const renderAlert = (title: string, count: number, dismissKey: "noSales" | "debt") => {
+    if (dismissedAlerts[dismissKey] || (!alertsLoading && count === 0)) return null;
+
+    const singular = count === 1;
+    const summary = singular ? "1 persona" : `${count} personas`;
 
     return (
       <Alert
@@ -105,9 +87,9 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
         message={title}
         description={
           <Space size={8} wrap>
-            <span>{summary}</span>
+            {alertsLoading ? <span>Cargando...</span> : <span>{summary}</span>}
             {!singular && (
-              <Button type="link" size="small" onClick={() => setAlertModal({ title, rows })}>
+              <Button type="link" size="small" loading={alertsLoading} onClick={() => void openAlertDetails(dismissKey, title)}>
                 Ver más
               </Button>
             )}
@@ -207,8 +189,8 @@ export const Seller: React.FC<{ isFactura: boolean }> = ({
       </div>
 
       <div className="mb-4 grid gap-3 xl:grid-cols-2">
-        {renderAlert("Esta o estas personas no hicieron una venta este mes", noSalesSellers, "noSales")}
-        {renderAlert("Revisar pago pendiente de esta o estas personas", debtAlertSellers, "debt")}
+        {renderAlert("Esta o estas personas no hicieron una venta este mes", noSalesCount, "noSales")}
+        {renderAlert("Revisar pago pendiente de esta o estas personas", debtAlertCount, "debt")}
       </div>
 
       <SellerTable

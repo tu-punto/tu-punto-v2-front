@@ -52,6 +52,7 @@ const getShippingDashboardListAPI = async (params?: {
   guide?: string;
   destinationMode?: "any" | "branch" | "other";
   destinationQuery?: string;
+  includeGlobalVendorIds?: boolean;
 }) => {
   try {
     const res = await apiClient.get("/shipping/dashboard", { params });
