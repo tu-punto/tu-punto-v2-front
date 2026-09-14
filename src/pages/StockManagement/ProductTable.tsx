@@ -10,7 +10,6 @@ import { getCategoryByIdAPI } from '../../api/category';
 import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path si es diferente
 import ProductPriceMatrixModal from "./ProductPriceMatrixModal.tsx";
 import VariantInfoModal from "./VariantInfoModal";
-import { saveTempStock } from "../../utils/storageHelpers";
 import { reconstructProductFromFlat, fetchFullProductById } from "../../utils/storageHelpers";
 import { includesNormalized } from "../../utils/search";
 
@@ -31,7 +30,7 @@ interface ProductTableProps {
 }
 
 const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller, onShowVariantModal, sellersVigentes}: ProductTableProps) => {
-    const [ingresoData, setIngresoData] = useState<{ [key: string]: number | '' }>({});
+    const [incomeDraft, setIncomeDraft] = useState<Record<string, any>>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
     const [updatedProductsList, setUpdatedProductsList] = useState<any[]>([]);
@@ -62,53 +61,47 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         fetchCategories();
     }, []);
     useEffect(() => {
-        const ingresos = JSON.parse(localStorage.getItem("newStock") || "[]");
-
-        const ingresoObj: { [key: string]: number } = {};
-        ingresos.forEach((entry: any) => {
-            const key = `${entry.productId}-${entry.sucursalId}-${entry.index}`;
-            ingresoObj[key] = entry.stock;
-        });
-
-        setIngresoData(ingresoObj);
-    }, []);
-    useEffect(() => {
         if (resetSignal) {
-            setIngresoData({});
+            setIncomeDraft({});
         }
     }, [resetSignal]);
-    const handleIngresoChange = (key: string, value: number) => {
-        setIngresoData((prev) => {
-            const updated = { ...prev, [key]: value };
 
-            const newStockArray = Object.entries(updated)
-                .filter(([_, stock]) => Number(stock) !== 0)
-                .map(([k, stock]) => {
-                    const [productId, sucursalId] = k.split("-");
-                    const producto = productsList.find(p => `${p._id}-${p.sucursalId}-${p.variante || 'base'}` === k);
+    useEffect(() => {
+        setIncomeDraft({});
+    }, [selectedSeller]);
 
-                    return {
-                        product: {
-                            _id: producto._id,
-                            nombre_producto: producto.nombre_producto,
-                            nombre_categoria: producto.categoria || "Sin categoría",
-                            variantes: producto.variantes_obj || producto.variantes || producto.variant || {},
-                            precio: producto.precio ?? "-",
-                            stock: producto.stock ?? "-"
-                        },
-                        newStock: {
-                            productId,
-                            sucursalId,
-                            stock: Number(stock)
-                        }
-                    };
-                });
+    useEffect(() => {
+        setStockListForConfirmModal?.(Object.values(incomeDraft));
+    }, [incomeDraft, setStockListForConfirmModal]);
 
-            if (setStockListForConfirmModal) {
-                setStockListForConfirmModal(newStockArray);
+    const handleDraftIncomeChange = (record: any, value: number) => {
+        const stock = Number.isFinite(value) ? value : 0;
+
+        setIncomeDraft((previousDraft) => {
+            if (stock <= 0) {
+                const { [record.key]: _removedEntry, ...nextDraft } = previousDraft;
+                return nextDraft;
             }
 
-            return updated;
+            return {
+                ...previousDraft,
+                [record.key]: {
+                    id_vendedor: record.id_vendedor,
+                    product: {
+                        _id: record._id,
+                        nombre_producto: record.nombre_producto,
+                        nombre_categoria: record.categoria || record.nombre_categoria || "Sin categoria",
+                        variantes: record.variantes_obj || record.variantes || record.variant || {},
+                        precio: record.precio ?? "-",
+                        stock: record.stock ?? "-"
+                    },
+                    newStock: {
+                        productId: record._id,
+                        sucursalId: record.sucursalId,
+                        stock
+                    }
+                }
+            };
         });
     };
 
@@ -236,25 +229,6 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     };
 
 
-    const handleStockUpdate = () => {
-        const newStock = [];
-
-        for (const product of updatedProductsList) {
-            const key = `${product._id}-${product.sucursalId}`;
-            const ingreso = ingresoData[key] || 0;
-            if (ingreso > 0) {
-                newStock.push({
-                    productId: product._id,
-                    sucursalId: 3, //
-                    stock: ingreso
-                });
-            }
-        }
-
-        //console.log("Datos a enviar a API (mock):", newStock);
-        alert("Stock actualizado (simulado)");
-        setIngresoData({});
-    };
     const groupProductsByBaseName = (products: any[]) => {
         const groups: { [key: string]: any } = {};
 
@@ -354,8 +328,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 record.variant ? (
                     <Input
                         data-testid="stock-income-input"
-                        value={ingresoData[record.key] ?? ''}
-                        onChange={(e) => handleIngresoChange(record.key, Number(e.target.value))}
+                        value={incomeDraft[record.key]?.newStock?.stock ?? ''}
+                        onChange={(e) => handleDraftIncomeChange(record, Number(e.target.value))}
                         onClick={(event) => event.stopPropagation()}
                         placeholder="Ingresar cantidad"
                         type="number"
@@ -553,7 +527,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                                     columns={columns}
                                     dataSource={groupedProducts}
                                     rowClassName={(record) =>
-                                        record.variant && ingresoData[record.key] && ingresoData[record.key] !== 0
+                                        record.variant && incomeDraft[record.key]?.newStock?.stock
                                             ? "bg-green-50 border-l-4 border-green-500"
                                             : ""
                                     }
