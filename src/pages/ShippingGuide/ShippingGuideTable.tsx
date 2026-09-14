@@ -16,7 +16,10 @@ const attachmentType = (key: string): GuideAttachment["type"] => {
     return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext || "") ? "image" : ext === "pdf" ? "pdf" : "other";
 };
 const hasProductList = (guide: any) => Array.isArray(guide.lista_productos_keys) && guide.lista_productos_keys.length > 0;
-const isRegistered = (guide: any) => guide.isRegistrado !== false;
+const isRegistered = (guide: any) => {
+    const isLegacyGuide = guide.isRegistrado === undefined || guide.isRegistrado === null;
+    return isLegacyGuide ? Boolean(guide.isRecogido) : guide.isRegistrado === true;
+};
 const StatusDot = ({ active }: { active: boolean }) => <div className={`w-4 h-4 rounded-full ${active ? "bg-green-500" : "bg-red-500"}`} />;
 const sellerName = (guide: any) => `${guide.vendedor?.nombre || ""} ${guide.vendedor?.apellido || ""}`.trim() || "Sin vendedor";
 
