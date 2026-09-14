@@ -28,6 +28,7 @@ import {
 import { createPixelConfig, qzPrint, resolvePreferredQzPrinter } from "../../utils/qzTray";
 import { isDeliveryEditLockedAfterFiveDays } from "../../utils/deliveryEditGuard";
 import { PICKED_UP_BY_VENDOR_LABEL, isDeliveredLikeStatus, resolvePickupStatus } from "./shippingStatus";
+import DeliveryDateMetadata from "./DeliveryDateMetadata";
 
 const TZ = "America/La_Paz";
 const LATE_PICKUP_GRACE_DAYS = 200;
@@ -930,6 +931,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 onFinish={handleSave}
                 disabled={!canEditShipping}
             >
+                <DeliveryDateMetadata
+                    createdAt={shipping?.fecha_pedido}
+                    pickedUpAt={shipping?.hora_entrega_real}
+                />
                 {/* INFORMACIÓN DEL CLIENTE */}
                 <Card title="Información del Cliente" bordered={false}>
                     <Row gutter={16}>
