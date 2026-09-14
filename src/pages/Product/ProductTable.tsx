@@ -42,6 +42,11 @@ const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, is
                         promotion={record.pricingPromotion}
                         compact
                         showTierBadge
+                        onConditionalAccept={
+                            !isMobile
+                                ? (accepted) => onSelectProduct({ ...record, promoAccepted: accepted })
+                                : undefined
+                        }
                     />
                 </Space>
             ),
