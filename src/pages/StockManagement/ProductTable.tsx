@@ -74,11 +74,20 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         setStockListForConfirmModal?.(Object.values(incomeDraft));
     }, [incomeDraft, setStockListForConfirmModal]);
 
-    const handleDraftIncomeChange = (record: any, value: number) => {
-        const stock = Number.isFinite(value) ? value : 0;
+    const handleDraftIncomeChange = (record: any, rawValue: string) => {
+        if (rawValue === "") {
+            setIncomeDraft((previousDraft) => {
+                const { [record.key]: _removedEntry, ...nextDraft } = previousDraft;
+                return nextDraft;
+            });
+            return;
+        }
+
+        const stock = Number(rawValue);
+        if (!Number.isFinite(stock)) return;
 
         setIncomeDraft((previousDraft) => {
-            if (stock <= 0) {
+            if (stock === 0) {
                 const { [record.key]: _removedEntry, ...nextDraft } = previousDraft;
                 return nextDraft;
             }
@@ -329,7 +338,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                     <Input
                         data-testid="stock-income-input"
                         value={incomeDraft[record.key]?.newStock?.stock ?? ''}
-                        onChange={(e) => handleDraftIncomeChange(record, Number(e.target.value))}
+                        onChange={(e) => handleDraftIncomeChange(record, e.target.value)}
                         onClick={(event) => event.stopPropagation()}
                         placeholder="Ingresar cantidad"
                         type="number"
