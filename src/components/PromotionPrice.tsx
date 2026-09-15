@@ -65,10 +65,23 @@ export const ConditionalPromotionDetails = ({
         </div>
         {onDecision && (
           <Space style={{ marginTop: 10 }}>
-            <Button size="small" type="primary" onClick={() => handleDecision(true)}>
+            <Button
+              size="small"
+              type="primary"
+              onClick={(event) => {
+                stopPropagation(event);
+                handleDecision(true);
+              }}
+            >
               {acceptText}
             </Button>
-            <Button size="small" onClick={() => handleDecision(false)}>
+            <Button
+              size="small"
+              onClick={(event) => {
+                stopPropagation(event);
+                handleDecision(false);
+              }}
+            >
               {rejectText}
             </Button>
           </Space>
