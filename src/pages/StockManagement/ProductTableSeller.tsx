@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Table, Select, Input, Switch } from "antd";
 import VariantInfoModal from "./VariantInfoModal.tsx";
 import PromotionPrice from "../../components/PromotionPrice";
-import { includesNormalized } from "../../utils/search";
+import { matchesAllSearchWords } from "../../utils/search";
 
 const CRITICAL_STOCK_THRESHOLD = 1;
 
@@ -72,7 +72,7 @@ const ProductTableSeller = ({
             if (selectedCategory !== "all" && String(row.id_categoria) !== String(selectedCategory)) return false;
             if (selectedProductForList !== "all" && String(row._id) !== String(selectedProductForList)) return false;
             if (filterAvailableStock && Number(row.stock || 0) <= 0) return false;
-            return includesNormalized(row.nombre_producto, searchText) || includesNormalized(row.variant, searchText);
+            return matchesAllSearchWords(`${row.nombre_producto || ""} ${row.variant || ""}`, searchText);
         });
 
         const grouped = new Map<string, any[]>();

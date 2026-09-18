@@ -11,7 +11,7 @@ import PricePerBranchModal from "./PricePerBranchModal.tsx"; // corrige el path 
 import ProductPriceMatrixModal from "./ProductPriceMatrixModal.tsx";
 import VariantInfoModal from "./VariantInfoModal";
 import { reconstructProductFromFlat, fetchFullProductById } from "../../utils/storageHelpers";
-import { includesNormalized } from "../../utils/search";
+import { matchesAllSearchWords } from "../../utils/search";
 
 
 interface ProductTableProps {
@@ -246,17 +246,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
 
             const baseName = product.nombre_producto;
 
-            const searchWords = searchText.split(" ");
-            const specialChars = /[!@#$%^&*?:{}|<>]/
-            let nombreMatch = true;
-            let varianteMatch = true;
-            for (const word of searchWords) {
-                if (specialChars.test(word)) continue
-                nombreMatch = nombreMatch && includesNormalized(baseName, word);
-                varianteMatch = varianteMatch && includesNormalized(product.variant, word);
-            }
-
-            if (searchText && !nombreMatch && !varianteMatch) return;
+            if (searchText && !matchesAllSearchWords(`${baseName} ${product.variant || ""}`, searchText)) return;
 
             if (!groups[baseName]) {
                 groups[baseName] = {
@@ -451,13 +441,10 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         });
 
         setUpdatedProductsList(updatedProducts);
-        const lowerSearch = searchText.toLowerCase();
-
         const filteredProducts = updatedProducts.filter(product => {
             return (
-                lowerSearch === "" ||
-                includesNormalized(product.nombre_producto, lowerSearch) ||
-                includesNormalized(product.variant, lowerSearch)
+                !searchText.trim() ||
+                matchesAllSearchWords(`${product.nombre_producto || ""} ${product.variant || ""}`, searchText)
             );
         });
 

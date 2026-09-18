@@ -10,3 +10,11 @@ export const includesNormalized = (value: unknown, query: unknown) => {
   if (!normalizedQuery) return true;
   return normalizeSearchText(value).includes(normalizedQuery);
 };
+
+export const matchesAllSearchWords = (value: unknown, query: unknown) => {
+  const words = normalizeSearchText(query)
+    .split(/\s+/)
+    .filter((word) => word && !/[!@#$%^&*?:{}|<>]/.test(word));
+
+  return words.every((word) => includesNormalized(value, word));
+};
