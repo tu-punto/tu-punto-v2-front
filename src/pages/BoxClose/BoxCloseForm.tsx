@@ -173,12 +173,11 @@ const BoxCloseForm = ({
   function applyExpectedAndDiffs(ops: OperacionAdicional[]) {
     const iniEf = Number(form.getFieldValue("efectivo_inicial") || 0);
     const ventasE = Number(form.getFieldValue("ventas_efectivo") || 0);
-    const iniQr = Number(form.getFieldValue("bancario_inicial") || 0);
     const ventasQ = Number(form.getFieldValue("ventas_qr") || 0);
     const { deltaEf, deltaQr, cambiosExternos } = getOperationTotals(ops);
 
     const efectivoEsperado = iniEf + ventasE + deltaEf;
-    const bancarioEsperado = iniQr + ventasQ + deltaQr;
+    const bancarioEsperado = ventasQ + deltaQr;
     const efectivoReal = Number(form.getFieldValue("efectivo_real") || 0);
     const bancarioReal = Number(form.getFieldValue("bancario_real") || 0);
 
@@ -295,7 +294,7 @@ const BoxCloseForm = ({
   useEffect(() => {
     recalcExpectedAndDiffs(operations);
   }, [Form.useWatch("efectivo_inicial", form), Form.useWatch("ventas_efectivo", form),
-    Form.useWatch("bancario_inicial", form), Form.useWatch("ventas_qr", form)]);
+    Form.useWatch("ventas_qr", form)]);
 
   useEffect(() => {
     if (mode !== "edit") {
@@ -335,7 +334,7 @@ const BoxCloseForm = ({
     form.setFieldsValue({
       responsable: responsableValue,
       efectivo_inicial: initialData.efectivo_inicial || 0,
-      bancario_inicial: initialData.bancario_inicial || 0,
+      bancario_inicial: 0,
       ventas_efectivo: initialData.ventas_efectivo || 0,
       ventas_qr: initialData.ventas_qr || 0,
       efectivo_esperado: initialData.efectivo_esperado || 0,
@@ -489,7 +488,7 @@ const BoxCloseForm = ({
             : initialData.responsable,
           closed_at: closingAtISO,
           efectivo_inicial: form.getFieldValue("efectivo_inicial"),
-          bancario_inicial: form.getFieldValue("bancario_inicial"),
+          bancario_inicial: 0,
           ventas_efectivo: form.getFieldValue("ventas_efectivo"),
           ventas_qr: form.getFieldValue("ventas_qr"),
           ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
@@ -516,6 +515,7 @@ const BoxCloseForm = ({
           },
           cambios_externos: form.getFieldValue("cambios_externos") || 0,
           closed_at: closingAtISO,
+          bancario_inicial: 0,
           ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
           ventas_efectivo: salesSummary?.cash ?? 0,
           ventas_qr:       salesSummary?.bank ?? 0,
@@ -882,6 +882,48 @@ const BoxCloseForm = ({
             </Card>
           </Col>
         </Row>
+
+        <Card>
+          <Title level={5}>ConciliaciÃ³n QR</Title>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item label="Ventas QR del dÃ­a" name="ventas_qr">
+                <InputNumber
+                  prefix="Bs. "
+                  readOnly
+                  className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="QR esperado" name="bancario_esperado">
+                <InputNumber
+                  prefix="Bs. "
+                  readOnly
+                  className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="QR recibido hoy"
+                name="bancario_real"
+                rules={[{ required: true, message: "Ingresa el total QR recibido hoy" }]}
+              >
+                <InputNumber min={0} precision={2} prefix="Bs. " className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Diferencia QR" name="diferencia_bancario">
+                <InputNumber
+                  prefix="Bs. "
+                  readOnly
+                  className="w-full bg-gray-200 text-gray-700"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
 
         {/* Control bancario temporalmente deshabilitado
         <Card>

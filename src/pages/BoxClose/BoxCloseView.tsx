@@ -34,6 +34,10 @@ const BoxCloseView = ({ boxClose }: Props) => {
         efectivo_esperado,
         efectivo_real,
         diferencia_efectivo,
+        ventas_qr,
+        bancario_esperado,
+        bancario_real,
+        diferencia_bancario,
         observaciones,
         total_coins,
         total_bills,
@@ -109,10 +113,9 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 <Form.Item label="Efectivo">
                                     <InputNumber value={ventas_efectivo} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
-                                {/* Control bancario temporalmente deshabilitado */}
-                                {/* <Form.Item label="QR/Bancario">
+                                <Form.Item label="Ventas QR del dÃ­a">
                                     <InputNumber value={ventas_qr} readOnly style={{ width: "100%" }} prefix="Bs." />
-                                </Form.Item> */}
+                                </Form.Item>
                                 <Form.Item label="Cambios Externos">
                                     <InputNumber
                                         value={boxClose.cambios_externos}
@@ -159,6 +162,29 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                             style={{ width: "100%", textAlign: "center", padding: "4px 0" }}
                                         >
                                             Bs. {diferencia_efectivo?.toFixed(2)}
+                                        </Tag>
+                                    </Tooltip>
+                                </Form.Item>
+                            </Form>
+                        </Card>
+
+                        <Card className="mb-4">
+                            <Title level={5}>ConciliaciÃ³n QR</Title>
+                            <Form layout="vertical">
+                                <Form.Item label="QR esperado">
+                                    <InputNumber value={bancario_esperado} readOnly style={{ width: "100%" }} prefix="Bs." />
+                                </Form.Item>
+                                <Form.Item label="QR recibido hoy">
+                                    <InputNumber value={bancario_real} readOnly style={{ width: "100%" }} prefix="Bs." />
+                                </Form.Item>
+                                <Form.Item label="Diferencia QR">
+                                    <Tooltip title={diferencia_bancario === 0 ? "Cuadrado" : "Descuadre"}>
+                                        <Tag
+                                            icon={diferencia_bancario === 0 ? <CheckCircleOutlined /> : <WarningOutlined />}
+                                            color={diferencia_bancario === 0 ? "success" : diferencia_bancario > 0 ? "warning" : "error"}
+                                            style={{ width: "100%", textAlign: "center", padding: "4px 0" }}
+                                        >
+                                            Bs. {Number(diferencia_bancario || 0).toFixed(2)}
                                         </Tag>
                                     </Tooltip>
                                 </Form.Item>
