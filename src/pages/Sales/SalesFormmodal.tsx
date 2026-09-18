@@ -27,6 +27,7 @@ const tipoPagoMap: Record<number, string> = {
   2: "Efectivo",
   3: "Pagado al dueño",
   4: "Efectivo + QR",
+  5: "Correctivo",
 };
 
 function SalesFormModal({
@@ -74,6 +75,12 @@ function SalesFormModal({
       setEfectivoInput(mitad);
       form.setFieldsValue({ subtotal_qr: mitad, subtotal_efectivo: mitad });
     }
+
+    if (tipoPago === "5") {
+      setQrInput(0);
+      setEfectivoInput(0);
+      form.setFieldsValue({ subtotal_qr: 0, subtotal_efectivo: 0, subtotal_correctivo: monto });
+    }
   }, [tipoPago, totalAmount, form]);
 
   useEffect(() => {
@@ -108,6 +115,7 @@ function SalesFormModal({
         tipoPagoSeleccionado === 2 || tipoPagoSeleccionado === 4
           ? efectivoInput || totalAmount / 2
           : 0,
+      subtotal_correctivo: tipoPagoSeleccionado === 5 ? totalAmount : 0,
       sucursal: branchIdFromProps,
       lugar_origen: branchIdFromProps,
       cliente: "Sin nombre",
@@ -191,6 +199,7 @@ function SalesFormModal({
               <Radio.Button value="2">{tipoPagoMap[2]}</Radio.Button>
               <Radio.Button value="3">{tipoPagoMap[3]}</Radio.Button>
               <Radio.Button value="4">{tipoPagoMap[4]}</Radio.Button>
+              <Radio.Button value="5">{tipoPagoMap[5]}</Radio.Button>
             </Radio.Group>
           </Form.Item>
         </div>

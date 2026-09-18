@@ -4,6 +4,7 @@ import { getDailyServiceIncomeAPI } from "../api/financeFlux";
 export interface IDailySummary {
   cash: number;
   bank: number;
+  corrective: number;
   total: number;
 }
 
@@ -36,11 +37,13 @@ export const getDailySummary = async (
   
   let efectivoTotal = 0;
   let qrTotal = 0;
+  let correctivoTotal = 0;
 
   if (response.success) {
-    const { efectivo, qr } = response.totales_cierre || response.totales;
+    const { efectivo, qr, correctivo } = response.totales_cierre || response.totales;
     efectivoTotal = efectivo;
     qrTotal = qr;
+    correctivoTotal = correctivo || 0;
   }
 
   // Get service income from FinanceFlux
@@ -67,6 +70,7 @@ export const getDailySummary = async (
   return {
     cash: efectivoTotal,
     bank: qrTotal,
+    corrective: correctivoTotal,
     total: efectivoTotal + qrTotal,
   };
 };

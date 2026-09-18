@@ -35,6 +35,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
         efectivo_real,
         diferencia_efectivo,
         ventas_qr,
+        ventas_correctivo,
         bancario_esperado,
         bancario_real,
         diferencia_bancario,
@@ -115,6 +116,9 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 </Form.Item>
                                 <Form.Item label="Ventas QR del dÃ­a">
                                     <InputNumber value={ventas_qr} readOnly style={{ width: "100%" }} prefix="Bs." />
+                                </Form.Item>
+                                <Form.Item label="Ventas correctivas">
+                                    <InputNumber value={ventas_correctivo || 0} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
                                 <Form.Item label="Cambios Externos">
                                     <InputNumber

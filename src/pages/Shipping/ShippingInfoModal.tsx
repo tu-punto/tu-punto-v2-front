@@ -131,6 +131,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             'efectivo': '2',
             'pagado al dueño': '3',
             'efectivo + qr': '4',
+            'correctivo': '5',
             '1': '1',
             '2': '2',
             '3': '3',
@@ -449,6 +450,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             tipo_de_pago: normalizarTipoPago(shipping.tipo_de_pago || '') || null,
             subtotal_qr: shipping.subtotal_qr || 0,
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
+            subtotal_correctivo: shipping.subtotal_correctivo || 0,
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
@@ -513,6 +515,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             });
             setQrInput(mitad);
             setEfectivoInput(saldoACobrar - mitad);
+        } else if (tipoPago === '5') {
+            internalForm.setFieldsValue({ subtotal_qr: 0, subtotal_efectivo: 0, subtotal_correctivo: saldoACobrar });
+            setQrInput(0);
+            setEfectivoInput(0);
         }
     }, [tipoPago, saldoACobrar, internalForm]);
     useEffect(() => {
@@ -705,7 +711,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             const effectivePaidStatus = String(estaPagado || internalForm.getFieldValue("esta_pagado") || values.esta_pagado || "no");
             const selectedPaymentType = String(tipoPago || internalForm.getFieldValue("tipo_de_pago") || values.tipo_de_pago || "");
             const effectivePaymentType =
-                isDeliveredLikeStatus(selectedStatus) && effectivePaidStatus === "si"
+                isDeliveredLikeStatus(selectedStatus) && effectivePaidStatus === "si" && selectedPaymentType !== "5"
                     ? "3"
                     : selectedPaymentType;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
@@ -780,6 +786,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 case '3':
                     updateShippingInfo.subtotal_qr = 0;
                     updateShippingInfo.subtotal_efectivo = 0;
+                    updateShippingInfo.subtotal_correctivo = 0;
                     break;
                 case '4':
                     if (isSimplePackageOrder) {
@@ -790,6 +797,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                         updateShippingInfo.subtotal_qr = qrInput;
                         updateShippingInfo.subtotal_efectivo = efectivoInput;
                     }
+                    break;
+                case '5':
+                    updateShippingInfo.subtotal_qr = 0;
+                    updateShippingInfo.subtotal_efectivo = 0;
+                    updateShippingInfo.subtotal_correctivo = saldoACobrar;
                     break;
             }
 
@@ -1451,6 +1463,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                                 <Radio.Button value="2">Efectivo</Radio.Button>
                                                 <Radio.Button value="3">Pagado al dueño</Radio.Button>
                                                 <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                                                <Radio.Button value="5">Correctivo</Radio.Button>
                                             </Radio.Group>
 
                                             {clickedOnce && (

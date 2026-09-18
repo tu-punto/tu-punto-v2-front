@@ -248,14 +248,15 @@ function ShippingFormModal({
             1: 'Transferencia o QR',
             2: 'Efectivo',
             3: 'Pagado al dueño',
-            4: 'Efectivo + QR'
+            4: 'Efectivo + QR',
+            5: 'Correctivo'
         };
         try {
             const fechaSeleccionada = values.fecha_pedido?.format("YYYY-MM-DD") || moment().tz("America/La_Paz").format("YYYY-MM-DD");
             const horaSeleccionada = values.hora_entrega_acordada?.format("HH:mm:ss") || "00:00:00";
             const effectivePaidStatus = values.esta_pagado;
             const effectivePaymentType =
-                values.estado_pedido === "Entregado" && values.esta_pagado === "si"
+                values.estado_pedido === "Entregado" && values.esta_pagado === "si" && values.tipo_de_pago !== "5"
                     ? "3"
                     : values.tipo_de_pago;
             const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
@@ -443,6 +444,10 @@ function ShippingFormModal({
             });
             setQrInput(mitad);
             setEfectivoInput(saldoACobrar - mitad);
+        } else if (tipoPago === '5') {
+            form.setFieldsValue({ subtotal_qr: 0, subtotal_efectivo: 0, subtotal_correctivo: saldoACobrar });
+            setQrInput(0);
+            setEfectivoInput(0);
         }
     }, [tipoPago, saldoACobrar, form]);
 
@@ -942,6 +947,7 @@ function ShippingFormModal({
                                             <Radio.Button value="2">Efectivo</Radio.Button>
                                             <Radio.Button value="3">Pagado al dueño</Radio.Button>
                                             <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                                            <Radio.Button value="5">Correctivo</Radio.Button>
                                         </Radio.Group>
                                     </Form.Item>
                                 </Col>

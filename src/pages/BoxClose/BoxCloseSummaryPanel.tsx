@@ -23,6 +23,12 @@ type SummaryRow = {
   positiveDiff: number;
   negativeDiff: number;
   netDiff: number;
+  expectedQr: number;
+  realQr: number;
+  positiveDiffQr: number;
+  negativeDiffQr: number;
+  netDiffQr: number;
+  correctiveSales: number;
   lastClosedAt: string;
 };
 
@@ -120,6 +126,10 @@ export default function BoxCloseSummaryPanel({ compact = false }: BoxCloseSummar
       const expected = toMoney(boxClose?.efectivo_esperado);
       const real = toMoney(boxClose?.efectivo_real);
       const diff = real - expected;
+      const expectedQr = toMoney(boxClose?.bancario_esperado);
+      const realQr = toMoney(boxClose?.bancario_real);
+      const diffQr = realQr - expectedQr;
+      const correctiveSales = toMoney(boxClose?.ventas_correctivo);
       const prev = bucket.get(key);
 
       const next: SummaryRow = prev || {
@@ -134,16 +144,31 @@ export default function BoxCloseSummaryPanel({ compact = false }: BoxCloseSummar
         positiveDiff: 0,
         negativeDiff: 0,
         netDiff: 0,
+        expectedQr: 0,
+        realQr: 0,
+        positiveDiffQr: 0,
+        negativeDiffQr: 0,
+        netDiffQr: 0,
+        correctiveSales: 0,
         lastClosedAt: date.toISOString(),
       };
 
+      const isLatestClosing = !prev || date.isAfter(dayjs(next.lastClosedAt));
       next.closingsCount += 1;
-      next.expected += expected;
-      next.real += real;
       next.netDiff += diff;
       next.positiveDiff += Math.max(diff, 0);
       next.negativeDiff += Math.max(-diff, 0);
-      if (date.isAfter(dayjs(next.lastClosedAt))) next.lastClosedAt = date.toISOString();
+      next.netDiffQr += diffQr;
+      next.positiveDiffQr += Math.max(diffQr, 0);
+      next.negativeDiffQr += Math.max(-diffQr, 0);
+      next.correctiveSales += correctiveSales;
+      if (isLatestClosing) {
+        next.expected = expected;
+        next.real = real;
+        next.expectedQr = expectedQr;
+        next.realQr = realQr;
+        next.lastClosedAt = date.toISOString();
+      }
 
       bucket.set(key, next);
     });
@@ -162,10 +187,20 @@ export default function BoxCloseSummaryPanel({ compact = false }: BoxCloseSummar
         acc.positiveDiff += row.positiveDiff;
         acc.negativeDiff += row.negativeDiff;
         acc.netDiff += row.netDiff;
+        acc.expectedQr += row.expectedQr;
+        acc.realQr += row.realQr;
+        acc.positiveDiffQr += row.positiveDiffQr;
+        acc.negativeDiffQr += row.negativeDiffQr;
+        acc.netDiffQr += row.netDiffQr;
+        acc.correctiveSales += row.correctiveSales;
         acc.closingsCount += row.closingsCount;
         return acc;
       },
-      { expected: 0, real: 0, positiveDiff: 0, negativeDiff: 0, netDiff: 0, closingsCount: 0 }
+      {
+        expected: 0, real: 0, positiveDiff: 0, negativeDiff: 0, netDiff: 0,
+        expectedQr: 0, realQr: 0, positiveDiffQr: 0, negativeDiffQr: 0, netDiffQr: 0,
+        correctiveSales: 0, closingsCount: 0,
+      }
     );
   }, [summarizedRows]);
 
@@ -178,6 +213,12 @@ export default function BoxCloseSummaryPanel({ compact = false }: BoxCloseSummar
     { title: "Desfase positivo", dataIndex: "positiveDiff", key: "positiveDiff", render: (value: number) => <Tag color="green">Bs. {money(value)}</Tag> },
     { title: "Desfase negativo", dataIndex: "negativeDiff", key: "negativeDiff", render: (value: number) => <Tag color="volcano">Bs. {money(value)}</Tag> },
     { title: "Neto", dataIndex: "netDiff", key: "netDiff", render: (value: number) => <Tag color={value >= 0 ? "green" : "red"}>Bs. {money(value)}</Tag> },
+    { title: "QR esperado", dataIndex: "expectedQr", key: "expectedQr", render: (value: number) => `Bs. ${money(value)}` },
+    { title: "QR recibido", dataIndex: "realQr", key: "realQr", render: (value: number) => `Bs. ${money(value)}` },
+    { title: "Desfase QR positivo", dataIndex: "positiveDiffQr", key: "positiveDiffQr", render: (value: number) => <Tag color="green">Bs. {money(value)}</Tag> },
+    { title: "Desfase QR negativo", dataIndex: "negativeDiffQr", key: "negativeDiffQr", render: (value: number) => <Tag color="volcano">Bs. {money(value)}</Tag> },
+    { title: "Neto QR", dataIndex: "netDiffQr", key: "netDiffQr", render: (value: number) => <Tag color={value >= 0 ? "green" : "red"}>Bs. {money(value)}</Tag> },
+    { title: "Ventas correctivas", dataIndex: "correctiveSales", key: "correctiveSales", render: (value: number) => `Bs. ${money(value)}` },
     { title: "Último cierre", dataIndex: "lastClosedAt", key: "lastClosedAt", render: (value: string) => dayjs(value).format("DD/MM/YYYY HH:mm") },
   ];
 
@@ -252,7 +293,13 @@ export default function BoxCloseSummaryPanel({ compact = false }: BoxCloseSummar
                   <Table.Summary.Cell index={5}><strong>Bs. {money(totals.positiveDiff)}</strong></Table.Summary.Cell>
                   <Table.Summary.Cell index={6}><strong>Bs. {money(totals.negativeDiff)}</strong></Table.Summary.Cell>
                   <Table.Summary.Cell index={7}><strong>Bs. {money(totals.netDiff)}</strong></Table.Summary.Cell>
-                  <Table.Summary.Cell index={8} />
+                  <Table.Summary.Cell index={8}><strong>Bs. {money(totals.expectedQr)}</strong></Table.Summary.Cell>
+                  <Table.Summary.Cell index={9}><strong>Bs. {money(totals.realQr)}</strong></Table.Summary.Cell>
+                  <Table.Summary.Cell index={10}><strong>Bs. {money(totals.positiveDiffQr)}</strong></Table.Summary.Cell>
+                  <Table.Summary.Cell index={11}><strong>Bs. {money(totals.negativeDiffQr)}</strong></Table.Summary.Cell>
+                  <Table.Summary.Cell index={12}><strong>Bs. {money(totals.netDiffQr)}</strong></Table.Summary.Cell>
+                  <Table.Summary.Cell index={13}><strong>Bs. {money(totals.correctiveSales)}</strong></Table.Summary.Cell>
+                  <Table.Summary.Cell index={14} />
                 </Table.Summary.Row>
               )}
             />

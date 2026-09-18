@@ -42,10 +42,12 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       'efectivo': '2',
       'pagado al dueño': '3',
       'efectivo + qr': '4',
+      'correctivo': '5',
       '1': '1',
       '2': '2',
       '3': '3',
       '4': '4',
+      '5': '5',
     };
 
     const clave = valor.trim().toLowerCase();
@@ -148,6 +150,9 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
       const mitad = parseFloat((saldoACobrar / 2).toFixed(2));
       setQrInput(mitad);
       setEfectivoInput(saldoACobrar - mitad);
+    } else if (tipoPago === '5') {
+      setQrInput(0);
+      setEfectivoInput(0);
     }
   }, [tipoPago, saldoACobrar]);
   const enrichedProducts = useMemo(() => {
@@ -245,6 +250,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
         subtotal_qr: tipoPago === '1' || tipoPago === '4' ? qrInput : 0,
         subtotal_efectivo: tipoPago === '2' || tipoPago === '4' ? efectivoInput : 0,
+        subtotal_correctivo: tipoPago === '5' ? saldoACobrar : 0,
       };
 
       const res = await updateShippingAPI(updateData, shipping._id);
@@ -556,6 +562,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                   <Radio.Button value="2">Efectivo</Radio.Button>
                   <Radio.Button value="3">Pagado al dueño</Radio.Button>
                   <Radio.Button value="4">Efectivo + QR</Radio.Button>
+                  <Radio.Button value="5">Correctivo</Radio.Button>
                 </Radio.Group>
               </div>
             </Col>

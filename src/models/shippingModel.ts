@@ -24,6 +24,7 @@ export interface Shipping {
   pagado_al_vendedor: boolean;
   subtotal_qr: number;
   subtotal_efectivo: number;
+  subtotal_correctivo?: number;
   id_trabajador: number;
   id_sucursal: number;
   venta: ISale[];

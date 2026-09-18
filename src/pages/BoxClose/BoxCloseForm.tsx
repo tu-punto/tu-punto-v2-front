@@ -242,7 +242,7 @@ const BoxCloseForm = ({
       const nextClosingAtISO = buildClosingAtISO();
       setClosingAtISO(nextClosingAtISO);
       const summary = await getDailySummary(selectedDate?.format("YYYY-MM-DD"), nextClosingAtISO);
-      setSalesSummary(summary || { cash: 0, bank: 0, total: 0 });
+      setSalesSummary(summary || { cash: 0, bank: 0, corrective: 0, total: 0 });
       const efectivoInicial = parseFloat(lastClosingBalance.efectivo_real) || 0;
 
       form.setFieldsValue({
@@ -250,13 +250,14 @@ const BoxCloseForm = ({
         bancario_inicial: 0,
         ventas_efectivo: summary?.cash || 0,
         ventas_qr: summary?.bank || 0,
+        ventas_correctivo: summary?.corrective || 0,
         efectivo_esperado: roundAmount(efectivoInicial + (summary?.cash || 0)),
         bancario_esperado: roundAmount(summary?.bank || 0),
       });
       recalcExpectedAndDiffs(operations);
     } catch (error) {
       console.error("Error while fetching sales summary", error);
-      setSalesSummary({ cash: 0, bank: 0, total: 0 });
+      setSalesSummary({ cash: 0, bank: 0, corrective: 0, total: 0 });
     }
   };
 
@@ -329,6 +330,7 @@ const BoxCloseForm = ({
       cash: initialData.ventas_efectivo || 0,
       bank: initialData.ventas_qr || 0,
       total: (initialData.ventas_efectivo || 0) + (initialData.ventas_qr || 0),
+      corrective: initialData.ventas_correctivo || 0,
     });
 
     form.setFieldsValue({
@@ -337,6 +339,7 @@ const BoxCloseForm = ({
       bancario_inicial: 0,
       ventas_efectivo: initialData.ventas_efectivo || 0,
       ventas_qr: initialData.ventas_qr || 0,
+      ventas_correctivo: initialData.ventas_correctivo || 0,
       efectivo_esperado: initialData.efectivo_esperado || 0,
       bancario_esperado: initialData.bancario_esperado || 0,
       efectivo_real: initialData.efectivo_real || 0,
@@ -491,6 +494,7 @@ const BoxCloseForm = ({
           bancario_inicial: 0,
           ventas_efectivo: form.getFieldValue("ventas_efectivo"),
           ventas_qr: form.getFieldValue("ventas_qr"),
+          ventas_correctivo: form.getFieldValue("ventas_correctivo"),
           ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
           efectivo_esperado: form.getFieldValue("efectivo_esperado"),
           efectivo_real: form.getFieldValue("efectivo_real"),
@@ -519,6 +523,7 @@ const BoxCloseForm = ({
           ingresos_efectivo: form.getFieldValue("ventas_efectivo"),
           ventas_efectivo: salesSummary?.cash ?? 0,
           ventas_qr:       salesSummary?.bank ?? 0,
+          ventas_correctivo: salesSummary?.corrective ?? 0,
           id_sucursal: localStorage.getItem("sucursalId"),
           efectivo_diario,
           operaciones_adicionales: operationsPayload,
@@ -736,6 +741,15 @@ const BoxCloseForm = ({
                     prefix="Bs. "
                     className="w-full"
 
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Ventas correctivas" name="ventas_correctivo">
+                <InputNumber
+                    prefix="Bs. "
+                    readOnly
+                    className="w-full bg-gray-200 text-gray-700"
                 />
               </Form.Item>
             </Col>
