@@ -9,6 +9,7 @@ interface FlatProduct {
     precio_original?: number;
     pricingPromotion?: any;
     stockActual: number;
+    stockEnReserva?: number;
     categoria: string;
     id_vendedor: string;
     id_producto: string;
@@ -37,6 +38,7 @@ const useProductsFlat = (externalSucursalId?: string) => {
                 precio_original: Number(item.precio_original ?? item.originalPrice ?? item.precio ?? 0),
                 pricingPromotion: item.pricingPromotion || item.promotionPricing || null,
                 stockActual: item.stock,
+                stockEnReserva: Number(item.stockEnReserva ?? 0),
                 categoria: item.categoria || "Sin categoría",
                 id_vendedor: item.id_vendedor,
                 id_producto: item._id,

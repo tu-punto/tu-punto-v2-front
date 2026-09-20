@@ -550,6 +550,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     nombre_variante: `${p.nombre_producto} - ${varianteNombre}`,
                     precio: combo.precio,
                     stockActual: combo.stock,
+                    stockEnReserva: (combo.catalog_reservations || []).reduce(
+                        (total: number, reservation: any) => total + Number(reservation?.quantity || 0),
+                        0
+                    ),
                     variantes: combo.variantes,
                     sucursalId,
                 };

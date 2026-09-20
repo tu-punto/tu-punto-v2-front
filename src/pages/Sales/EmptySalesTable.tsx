@@ -1,4 +1,4 @@
-import { Button, InputNumber, Space, Table, Tag, Typography } from "antd";
+import { Button, InputNumber, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import PromotionPrice, { ConditionalPromotionDetails } from "../../components/PromotionPrice";
@@ -97,6 +97,28 @@ const EmptySalesTable = ({
                         onChange={value => handleValueChange(record.key, 'cantidad', value)}
                     />
                 ),
+            className: "text-mobile-sm xl:text-desktop-sm",
+        },
+        {
+            title: 'Stock',
+            key: 'stock',
+            render: (_: any, record: any) => {
+                const stock = Number(record.stockActual ?? record.stock ?? 0);
+                const stockEnReserva = Math.max(0, Number(record.stockEnReserva ?? 0));
+
+                return (
+                    <Space size={4}>
+                        <span>{stock}</span>
+                        {stockEnReserva > 0 && (
+                            <Tooltip title="En reserva">
+                                <span style={{ color: '#722ed1', fontWeight: 600, cursor: 'help' }}>
+                                    +{stockEnReserva}
+                                </span>
+                            </Tooltip>
+                        )}
+                    </Space>
+                );
+            },
             className: "text-mobile-sm xl:text-desktop-sm",
         },
         {
