@@ -39,11 +39,11 @@ export const getDailySummary = async (
   let qrTotal = 0;
   let correctivoTotal = 0;
 
-  if (response.success) {
-    const { efectivo, qr, correctivo } = response.totales_cierre || response.totales;
-    efectivoTotal = efectivo;
-    qrTotal = qr;
-    correctivoTotal = correctivo || 0;
+  const salesTotals = response?.totales_cierre || response?.totales;
+  if (salesTotals) {
+    efectivoTotal = Number(salesTotals.efectivo) || 0;
+    qrTotal = Number(salesTotals.qr) || 0;
+    correctivoTotal = Number(salesTotals.correctivo) || 0;
   }
 
   // Get service income from FinanceFlux

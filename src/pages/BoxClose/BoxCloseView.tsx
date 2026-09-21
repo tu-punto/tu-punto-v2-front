@@ -114,7 +114,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 <Form.Item label="Efectivo">
                                     <InputNumber value={ventas_efectivo} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
-                                <Form.Item label="Ventas QR del dÃ­a">
+                                <Form.Item label={"Ventas QR del d\u00eda"}>
                                     <InputNumber value={ventas_qr} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
                                 <Form.Item label="Ventas correctivas">
@@ -173,7 +173,7 @@ const BoxCloseView = ({ boxClose }: Props) => {
                         </Card>
 
                         <Card className="mb-4">
-                            <Title level={5}>ConciliaciÃ³n QR</Title>
+                            <Title level={5}>{"Conciliaci\u00f3n QR"}</Title>
                             <Form layout="vertical">
                                 <Form.Item label="QR esperado">
                                     <InputNumber value={bancario_esperado} readOnly style={{ width: "100%" }} prefix="Bs." />

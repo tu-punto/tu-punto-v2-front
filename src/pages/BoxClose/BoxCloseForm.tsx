@@ -898,10 +898,10 @@ const BoxCloseForm = ({
         </Row>
 
         <Card>
-          <Title level={5}>ConciliaciÃ³n QR</Title>
+          <Title level={5}>{"Conciliaci\u00f3n QR"}</Title>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item label="Ventas QR del dÃ­a" name="ventas_qr">
+              <Form.Item label={"Ventas QR del d\u00eda"} name="ventas_qr">
                 <InputNumber
                   prefix="Bs. "
                   readOnly
