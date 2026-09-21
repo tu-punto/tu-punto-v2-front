@@ -467,7 +467,7 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         setTableGroup(groups);
 
 
-    }, [productsList]);
+    }, [productsList, searchText, sellersVigentes]);
 
     const loading = updatedProductsList.length === 0;
     return (
