@@ -145,6 +145,12 @@ const BoxClosePage = () => {
           render: (amount: number) => `Bs. ${round(amount)}`,
         },
         {
+          title: "Final real",
+          dataIndex: "efectivo_real",
+          key: "efectivo_real",
+          render: (amount: number) => `Bs. ${round(amount)}`,
+        },
+        {
           title: "Diferencia",
           dataIndex: "diferencia_efectivo",
           key: "diferencia_efectivo",
