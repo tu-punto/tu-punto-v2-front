@@ -161,4 +161,10 @@ export const menu = [
     requiresSuperadmin: true,
     hiddenInMenuForRoles: ["admin"],
   },
+  {
+    path: "/dynamic-qr",
+    label: "QR Promocionales",
+    icon: tagIcon,
+    roles: getAllowedRoles("/dynamic-qr"),
+  },
 ];

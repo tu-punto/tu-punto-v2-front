@@ -27,6 +27,7 @@ import AttendancePage from "../pages/Attendance/AttendancePage";
 import SellerPromotionsPage from "../pages/SellerPromotions/SellerPromotionsPage";
 import SellerDashboardPage from "../pages/SellerDashboard/SellerDashboardPage";
 import InventoryAuditPage from "../pages/InventoryAudit/InventoryAuditPage";
+import DynamicQRPage from "../pages/DynamicQR/DynamicQRPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -254,6 +255,10 @@ const protectedRoutes = [
       {
         path: "/inventory-audit",
         element: guard("/inventory-audit", <InventoryAuditRoute />),
+      },
+      {
+        path: "/dynamic-qr",
+        element: guard("/dynamic-qr", <DynamicQRPage />),
       },
       {
         path: "*",
