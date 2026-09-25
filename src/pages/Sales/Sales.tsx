@@ -207,7 +207,7 @@ export const Sales = () => {
 
     let filtered = data.filter((p: any) => {
       const stock = getStockActual(p, branchIdForFetch);
-      if (stock <= 0) return false;
+      if (stock <= 0 && Number(p.stockEnReserva ?? 0) <= 0) return false;
 
       if (selectedProduct !== "all" && String(selectedProduct) !== String(p.id_producto)) {
         return false;

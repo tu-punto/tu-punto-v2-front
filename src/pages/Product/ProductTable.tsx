@@ -1,4 +1,4 @@
-import { Space, Table, message } from 'antd';
+import { Space, Table, Tooltip, message } from 'antd';
 import { useContext } from 'react';
 import PromotionPrice from '../../components/PromotionPrice';
 import { UserContext } from '../../context/userContext';
@@ -19,12 +19,18 @@ const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, is
             title: <span className="text-mobile-sm xl:text-desktop-sm">Stock actual</span>,
             dataIndex: 'stockActual',
             key: 'stockActual',
-            render: (stockActual: number) => {
+            render: (stockActual: number, record: any) => {
                 const stock = Number(stockActual || 0);
+                const stockEnReserva = Math.max(0, Number(record?.stockEnReserva ?? 0));
                 const critical = stock <= CRITICAL_STOCK_THRESHOLD;
                 return (
                     <span className={isSeller && stock === 0 ? 'text-red-700 font-semibold' : isSeller && critical ? 'text-amber-700 font-semibold' : ''}>
                         {stock}
+                        {stockEnReserva > 0 && (
+                            <Tooltip title="En reserva">
+                                <span style={{ marginLeft: 4, color: '#722ed1', cursor: 'help' }}>+{stockEnReserva}</span>
+                            </Tooltip>
+                        )}
                         {isSeller && (stock === 0 ? ' (agotado)' : critical ? ' (crítico)' : '')}
                     </span>
                 );

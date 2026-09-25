@@ -173,7 +173,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
           precio: combo.precio,
           precio_original: combo.precio,
           stockActual: combo.stock,
-          stockEnReserva: (combo.catalog_reservations || []).reduce(
+          stockEnReserva: [...(combo.catalog_reservations || []), ...(combo.internal_reservations || [])].reduce(
             (total: number, reservation: any) => total + Number(reservation?.quantity || 0),
             0
           ),

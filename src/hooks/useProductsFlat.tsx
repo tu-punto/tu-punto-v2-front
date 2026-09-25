@@ -29,7 +29,9 @@ const useProductsFlat = (externalSucursalId?: string) => {
                 inStock: true
             });
             // Solo productos con stock > 0
-            const withStock = all.filter((p: any) => p.stock > 0);
+            const withStock = all.filter(
+                (p: any) => Number(p.stock || 0) > 0 || Number(p.stockEnReserva || 0) > 0
+            );
 
             const mapped = withStock.map((item: any, index: number) => ({
                 key: `${item._id}-${index}`,
