@@ -30,6 +30,7 @@ export const routeRoleMap: Record<string, string[]> = {
   "/admin-seller-product-info": [ADMIN],
   "/superadmin-variants": [ADMIN],
   "/inventory-audit": [ADMIN],
+  "/dynamic-qr": [ADMIN],
 };
 
 export const getAllowedRoles = (path: string): string[] => routeRoleMap[path] || [];

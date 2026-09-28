@@ -48,12 +48,14 @@ const EditProductsModal = ({
         );
 
         const stockActual = productoCompleto?.stockActual ?? 0;
+        const stockEnReserva = productoCompleto?.stockEnReserva ?? p.stockEnReserva ?? 0;
         const cantidadVendida = Number(p.cantidad || 0);
         const cantidadMaximaEditable = stockActual + cantidadVendida;
 
         return {
           ...p,
           cantidadMaximaEditable,
+          stockEnReserva,
           precio_original: p.precio_antes_recogido !== undefined && p.precio_antes_recogido !== null
             ? p.precio_unitario
             : (p.precio_original ?? p.precio_unitario),

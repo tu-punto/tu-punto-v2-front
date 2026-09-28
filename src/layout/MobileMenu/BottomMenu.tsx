@@ -56,7 +56,7 @@ const BottomMenu = () => {
 
     return (
         <div
-            className="fixed bottom-0 left-0 right-0 shadow-lg z-40"
+            className="fixed bottom-0 left-0 right-0 z-40 bg-[#094f89] shadow-lg"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
             <div className="relative bottom-menu">

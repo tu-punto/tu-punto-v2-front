@@ -207,7 +207,7 @@ export const Sales = () => {
 
     let filtered = data.filter((p: any) => {
       const stock = getStockActual(p, branchIdForFetch);
-      if (stock <= 0) return false;
+      if (stock <= 0 && Number(p.stockEnReserva ?? 0) <= 0) return false;
 
       if (selectedProduct !== "all" && String(selectedProduct) !== String(p.id_producto)) {
         return false;
@@ -700,7 +700,10 @@ export const Sales = () => {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4" data-tour-id="sales-root">
+      <div
+        className="flex flex-col items-start gap-3 mb-4 tablet:flex-row tablet:items-center tablet:justify-between"
+        data-tour-id="sales-root"
+      >
         <div className="flex items-center gap-3 bg-white rounded-xl px-5 py-2 shadow-md">
           <img src="/shopping-cart-icon.png" alt="Carrito" className="w-8 h-8" />
           <h1 className="text-mobile-3xl xl:text-desktop-3xl font-bold text-gray-800">
@@ -708,7 +711,7 @@ export const Sales = () => {
           </h1>
         </div>
         {(isAdmin || isOperator) && (
-          <Space>
+          <Space direction={isMobile ? "vertical" : "horizontal"} size="middle" className={isMobile ? "self-end" : undefined}>
             <Button icon={<HistoryOutlined />} onClick={() => navigate("/sales-history")}>
               Historial de Ventas
             </Button>
