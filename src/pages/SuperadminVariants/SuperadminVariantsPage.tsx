@@ -26,7 +26,9 @@ import { includesNormalized } from "../../utils/search";
 import {
   deleteSuperadminVariantAPI,
   duplicateSuperadminVariantAPI,
+  completeBranchVariantsAPI,
   getSuperadminVariantInventoryPageAPI,
+  previewCompleteBranchVariantsAPI,
   renameSuperadminVariantAPI,
   updateSuperadminVariantStockAPI,
 } from "../../api/product";
@@ -256,6 +258,59 @@ const SuperadminVariantsPage = () => {
     setSortOrder("asc");
     setPage(1);
     setLimit(20);
+  };
+
+  const handleCompleteBranches = async () => {
+    if (!selectedSellerId) return;
+
+    setBusyKey("complete-branches-preview");
+    try {
+      const preview = await previewCompleteBranchVariantsAPI(selectedSellerId);
+      if (!preview?.success) {
+        message.error(preview?.message || preview?.msg || "No se pudo calcular las variantes faltantes.");
+        return;
+      }
+
+      const result = preview?.result || {};
+      const variantsToCreate = Number(result?.variantsToCreate || 0);
+      if (variantsToCreate === 0) {
+        message.info("No hay variantes faltantes en las sucursales habilitadas.");
+        return;
+      }
+
+      Modal.confirm({
+        title: "Completar variantes en sucursales?",
+        content: (
+          <div>
+            <p>
+              Se crearán <strong>{variantsToCreate}</strong> variantes faltantes en {Number(result?.productsToUpdate || 0)} productos.
+            </p>
+            <p>Solo se usarán las sucursales habilitadas para este vendedor.</p>
+            <p>Las variantes nuevas tendrán stock 0, no tendrán reservas y esta acción no se puede revertir automáticamente.</p>
+          </div>
+        ),
+        okText: "Completar variantes",
+        cancelText: "Cancelar",
+        okButtonProps: { danger: true },
+        onOk: async () => {
+          setBusyKey("complete-branches");
+          try {
+            const response = await completeBranchVariantsAPI(selectedSellerId);
+            if (!response?.success) {
+              message.error(response?.message || response?.msg || "No se pudieron completar las variantes.");
+              return Promise.reject();
+            }
+
+            message.success(response?.message || "Variantes completadas.");
+            refreshData();
+          } finally {
+            setBusyKey("");
+          }
+        },
+      });
+    } finally {
+      setBusyKey("");
+    }
   };
 
   const handleSaveStock = async (row: VariantRow, branchId: string, stock: number) => {
@@ -589,6 +644,14 @@ const SuperadminVariantsPage = () => {
         </div>
         <Space>
           {isSuperadminUser(user) && <Button onClick={() => setCategoriesOpen(true)}>Administrar categorias</Button>}
+          {selectedSellerId && (
+            <Button
+              onClick={() => void handleCompleteBranches()}
+              loading={busyKey === "complete-branches-preview" || busyKey === "complete-branches"}
+            >
+              Completar sucursales
+            </Button>
+          )}
           <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>Limpiar filtros</Button>
         </Space>
       </div>
