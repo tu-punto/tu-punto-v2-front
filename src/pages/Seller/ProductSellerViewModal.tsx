@@ -1,6 +1,5 @@
 import { Select, Button, Form, Input, Modal, message, InputNumber } from "antd"
 import { useContext, useEffect, useState } from "react"
-import { getCategoriesAPI} from "../../api/category"
 import { UserContext } from "../../context/userContext";
 import { registerVariantAPI } from "../../api/product";
 import { createEntryAPI } from "../../api/entry";
@@ -10,8 +9,6 @@ import { includesNormalized } from "../../utils/search";
 const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, selectedSeller, openFromEditProductsModal = false, sellers = [] , sucursalId }: any) => {
     const { user }: any = useContext(UserContext);
     const [loading, setLoading] = useState(false)
-    const [categories, setCategories] = useState([])
-    const [newCategory, setNewCategory] = useState('')
     const [form] = Form.useForm();
     const [showConfirm, setShowConfirm] = useState(false);
     const [pendingData, setPendingData] = useState<any>(null);
@@ -43,7 +40,6 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
         }
         const productPayload = {
             nombre_producto: productData.nombre_producto,
-            id_categoria: productData.id_categoria,
             id_vendedor: productData.id_vendedor || selectedSeller?._id,
             esTemporal: true,
             sucursales: [{
@@ -81,18 +77,6 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
         form.resetFields();
     };
 
-    const fetchCategories = async () => {
-        try {
-            const response = await getCategoriesAPI();
-            setCategories(response);
-        } catch (error) {
-            message.error('Error al obtener las categorías');
-        }
-    };
-
-    useEffect(() => {
-        fetchCategories();
-    }, []);
     useEffect(() => {
         if (visible) {
             form.resetFields();
@@ -207,34 +191,6 @@ const ProductSellerViewModal = ({ visible, onCancel, onSuccess, onAddProduct, se
                         }
                     />
                 </Form.Item> */}
-                <Form.Item
-                    name="id_categoria"
-                    label="Categoría"
-                    rules={[{ required: true, message: 'Por favor seleccione una categoría' }]}
-                >
-                    <Select
-                        placeholder="Selecciona una categoría"
-                        dropdownRender={menu => (
-                            <>
-                                {menu}
-                                <div style={{ display: 'flex', padding: 8 }}>
-                                    <Input
-                                        style={{ flex: 'auto' }}
-                                        value={newCategory}
-                                        onChange={e => setNewCategory(e.target.value)}
-                                    />
-                                </div>
-                            </>
-                        )}
-                        options={categories.map((category: any) => ({
-                            value: category._id,
-                            label: category.categoria,
-                        }))}
-                        showSearch
-                        filterOption={(input, option: any) => includesNormalized(option?.label, input)}
-                    />
-                </Form.Item>
-        
                 <Form.Item>
                     <Button type="primary" htmlType="submit" loading={loading} className="text-mobile-sm xl:text-desktop-sm">
                         Registrar Producto
