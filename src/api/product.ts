@@ -253,6 +253,24 @@ export const updateSuperadminVariantStockAPI = async (payload: {
     }
 };
 
+export const previewCompleteBranchVariantsAPI = async (sellerId: string) => {
+    try {
+        const res = await apiClient.post("/product/superadmin/complete-branch-variants/preview", { sellerId });
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
+export const completeBranchVariantsAPI = async (sellerId: string) => {
+    try {
+        const res = await apiClient.post("/product/superadmin/complete-branch-variants", { sellerId });
+        return res.data;
+    } catch (error) {
+        return handleError(error);
+    }
+};
+
 export const renameSuperadminVariantAPI = async (payload: {
     productId: string;
     sellerId: string;
