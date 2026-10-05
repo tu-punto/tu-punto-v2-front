@@ -61,6 +61,12 @@ export const menu = [
     roles: getAllowedRoles("/shop"),
   },
   {
+    path: "/my-inventory",
+    label: "Mi inventario",
+    icon: stockManagementIcon,
+    roles: getAllowedRoles("/my-inventory"),
+  },
+  {
     path: "/seller-info",
     label: "Mi Informacion",
     icon: sellerIcon,

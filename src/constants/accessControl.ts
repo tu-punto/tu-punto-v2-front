@@ -17,6 +17,7 @@ export const routeRoleMap: Record<string, string[]> = {
   "/simple-packages": [SELLER],
   "/seller-info": [SELLER],
   "/shop": [SELLER],
+  "/my-inventory": [SELLER],
   "/cash": [ADMIN, OPERATOR],
   "/cierreCaja": [ADMIN, OPERATOR],
   "/branch": [ADMIN, SELLER, OPERATOR],

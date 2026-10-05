@@ -2,6 +2,7 @@ import { Button, InputNumber, Space, Table, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import PromotionPrice, { ConditionalPromotionDetails } from "../../components/PromotionPrice";
+import { InfoCircleOutlined } from "@ant-design/icons";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
     const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -23,6 +24,19 @@ const getSellerBranchCommission = (seller: any, branchId?: string) => {
 };
 
 const formatMoney = (value: number) => `Bs. ${Number(value || 0).toFixed(2)}`;
+
+const PriceChangeNotice = ({ alert }: { alert?: { previousPrice: number; currentPrice: number } | null }) => {
+    if (!alert) return null;
+    return (
+        <div style={{ color: "#59636e", fontSize: 12, lineHeight: 1.35 }}>
+            <Space size={4}>
+                <InfoCircleOutlined aria-hidden />
+                <Typography.Text style={{ color: "#47515c", fontSize: 12, fontWeight: 600 }}>Precio actualizado</Typography.Text>
+            </Space>
+            <div>Antes: {formatMoney(alert.previousPrice)} · Ahora: {formatMoney(alert.currentPrice)}</div>
+        </div>
+    );
+};
 
 const EmptySalesTable = ({
     products,
@@ -141,6 +155,7 @@ const EmptySalesTable = ({
                               showTierBadge
                           />
                         )}
+                        <PriceChangeNotice alert={record.priceChangeAlert} />
                         <InputNumber
                             min={0}
                             value={record.precio_unitario}

@@ -28,6 +28,7 @@ import SellerPromotionsPage from "../pages/SellerPromotions/SellerPromotionsPage
 import SellerDashboardPage from "../pages/SellerDashboard/SellerDashboardPage";
 import InventoryAuditPage from "../pages/InventoryAudit/InventoryAuditPage";
 import DynamicQRPage from "../pages/DynamicQR/DynamicQRPage";
+import PersonalInventoryPage from "../pages/PersonalInventory/PersonalInventoryPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -199,6 +200,10 @@ const protectedRoutes = [
       {
         path: "/shop",
         element: guard("/shop", <ShopRoute />),
+      },
+      {
+        path: "/my-inventory",
+        element: guard("/my-inventory", <PersonalInventoryPage />),
       },
       {
         path: "/simple-packages",
