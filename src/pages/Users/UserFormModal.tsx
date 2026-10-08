@@ -152,11 +152,13 @@ const UserFormModal = ({
 
   const handleSubmit = async (values: any) => {
     const submitData = { ...values };
-    if (submitData.role !== "operator") {
+    if (submitData.role !== "operator" && submitData.role !== "farmer") {
       submitData.sucursal = null;
       delete submitData.system_access_hours;
-    } else {
+    } else if (submitData.role === "operator") {
       submitData.system_access_hours = normalizeAccessHours(submitData.system_access_hours);
+    } else {
+      delete submitData.system_access_hours;
     }
 
     if (editingUser && !changePassword) {
@@ -216,15 +218,16 @@ const UserFormModal = ({
             <Select.Option value="admin">Administrador</Select.Option>
             <Select.Option value="operator">Operador</Select.Option>
             <Select.Option value="seller">Vendedor</Select.Option>
+            <Select.Option value="farmer">Granjero</Select.Option>
           </Select>
         </Form.Item>
 
         {/* Checkbox para cambiar contraseña en modo edición */}
-        {selectedRole === "operator" && (
+        {(selectedRole === "operator" || selectedRole === "farmer") && (
           <Form.Item
             name="sucursal"
             label="Sucursal asignada"
-            rules={[{ required: true, message: "Sucursal requerida para operadores" }]}
+            rules={[{ required: true, message: "Sucursal requerida para operadores y granjeros" }]}
           >
             <Select
               size="large"
