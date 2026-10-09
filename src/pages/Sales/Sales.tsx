@@ -49,6 +49,7 @@ export const Sales = () => {
   const normalizedRole = normalizeRole(user?.role);
   const isAdmin = normalizedRole === "admin";
   const isOperator = normalizedRole === "operator";
+  const isFarmer = normalizedRole === "farmer";
   //console.log ("🚀 user en Sales:", user);
 
   const [modalType, setModalType] = useState<'sales' | 'shipping' | null>(null);
@@ -217,6 +218,9 @@ export const Sales = () => {
 
     if ((isAdmin || isOperator) && selectedSellerId) {
       filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
+    } else if (isFarmer) {
+      const authorizedSellerIds = new Set((user?.vendedores_autorizados || []).map((seller: any) => String(seller?._id || seller)));
+      filtered = filtered.filter(p => authorizedSellerIds.has(String(p.id_vendedor)));
     } else if (!isAdmin && !isOperator) {
       filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
     }
@@ -252,12 +256,12 @@ export const Sales = () => {
     fetchSucursal();
   }, []);
   useEffect(() => {
-    if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
+    if ((!isAdmin && !isOperator && !isFarmer) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
   }, [branches, isAdmin, isOperator, selectedBranchId]);
   useEffect(() => {
-    const newSucursalId = (isAdmin || isOperator)
+    const newSucursalId = (isAdmin || isOperator || isFarmer)
       ? localStorage.getItem("sucursalId")
       : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -372,7 +376,7 @@ export const Sales = () => {
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
-      const sucursalId = (isAdmin || isOperator)
+      const sucursalId = (isAdmin || isOperator || isFarmer)
         ? localStorage.getItem("sucursalId")
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -383,7 +387,9 @@ export const Sales = () => {
         return;
       }
 
+      const authorizedSellerIds = new Set((user?.vendedores_autorizados || []).map((seller: any) => String(seller?._id || seller)));
       const sellersVigentes = sellersList.filter((v: any) => {
+        if (isFarmer && !authorizedSellerIds.has(String(v._id))) return false;
         return v.pago_sucursales?.some((pago: any) => {
           const idSucursal = pago.id_sucursal?._id || pago.id_sucursal;
           const perteneceASucursal = String(idSucursal) === String(sucursalId);
@@ -414,7 +420,7 @@ export const Sales = () => {
     try {
       const response = await getSucursalsBasicAPI()
       setBranches(Array.isArray(response) ? response : [])
-      if (isAdmin || isOperator) {
+      if (isAdmin || isOperator || isFarmer) {
         const sucursalIdLogin = localStorage.getItem("sucursalId");
         if (sucursalIdLogin) {
           setSelectedBranchId(sucursalIdLogin);
@@ -427,12 +433,12 @@ export const Sales = () => {
   }
 
   useEffect(() => {
-    if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
+    if ((!isAdmin && !isOperator && !isFarmer) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
   }, [branches, isAdmin, selectedBranchId]);
 
-  const fallbackSucursalId = isAdmin || isOperator
+  const fallbackSucursalId = isAdmin || isOperator || isFarmer
     ? localStorage.getItem('sucursalId')
     : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 

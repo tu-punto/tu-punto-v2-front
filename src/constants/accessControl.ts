@@ -1,11 +1,11 @@
 import { roles } from "./roles";
 
-const { ADMIN, OPERATOR, SELLER } = roles;
+const { ADMIN, OPERATOR, SELLER, FARMER } = roles;
 
 export const routeRoleMap: Record<string, string[]> = {
   "/product": [ADMIN],
   "/seller": [ADMIN],
-  "/sales": [ADMIN, OPERATOR],
+  "/sales": [ADMIN, OPERATOR, FARMER],
   "/shipping": [ADMIN, SELLER, OPERATOR],
   "/find-shipping": [ADMIN],
   "/financeFlux": [ADMIN],
