@@ -36,6 +36,7 @@ export const menu = [
     icon: cartIcon,
     roles: getAllowedRoles("/sales"),
   },
+  { path: "/farmer-profile", label: "Mi perfil", icon: sellerIcon, roles: getAllowedRoles("/farmer-profile") },
   {
     path: "/shipping",
     label: "Pedidos",

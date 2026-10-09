@@ -6,6 +6,7 @@ export const routeRoleMap: Record<string, string[]> = {
   "/product": [ADMIN],
   "/seller": [ADMIN],
   "/sales": [ADMIN, OPERATOR, FARMER],
+  "/farmer-profile": [FARMER],
   "/shipping": [ADMIN, SELLER, OPERATOR],
   "/find-shipping": [ADMIN],
   "/financeFlux": [ADMIN],

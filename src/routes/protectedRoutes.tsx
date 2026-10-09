@@ -29,6 +29,7 @@ import SellerDashboardPage from "../pages/SellerDashboard/SellerDashboardPage";
 import InventoryAuditPage from "../pages/InventoryAudit/InventoryAuditPage";
 import DynamicQRPage from "../pages/DynamicQR/DynamicQRPage";
 import PersonalInventoryPage from "../pages/PersonalInventory/PersonalInventoryPage";
+import FarmerProfilePage from "../pages/Farmer/FarmerProfilePage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -161,6 +162,7 @@ const protectedRoutes = [
         path: "/sales",
         element: guard("/sales", <SalesRoute />),
       },
+      { path: "/farmer-profile", element: guard("/farmer-profile", <FarmerProfilePage />) },
       {
         path: "/shipping",
         element: guard("/shipping", <Shipping />),
