@@ -757,6 +757,16 @@ const BoxCloseForm = ({
                 />
               </Form.Item>
             </Col>
+            <Col span={6}>
+              <Form.Item label="Adelanto a Tu Punto · efectivo" name="adelantos_tu_punto_efectivo">
+                <InputNumber prefix="Bs. " readOnly className="w-full bg-gray-200 text-gray-700" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Adelanto a Tu Punto · QR" name="adelantos_tu_punto_qr">
+                <InputNumber prefix="Bs. " readOnly className="w-full bg-gray-200 text-gray-700" />
+              </Form.Item>
+            </Col>
 
           </Row>
         </Card>
