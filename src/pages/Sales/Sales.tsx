@@ -1004,6 +1004,7 @@ export const Sales = () => {
         //handleDebt={updateSellerDebt}
         clearSelectedProducts={() => setSelectedProducts([])}
         isAdmin={isAdmin || isOperator}
+        isFarmer={isFarmer}
         sellers={sellers}
         suc={fallbackSucursalId}
       />

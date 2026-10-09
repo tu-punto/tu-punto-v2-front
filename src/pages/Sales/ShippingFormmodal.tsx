@@ -86,7 +86,7 @@ function ShippingFormModal({
                                visible, onCancel, onSuccess, selectedProducts,
                                totalAmount, handleSales, sucursals,
                                //handleDebt,
-                               clearSelectedProducts, isAdmin,sellers, suc
+                               clearSelectedProducts, isAdmin, isFarmer = false, sellers, suc
                            }: any) {
     const branchIdFromProps = suc || localStorage.getItem("sucursalId");
     const [loading, setLoading] = useState(false);
@@ -94,6 +94,7 @@ function ShippingFormModal({
     const [efectivoInput, setEfectivoInput] = useState<number>(0);
     const [adelantoClienteInput, setAdelantoClienteInput] = useState<number>(0);
     const [adelantoVisible, setAdelantoVisible] = useState(false);
+    const [advanceMethod, setAdvanceMethod] = useState<"efectivo" | "qr" | "mixto">("efectivo");
     const [montoCobradoDelivery, setMontoCobradoDelivery] = useState<number>(0);
     const [costoRealizarDelivery, setCostoRealizarDelivery] = useState<number>(0);
     const [codigoCelular, setCodigoCelular] = useState<string | null>(COUNTRY_CODES[0]?.code || null)
@@ -142,6 +143,23 @@ function ShippingFormModal({
             });
         }
     }, [estaPagado]);
+
+    useEffect(() => {
+        if (!visible || !isFarmer) return;
+        setEstaPagado("adelanto_tu_punto");
+        setAdelantoVisible(true);
+        form.setFieldsValue({ esta_pagado: "adelanto_tu_punto" });
+    }, [visible, isFarmer, form]);
+
+    useEffect(() => {
+        if (estaPagado !== "adelanto_tu_punto") return;
+        const advance = Number(adelantoClienteInput || 0);
+        const qr = advanceMethod === "qr" ? advance : advanceMethod === "mixto" ? Number((advance / 2).toFixed(2)) : 0;
+        form.setFieldsValue({
+            adelanto_tu_punto_qr: qr,
+            adelanto_tu_punto_efectivo: Number((advance - qr).toFixed(2)),
+        });
+    }, [estaPagado, adelantoClienteInput, advanceMethod, form]);
 
     useEffect(() => {
         if (adelantoClienteInput < 0) {
@@ -259,7 +277,9 @@ function ShippingFormModal({
                 values.estado_pedido === "Entregado" && values.esta_pagado === "si" && values.tipo_de_pago !== "5"
                     ? "3"
                     : values.tipo_de_pago;
-            const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
+            const effectiveAdvance = ["adelanto", "adelanto_tu_punto"].includes(effectivePaidStatus)
+                ? (values.adelanto_cliente || 0)
+                : 0;
             const effectiveDestinationType = values.tipo_destino === "otro_lugar" ? "otro_lugar" : "sucursal";
             const destinationBranchId =
                 values.tipo_destino === "esta_sucursal" ? branchIdFromProps : values.destino_sucursal_id;
@@ -324,6 +344,8 @@ function ShippingFormModal({
                 ubicacion_link: ubicacionLinkFinal,
                 esta_pagado: effectivePaidStatus,
                 adelanto_cliente: effectiveAdvance,
+                adelanto_tu_punto_efectivo: values.adelanto_tu_punto_efectivo || 0,
+                adelanto_tu_punto_qr: values.adelanto_tu_punto_qr || 0,
                 telefono_cliente: selectedCountryCode ? `${selectedCountryCode}${values.telefono_cliente}` : "",
                 fecha_pedido: fechaPedido,
                 hora_entrega_acordada: horaEntregaAcordada,
@@ -471,6 +493,7 @@ function ShippingFormModal({
                         <Col span={24}>
                             <Form.Item name="tipo_destino" label="Destino de la entrega" rules={[{ required: true }]}>
                                 <Radio.Group
+                                    disabled={isFarmer}
                                     onChange={(e) => {
                                         const nextType = e.target.value;
                                         if (nextType === "otro_lugar") {
@@ -797,9 +820,9 @@ function ShippingFormModal({
                                     onChange={(e) => {
                                         const value = e.target.value;
                                         setEstaPagado(value);
-                                        setAdelantoVisible(value === 'adelanto');
+                                        setAdelantoVisible(value === 'adelanto' || value === 'adelanto_tu_punto');
 
-                                        if (value !== 'adelanto') {
+                                        if (value !== 'adelanto' && value !== 'adelanto_tu_punto') {
                                             setAdelantoClienteInput(0);
                                             form.setFieldValue("adelanto_cliente", 0);
                                         }
@@ -813,6 +836,11 @@ function ShippingFormModal({
                                     <Radio.Button value="si">Sí</Radio.Button>
                                     <Radio.Button value="no">No</Radio.Button>
                                     <Radio.Button value="adelanto" disabled={hayMultiplesVendedores}>Pago Adelanto</Radio.Button>
+                                    {isFarmer ? (
+                                      <Radio.Button value="adelanto_tu_punto">Adelanto a Tu Punto</Radio.Button>
+                                    ) : (
+                                      <Radio.Button value="adelanto_tu_punto">Adelanto a Tu Punto</Radio.Button>
+                                    )}
                                 </Radio.Group>
                             </Form.Item>
                         </Col>
@@ -831,6 +859,19 @@ function ShippingFormModal({
                                     />
                                 </Form.Item>
                             </Col>
+                            {estaPagado === "adelanto_tu_punto" && (
+                              <Col span={24}>
+                                <Form.Item label="Método del adelanto a Tu Punto" required>
+                                  <Radio.Group value={advanceMethod} onChange={(event) => setAdvanceMethod(event.target.value)}>
+                                    <Radio.Button value="efectivo">Efectivo</Radio.Button>
+                                    <Radio.Button value="qr">QR</Radio.Button>
+                                    <Radio.Button value="mixto">Efectivo + QR</Radio.Button>
+                                  </Radio.Group>
+                                </Form.Item>
+                                <Form.Item name="adelanto_tu_punto_efectivo" hidden><InputNumber /></Form.Item>
+                                <Form.Item name="adelanto_tu_punto_qr" hidden><InputNumber /></Form.Item>
+                              </Col>
+                            )}
                         </Row>
                     )}
 
