@@ -251,6 +251,8 @@ const BoxCloseForm = ({
         ventas_efectivo: summary?.cash || 0,
         ventas_qr: summary?.bank || 0,
         ventas_correctivo: summary?.corrective || 0,
+        adelantos_tu_punto_efectivo: summary?.tuPuntoAdvanceCash || 0,
+        adelantos_tu_punto_qr: summary?.tuPuntoAdvanceQr || 0,
         efectivo_esperado: roundAmount(efectivoInicial + (summary?.cash || 0)),
         bancario_esperado: roundAmount(summary?.bank || 0),
       });
@@ -524,6 +526,8 @@ const BoxCloseForm = ({
           ventas_efectivo: salesSummary?.cash ?? 0,
           ventas_qr:       salesSummary?.bank ?? 0,
           ventas_correctivo: salesSummary?.corrective ?? 0,
+          adelantos_tu_punto_efectivo: salesSummary?.tuPuntoAdvanceCash ?? 0,
+          adelantos_tu_punto_qr: salesSummary?.tuPuntoAdvanceQr ?? 0,
           id_sucursal: localStorage.getItem("sucursalId"),
           efectivo_diario,
           operaciones_adicionales: operationsPayload,
