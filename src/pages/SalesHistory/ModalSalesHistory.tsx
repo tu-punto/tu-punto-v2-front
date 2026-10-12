@@ -98,7 +98,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     // Inicializar estado de pago
     const pagoEstado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
     setEstaPagado(pagoEstado);
-    setAdelantoVisible(pagoEstado === "adelanto");
+    setAdelantoVisible(pagoEstado === "adelanto" || pagoEstado === "adelanto_tu_punto");
     setAdelantoCliente(shipping.adelanto_cliente || 0);
 
     // Inicializar tipo de pago
@@ -252,6 +252,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         tipo_de_pago: tipoPago,
         esta_pagado: estaPagado,
         adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
+        adelanto_tu_punto_efectivo: shipping?.adelanto_tu_punto_efectivo || 0,
+        adelanto_tu_punto_qr: shipping?.adelanto_tu_punto_qr || 0,
         subtotal_qr: tipoPago === '1' || tipoPago === '4' ? qrInput : 0,
         subtotal_efectivo: tipoPago === '2' || tipoPago === '4' ? efectivoInput : 0,
         subtotal_correctivo: tipoPago === '5' ? saldoACobrar : 0,
@@ -500,8 +502,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                   onChange={(e) => {
                     const value = e.target.value;
                     setEstaPagado(value);
-                    setAdelantoVisible(value === 'adelanto');
-                    if (value !== 'adelanto') {
+                    setAdelantoVisible(value === 'adelanto' || value === 'adelanto_tu_punto');
+                    if (value !== 'adelanto' && value !== 'adelanto_tu_punto') {
                       setAdelantoCliente(0);
                     }
                     if (value === 'si') {
@@ -512,6 +514,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                   <Radio.Button value="si">Sí</Radio.Button>
                   <Radio.Button value="no">No</Radio.Button>
                   <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
+                  <Radio.Button value="adelanto_tu_punto">Adelanto a Tu Punto</Radio.Button>
                 </Radio.Group>
               </div>
             </Col>
