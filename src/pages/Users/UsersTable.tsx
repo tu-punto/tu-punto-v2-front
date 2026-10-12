@@ -1,8 +1,9 @@
 import { Button, Table, Space, Popconfirm, Tag, Input, Select } from "antd";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { EditOutlined, DeleteOutlined, DollarOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useUserStore } from "../../stores/userStore";
 import { includesNormalized } from "../../utils/search";
+import FarmerSummaryModal from "../Farmer/FarmerSummaryModal";
 
 interface UsersTableProps {
   onEdit: (user: any) => void;
@@ -16,12 +17,13 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
   const [emailSearch, setEmailSearch] = useState("");
   const [roleFilters, setRoleFilters] = useState<string[]>([]);
   const [branchFilters, setBranchFilters] = useState<string[]>([]);
+  const [farmerToView, setFarmerToView] = useState<any>(null);
 
   useEffect(() => {
     if (users.length === 0) {
       fetchUsers();
     }
-  }, []);
+  }, [fetchUsers, users.length]);
 
   const handleDelete = async (id: string) => {
     await deleteUser(id);
@@ -109,6 +111,7 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
       width: 120,
       render: (_, record) => (
         <Space>
+          {record.role === "farmer" && <Button icon={<DollarOutlined />} onClick={() => setFarmerToView(record)} size="small" title="Ver entregas y pagos" />}
           <Button
             icon={<EditOutlined />}
             onClick={() => onEdit(record)}
@@ -177,6 +180,7 @@ const UsersTable = ({ onEdit }: UsersTableProps) => {
         pagination={{ pageSize: 10 }}
         scroll={{ x: "max-content" }}
       />
+      <FarmerSummaryModal farmer={farmerToView} open={Boolean(farmerToView)} onClose={() => setFarmerToView(null)} />
     </>
   );
 };
