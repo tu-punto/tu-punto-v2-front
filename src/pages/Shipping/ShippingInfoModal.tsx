@@ -146,7 +146,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         if (visible && shipping) {
             const pagoEstado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
             setEstaPagado(pagoEstado);
-            setAdelantoVisible(pagoEstado === "adelanto");
+            setAdelantoVisible(pagoEstado === "adelanto" || pagoEstado === "adelanto_tu_punto");
         }
     }, [visible, shipping]);
 
@@ -288,9 +288,9 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const applyPaidStatus = (value: string) => {
         internalForm.setFieldValue("esta_pagado", value);
         setEstaPagado(value);
-        setAdelantoVisible(value === 'adelanto');
+        setAdelantoVisible(value === 'adelanto' || value === 'adelanto_tu_punto');
 
-        if (value !== 'adelanto') {
+        if (value !== 'adelanto' && value !== 'adelanto_tu_punto') {
             internalForm.setFieldsValue({ adelanto_cliente: 0 });
         }
 
@@ -451,6 +451,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             subtotal_qr: shipping.subtotal_qr || 0,
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
             subtotal_correctivo: shipping.subtotal_correctivo || 0,
+            adelanto_tu_punto_efectivo: shipping.adelanto_tu_punto_efectivo || 0,
+            adelanto_tu_punto_qr: shipping.adelanto_tu_punto_qr || 0,
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
@@ -718,7 +720,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 isDeliveredLikeStatus(selectedStatus) && effectivePaidStatus === "si" && selectedPaymentType !== "5"
                     ? "3"
                     : selectedPaymentType;
-            const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
+            const effectiveAdvance = ["adelanto", "adelanto_tu_punto"].includes(effectivePaidStatus) ? (values.adelanto_cliente || 0) : 0;
             const simplePackageDestinationId =
                 values.destino_sucursal_id || paymentBranchId || origenBranchId;
             const effectiveDestinationType = isSimplePackageOrder
@@ -764,6 +766,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: effectivePaidStatus,
                 adelanto_cliente: effectiveAdvance,
+                adelanto_tu_punto_efectivo: values.adelanto_tu_punto_efectivo || shipping.adelanto_tu_punto_efectivo || 0,
+                adelanto_tu_punto_qr: values.adelanto_tu_punto_qr || shipping.adelanto_tu_punto_qr || 0,
                 tipo_de_pago: effectivePaymentType,
                 quien_paga_delivery: normalizeDeliveryPayer(values.quien_paga_delivery),
             };
@@ -1283,6 +1287,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     <Radio.Button value="si">Sí</Radio.Button>
                                     <Radio.Button value="no">No</Radio.Button>
                                     <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
+                                    <Radio.Button value="adelanto_tu_punto">Adelanto a Tu Punto</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
                         </Col>
