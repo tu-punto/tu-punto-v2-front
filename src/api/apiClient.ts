@@ -19,7 +19,7 @@ const isExcludedAuthEndpoint = (url?: string) => {
   return url.includes("/user/login") || url.includes("/user/info");
 };
 
-const handleAuthRedirect = (status?: number, url?: string, data?: any) => {
+const handleAuthRedirect = (status?: number, url?: string) => {
   const currentHash = window.location.hash || "";
 
   if (status === 401 && !isExcludedAuthEndpoint(url)) {
@@ -30,12 +30,10 @@ const handleAuthRedirect = (status?: number, url?: string, data?: any) => {
     }
   }
 
-  if (status === 403 && !url?.includes("/user/login")) {
-    const isUnauthorizedPage = currentHash.startsWith("#/unauthorized");
-    if (!isUnauthorizedPage) {
-      window.location.hash = "/unauthorized";
-    }
-  }
+  // Un 403 en una consulta auxiliar no significa que la sesión no pueda usar
+  // su ruta actual. La autorización de pantallas se resuelve con RoleGuard y
+  // el backend sigue negando cada endpoint no permitido. Redirigir aquí
+  // expulsaba, por ejemplo, a un granjero cuando una carga secundaria fallaba.
 };
 
 const attachAuthInterceptor = (client: AxiosInstance) => {
@@ -44,7 +42,7 @@ const attachAuthInterceptor = (client: AxiosInstance) => {
     (error) => {
       const status = error?.response?.status as number | undefined;
       const url = error?.config?.url as string | undefined;
-      handleAuthRedirect(status, url, error?.response?.data);
+      handleAuthRedirect(status, url);
       return Promise.reject(error);
     }
   );
