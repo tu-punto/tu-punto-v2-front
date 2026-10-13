@@ -50,8 +50,9 @@ export const getDailySummary = async (
     correctivoTotal = Number(salesTotals.correctivo) || 0;
     adelantoTuPuntoEfectivo = Number(salesTotals.adelantoTuPuntoEfectivo) || 0;
     adelantoTuPuntoQr = Number(salesTotals.adelantoTuPuntoQr) || 0;
-    efectivoTotal += adelantoTuPuntoEfectivo;
-    qrTotal += adelantoTuPuntoQr;
+    // Los adelantos independientes ya vienen incluidos como filas de efectivo/QR
+    // en el historial. Estos campos se conservan para mostrarlos separados en
+    // el cierre, sin sumarlos por segunda vez.
   }
 
   // Get service income from FinanceFlux
