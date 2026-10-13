@@ -275,8 +275,12 @@ export const Sales = () => {
     if (!data || data.length === 0) return
 
     const rawProducts = new Map<string, string>();
+    const authorizedSellerIds = new Set((user?.vendedores_autorizados || []).map((seller: any) => String(seller?._id || seller)));
     data.forEach(product => {
-      if (!rawProducts.has(product.id_producto) && product.id_vendedor == user.id_vendedor) {
+      const canUseProduct = isFarmer
+        ? authorizedSellerIds.has(String(product.id_vendedor))
+        : String(product.id_vendedor) === String(user?.id_vendedor);
+      if (!rawProducts.has(product.id_producto) && canUseProduct) {
         rawProducts.set(product.id_producto, product.producto.split(" - ")[0])
       }
     })
@@ -289,7 +293,7 @@ export const Sales = () => {
       )
     })
     setProductOptions(options)
-  }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers]);
+  }, [data, selectedSellerId, isAdmin, isOperator, isFarmer, user?.id_vendedor, user?.vendedores_autorizados, searchText, sellers]);
 
   //console.log(" Productos desde useProductsFlat:", data);
   const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -758,7 +762,7 @@ export const Sales = () => {
                       style={{ width: 200 }}
                       allowClear
                     />
-                    {!isAdmin && !isOperator && (
+                    {!isAdmin && !isOperator && !isFarmer && (
                       <Select
                         placeholder="Sucursal"
                         value={selectedBranchId}
@@ -784,13 +788,13 @@ export const Sales = () => {
                         {productOptions}
                       </Select>
                     )}
-                    <Button
+                    {!isFarmer && <Button
                       type="primary"
                       onClick={() => setProductAddModal(true)}
                       className="text-mobile-base xl:text-desktop-sm "
                     >
                       {isAdmin || isOperator ? "Añadir nuevo producto" : "Añadir temporal"}
-                    </Button>
+                    </Button>}
                     {(isAdmin || isOperator) && (
                       <Select
                         placeholder="Selecciona un vendedor"
