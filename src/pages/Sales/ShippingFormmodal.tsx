@@ -406,6 +406,8 @@ function ShippingFormModal({
             if (ventas.length > 0) {
                 //await handleDebt(ventas, response.newShipping.adelanto_cliente);
                 await handleSales(response.newShipping, ventas);
+            } else {
+                throw new Error("La entrega requiere al menos un producto");
             }
 
             clearSelectedProducts();
@@ -416,7 +418,7 @@ function ShippingFormModal({
             onSuccess();
         } catch (error) {
             console.error("Error en handleFinish:", error);
-            message.error("Error al procesar la entrega");
+            message.error(error instanceof Error ? error.message : "Error al procesar la entrega");
         }
 
         setLoading(false);

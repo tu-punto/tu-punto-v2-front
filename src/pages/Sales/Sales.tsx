@@ -550,12 +550,18 @@ export const Sales = () => {
     })
     try {
       //console.log("📤 Enviando ventas:", productsToAdd);
-      await registerSalesToShippingAPI({
+      const result = await registerSalesToShippingAPI({
         shippingId: shipping._id,
         sales: productsToAdd
       });
+      if (!result?.success) {
+        throw new Error(result?.msg || result?.error || "No se pudieron registrar los productos de la entrega");
+      }
+      return result;
     } catch (error) {
-      message.error('Error registrando ventas del pedido')
+      const detail = error instanceof Error ? error.message : "Error registrando ventas del pedido";
+      message.error(detail);
+      throw error;
     }
   }
   const handleEnhancedValueChange = (key: string, field: string, value: any) => {
