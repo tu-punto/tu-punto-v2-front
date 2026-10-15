@@ -46,6 +46,8 @@ const EmptySalesTable = ({
     onConditionalPromotionDecision,
     sellers,
     isAdmin,
+    isFarmer = false,
+    farmerDiscountRules = [],
     branchId,
     readonly = false,
 }: any) => {
@@ -77,6 +79,17 @@ const EmptySalesTable = ({
     const totalAmount = updatedProducts.reduce((acc: number, product: any) => {
         return acc + (product.precio_unitario * product.cantidad);
     }, 0);
+
+    const getFarmerBonus = (record: any) => {
+        const price = Number(record?.precio_unitario || 0);
+        const quantity = Number(record?.cantidad || 0);
+        const rule = farmerDiscountRules.find((item: any) =>
+            price >= Number(item?.limite_inferior || 0) && price <= Number(item?.limite_superior || 0)
+        );
+        if (!rule) return null;
+        const unitBonus = Math.max(0, Number(rule?.monto_descontado || 0) - Number(rule?.monto_para_tu_punto || 0));
+        return { unitBonus, total: unitBonus * quantity };
+    };
 
     const columns = [
         {
@@ -165,6 +178,19 @@ const EmptySalesTable = ({
                 ),
             className: "text-mobile-sm xl:text-desktop-sm",
         },
+        ...(isFarmer ? [{
+            title: 'Tu bono',
+            key: 'bono_granjero',
+            render: (_: any, record: any) => {
+                const bonus = getFarmerBonus(record);
+                if (!bonus) return <Typography.Text type="secondary">Sin regla</Typography.Text>;
+                return <Space direction="vertical" size={0}>
+                    <Typography.Text strong type="success">{formatMoney(bonus.total)}</Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>{formatMoney(bonus.unitBonus)} por unidad</Typography.Text>
+                </Space>;
+            },
+            className: "text-mobile-sm xl:text-desktop-sm",
+        }] : []),
         ...(isAdmin ? [
             {
                 title: 'Utilidad',

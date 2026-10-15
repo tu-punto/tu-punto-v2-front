@@ -23,6 +23,7 @@ interface QRScannerProps {
   appearance?: "default" | "simple";
   simpleVideoMinHeight?: number;
   sucursalId?: string;
+  canUseProduct?: (product: { id_vendedor?: string; sellerId?: string }) => boolean;
 }
 
 interface ScannedVariantItem {
@@ -203,7 +204,8 @@ function QRScanner({
   groupSuccessLabel = "Variante del grupo agregada",
   appearance = "default",
   simpleVideoMinHeight = 280,
-  sucursalId
+  sucursalId,
+  canUseProduct
 }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -678,6 +680,10 @@ function QRScanner({
   };
 
   const handleResolvedVariant = (item: ScannedVariantItem, label = successLabel) => {
+    if (canUseProduct && !canUseProduct(item)) {
+      showFlash("error", "Este producto no pertenece a tus vendedores autorizados");
+      return;
+    }
     onProductScanned?.(item);
     resetInactivityCountdown();
     showFlash("success", label);
@@ -832,7 +838,7 @@ function QRScanner({
   };
 
   const filteredGroupItems = useMemo(() => {
-    const items = groupSelection?.items || [];
+    const items = (groupSelection?.items || []).filter((item) => !canUseProduct || canUseProduct(item));
     const q = groupSearch.trim().toLowerCase();
 
     const sorted = [...items].sort((a, b) => {

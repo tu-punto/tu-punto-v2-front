@@ -20,6 +20,7 @@ import { resolvePromotionPricing } from "../../utils/promotionPricing";
 import { useNavigate } from "react-router-dom";
 import { includesNormalized } from "../../utils/search";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { getFarmerDiscountRulesAPI } from "../../api/farmerDiscountRule";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
   const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -56,6 +57,7 @@ export const Sales = () => {
   const [productAddModal, setProductAddModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0)
   const [sellers, setSellers] = useState<any[]>([])
+  const [farmerDiscountRules, setFarmerDiscountRules] = useState<any[]>([]);
   const [sellersLoading, setSellersLoading] = useState(true);
   const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
   //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
@@ -73,6 +75,10 @@ export const Sales = () => {
   const [cartLoading, setCartLoading] = useState(false);
   const normalizeId = (id: any) => String(id?._id ?? id?.$oid ?? id ?? "");
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const canUseFarmerSeller = (sellerId: unknown) => {
+    if (!isFarmer) return true;
+    return (user?.vendedores_autorizados || []).some((seller: any) => String(seller?._id || seller) === String(sellerId || ""));
+  };
   const effectiveSalesBranchId = branchIdForFetch || selectedBranchId || localStorage.getItem("sucursalId") || undefined;
   const getStockActual = (p: any, sucursalId?: string | null) => {
     // Caso 1: viene "flat" (lo ideal)
@@ -249,12 +255,21 @@ export const Sales = () => {
       };
     });
     setFilteredBySeller(filtered);
-  }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
+  }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, isFarmer, user?.id_vendedor, user?.vendedores_autorizados, searchText, sellers, selectedProduct]);
 
   useEffect(() => {
     // fetchSellers();
     fetchSucursal();
   }, []);
+  useEffect(() => {
+    if (!isFarmer) {
+      setFarmerDiscountRules([]);
+      return;
+    }
+    getFarmerDiscountRulesAPI()
+      .then((response: any) => setFarmerDiscountRules(Array.isArray(response?.data) ? response.data : []))
+      .catch(() => setFarmerDiscountRules([]));
+  }, [isFarmer]);
   useEffect(() => {
     if ((!isAdmin && !isOperator && !isFarmer) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
@@ -868,7 +883,7 @@ export const Sales = () => {
                     <Button onClick={showShippingModal} type="primary" data-tour-id="sales-delivery-button">
                       Realizar Entrega
                     </Button>
-                    {(isAdmin || isOperator) && (
+                    {(isAdmin || isOperator || isFarmer) && (
                       <Button
                         type="primary"
                         className="text-mobile-sm xl:text-desktop-sm"
@@ -877,7 +892,7 @@ export const Sales = () => {
                         Agregar por QR
                       </Button>
                     )}
-                    {(isAdmin || isOperator) && (
+                    {(isAdmin || isOperator || isFarmer) && (
                       <Button
                         icon={<InfoCircleOutlined />}
                         className="text-mobile-sm xl:text-desktop-sm"
@@ -902,6 +917,8 @@ export const Sales = () => {
                   key={refreshKey}
                   sellers={sellers}
                   isAdmin={isAdmin || isOperator}
+                  isFarmer={isFarmer}
+                  farmerDiscountRules={farmerDiscountRules}
                   branchId={effectiveSalesBranchId}
               />
             </Spin>
@@ -910,7 +927,13 @@ export const Sales = () => {
             <div style={{ paddingTop: 24 }}>
               <QRScanner
                 onClose={() => setShowQRScanner(false)}
+                sucursalId={effectiveSalesBranchId}
+                canUseProduct={(item) => canUseFarmerSeller(item?.id_vendedor || item?.sellerId)}
                 onProductScanned={(item) => {
+                  if (!canUseFarmerSeller(item?.id_vendedor || item?.sellerId)) {
+                    message.error("Solo puedes agregar productos de tus vendedores autorizados.");
+                    return;
+                  }
                   const vendedor = sellers.find((v: any) => v._id === item.id_vendedor);
                   const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
 
@@ -947,6 +970,7 @@ export const Sales = () => {
             sellerLabel="Cualquier vendedor"
             sucursalId={fallbackSucursalId || undefined}
             sucursalLabel="Sucursal actual"
+            canUseProduct={(item) => canUseFarmerSeller(item?.id_vendedor || item?.sellerId)}
           />
         </Col>
       </Row>
