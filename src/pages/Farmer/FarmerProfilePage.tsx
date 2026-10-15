@@ -19,7 +19,20 @@ export default function FarmerProfilePage() {
       { title: "Fecha", dataIndex: "fecha_pedido", render: (v) => v ? new Date(v).toLocaleDateString("es-BO") : "-" },
       { title: "Estado", dataIndex: "estado_pedido", render: (v) => <Tag>{v || "-"}</Tag> },
       { title: "Cantidad", dataIndex: "cantidad" }, { title: "Precio", dataIndex: "precio_unitario", render: money },
-      { title: "Tu saldo", dataIndex: "saldo_granjero", render: money }, { title: "Pago", dataIndex: "pagado_a_granjero", render: (v) => <Tag color={v ? "success" : "warning"}>{v ? "Pagado" : "Pendiente"}</Tag> },
+      {
+        title: "Tu saldo",
+        dataIndex: "saldo_granjero",
+        render: (v, row) => String(row?.estado_pedido || "").toLowerCase() === "entregado"
+          ? money(v)
+          : <Typography.Text type="secondary">Disponible al entregar</Typography.Text>,
+      },
+      {
+        title: "Pago",
+        dataIndex: "pagado_a_granjero",
+        render: (v, row) => String(row?.estado_pedido || "").toLowerCase() !== "entregado"
+          ? <Tag>En espera de entrega</Tag>
+          : <Tag color={v ? "success" : "warning"}>{v ? "Pagado" : "Pendiente"}</Tag>,
+      },
     ]} /></Card>
   </div>;
 }

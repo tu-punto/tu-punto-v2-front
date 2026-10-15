@@ -13,7 +13,9 @@ export default function FarmerSummaryModal({ farmer, open, onClose }: { farmer?:
     <Descriptions size="small" column={2} bordered className="mb-4"><Descriptions.Item label="Email">{farmer?.email}</Descriptions.Item><Descriptions.Item label="Sucursal">{farmer?.sucursal?.nombre || "-"}</Descriptions.Item></Descriptions>
     <div className="mb-4 flex items-center justify-between rounded-lg bg-slate-50 p-4"><Statistic title="Pago pendiente" value={Number(body?.pago_pendiente || 0)} precision={2} prefix="Bs." /><Popconfirm title="¿Registrar el pago de todas las entregas pendientes?" description="Las entregas incluidas quedarán liquidadas y se conservará el historial." onConfirm={settle} okText="Registrar pago" cancelText="Cancelar"><Button type="primary" disabled={!Number(body?.pago_pendiente || 0)} loading={settling}>Marcar como pagado</Button></Popconfirm></div>
     <Table loading={loading} size="small" rowKey={(row) => String(row._id)} pagination={{ pageSize: 7 }} dataSource={body?.entregas || []} columns={[
-      { title: "Fecha", dataIndex: "fecha_pedido", render: (v) => v ? new Date(v).toLocaleDateString("es-BO") : "-" }, { title: "Estado", dataIndex: "estado_pedido", render: (v) => <Tag>{v || "-"}</Tag> }, { title: "Saldo", dataIndex: "saldo_granjero", render: money }, { title: "Pago", dataIndex: "pagado_a_granjero", render: (v) => <Tag color={v ? "success" : "warning"}>{v ? "Pagado" : "Pendiente"}</Tag> }
+      { title: "Fecha", dataIndex: "fecha_pedido", render: (v) => v ? new Date(v).toLocaleDateString("es-BO") : "-" }, { title: "Estado", dataIndex: "estado_pedido", render: (v) => <Tag>{v || "-"}</Tag> },
+      { title: "Saldo", dataIndex: "saldo_granjero", render: (v, row) => String(row?.estado_pedido || "").toLowerCase() === "entregado" ? money(v) : "Disponible al entregar" },
+      { title: "Pago", dataIndex: "pagado_a_granjero", render: (v, row) => String(row?.estado_pedido || "").toLowerCase() !== "entregado" ? <Tag>En espera de entrega</Tag> : <Tag color={v ? "success" : "warning"}>{v ? "Pagado" : "Pendiente"}</Tag> }
     ]} />
   </Modal>;
 }
