@@ -203,6 +203,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       comision_diferente_por_sucursal: sellerData?.comision_diferente_por_sucursal === true,
       amortizacion: sellerData?.amortizacion ?? null,
       precio_paquete: sellerData?.precio_paquete ?? null,
+      is_external: sellerData?.is_external === true,
+      can_access_seller_dashboard: sellerData?.can_access_seller_dashboard === true,
+      can_access_personal_inventory: sellerData?.can_access_personal_inventory === true,
       sucursales: branches,
     };
   };
@@ -1189,6 +1192,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           comision_diferente_por_sucursal: seller.comision_diferente_por_sucursal === true,
           amortizacion: seller.amortizacion ?? null,
           precio_paquete: seller.precio_paquete ?? null,
+          is_external: seller.is_external === true,
+          can_access_seller_dashboard: seller.can_access_seller_dashboard === true,
+          can_access_personal_inventory: seller.can_access_personal_inventory === true,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -1328,6 +1334,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             </Col>
           </Row>
         </Card>
+
+        {!isSeller && <Card title="Pantallas especiales" style={{ marginBottom: 24 }}>
+          <Form.Item name="is_external" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox>Externo — oculta las pantallas habituales</Checkbox>
+          </Form.Item>
+          <Form.Item name="can_access_seller_dashboard" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox>Habilitar Mi Dashboard</Checkbox>
+          </Form.Item>
+          <Form.Item name="can_access_personal_inventory" valuePropName="checked" style={{ marginBottom: 0 }}>
+            <Checkbox>Habilitar Mi inventario</Checkbox>
+          </Form.Item>
+        </Card>}
 
         {/* Servicios por sucursal */}
         <Card

@@ -230,6 +230,14 @@ export default function SellerFormModal({
             </Form.Item>
           </Col>
         </Row>
+        <Card size="small" title="Pantallas especiales" className="mb-4">
+          <Form.Item name="is_external" valuePropName="checked" className="mb-2">
+            <Switch checkedChildren="Externo" unCheckedChildren="Vendedor normal" />
+          </Form.Item>
+          <div className="text-xs text-gray-500 mb-3">Un vendedor externo solo verá los módulos especiales habilitados.</div>
+          <Form.Item name="can_access_seller_dashboard" valuePropName="checked" className="mb-2"><Switch checkedChildren="Mi Dashboard" unCheckedChildren="Sin Dashboard" /></Form.Item>
+          <Form.Item name="can_access_personal_inventory" valuePropName="checked" className="mb-0"><Switch checkedChildren="Mi inventario" unCheckedChildren="Sin inventario personal" /></Form.Item>
+        </Card>
 
         <Row gutter={16}>
           <Col xs={24} md={12}>

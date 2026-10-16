@@ -22,7 +22,6 @@ export const menu = [
     label: "Mi Dashboard",
     icon: statsIcon,
     roles: getAllowedRoles("/seller-dashboard"),
-    hiddenInMenuForRoles: ["seller"],
   },
   {
     path: "/seller",

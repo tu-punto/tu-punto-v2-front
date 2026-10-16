@@ -34,7 +34,7 @@ import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
 import { isSuperadminUser, normalizeRole } from "../utils/role";
-import { canSellerAccessInventory, canSellerAccessShop, canSellerAccessSales, canSellerAccessSimplePackages } from "../utils/sellerServiceAccess";
+import { canSellerAccessDashboard, canSellerAccessNormalScreens, canSellerAccessPersonalInventory, canSellerAccessInventory, canSellerAccessShop, canSellerAccessSales, canSellerAccessSimplePackages } from "../utils/sellerServiceAccess";
 
 const guard = (path: string, element: JSX.Element) => (
   <RoleGuard allowedRoles={getAllowedRoles(path)}>{element}</RoleGuard>
@@ -51,6 +51,17 @@ const SellerProductInfoRoute = () => {
   return <SellerProductInfoPage mode={role === "seller" ? "seller" : "admin"} />;
 };
 
+const SellerSpecialRoute = ({ feature, children }: { feature: "dashboard" | "inventory"; children: JSX.Element }) => {
+  const { user } = useContext(UserContext);
+  const allowed = feature === "dashboard" ? canSellerAccessDashboard(user) : canSellerAccessPersonalInventory(user);
+  return allowed ? children : <Navigate to="/unauthorized" replace />;
+};
+
+const SellerNormalRoute = ({ children }: { children: JSX.Element }) => {
+  const { user } = useContext(UserContext);
+  return canSellerAccessNormalScreens(user) ? children : <Navigate to="/unauthorized" replace />;
+};
+
 const sellerAccessDeniedState = (reason: string) => ({
   redirectTo: "/seller-info",
   seconds: 4,
@@ -60,7 +71,7 @@ const sellerAccessDeniedState = (reason: string) => ({
 const StockRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!canSellerAccessInventory(user)) {
+  if (!canSellerAccessNormalScreens(user) || !canSellerAccessInventory(user)) {
     return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("stock")} />;
   }
 
@@ -70,7 +81,7 @@ const StockRoute = () => {
 const SalesRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!canSellerAccessSales(user)) {
+  if (!canSellerAccessNormalScreens(user) || !canSellerAccessSales(user)) {
     return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("sales")} />;
   }
 
@@ -80,7 +91,7 @@ const SalesRoute = () => {
 const ShopRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!canSellerAccessShop(user)) {
+  if (!canSellerAccessNormalScreens(user) || !canSellerAccessShop(user)) {
     return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("shop")} />;
   }
 
@@ -90,7 +101,7 @@ const ShopRoute = () => {
 const SimplePackagesRoute = () => {
   const { user } = useContext(UserContext);
 
-  if (!canSellerAccessSimplePackages(user)) {
+  if (!canSellerAccessNormalScreens(user) || !canSellerAccessSimplePackages(user)) {
     return <Navigate to="/unauthorized" replace state={sellerAccessDeniedState("simple-packages")} />;
   }
 
@@ -165,7 +176,7 @@ const protectedRoutes = [
       { path: "/farmer-profile", element: guard("/farmer-profile", <FarmerProfilePage />) },
       {
         path: "/shipping",
-        element: guard("/shipping", <Shipping />),
+        element: guard("/shipping", <SellerNormalRoute><Shipping /></SellerNormalRoute>),
       },
       {
         path: "/find-shipping",
@@ -197,7 +208,7 @@ const protectedRoutes = [
       },
       {
         path: "/seller-info",
-        element: guard("/seller-info", <SellerInfoPageWrapper />),
+        element: guard("/seller-info", <SellerNormalRoute><SellerInfoPageWrapper /></SellerNormalRoute>),
       },
       {
         path: "/shop",
@@ -205,7 +216,7 @@ const protectedRoutes = [
       },
       {
         path: "/my-inventory",
-        element: guard("/my-inventory", <PersonalInventoryPage />),
+        element: guard("/my-inventory", <SellerSpecialRoute feature="inventory"><PersonalInventoryPage /></SellerSpecialRoute>),
       },
       {
         path: "/simple-packages",
@@ -237,19 +248,19 @@ const protectedRoutes = [
       },
       {
         path: "/shipping-guide",
-        element: guard("/shipping-guide", <ShippingGuide />),
+        element: guard("/shipping-guide", <SellerNormalRoute><ShippingGuide /></SellerNormalRoute>),
       },
       {
         path: "/seller-product-info",
-        element: guard("/seller-product-info", <SellerProductInfoRoute />),
+        element: guard("/seller-product-info", <SellerNormalRoute><SellerProductInfoRoute /></SellerNormalRoute>),
       },
       {
         path: "/seller-promotions",
-        element: guard("/seller-promotions", <SellerPromotionsPage />),
+        element: guard("/seller-promotions", <SellerNormalRoute><SellerPromotionsPage /></SellerNormalRoute>),
       },
       {
         path: "/seller-dashboard",
-        element: guard("/seller-dashboard", <SellerDashboardPage />),
+        element: guard("/seller-dashboard", <SellerSpecialRoute feature="dashboard"><SellerDashboardPage /></SellerSpecialRoute>),
       },
       {
         path: "/admin-seller-product-info",
