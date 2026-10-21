@@ -193,7 +193,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           fecha_ingreso: sucursal.fecha_ingreso ? dayjs(sucursal.fecha_ingreso) : null,
           fecha_salida: sucursal.fecha_salida ? dayjs(sucursal.fecha_salida) : null,
         }))
-      : [{ delivery: 0 }];
+      : [];
 
     return {
       telefono: sellerData?.telefono,
@@ -236,6 +236,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         }
 
         setSellerDetail(detail);
+        // El listado puede estar desactualizado; cargar los permisos desde el
+        // detalle sin sobrescribir un cambio que el administrador ya haya hecho.
+        ["is_external", "can_access_seller_dashboard", "can_access_personal_inventory"].forEach((field) => {
+          if (!form.isFieldTouched(field)) form.setFieldValue(field, detail[field] === true);
+        });
 
         const saldoPendiente = Number(detail.saldo_pendiente ?? 0);
         const deuda = Number(detail.deuda ?? 0);
@@ -737,7 +742,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       const resSeller = await updateSellerAPI(seller.key, {
         ...formValues,
         comision_diferente_por_sucursal: formValues.comision_diferente_por_sucursal === true,
-        pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
+        pago_sucursales: (formValues.sucursales || []).map((sucursal: any) => ({
           ...sucursal,
           alquiler: sucursal.almacenamiento,
           delivery: 0,
@@ -1207,7 +1212,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                   ? dayjs(sucursal.fecha_salida)
                   : null,
               }))
-            : [{ delivery: 0 }],
+            : [],
         }}
       >
         {/* Información del vendedor */}

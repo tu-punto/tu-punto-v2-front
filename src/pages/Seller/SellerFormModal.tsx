@@ -92,7 +92,7 @@ export default function SellerFormModal({
         saldo_pendiente: 0,
         fecha_vigencia: dayjs(values.fecha_vigencia).toISOString(),
         descuento_porcentaje: Number(values.descuento_porcentaje || 0),
-        pago_sucursales: values.sucursales.map((s: any) => ({
+        pago_sucursales: (values.sucursales || []).map((s: any) => ({
           id_sucursal: s.id_sucursal,
           sucursalName:
             sucursalOptions.find((opt) => opt._id === s.id_sucursal)?.nombre ||
@@ -113,7 +113,11 @@ export default function SellerFormModal({
         esDeuda: true, // alta siempre entra como deuda
       };
 
-      await registerSellerAPI(payload);
+      const result = await registerSellerAPI(payload);
+      if (!result?.ok) {
+        message.error(result?.msg || "No se pudo registrar el vendedor");
+        return;
+      }
       message.success("Vendedor registrado");
       onSuccess();
     } catch {

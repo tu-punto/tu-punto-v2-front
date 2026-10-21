@@ -99,7 +99,7 @@ export const registerSellerAPI = async (sellerData: any) => {
         const res = await apiClient.post(`/seller/register`, sellerData)
         return res.data
     } catch (error) {
-        parseError(error as AxiosError)
+        return parseError(error as AxiosError)
     }
 }
 
