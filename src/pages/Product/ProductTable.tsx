@@ -1,14 +1,17 @@
-import { Space, Table, Tooltip, message } from 'antd';
+import { Space, Table, Tooltip, Typography, message } from 'antd';
 import { useContext } from 'react';
 import PromotionPrice from '../../components/PromotionPrice';
 import { UserContext } from '../../context/userContext';
 import { normalizeRole } from '../../utils/role';
+import { getFarmerUnitBonus } from '../../utils/farmerBonus';
+import { resolvePromotionPricing } from '../../utils/promotionPricing';
 
 const CRITICAL_STOCK_THRESHOLD = 1;
 
-const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, isMobile = false }: any) => {
+const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, isMobile = false, farmerDiscountRules = [], farmerBonusStatus = 'loading' }: any) => {
     const { user } = useContext(UserContext) || {};
     const isSeller = normalizeRole(user?.role) === 'seller';
+    const isFarmer = normalizeRole(user?.role) === 'farmer';
     const columns = [
         {
             title: <span className="text-mobile-sm xl:text-desktop-sm">Producto</span>,
@@ -65,6 +68,20 @@ const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, is
                 return record.vendedor || 'Sin vendedor';
             }
         },
+        ...(isFarmer ? [{
+            title: <span className="text-mobile-sm xl:text-desktop-sm">Tu bono por unidad</span>,
+            key: 'bono_granjero',
+            render: (_: any, record: any) => {
+                if (farmerBonusStatus === 'loading') return <Typography.Text type="secondary">Cargando...</Typography.Text>;
+                if (farmerBonusStatus === 'error') return <Typography.Text type="secondary">No disponible</Typography.Text>;
+                const basePrice = Number(record.precio_original ?? record.originalPrice ?? record.basePrice ?? record.precio ?? 0);
+                const price = resolvePromotionPricing(basePrice, record.pricingPromotion || record.promotionPricing || null, 1).effectivePrice;
+                const bonus = getFarmerUnitBonus(price, farmerDiscountRules);
+                return bonus === null
+                    ? <Typography.Text type="secondary">Sin regla</Typography.Text>
+                    : <Typography.Text strong type="success">Bs. {bonus.toFixed(2)}</Typography.Text>;
+            },
+        }] : []),
     ];
 
     return (

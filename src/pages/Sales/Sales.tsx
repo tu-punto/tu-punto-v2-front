@@ -58,6 +58,7 @@ export const Sales = () => {
   const [refreshKey, setRefreshKey] = useState(0)
   const [sellers, setSellers] = useState<any[]>([])
   const [farmerDiscountRules, setFarmerDiscountRules] = useState<any[]>([]);
+  const [farmerBonusStatus, setFarmerBonusStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [sellersLoading, setSellersLoading] = useState(true);
   const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
   //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
@@ -266,9 +267,17 @@ export const Sales = () => {
       setFarmerDiscountRules([]);
       return;
     }
+    setFarmerBonusStatus('loading');
     getFarmerDiscountRulesAPI()
-      .then((response: any) => setFarmerDiscountRules(Array.isArray(response?.data) ? response.data : []))
-      .catch(() => setFarmerDiscountRules([]));
+      .then((response: any) => {
+        if (!response?.success || !Array.isArray(response.data)) throw new Error('No se pudieron cargar las reglas');
+        setFarmerDiscountRules(response.data);
+        setFarmerBonusStatus('ready');
+      })
+      .catch(() => {
+        setFarmerDiscountRules([]);
+        setFarmerBonusStatus('error');
+      });
   }, [isFarmer]);
   useEffect(() => {
     if ((!isAdmin && !isOperator && !isFarmer) && branches.length > 0 && !selectedBranchId) {
@@ -848,6 +857,8 @@ export const Sales = () => {
                   onSelectProduct={handleProductSelect}
                   onConditionalPromotionRequest={openConditionalPromotionPrompt}
                   isMobile={isMobile}
+                  farmerDiscountRules={farmerDiscountRules}
+                  farmerBonusStatus={farmerBonusStatus}
                   refreshKey={refreshKey}
                   data={filteredBySeller}
                 />

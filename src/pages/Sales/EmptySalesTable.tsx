@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { applySellerCommissionCap } from "../../utils/commissionCap";
 import PromotionPrice, { ConditionalPromotionDetails } from "../../components/PromotionPrice";
 import { InfoCircleOutlined } from "@ant-design/icons";
+import { getFarmerUnitBonus } from "../../utils/farmerBonus";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
     const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -83,11 +84,8 @@ const EmptySalesTable = ({
     const getFarmerBonus = (record: any) => {
         const price = Number(record?.precio_unitario || 0);
         const quantity = Number(record?.cantidad || 0);
-        const rule = farmerDiscountRules.find((item: any) =>
-            price >= Number(item?.limite_inferior || 0) && price <= Number(item?.limite_superior || 0)
-        );
-        if (!rule) return null;
-        const unitBonus = Math.max(0, Number(rule?.monto_descontado || 0) - Number(rule?.monto_para_tu_punto || 0));
+        const unitBonus = getFarmerUnitBonus(price, farmerDiscountRules);
+        if (unitBonus === null) return null;
         return { unitBonus, total: unitBonus * quantity };
     };
 
