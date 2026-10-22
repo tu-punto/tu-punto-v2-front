@@ -20,7 +20,7 @@ import { resolvePromotionPricing } from "../../utils/promotionPricing";
 import { useNavigate } from "react-router-dom";
 import { includesNormalized } from "../../utils/search";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { getFarmerDiscountRulesAPI } from "../../api/farmerDiscountRule";
+import { getFarmerBonusRulesAPI } from "../../api/farmerDiscountRule";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
   const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -268,7 +268,7 @@ export const Sales = () => {
       return;
     }
     setFarmerBonusStatus('loading');
-    getFarmerDiscountRulesAPI()
+    getFarmerBonusRulesAPI()
       .then((response: any) => {
         if (!response?.success || !Array.isArray(response.data)) throw new Error('No se pudieron cargar las reglas');
         setFarmerDiscountRules(response.data);

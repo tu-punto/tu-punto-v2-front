@@ -60,14 +60,6 @@ const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, is
                 </Space>
             ),
         },
-        {
-            title: <span className="text-mobile-sm xl:text-desktop-sm">Vendedor</span>,
-            dataIndex: 'vendedor',
-            key: 'vendedor',
-            render: (vendedor: any, record: any) => {
-                return record.vendedor || 'Sin vendedor';
-            }
-        },
         ...(isFarmer ? [{
             title: <span className="text-mobile-sm xl:text-desktop-sm">Tu bono por unidad</span>,
             key: 'bono_granjero',
@@ -82,6 +74,14 @@ const ProductTable = ({ data, onSelectProduct, onConditionalPromotionRequest, is
                     : <Typography.Text strong type="success">Bs. {bonus.toFixed(2)}</Typography.Text>;
             },
         }] : []),
+        {
+            title: <span className="text-mobile-sm xl:text-desktop-sm">Vendedor</span>,
+            dataIndex: 'vendedor',
+            key: 'vendedor',
+            render: (vendedor: any, record: any) => {
+                return record.vendedor || 'Sin vendedor';
+            }
+        },
     ];
 
     return (
