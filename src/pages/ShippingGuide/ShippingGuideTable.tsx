@@ -16,6 +16,7 @@ const attachmentType = (key: string): GuideAttachment["type"] => {
     return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext || "") ? "image" : ext === "pdf" ? "pdf" : "other";
 };
 const hasProductList = (guide: any) => Array.isArray(guide.lista_productos_keys) && guide.lista_productos_keys.length > 0;
+const fleetShipmentLabel = (guide: any) => guide.enviado_por_flota === true ? "Sí" : guide.enviado_por_flota === false ? "No" : "No especificado";
 const isRegistered = (guide: any) => {
     const isLegacyGuide = guide.isRegistrado === undefined || guide.isRegistrado === null;
     return isLegacyGuide ? Boolean(guide.isRecogido) : guide.isRegistrado === true;
@@ -57,10 +58,11 @@ const ShippingGuideTable = ({ refreshKey, user, isFilterBySeller, isFilterByBran
     const showFiles = async (record: any, kind: Exclude<PreviewKind, null>) => {
         const keys = Array.isArray(record.lista_productos_keys) ? record.lista_productos_keys : [];
         if ((kind === "guide" && !record.imagen_key) || (kind === "list" && !keys.length)) { message.info(kind === "guide" ? "Esta guia no tiene archivo adjunto" : "Esta lista no tiene archivos adjuntos"); return; }
-        setIsPreviewVisible(true); setPreviewLoading(true); setPreview({ kind, imageUrl: null, description: record.descripcion, attachments: [] });
+        const description = `${record.descripcion && record.descripcion !== "undefined" ? record.descripcion : "Sin descripcion"}\nEnvío por flota: ${fleetShipmentLabel(record)}`;
+        setIsPreviewVisible(true); setPreviewLoading(true); setPreview({ kind, imageUrl: null, description, attachments: [] });
         try {
-            if (kind === "guide") setPreview({ kind, imageUrl: await getSignedURL(record.imagen_key), description: record.descripcion, attachments: [] });
-            else setPreview({ kind, imageUrl: null, description: record.descripcion, attachments: await Promise.all(keys.map(async (key: string) => ({ key, name: attachmentName(key), url: await getSignedURL(key), type: attachmentType(key) }))) });
+            if (kind === "guide") setPreview({ kind, imageUrl: await getSignedURL(record.imagen_key), description, attachments: [] });
+            else setPreview({ kind, imageUrl: null, description, attachments: await Promise.all(keys.map(async (key: string) => ({ key, name: attachmentName(key), url: await getSignedURL(key), type: attachmentType(key) }))) });
         } catch (error) { console.error(error); message.error("No se pudo cargar la vista previa"); } finally { setPreviewLoading(false); }
     };
     const markPickedUp = async (record: any) => {

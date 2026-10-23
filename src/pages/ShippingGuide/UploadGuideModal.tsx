@@ -1,10 +1,10 @@
-import { Card, Col, Form, Modal, Row, Input, Upload, Button, message, DatePicker, Select } from "antd";
+import { Button, Card, Col, DatePicker, Form, Input, message, Modal, Radio, Row, Select, Upload } from "antd";
 import { useContext, useEffect, useState } from "react";
+import { MessageOutlined, UploadOutlined } from "@ant-design/icons";
+import moment from "moment";
 import { UserContext } from "../../context/userContext.tsx";
-import { MessageOutlined, UploadOutlined } from '@ant-design/icons';
 import { registerShippingGuideAPI } from "../../api/shippingGuide.ts";
 import { getSellerAPI } from "../../api/seller";
-import moment from 'moment';
 import { IBranch } from "../../models/branchModel.ts";
 import { getSucursalsAPI } from "../../api/sucursal.ts";
 
@@ -16,218 +16,79 @@ function UploadGuideModal({ visible, onCancel, onFinish }: any) {
     const [loading, setLoading] = useState(false);
     const [guideFiles, setGuideFiles] = useState<any[]>([]);
     const [listFiles, setListFiles] = useState<any[]>([]);
+    const [isFleetShipment, setIsFleetShipment] = useState<boolean | undefined>();
 
-    useEffect(() => {
-        if (visible) {
-            fetchBranchs();
-        }
-    }, [visible, user?.id_vendedor])
+    useEffect(() => { if (visible) fetchBranchs(); }, [visible, user?.id_vendedor]);
 
     const fetchBranchs = async () => {
         const branches = await getSucursalsAPI();
         const sellerData = await getSellerAPI(user.id_vendedor);
-        const branchData = sellerData.pago_sucursales;
-        
-        const activeBranchIDs: Set<string> = new Set();
+        const activeBranchIDs = new Set<string>();
         const sellerFinalDate = new Date(sellerData.fecha_vigencia);
-        branchData.forEach((branch: IBranch) => {
-            if (isActiveSellerBranch(branch, sellerFinalDate)) {
-                activeBranchIDs.add(String((branch as any).id_sucursal?._id || branch.id_sucursal || ""));
-            }
+        sellerData.pago_sucursales.forEach((branch: IBranch) => {
+            const finalDate = branch.fecha_salida ? new Date(branch.fecha_salida) : sellerFinalDate;
+            if (finalDate > new Date()) activeBranchIDs.add(String((branch as any).id_sucursal?._id || branch.id_sucursal || ""));
         });
+        setBranchs(branches.filter((branch: IBranch) => activeBranchIDs.has(String(branch._id || ""))));
+    };
 
-        const filteredBranches: IBranch[] = [];
-        branches.forEach((branch: IBranch) => {
-            if (activeBranchIDs.has(String(branch._id || ""))) {
-                filteredBranches.push(branch);
-            }
-        })
-        setBranchs(filteredBranches)
-    }
-
-    const isActiveSellerBranch = (branch: any, finalDate: Date) => {
-        const actualDate = new Date();
-        let branchFinalDate: Date;
-        if (branch.fecha_salida) {
-            branchFinalDate = new Date(branch.fecha_salida);
-        } else {
-            branchFinalDate = finalDate;
-        }
-        return branchFinalDate > actualDate
-    }
-
-    const handleUploadChange = (info: any) => {
-        if (info.file.status === 'done') {
-            message.success(`${info.file.name} file uploaded successfully`);
-        } else if (info.file.status === 'error') {
-            message.error(`${info.file.name} file upload failed.`);
-        }
+    const resetModal = () => {
+        form.resetFields();
+        setSelectedBranch("");
+        setGuideFiles([]);
+        setListFiles([]);
+        setIsFleetShipment(undefined);
     };
 
     const handleFinish = async (values: any) => {
+        const productFiles = listFiles.slice(0, 3).map((file) => file.originFileObj).filter(Boolean);
+        const image = isFleetShipment ? guideFiles[0]?.originFileObj : null;
+        if (typeof isFleetShipment !== "boolean") return message.error("Indica si los productos se enviarán por flota");
+        if (isFleetShipment && !image) return message.error("Debes subir la foto de la guía de envío");
+        if (!productFiles.length) return message.error("Debes subir al menos un archivo con la lista de productos");
+
         setLoading(true);
         try {
-            const sucursal = selectedBranch;
-            const vendedor_id = user.id_vendedor;
-            const descripcion = values.description || "";
-            const imagen = guideFiles[0]?.originFileObj || null;
-            const productFiles = listFiles.slice(0, 3).map((file) => file.originFileObj).filter(Boolean);
-
-            if (!productFiles.length) {
-                message.error("Debes subir al menos un archivo con la lista de productos");
-                setLoading(false);
-                return;
-            }
-
             const formData = new FormData();
-            formData.append('vendedor', vendedor_id);
-            formData.append('sucursal', sucursal);
-            formData.append('descripcion', descripcion);
-            if (imagen) {
-                formData.append('imagen', imagen);
-            }
-            productFiles.forEach((file) => {
-                formData.append('lista_productos', file);
-            });
-
+            formData.append("vendedor", user.id_vendedor);
+            formData.append("sucursal", selectedBranch);
+            formData.append("descripcion", values.description || "");
+            formData.append("enviado_por_flota", String(isFleetShipment));
+            if (image) formData.append("imagen", image);
+            productFiles.forEach((file) => formData.append("lista_productos", file));
             const response = await registerShippingGuideAPI(formData);
-
-            if (!response.success) {
-                message.error(response.message || response.msg || "Error registrando la guia");
-                setLoading(false);
-                return;
-            } else {
-                message.success("Guia de envío registrada");
-                onCancel();
-            }
+            if (!response.success) return message.error(response.message || response.msg || "Error registrando la guía");
+            message.success("Guía de envío registrada");
+            resetModal();
+            onCancel();
+            onFinish();
         } catch (error) {
             console.error("Error en Modal Guía de Envío: ", error);
             message.error("Error procesando la guía");
-        }
-        setLoading(false);
-        form.resetFields();
-        setSelectedBranch("");
-        setGuideFiles([]);
-        setListFiles([]);
-        onFinish();
+        } finally { setLoading(false); }
     };
 
-
-    const handleCancel = () => {
-        form.resetFields();
-        setSelectedBranch("");
-        setGuideFiles([]);
-        setListFiles([]);
-        onCancel();
-    };
-
-    return (
-        <Modal title="Lista y/o Guía" open={visible} onCancel={handleCancel} width={700} footer={null}>
-            <div data-tour-id="shipping-guide-upload-modal">
-            <Form form={form} name="uploadGuideForm" onFinish={handleFinish} layout='vertical'>
+    return <Modal title="Lista y/o Guía" open={visible} onCancel={() => { resetModal(); onCancel(); }} width={700} footer={null}>
+        <div data-tour-id="shipping-guide-upload-modal">
+            <Form form={form} name="uploadGuideForm" onFinish={handleFinish} layout="vertical">
                 <Card title="Información Básica" bordered={false}>
                     <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name='fecha_subida' label='Fecha de Subida'>
-                                <DatePicker
-                                    style={{ width: '100%' }}
-                                    disabled={true}
-                                    defaultValue={moment()}
-                                />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name='sucursal' label='Sucursal' rules={[{ required: true }]}>
-                                <Select
-                                    placeholder="Seleccione una sucursal"
-                                    value={selectedBranch}
-                                    onChange={(value) => setSelectedBranch(value)}
-                                >
-                                    {branchs?.map((b: any) => (
-                                        <Select.Option key={b._id} value={b._id}>
-                                            {b.nombre}
-                                        </Select.Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-                        </Col>
+                        <Col span={12}><Form.Item name="fecha_subida" label="Fecha de Subida"><DatePicker style={{ width: "100%" }} disabled defaultValue={moment()} /></Form.Item></Col>
+                        <Col span={12}><Form.Item name="sucursal" label="Sucursal" rules={[{ required: true }]}><Select placeholder="Seleccione una sucursal" value={selectedBranch} onChange={setSelectedBranch}>{branchs?.map((branch: any) => <Select.Option key={branch._id} value={branch._id}>{branch.nombre}</Select.Option>)}</Select></Form.Item></Col>
                     </Row>
                 </Card>
                 <Card bordered={false}>
-                    <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name='description' label='Descripción' rules={[{ required: false }]}>
-                                <Input
-                                    prefix={<MessageOutlined />}
-                                />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                    <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name='image' label='Foto de la Guía' valuePropName="fileList" getValueFromEvent={e => Array.isArray(e) ? e : e && e.fileList} rules={[{ required: false }]}> 
-                                <Upload
-                                    name="image"
-                                    accept="image/*"
-                                    beforeUpload={() => false}
-                                    fileList={guideFiles}
-                                    maxCount={1}
-                                    onChange={(info) => {
-                                        const next = info.fileList.slice(-1);
-                                        setGuideFiles(next);
-                                        form.setFieldValue("image", next);
-                                        handleUploadChange(info);
-                                    }}
-                                    onRemove={() => {
-                                        setGuideFiles([]);
-                                        form.setFieldValue("image", []);
-                                    }}
-                                >
-                                    <Button icon={<UploadOutlined />}>Seleccionar Imagen</Button>
-                                </Upload>
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item
-                                name='lista_productos'
-                                label='Lista de productos (obligatoria)'
-                                valuePropName="fileList"
-                                getValueFromEvent={e => Array.isArray(e) ? e : e && e.fileList}
-                                rules={[{ required: true, message: 'Adjunta al menos un archivo' }]}
-                            >
-                                <Upload
-                                    multiple
-                                    beforeUpload={() => false}
-                                    accept=".pdf,.xls,.xlsx,.csv,image/*"
-                                    fileList={listFiles}
-                                    maxCount={3}
-                                    onChange={(info) => {
-                                        const next = info.fileList.slice(0, 3);
-                                        setListFiles(next);
-                                        form.setFieldValue("lista_productos", next);
-                                        handleUploadChange(info);
-                                    }}
-                                    onRemove={(file) => {
-                                        const next = listFiles.filter((item) => item.uid !== file.uid);
-                                        setListFiles(next);
-                                        form.setFieldValue("lista_productos", next);
-                                    }}
-                                >
-                                    <Button icon={<UploadOutlined />}>Subir lista</Button>
-                                </Upload>
-                            </Form.Item>
-                        </Col>
-                    </Row>
+                    <Row gutter={16}><Col span={12}><Form.Item name="enviado_por_flota" label="¿Los productos se enviarán por flota?" rules={[{ required: true, message: "Selecciona una opción" }]}><Radio.Group onChange={(event) => { const value = event.target.value as boolean; setIsFleetShipment(value); if (!value) { setGuideFiles([]); form.setFieldValue("image", []); } }}><Radio value={true}>Sí</Radio><Radio value={false}>No</Radio></Radio.Group></Form.Item></Col></Row>
+                    <Row gutter={16}><Col span={12}><Form.Item name="description" label="Descripción"><Input prefix={<MessageOutlined />} /></Form.Item></Col></Row>
+                    {isFleetShipment !== undefined && <Row gutter={16}>
+                        {isFleetShipment && <Col span={12}><Form.Item name="image" label="Foto de la Guía de Envío (obligatoria)" valuePropName="fileList" getValueFromEvent={(event) => Array.isArray(event) ? event : event?.fileList} rules={[{ required: true, message: "Adjunta la foto de la guía de envío" }]}><Upload name="image" accept="image/*" beforeUpload={() => false} fileList={guideFiles} maxCount={1} onChange={(info) => { const next = info.fileList.slice(-1); setGuideFiles(next); form.setFieldValue("image", next); }} onRemove={() => { setGuideFiles([]); form.setFieldValue("image", []); }}><Button icon={<UploadOutlined />}>Seleccionar Imagen</Button></Upload></Form.Item></Col>}
+                        <Col span={12}><Form.Item name="lista_productos" label="Lista de productos (obligatoria)" valuePropName="fileList" getValueFromEvent={(event) => Array.isArray(event) ? event : event?.fileList} rules={[{ required: true, message: "Adjunta al menos un archivo" }]}><Upload multiple beforeUpload={() => false} accept=".pdf,.xls,.xlsx,.csv,image/*" fileList={listFiles} maxCount={3} onChange={(info) => { const next = info.fileList.slice(0, 3); setListFiles(next); form.setFieldValue("lista_productos", next); }} onRemove={(file) => { const next = listFiles.filter((item) => item.uid !== file.uid); setListFiles(next); form.setFieldValue("lista_productos", next); }}><Button icon={<UploadOutlined />}>Subir lista</Button></Upload></Form.Item></Col>
+                    </Row>}
                 </Card>
-                <Form.Item style={{ marginTop: 16 }}>
-                    <Button type="primary" htmlType="submit" loading={loading}>
-                        Guardar
-                    </Button>
-                </Form.Item>
+                <Form.Item style={{ marginTop: 16 }}><Button type="primary" htmlType="submit" loading={loading}>Guardar</Button></Form.Item>
             </Form>
-            </div>
-        </Modal>
-    );
+        </div>
+    </Modal>;
 }
 
 export default UploadGuideModal;
