@@ -31,3 +31,14 @@ export const canSellerAccessSales = (user?: any) =>
 
 export const canSellerAccessSimplePackages = (user?: any) =>
   normalizeRole(user?.role) !== "seller" || user?.seller_has_simple_package_service === true;
+
+export const isExternalSeller = (user?: any) =>
+  normalizeRole(user?.role) === "seller" && user?.seller_is_external === true;
+
+export const canSellerAccessNormalScreens = (user?: any) => !isExternalSeller(user);
+
+export const canSellerAccessDashboard = (user?: any) =>
+  normalizeRole(user?.role) !== "seller" || user?.seller_can_access_dashboard === true;
+
+export const canSellerAccessPersonalInventory = (user?: any) =>
+  normalizeRole(user?.role) === "seller" && user?.seller_can_access_personal_inventory === true;

@@ -31,6 +31,9 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   const [estaPagado, setEstaPagado] = useState<string | null>(null);
   const [adelantoVisible, setAdelantoVisible] = useState(false);
   const [adelantoCliente, setAdelantoCliente] = useState<number>(0);
+  const [adelantoTuPuntoMetodo, setAdelantoTuPuntoMetodo] = useState<'efectivo' | 'qr' | 'mixto'>('efectivo');
+  const [adelantoTuPuntoEfectivo, setAdelantoTuPuntoEfectivo] = useState<number>(0);
+  const [adelantoTuPuntoQr, setAdelantoTuPuntoQr] = useState<number>(0);
   const [sellers, setSellers] = useState([]);
   const isSimplePackageOrder = Boolean(shipping?.simple_package_order || shipping?.simple_package_source_id);
   const buyerDebt = Number(shipping?.deuda_comprador ?? 0);
@@ -98,8 +101,13 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
     // Inicializar estado de pago
     const pagoEstado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
     setEstaPagado(pagoEstado);
-    setAdelantoVisible(pagoEstado === "adelanto");
+    setAdelantoVisible(pagoEstado === "adelanto" || pagoEstado === "adelanto_tu_punto");
     setAdelantoCliente(shipping.adelanto_cliente || 0);
+    const advanceCash = Number(shipping.adelanto_tu_punto_efectivo || 0);
+    const advanceQr = Number(shipping.adelanto_tu_punto_qr || 0);
+    setAdelantoTuPuntoEfectivo(advanceCash);
+    setAdelantoTuPuntoQr(advanceQr);
+    setAdelantoTuPuntoMetodo(advanceCash > 0 && advanceQr > 0 ? 'mixto' : advanceQr > 0 ? 'qr' : 'efectivo');
 
     // Inicializar tipo de pago
     if (shipping?.tipo_de_pago) {
@@ -245,6 +253,15 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
   };
 
   const handleSave = async () => {
+    if (estaPagado === 'adelanto_tu_punto') {
+      const advance = Number(adelantoCliente || 0);
+      const cash = Number(adelantoTuPuntoEfectivo || 0);
+      const qr = Number(adelantoTuPuntoQr || 0);
+      if (advance <= 0 || Math.abs(cash + qr - advance) > 0.01) {
+        message.error('El efectivo y QR del Adelanto a Tu Punto deben sumar exactamente el monto adelantado.');
+        return;
+      }
+    }
     setLoading(true);
     try {
       const updateData = {
@@ -252,6 +269,8 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
         tipo_de_pago: tipoPago,
         esta_pagado: estaPagado,
         adelanto_cliente: ['si', 'no'].includes(estaPagado) ? 0 : adelantoCliente,
+        adelanto_tu_punto_efectivo: estaPagado === 'adelanto_tu_punto' ? adelantoTuPuntoEfectivo : 0,
+        adelanto_tu_punto_qr: estaPagado === 'adelanto_tu_punto' ? adelantoTuPuntoQr : 0,
         subtotal_qr: tipoPago === '1' || tipoPago === '4' ? qrInput : 0,
         subtotal_efectivo: tipoPago === '2' || tipoPago === '4' ? efectivoInput : 0,
         subtotal_correctivo: tipoPago === '5' ? saldoACobrar : 0,
@@ -500,8 +519,13 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                   onChange={(e) => {
                     const value = e.target.value;
                     setEstaPagado(value);
-                    setAdelantoVisible(value === 'adelanto');
-                    if (value !== 'adelanto') {
+                    setAdelantoVisible(value === 'adelanto' || value === 'adelanto_tu_punto');
+                    if (value === 'adelanto_tu_punto' && adelantoCliente > 0 && adelantoTuPuntoEfectivo + adelantoTuPuntoQr === 0) {
+                      setAdelantoTuPuntoEfectivo(adelantoCliente);
+                      setAdelantoTuPuntoQr(0);
+                      setAdelantoTuPuntoMetodo('efectivo');
+                    }
+                    if (value !== 'adelanto' && value !== 'adelanto_tu_punto') {
                       setAdelantoCliente(0);
                     }
                     if (value === 'si') {
@@ -512,6 +536,7 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                   <Radio.Button value="si">Sí</Radio.Button>
                   <Radio.Button value="no">No</Radio.Button>
                   <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
+                  <Radio.Button value="adelanto_tu_punto">Adelanto a Tu Punto</Radio.Button>
                 </Radio.Group>
               </div>
             </Col>
@@ -526,12 +551,42 @@ const ModalSalesHistory = ({ visible, onClose, shipping, onSave, isAdmin }: any)
                     prefix="Bs."
                     min={0}
                     value={adelantoCliente}
-                    onChange={(val) => setAdelantoCliente(val || 0)}
+                    onChange={(val) => {
+                      const next = Number(val || 0);
+                      setAdelantoCliente(next);
+                      if (estaPagado === 'adelanto_tu_punto') {
+                        if (adelantoTuPuntoMetodo === 'efectivo') { setAdelantoTuPuntoEfectivo(next); setAdelantoTuPuntoQr(0); }
+                        if (adelantoTuPuntoMetodo === 'qr') { setAdelantoTuPuntoEfectivo(0); setAdelantoTuPuntoQr(next); }
+                      }
+                    }}
                     style={{ width: '100%' }}
                   />
                 </div>
               </Col>
             </Row>
+          )}
+
+          {estaPagado === 'adelanto_tu_punto' && (
+            <Card size="small" title="Cobro del Adelanto a Tu Punto" style={{ marginBottom: 16, background: '#fafcff' }}>
+              <Radio.Group
+                value={adelantoTuPuntoMetodo}
+                onChange={(e) => {
+                  const method = e.target.value as 'efectivo' | 'qr' | 'mixto';
+                  setAdelantoTuPuntoMetodo(method);
+                  if (method === 'efectivo') { setAdelantoTuPuntoEfectivo(adelantoCliente); setAdelantoTuPuntoQr(0); }
+                  if (method === 'qr') { setAdelantoTuPuntoEfectivo(0); setAdelantoTuPuntoQr(adelantoCliente); }
+                  if (method === 'mixto') { const half = Number((adelantoCliente / 2).toFixed(2)); setAdelantoTuPuntoEfectivo(adelantoCliente - half); setAdelantoTuPuntoQr(half); }
+                }}
+              >
+                <Radio.Button value="efectivo">Efectivo</Radio.Button>
+                <Radio.Button value="qr">QR</Radio.Button>
+                <Radio.Button value="mixto">Mixto</Radio.Button>
+              </Radio.Group>
+              <Row gutter={12} style={{ marginTop: 12 }}>
+                <Col span={12}><InputNumber prefix="Bs." min={0} disabled={adelantoTuPuntoMetodo === 'qr'} value={adelantoTuPuntoEfectivo} onChange={(v) => setAdelantoTuPuntoEfectivo(Number(v || 0))} style={{ width: '100%' }} placeholder="Efectivo" /></Col>
+                <Col span={12}><InputNumber prefix="Bs." min={0} disabled={adelantoTuPuntoMetodo === 'efectivo'} value={adelantoTuPuntoQr} onChange={(v) => setAdelantoTuPuntoQr(Number(v || 0))} style={{ width: '100%' }} placeholder="QR" /></Col>
+              </Row>
+            </Card>
           )}
 
           {/* Saldo a cobrar */}

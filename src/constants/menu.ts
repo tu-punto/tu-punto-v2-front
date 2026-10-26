@@ -22,7 +22,6 @@ export const menu = [
     label: "Mi Dashboard",
     icon: statsIcon,
     roles: getAllowedRoles("/seller-dashboard"),
-    hiddenInMenuForRoles: ["seller"],
   },
   {
     path: "/seller",
@@ -36,6 +35,7 @@ export const menu = [
     icon: cartIcon,
     roles: getAllowedRoles("/sales"),
   },
+  { path: "/farmer-profile", label: "Mi perfil", icon: sellerIcon, roles: getAllowedRoles("/farmer-profile") },
   {
     path: "/shipping",
     label: "Pedidos",
@@ -59,6 +59,12 @@ export const menu = [
     label: "Vender",
     icon: cartIcon,
     roles: getAllowedRoles("/shop"),
+  },
+  {
+    path: "/my-inventory",
+    label: "Mi inventario",
+    icon: stockManagementIcon,
+    roles: getAllowedRoles("/my-inventory"),
   },
   {
     path: "/seller-info",

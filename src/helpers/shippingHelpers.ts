@@ -5,6 +5,8 @@ export interface IDailySummary {
   cash: number;
   bank: number;
   corrective: number;
+  tuPuntoAdvanceCash: number;
+  tuPuntoAdvanceQr: number;
   total: number;
 }
 
@@ -38,12 +40,19 @@ export const getDailySummary = async (
   let efectivoTotal = 0;
   let qrTotal = 0;
   let correctivoTotal = 0;
+  let adelantoTuPuntoEfectivo = 0;
+  let adelantoTuPuntoQr = 0;
 
   const salesTotals = response?.totales_cierre || response?.totales;
   if (salesTotals) {
     efectivoTotal = Number(salesTotals.efectivo) || 0;
     qrTotal = Number(salesTotals.qr) || 0;
     correctivoTotal = Number(salesTotals.correctivo) || 0;
+    adelantoTuPuntoEfectivo = Number(salesTotals.adelantoTuPuntoEfectivo) || 0;
+    adelantoTuPuntoQr = Number(salesTotals.adelantoTuPuntoQr) || 0;
+    // Los adelantos independientes ya vienen incluidos como filas de efectivo/QR
+    // en el historial. Estos campos se conservan para mostrarlos separados en
+    // el cierre, sin sumarlos por segunda vez.
   }
 
   // Get service income from FinanceFlux
@@ -71,6 +80,8 @@ export const getDailySummary = async (
     cash: efectivoTotal,
     bank: qrTotal,
     corrective: correctivoTotal,
+    tuPuntoAdvanceCash: adelantoTuPuntoEfectivo,
+    tuPuntoAdvanceQr: adelantoTuPuntoQr,
     total: efectivoTotal + qrTotal,
   };
 };

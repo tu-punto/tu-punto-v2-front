@@ -99,6 +99,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const [tempModalVisible, setTempModalVisible] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
     const [adelantoVisible, setAdelantoVisible] = useState(false);
+    const [adelantoTuPuntoMetodo, setAdelantoTuPuntoMetodo] = useState<'efectivo' | 'qr' | 'mixto'>('efectivo');
     //const [quienPaga, setQuienPaga] = useState<string | null>(null);
     const [montoDelivery, setMontoDelivery] = useState(0);
     const [costoDelivery, setCostoDelivery] = useState(0);
@@ -146,7 +147,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         if (visible && shipping) {
             const pagoEstado = shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no");
             setEstaPagado(pagoEstado);
-            setAdelantoVisible(pagoEstado === "adelanto");
+            setAdelantoVisible(pagoEstado === "adelanto" || pagoEstado === "adelanto_tu_punto");
+            const advanceCash = Number(shipping.adelanto_tu_punto_efectivo || 0);
+            const advanceQr = Number(shipping.adelanto_tu_punto_qr || 0);
+            setAdelantoTuPuntoMetodo(advanceCash > 0 && advanceQr > 0 ? 'mixto' : advanceQr > 0 ? 'qr' : 'efectivo');
         }
     }, [visible, shipping]);
 
@@ -228,6 +232,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     );
     const simplePackageLatePickupFee = useMemo(() => {
         if (!isSimplePackageOrder) return 0;
+        if (shipping?.pricing_version === "package-pricing-v2") return 0;
         if (shipping?.estado_pedido === "En camino") return 0;
         if (shipping?.estado_pedido === "Entregado") {
             return Number(shipping?.late_pickup_fee || 0);
@@ -288,10 +293,13 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     const applyPaidStatus = (value: string) => {
         internalForm.setFieldValue("esta_pagado", value);
         setEstaPagado(value);
-        setAdelantoVisible(value === 'adelanto');
+        setAdelantoVisible(value === 'adelanto' || value === 'adelanto_tu_punto');
 
-        if (value !== 'adelanto') {
-            internalForm.setFieldsValue({ adelanto_cliente: 0 });
+        if (value !== 'adelanto' && value !== 'adelanto_tu_punto') {
+            internalForm.setFieldsValue({ adelanto_cliente: 0, adelanto_tu_punto_efectivo: 0, adelanto_tu_punto_qr: 0 });
+        } else if (value === 'adelanto_tu_punto' && !internalForm.getFieldValue('adelanto_tu_punto_efectivo') && !internalForm.getFieldValue('adelanto_tu_punto_qr')) {
+            internalForm.setFieldsValue({ adelanto_tu_punto_efectivo: Number(internalForm.getFieldValue('adelanto_cliente') || 0), adelanto_tu_punto_qr: 0 });
+            setAdelantoTuPuntoMetodo('efectivo');
         }
 
         if (value === 'si') {
@@ -451,6 +459,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
             subtotal_qr: shipping.subtotal_qr || 0,
             subtotal_efectivo: shipping.subtotal_efectivo || 0,
             subtotal_correctivo: shipping.subtotal_correctivo || 0,
+            adelanto_tu_punto_efectivo: shipping.adelanto_tu_punto_efectivo || 0,
+            adelanto_tu_punto_qr: shipping.adelanto_tu_punto_qr || 0,
             esta_pagado: shipping.esta_pagado || (shipping.adelanto_cliente ? "adelanto" : "no"),
         });
 
@@ -718,7 +728,16 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 isDeliveredLikeStatus(selectedStatus) && effectivePaidStatus === "si" && selectedPaymentType !== "5"
                     ? "3"
                     : selectedPaymentType;
-            const effectiveAdvance = effectivePaidStatus === "adelanto" ? (values.adelanto_cliente || 0) : 0;
+            const effectiveAdvance = ["adelanto", "adelanto_tu_punto"].includes(effectivePaidStatus) ? (values.adelanto_cliente || 0) : 0;
+            if (effectivePaidStatus === 'adelanto_tu_punto') {
+                const advanceCash = Number(values.adelanto_tu_punto_efectivo || 0);
+                const advanceQr = Number(values.adelanto_tu_punto_qr || 0);
+                if (Number(effectiveAdvance) <= 0 || Math.abs(advanceCash + advanceQr - Number(effectiveAdvance)) > 0.01) {
+                    message.error('El efectivo y QR del Adelanto a Tu Punto deben sumar exactamente el monto adelantado.');
+                    setLoading(false);
+                    return;
+                }
+            }
             const simplePackageDestinationId =
                 values.destino_sucursal_id || paymentBranchId || origenBranchId;
             const effectiveDestinationType = isSimplePackageOrder
@@ -764,6 +783,8 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 hora_entrega_rango_final: horaEntregaRangoFinal,
                 esta_pagado: effectivePaidStatus,
                 adelanto_cliente: effectiveAdvance,
+                adelanto_tu_punto_efectivo: effectivePaidStatus === 'adelanto_tu_punto' ? Number(values.adelanto_tu_punto_efectivo || 0) : 0,
+                adelanto_tu_punto_qr: effectivePaidStatus === 'adelanto_tu_punto' ? Number(values.adelanto_tu_punto_qr || 0) : 0,
                 tipo_de_pago: effectivePaymentType,
                 quien_paga_delivery: normalizeDeliveryPayer(values.quien_paga_delivery),
             };
@@ -1283,6 +1304,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     <Radio.Button value="si">Sí</Radio.Button>
                                     <Radio.Button value="no">No</Radio.Button>
                                     <Radio.Button value="adelanto">Pago Adelanto</Radio.Button>
+                                    <Radio.Button value="adelanto_tu_punto">Adelanto a Tu Punto</Radio.Button>
                                 </Radio.Group>
                             </Form.Item>
                         </Col>
@@ -1296,10 +1318,41 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                         prefix="Bs."
                                         min={0}
                                         style={{ width: '100%' }}
+                                        onChange={(value) => {
+                                            const amount = Number(value || 0);
+                                            if (internalForm.getFieldValue('esta_pagado') === 'adelanto_tu_punto') {
+                                                if (adelantoTuPuntoMetodo === 'efectivo') internalForm.setFieldsValue({ adelanto_tu_punto_efectivo: amount, adelanto_tu_punto_qr: 0 });
+                                                if (adelantoTuPuntoMetodo === 'qr') internalForm.setFieldsValue({ adelanto_tu_punto_efectivo: 0, adelanto_tu_punto_qr: amount });
+                                            }
+                                        }}
                                     />
                                 </Form.Item>
                             </Col>
                         </Row>
+                    )}
+
+                    {estaPagado === 'adelanto_tu_punto' && (
+                        <Card size="small" title="Cobro del Adelanto a Tu Punto" style={{ marginBottom: 16, background: '#fafcff' }}>
+                            <Radio.Group
+                                value={adelantoTuPuntoMetodo}
+                                onChange={(e) => {
+                                    const method = e.target.value as 'efectivo' | 'qr' | 'mixto';
+                                    const amount = Number(internalForm.getFieldValue('adelanto_cliente') || 0);
+                                    setAdelantoTuPuntoMetodo(method);
+                                    if (method === 'efectivo') internalForm.setFieldsValue({ adelanto_tu_punto_efectivo: amount, adelanto_tu_punto_qr: 0 });
+                                    if (method === 'qr') internalForm.setFieldsValue({ adelanto_tu_punto_efectivo: 0, adelanto_tu_punto_qr: amount });
+                                    if (method === 'mixto') { const half = Number((amount / 2).toFixed(2)); internalForm.setFieldsValue({ adelanto_tu_punto_efectivo: amount - half, adelanto_tu_punto_qr: half }); }
+                                }}
+                            >
+                                <Radio.Button value="efectivo">Efectivo</Radio.Button>
+                                <Radio.Button value="qr">QR</Radio.Button>
+                                <Radio.Button value="mixto">Mixto</Radio.Button>
+                            </Radio.Group>
+                            <Row gutter={12} style={{ marginTop: 12 }}>
+                                <Col span={12}><Form.Item name="adelanto_tu_punto_efectivo" label="Efectivo" style={{ marginBottom: 0 }}><InputNumber prefix="Bs." min={0} disabled={adelantoTuPuntoMetodo === 'qr'} style={{ width: '100%' }} /></Form.Item></Col>
+                                <Col span={12}><Form.Item name="adelanto_tu_punto_qr" label="QR" style={{ marginBottom: 0 }}><InputNumber prefix="Bs." min={0} disabled={adelantoTuPuntoMetodo === 'efectivo'} style={{ width: '100%' }} /></Form.Item></Col>
+                            </Row>
+                        </Card>
                     )}
 
                     {/* Estado del Pedido */}

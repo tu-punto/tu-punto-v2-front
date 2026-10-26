@@ -251,6 +251,8 @@ const BoxCloseForm = ({
         ventas_efectivo: summary?.cash || 0,
         ventas_qr: summary?.bank || 0,
         ventas_correctivo: summary?.corrective || 0,
+        adelantos_tu_punto_efectivo: summary?.tuPuntoAdvanceCash || 0,
+        adelantos_tu_punto_qr: summary?.tuPuntoAdvanceQr || 0,
         efectivo_esperado: roundAmount(efectivoInicial + (summary?.cash || 0)),
         bancario_esperado: roundAmount(summary?.bank || 0),
       });
@@ -524,6 +526,8 @@ const BoxCloseForm = ({
           ventas_efectivo: salesSummary?.cash ?? 0,
           ventas_qr:       salesSummary?.bank ?? 0,
           ventas_correctivo: salesSummary?.corrective ?? 0,
+          adelantos_tu_punto_efectivo: salesSummary?.tuPuntoAdvanceCash ?? 0,
+          adelantos_tu_punto_qr: salesSummary?.tuPuntoAdvanceQr ?? 0,
           id_sucursal: localStorage.getItem("sucursalId"),
           efectivo_diario,
           operaciones_adicionales: operationsPayload,
@@ -751,6 +755,16 @@ const BoxCloseForm = ({
                     readOnly
                     className="w-full bg-gray-200 text-gray-700"
                 />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Adelanto a Tu Punto · efectivo" name="adelantos_tu_punto_efectivo">
+                <InputNumber prefix="Bs. " readOnly className="w-full bg-gray-200 text-gray-700" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Adelanto a Tu Punto · QR" name="adelantos_tu_punto_qr">
+                <InputNumber prefix="Bs. " readOnly className="w-full bg-gray-200 text-gray-700" />
               </Form.Item>
             </Col>
 

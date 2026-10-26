@@ -124,6 +124,13 @@ export type PackageDeliverySpace = {
   spaces: number;
 };
 
+export type ExternalPackagePricing = {
+  small_price: number;
+  large_price: number;
+  weekly_fee: number;
+  fee_cap: number;
+};
+
 export const getPackageEscalationConfigAPI = async (params?: { routeId?: string }) => {
   try {
     const res = await apiClient.get("/simple-packages/escalation-config", { params });
@@ -138,6 +145,7 @@ export const upsertPackageEscalationConfigAPI = async (payload: {
   serviceOrigin: "external" | "simple_package" | "delivery";
   ranges: PackageEscalationRange[];
   deliverySpaces?: PackageDeliverySpace[];
+  externalPricing?: ExternalPackagePricing;
 }) => {
   try {
     const res = await apiClient.post("/simple-packages/escalation-config", payload);

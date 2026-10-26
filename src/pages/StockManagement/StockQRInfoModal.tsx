@@ -32,6 +32,7 @@ type Props = {
   sellerLabel?: string;
   sucursalId?: string;
   sucursalLabel?: string;
+  canUseProduct?: (product: { id_vendedor?: string; sellerId?: string }) => boolean;
 };
 
 const normalizeNumber = (value: any) => {
@@ -46,7 +47,7 @@ const formatDate = (value?: string | null) => {
   return parsed.toLocaleDateString("es-BO");
 };
 
-const StockQRInfoModal = ({ open, onClose, sellerLabel, sucursalId, sucursalLabel }: Props) => {
+const StockQRInfoModal = ({ open, onClose, sellerLabel, sucursalId, sucursalLabel, canUseProduct }: Props) => {
   const [scannerVisible, setScannerVisible] = useState(true);
   const [scannerSession, setScannerSession] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -87,6 +88,10 @@ const StockQRInfoModal = ({ open, onClose, sellerLabel, sucursalId, sucursalLabe
   };
 
   const handleScannedVariant = async (item: any) => {
+    if (canUseProduct && !canUseProduct(item)) {
+      message.error("Solo puedes consultar productos de tus vendedores autorizados.");
+      return;
+    }
     setLoading(true);
     try {
       const product = await getProductByIdAPI(String(item?.id_producto || ""));
@@ -182,6 +187,7 @@ const StockQRInfoModal = ({ open, onClose, sellerLabel, sucursalId, sucursalLabe
                   appearance="simple"
                   simpleVideoMinHeight={240}
                   sucursalId={sucursalId}
+                  canUseProduct={canUseProduct}
                 />
               </div>
             )}

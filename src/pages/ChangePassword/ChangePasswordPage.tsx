@@ -32,6 +32,7 @@ const getPasswordStatus = (password: string) => {
 
 const getDefaultRedirect = (role?: string) => {
   if (normalizeRole(role) === "seller") return "/seller-info";
+  if (normalizeRole(role) === "farmer") return "/sales";
   return "/stock";
 };
 

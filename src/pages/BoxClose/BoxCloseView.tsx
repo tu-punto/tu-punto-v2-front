@@ -36,6 +36,8 @@ const BoxCloseView = ({ boxClose }: Props) => {
         diferencia_efectivo,
         ventas_qr,
         ventas_correctivo,
+        adelantos_tu_punto_efectivo,
+        adelantos_tu_punto_qr,
         bancario_esperado,
         bancario_real,
         diferencia_bancario,
@@ -116,6 +118,12 @@ const BoxCloseView = ({ boxClose }: Props) => {
                                 </Form.Item>
                                 <Form.Item label={"Ventas QR del d\u00eda"}>
                                     <InputNumber value={ventas_qr} readOnly style={{ width: "100%" }} prefix="Bs." />
+                                </Form.Item>
+                                <Form.Item label="Adelantos a Tu Punto · efectivo (incluidos arriba)">
+                                    <InputNumber value={adelantos_tu_punto_efectivo || 0} readOnly style={{ width: "100%" }} prefix="Bs." />
+                                </Form.Item>
+                                <Form.Item label="Adelantos a Tu Punto · QR (incluidos arriba)">
+                                    <InputNumber value={adelantos_tu_punto_qr || 0} readOnly style={{ width: "100%" }} prefix="Bs." />
                                 </Form.Item>
                                 <Form.Item label="Ventas correctivas">
                                     <InputNumber value={ventas_correctivo || 0} readOnly style={{ width: "100%" }} prefix="Bs." />

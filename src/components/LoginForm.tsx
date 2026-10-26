@@ -56,7 +56,7 @@ export default function LoginForm({
         navigate("/change-password", { replace: true });
         return;
       }
-      navigate(redirectTo);
+      navigate(normalizeRole(userRes.data?.role) === "farmer" ? "/sales" : redirectTo);
     } catch {
       message.error("Error en el proceso de login");
     } finally {

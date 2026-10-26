@@ -50,6 +50,17 @@ const calculateLatePickupFee = (startAt?: unknown, pickedUpAt: Date = new Date()
   return Math.max(0, pickedUp.startOf("day").diff(start.startOf("day"), "days") - LATE_PICKUP_GRACE_DAYS);
 };
 
+const calculateV2PickupFee = (row: any, pickedUpAt: Date = new Date()) => {
+  if (row?.pricing_version !== "package-pricing-v2" || row?.service_origin !== "external") return null;
+  const start = row?.pickup_fee_started_at;
+  const snapshot = row?.external_pricing_snapshot;
+  if (!start || !snapshot) return 0;
+  const elapsedDays = moment.tz(pickedUpAt, TZ).diff(moment.tz(start, TZ), "days");
+  const weeks = Math.max(0, Math.floor(elapsedDays / 7));
+  const base = Number(row?.precio_paquete || 0);
+  return roundCurrency(Math.max(0, Math.min(Number(snapshot.fee_cap || 0), base + weeks * Number(snapshot.weekly_fee || 0)) - base));
+};
+
 const isSameBusinessDay = (value?: unknown) => {
   const date = moment.tz(value as any, TZ);
   return date.isValid() && date.isSame(moment.tz(TZ), "day");
@@ -189,6 +200,9 @@ const ExternalShippingInfoModal = ({
   );
   const latePickupFee = useMemo(
     () => {
+      const v2Fee = calculateV2PickupFee(chargeSource);
+      if (v2Fee !== null) return chargeSource?.estado_pedido === "Entregado" ? roundCurrency(Number(chargeSource?.late_pickup_fee || v2Fee)) : v2Fee;
+      if (chargeSource?.pricing_version === "package-pricing-v2") return 0;
       if (chargeSource?.estado_pedido === "En camino") {
         return 0;
       }

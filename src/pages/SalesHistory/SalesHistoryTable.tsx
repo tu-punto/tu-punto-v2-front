@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Table, DatePicker, message, Tag, Input, Space } from "antd";
 import dayjs from "dayjs";
+import moment from "moment-timezone";
 import { getSalesHistoryAPI } from "../../api/shipping"; // si está ahí
 import { getShippingByIdAPI } from "../../api/shipping";
 import { getExternalSaleByIdAPI } from "../../api/externalSale";
@@ -9,6 +10,8 @@ import ExternalShippingInfoModal from "../Shipping/ExternalShippingInfoModal";
 import { includesNormalized } from "../../utils/search";
 
 const SalesHistoryTable = () => {
+    const formatLaPaz = (value: unknown, format: string) =>
+        value ? moment.tz(value as moment.MomentInput, "America/La_Paz").format(format) : "-";
     const [sales, setSales] = useState([]);
     const [totales, setTotales] = useState({ efectivo: 0, qr: 0 });
     const [selectedDate, setSelectedDate] = useState(dayjs());
@@ -95,7 +98,7 @@ const SalesHistoryTable = () => {
 
         const grouped: Record<string, any[]> = {};
         filteredSales.forEach(item => {
-            const fecha = dayjs(item.fecha).add(4, "hour").format("DD/MM/YYYY");
+            const fecha = formatLaPaz(item.fecha, "DD/MM/YYYY");
             if (!grouped[fecha]) grouped[fecha] = [];
             grouped[fecha].push(item);
         });
@@ -127,7 +130,7 @@ const SalesHistoryTable = () => {
             dataIndex: "fecha",
             render: (val, record) => {
                 if (record.isSummary) return <span className="italic text-gray-600">{record.fecha}</span>;
-                return val?.substring(0, 10).split("-").reverse().join("/");
+                return formatLaPaz(val, "DD/MM/YYYY");
             }
         },
         {
@@ -135,7 +138,7 @@ const SalesHistoryTable = () => {
             dataIndex: "fecha",
             render: (val) => {
                 if (!val) return "-";
-                return dayjs(val).add(4, "hour").format("HH:mm"); // 👉 suma las 4 horas
+                return formatLaPaz(val, "HH:mm");
             }
         },
         {

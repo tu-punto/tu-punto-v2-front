@@ -1,9 +1,10 @@
 export interface IUser {
     _id: string;
-    role: "admin" | "operator" | "seller";
+    role: "admin" | "operator" | "seller" | "farmer";
     is_superadmin?: boolean;
     sucursalId?: string;
     sucursal?: string | { _id: string; nombre?: string };
+    vendedores_autorizados?: Array<string | { _id: string; nombre?: string; apellido?: string }>;
     email: string;
     must_change_password?: boolean;
     system_access_hours?: {

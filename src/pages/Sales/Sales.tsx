@@ -20,6 +20,7 @@ import { resolvePromotionPricing } from "../../utils/promotionPricing";
 import { useNavigate } from "react-router-dom";
 import { includesNormalized } from "../../utils/search";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { getFarmerBonusRulesAPI } from "../../api/farmerDiscountRule";
 
 const getSellerBranchCommission = (seller: any, branchId?: string) => {
   const useBranchCommission = Boolean(seller?.comision_diferente_por_sucursal);
@@ -49,12 +50,15 @@ export const Sales = () => {
   const normalizedRole = normalizeRole(user?.role);
   const isAdmin = normalizedRole === "admin";
   const isOperator = normalizedRole === "operator";
+  const isFarmer = normalizedRole === "farmer";
   //console.log ("🚀 user en Sales:", user);
 
   const [modalType, setModalType] = useState<'sales' | 'shipping' | null>(null);
   const [productAddModal, setProductAddModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0)
   const [sellers, setSellers] = useState<any[]>([])
+  const [farmerDiscountRules, setFarmerDiscountRules] = useState<any[]>([]);
+  const [farmerBonusStatus, setFarmerBonusStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [sellersLoading, setSellersLoading] = useState(true);
   const [selectedSellerId, setSelectedSellerId] = useState<string | undefined>(undefined);
   //const [selectedBranchId, setSelectedBranchId] = useState<number | undefined>(undefined);
@@ -72,6 +76,10 @@ export const Sales = () => {
   const [cartLoading, setCartLoading] = useState(false);
   const normalizeId = (id: any) => String(id?._id ?? id?.$oid ?? id ?? "");
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const canUseFarmerSeller = (sellerId: unknown) => {
+    if (!isFarmer) return true;
+    return (user?.vendedores_autorizados || []).some((seller: any) => String(seller?._id || seller) === String(sellerId || ""));
+  };
   const effectiveSalesBranchId = branchIdForFetch || selectedBranchId || localStorage.getItem("sucursalId") || undefined;
   const getStockActual = (p: any, sucursalId?: string | null) => {
     // Caso 1: viene "flat" (lo ideal)
@@ -217,6 +225,9 @@ export const Sales = () => {
 
     if ((isAdmin || isOperator) && selectedSellerId) {
       filtered = filtered.filter(p => String(p.id_vendedor) === String(selectedSellerId));
+    } else if (isFarmer) {
+      const authorizedSellerIds = new Set((user?.vendedores_autorizados || []).map((seller: any) => String(seller?._id || seller)));
+      filtered = filtered.filter(p => authorizedSellerIds.has(String(p.id_vendedor)));
     } else if (!isAdmin && !isOperator) {
       filtered = filtered.filter(p => String(p.id_vendedor) === String(user.id_vendedor));
     }
@@ -245,19 +256,36 @@ export const Sales = () => {
       };
     });
     setFilteredBySeller(filtered);
-  }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers, selectedProduct]);
+  }, [data, branchIdForFetch, selectedSellerId, isAdmin, isOperator, isFarmer, user?.id_vendedor, user?.vendedores_autorizados, searchText, sellers, selectedProduct]);
 
   useEffect(() => {
     // fetchSellers();
     fetchSucursal();
   }, []);
   useEffect(() => {
-    if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
+    if (!isFarmer) {
+      setFarmerDiscountRules([]);
+      return;
+    }
+    setFarmerBonusStatus('loading');
+    getFarmerBonusRulesAPI()
+      .then((response: any) => {
+        if (!response?.success || !Array.isArray(response.data)) throw new Error('No se pudieron cargar las reglas');
+        setFarmerDiscountRules(response.data);
+        setFarmerBonusStatus('ready');
+      })
+      .catch(() => {
+        setFarmerDiscountRules([]);
+        setFarmerBonusStatus('error');
+      });
+  }, [isFarmer]);
+  useEffect(() => {
+    if ((!isAdmin && !isOperator && !isFarmer) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
   }, [branches, isAdmin, isOperator, selectedBranchId]);
   useEffect(() => {
-    const newSucursalId = (isAdmin || isOperator)
+    const newSucursalId = (isAdmin || isOperator || isFarmer)
       ? localStorage.getItem("sucursalId")
       : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -271,8 +299,12 @@ export const Sales = () => {
     if (!data || data.length === 0) return
 
     const rawProducts = new Map<string, string>();
+    const authorizedSellerIds = new Set((user?.vendedores_autorizados || []).map((seller: any) => String(seller?._id || seller)));
     data.forEach(product => {
-      if (!rawProducts.has(product.id_producto) && product.id_vendedor == user.id_vendedor) {
+      const canUseProduct = isFarmer
+        ? authorizedSellerIds.has(String(product.id_vendedor))
+        : String(product.id_vendedor) === String(user?.id_vendedor);
+      if (!rawProducts.has(product.id_producto) && canUseProduct) {
         rawProducts.set(product.id_producto, product.producto.split(" - ")[0])
       }
     })
@@ -285,7 +317,7 @@ export const Sales = () => {
       )
     })
     setProductOptions(options)
-  }, [data, selectedSellerId, isAdmin, isOperator, user?.id_vendedor, searchText, sellers]);
+  }, [data, selectedSellerId, isAdmin, isOperator, isFarmer, user?.id_vendedor, user?.vendedores_autorizados, searchText, sellers]);
 
   //console.log(" Productos desde useProductsFlat:", data);
   const [totalAmount, setTotalAmount] = useState<number>(0);
@@ -372,7 +404,7 @@ export const Sales = () => {
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
-      const sucursalId = (isAdmin || isOperator)
+      const sucursalId = (isAdmin || isOperator || isFarmer)
         ? localStorage.getItem("sucursalId")
         : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -383,7 +415,9 @@ export const Sales = () => {
         return;
       }
 
+      const authorizedSellerIds = new Set((user?.vendedores_autorizados || []).map((seller: any) => String(seller?._id || seller)));
       const sellersVigentes = sellersList.filter((v: any) => {
+        if (isFarmer && !authorizedSellerIds.has(String(v._id))) return false;
         return v.pago_sucursales?.some((pago: any) => {
           const idSucursal = pago.id_sucursal?._id || pago.id_sucursal;
           const perteneceASucursal = String(idSucursal) === String(sucursalId);
@@ -414,7 +448,7 @@ export const Sales = () => {
     try {
       const response = await getSucursalsBasicAPI()
       setBranches(Array.isArray(response) ? response : [])
-      if (isAdmin || isOperator) {
+      if (isAdmin || isOperator || isFarmer) {
         const sucursalIdLogin = localStorage.getItem("sucursalId");
         if (sucursalIdLogin) {
           setSelectedBranchId(sucursalIdLogin);
@@ -427,12 +461,12 @@ export const Sales = () => {
   }
 
   useEffect(() => {
-    if ((!isAdmin && !isOperator) && branches.length > 0 && !selectedBranchId) {
+    if ((!isAdmin && !isOperator && !isFarmer) && branches.length > 0 && !selectedBranchId) {
       setSelectedBranchId(branches[0]._id);
     }
   }, [branches, isAdmin, selectedBranchId]);
 
-  const fallbackSucursalId = isAdmin || isOperator
+  const fallbackSucursalId = isAdmin || isOperator || isFarmer
     ? localStorage.getItem('sucursalId')
     : selectedBranchId ?? (branches.length > 0 ? branches[0]._id : null);
 
@@ -540,12 +574,18 @@ export const Sales = () => {
     })
     try {
       //console.log("📤 Enviando ventas:", productsToAdd);
-      await registerSalesToShippingAPI({
+      const result = await registerSalesToShippingAPI({
         shippingId: shipping._id,
         sales: productsToAdd
       });
+      if (!result?.success) {
+        throw new Error(result?.msg || result?.error || "No se pudieron registrar los productos de la entrega");
+      }
+      return result;
     } catch (error) {
-      message.error('Error registrando ventas del pedido')
+      const detail = error instanceof Error ? error.message : "Error registrando ventas del pedido";
+      message.error(detail);
+      throw error;
     }
   }
   const handleEnhancedValueChange = (key: string, field: string, value: any) => {
@@ -752,7 +792,7 @@ export const Sales = () => {
                       style={{ width: 200 }}
                       allowClear
                     />
-                    {!isAdmin && !isOperator && (
+                    {!isAdmin && !isOperator && !isFarmer && (
                       <Select
                         placeholder="Sucursal"
                         value={selectedBranchId}
@@ -778,13 +818,13 @@ export const Sales = () => {
                         {productOptions}
                       </Select>
                     )}
-                    <Button
+                    {!isFarmer && <Button
                       type="primary"
                       onClick={() => setProductAddModal(true)}
                       className="text-mobile-base xl:text-desktop-sm "
                     >
                       {isAdmin || isOperator ? "Añadir nuevo producto" : "Añadir temporal"}
-                    </Button>
+                    </Button>}
                     {(isAdmin || isOperator) && (
                       <Select
                         placeholder="Selecciona un vendedor"
@@ -817,6 +857,8 @@ export const Sales = () => {
                   onSelectProduct={handleProductSelect}
                   onConditionalPromotionRequest={openConditionalPromotionPrompt}
                   isMobile={isMobile}
+                  farmerDiscountRules={farmerDiscountRules}
+                  farmerBonusStatus={farmerBonusStatus}
                   refreshKey={refreshKey}
                   data={filteredBySeller}
                 />
@@ -852,7 +894,7 @@ export const Sales = () => {
                     <Button onClick={showShippingModal} type="primary" data-tour-id="sales-delivery-button">
                       Realizar Entrega
                     </Button>
-                    {(isAdmin || isOperator) && (
+                    {(isAdmin || isOperator || isFarmer) && (
                       <Button
                         type="primary"
                         className="text-mobile-sm xl:text-desktop-sm"
@@ -861,7 +903,7 @@ export const Sales = () => {
                         Agregar por QR
                       </Button>
                     )}
-                    {(isAdmin || isOperator) && (
+                    {(isAdmin || isOperator || isFarmer) && (
                       <Button
                         icon={<InfoCircleOutlined />}
                         className="text-mobile-sm xl:text-desktop-sm"
@@ -886,6 +928,8 @@ export const Sales = () => {
                   key={refreshKey}
                   sellers={sellers}
                   isAdmin={isAdmin || isOperator}
+                  isFarmer={isFarmer}
+                  farmerDiscountRules={farmerDiscountRules}
                   branchId={effectiveSalesBranchId}
               />
             </Spin>
@@ -894,7 +938,13 @@ export const Sales = () => {
             <div style={{ paddingTop: 24 }}>
               <QRScanner
                 onClose={() => setShowQRScanner(false)}
+                sucursalId={effectiveSalesBranchId}
+                canUseProduct={(item) => canUseFarmerSeller(item?.id_vendedor || item?.sellerId)}
                 onProductScanned={(item) => {
+                  if (!canUseFarmerSeller(item?.id_vendedor || item?.sellerId)) {
+                    message.error("Solo puedes agregar productos de tus vendedores autorizados.");
+                    return;
+                  }
                   const vendedor = sellers.find((v: any) => v._id === item.id_vendedor);
                   const branchCommission = getSellerBranchCommission(vendedor, effectiveSalesBranchId);
 
@@ -931,6 +981,7 @@ export const Sales = () => {
             sellerLabel="Cualquier vendedor"
             sucursalId={fallbackSucursalId || undefined}
             sucursalLabel="Sucursal actual"
+            canUseProduct={(item) => canUseFarmerSeller(item?.id_vendedor || item?.sellerId)}
           />
         </Col>
       </Row>
@@ -998,6 +1049,7 @@ export const Sales = () => {
         //handleDebt={updateSellerDebt}
         clearSelectedProducts={() => setSelectedProducts([])}
         isAdmin={isAdmin || isOperator}
+        isFarmer={isFarmer}
         sellers={sellers}
         suc={fallbackSucursalId}
       />

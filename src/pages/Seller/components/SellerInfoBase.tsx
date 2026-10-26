@@ -193,7 +193,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           fecha_ingreso: sucursal.fecha_ingreso ? dayjs(sucursal.fecha_ingreso) : null,
           fecha_salida: sucursal.fecha_salida ? dayjs(sucursal.fecha_salida) : null,
         }))
-      : [{ delivery: 0 }];
+      : [];
 
     return {
       telefono: sellerData?.telefono,
@@ -203,6 +203,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       comision_diferente_por_sucursal: sellerData?.comision_diferente_por_sucursal === true,
       amortizacion: sellerData?.amortizacion ?? null,
       precio_paquete: sellerData?.precio_paquete ?? null,
+      is_external: sellerData?.is_external === true,
+      can_access_seller_dashboard: sellerData?.can_access_seller_dashboard === true,
+      can_access_personal_inventory: sellerData?.can_access_personal_inventory === true,
       sucursales: branches,
     };
   };
@@ -233,6 +236,11 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
         }
 
         setSellerDetail(detail);
+        // El listado puede estar desactualizado; cargar los permisos desde el
+        // detalle sin sobrescribir un cambio que el administrador ya haya hecho.
+        ["is_external", "can_access_seller_dashboard", "can_access_personal_inventory"].forEach((field) => {
+          if (!form.isFieldTouched(field)) form.setFieldValue(field, detail[field] === true);
+        });
 
         const saldoPendiente = Number(detail.saldo_pendiente ?? 0);
         const deuda = Number(detail.deuda ?? 0);
@@ -734,7 +742,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
       const resSeller = await updateSellerAPI(seller.key, {
         ...formValues,
         comision_diferente_por_sucursal: formValues.comision_diferente_por_sucursal === true,
-        pago_sucursales: formValues.sucursales.map((sucursal: any) => ({
+        pago_sucursales: (formValues.sucursales || []).map((sucursal: any) => ({
           ...sucursal,
           alquiler: sucursal.almacenamiento,
           delivery: 0,
@@ -1189,6 +1197,9 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           comision_diferente_por_sucursal: seller.comision_diferente_por_sucursal === true,
           amortizacion: seller.amortizacion ?? null,
           precio_paquete: seller.precio_paquete ?? null,
+          is_external: seller.is_external === true,
+          can_access_seller_dashboard: seller.can_access_seller_dashboard === true,
+          can_access_personal_inventory: seller.can_access_personal_inventory === true,
           sucursales: seller.pago_sucursales.length
             ? seller.pago_sucursales.map((sucursal: any) => ({
                 ...sucursal,
@@ -1201,7 +1212,7 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
                   ? dayjs(sucursal.fecha_salida)
                   : null,
               }))
-            : [{ delivery: 0 }],
+            : [],
         }}
       >
         {/* Información del vendedor */}
@@ -1328,6 +1339,18 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             </Col>
           </Row>
         </Card>
+
+        {!isSeller && <Card title="Pantallas especiales" style={{ marginBottom: 24 }}>
+          <Form.Item name="is_external" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox>Externo — oculta las pantallas habituales</Checkbox>
+          </Form.Item>
+          <Form.Item name="can_access_seller_dashboard" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox>Habilitar Mi Dashboard</Checkbox>
+          </Form.Item>
+          <Form.Item name="can_access_personal_inventory" valuePropName="checked" style={{ marginBottom: 0 }}>
+            <Checkbox>Habilitar Mi inventario</Checkbox>
+          </Form.Item>
+        </Card>}
 
         {/* Servicios por sucursal */}
         <Card

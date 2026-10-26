@@ -1,6 +1,7 @@
 import { Modal, Form, Input, Select, Checkbox, Switch, TimePicker, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { getSellersBasicAPI } from "../../api/seller";
 import dayjs from "dayjs";
 
 const DEFAULT_SYSTEM_ACCESS_HOURS = {
@@ -84,6 +85,7 @@ const UserFormModal = ({
   const [form] = Form.useForm();
   const [changePassword, setChangePassword] = useState(false);
   const [sucursales, setSucursales] = useState<any[]>([]);
+  const [sellers, setSellers] = useState<any[]>([]);
   const selectedRole = Form.useWatch("role", form);
   const weekdaysEnabled = Form.useWatch(["system_access_hours", "weekdays", "enabled"], form);
   const saturdayEnabled = Form.useWatch(["system_access_hours", "saturday", "enabled"], form);
@@ -95,6 +97,9 @@ const UserFormModal = ({
     getSucursalsAPI()
       .then((data) => setSucursales(Array.isArray(data) ? data : []))
       .catch(() => setSucursales([]));
+    getSellersBasicAPI()
+      .then((data) => setSellers(Array.isArray(data) ? data : []))
+      .catch(() => setSellers([]));
   }, [visible]);
 
   useEffect(() => {
@@ -105,6 +110,9 @@ const UserFormModal = ({
           email: editingUser.email,
           role: editingUser.role,
           sucursal: editingUser.sucursal?._id || editingUser.sucursal || editingUser.sucursalId,
+          vendedores_autorizados: Array.isArray(editingUser.vendedores_autorizados)
+            ? editingUser.vendedores_autorizados.map((seller: any) => seller?._id || seller)
+            : [],
           system_access_hours: {
             weekdays: {
               ...initialAccessHours.weekdays,
@@ -152,11 +160,13 @@ const UserFormModal = ({
 
   const handleSubmit = async (values: any) => {
     const submitData = { ...values };
-    if (submitData.role !== "operator") {
+    if (submitData.role !== "operator" && submitData.role !== "farmer") {
       submitData.sucursal = null;
       delete submitData.system_access_hours;
-    } else {
+    } else if (submitData.role === "operator") {
       submitData.system_access_hours = normalizeAccessHours(submitData.system_access_hours);
+    } else {
+      delete submitData.system_access_hours;
     }
 
     if (editingUser && !changePassword) {
@@ -216,15 +226,16 @@ const UserFormModal = ({
             <Select.Option value="admin">Administrador</Select.Option>
             <Select.Option value="operator">Operador</Select.Option>
             <Select.Option value="seller">Vendedor</Select.Option>
+            <Select.Option value="farmer">Granjero</Select.Option>
           </Select>
         </Form.Item>
 
         {/* Checkbox para cambiar contraseña en modo edición */}
-        {selectedRole === "operator" && (
+        {(selectedRole === "operator" || selectedRole === "farmer") && (
           <Form.Item
             name="sucursal"
             label="Sucursal asignada"
-            rules={[{ required: true, message: "Sucursal requerida para operadores" }]}
+            rules={[{ required: true, message: "Sucursal requerida para operadores y granjeros" }]}
           >
             <Select
               size="large"
@@ -232,6 +243,27 @@ const UserFormModal = ({
               options={sucursales.map((sucursal) => ({
                 label: sucursal.nombre,
                 value: sucursal._id,
+              }))}
+            />
+          </Form.Item>
+        )}
+
+        {selectedRole === "farmer" && (
+          <Form.Item
+            name="vendedores_autorizados"
+            label="Vendedores autorizados"
+            rules={[{ required: true, message: "Selecciona al menos un vendedor para el granjero" }]}
+            extra="El granjero solo podrá ver productos de los vendedores seleccionados."
+          >
+            <Select
+              mode="multiple"
+              size="large"
+              showSearch
+              optionFilterProp="label"
+              placeholder="Selecciona vendedores"
+              options={sellers.map((seller) => ({
+                value: seller._id,
+                label: `${seller.nombre || ""} ${seller.apellido || ""}`.trim() || seller.mail || seller._id,
               }))}
             />
           </Form.Item>
