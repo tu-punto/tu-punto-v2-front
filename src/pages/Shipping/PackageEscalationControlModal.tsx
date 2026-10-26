@@ -5,6 +5,7 @@ import {
   getSimplePackageBranchPricesAPI,
   getPackageEscalationConfigAPI,
   PackageDeliverySpace,
+  ExternalPackagePricing,
   PackageEscalationRange,
   upsertPackageEscalationConfigAPI,
 } from "../../api/simplePackage";
@@ -36,6 +37,12 @@ const DEFAULT_DELIVERY_RANGES: PackageEscalationRange[] = [
 const DEFAULT_DELIVERY_SPACES: PackageDeliverySpace[] = [
   { size: "small_limit", spaces: 1 },
 ];
+const DEFAULT_EXTERNAL_PRICING: ExternalPackagePricing = {
+  small_price: 3,
+  large_price: 6,
+  weekly_fee: 3,
+  fee_cap: 15,
+};
 
 const tableCellStyle: React.CSSProperties = {
   border: "1px solid #d9d9d9",
@@ -77,7 +84,7 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
   const [routeModalVisible, setRouteModalVisible] = useState(false);
   const [spacesModalVisible, setSpacesModalVisible] = useState(false);
   const [externalRanges, setExternalRanges] = useState<PackageEscalationRange[]>(DEFAULT_EXTERNAL_RANGES);
-  const [simpleRanges, setSimpleRanges] = useState<PackageEscalationRange[]>(DEFAULT_SIMPLE_RANGES);
+  const [externalPricing, setExternalPricing] = useState<ExternalPackagePricing>(DEFAULT_EXTERNAL_PRICING);
   const [deliveryRanges, setDeliveryRanges] = useState<PackageEscalationRange[]>(DEFAULT_DELIVERY_RANGES);
   const [deliverySpaces, setDeliverySpaces] = useState<PackageDeliverySpace[]>(DEFAULT_DELIVERY_SPACES);
 
@@ -116,7 +123,7 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
       }
 
       setExternalRanges(normalizeRanges(response.data?.external, DEFAULT_EXTERNAL_RANGES));
-      setSimpleRanges(normalizeRanges(response.data?.simple_package, DEFAULT_SIMPLE_RANGES));
+      setExternalPricing({ ...DEFAULT_EXTERNAL_PRICING, ...(response.data?.external_pricing || {}) });
       setDeliveryRanges(normalizeRanges(response.data?.delivery, DEFAULT_DELIVERY_RANGES));
       setDeliverySpaces(
         Array.isArray(response.data?.delivery_spaces) && response.data.delivery_spaces.length
@@ -165,7 +172,7 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
         ? setExternalRanges
         : serviceOrigin === "delivery"
         ? setDeliveryRanges
-        : setSimpleRanges;
+        : setExternalRanges;
     setter((current) => {
       const next = current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : { ...row }));
 
@@ -214,13 +221,7 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
                   routeId,
                   serviceOrigin: "external",
                   ranges: externalRanges,
-                })
-              ),
-              ...safeRouteIds.map((routeId) =>
-                upsertPackageEscalationConfigAPI({
-                  routeId,
-                  serviceOrigin: "simple_package",
-                  ranges: simpleRanges,
+                externalPricing,
                 })
               ),
             ];
@@ -362,6 +363,21 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
     </div>
   );
 
+  const renderExternalPricing = () => (
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+      <div style={{ padding: "10px 12px", background: "#f8fafc", fontWeight: 700 }}>Externas</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+        <thead><tr><th style={tableCellStyle}>PequeÃ±o</th><th style={tableCellStyle}>Grande</th><th style={tableCellStyle}>Multa semanal</th><th style={tableCellStyle}>Tope multa</th></tr></thead>
+        <tbody><tr>
+          {(["small_price", "large_price", "weekly_fee", "fee_cap"] as const).map((key) => (
+            <td key={key} style={tableCellStyle}><InputNumber min={0} precision={2} addonBefore="Bs." value={externalPricing[key]} style={{ width: "100%" }} onChange={(value) => setExternalPricing((current) => ({ ...current, [key]: Number(value || 0) }))} /></td>
+          ))}
+        </tr></tbody>
+      </table>
+      <div style={{ padding: "8px 12px", color: "#64748b", fontSize: 12 }}>La multa inicia tras 7 dÃ­as en “Listo para recoger” y el tope incluye el precio base del paquete.</div>
+    </div>
+  );
+
   const renderHeader = (title: string, subtitle: string) => (
     <div
       style={{
@@ -411,14 +427,13 @@ const PackageEscalationControlModal = ({ visible, onClose }: PackageEscalationCo
 
   const renderPackagesTab = () => (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      {renderHeader("Control de Escalonamiento: Precio Paquetes", "Las externas se configuran por ruta. En simples, los rangos son generales y los precios pueden variar por ruta.")}
+      {renderHeader("Control de precios de paquetes", "Las externas se configuran por ruta. Los simples usan el precio fijo del perfil del vendedor y no tienen multa.")}
       {renderRouteSelector()}
       {!selectedRouteId ? (
         <Empty description="Selecciona una ruta para editar sus rangos" />
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
-          {renderRangesTable("Externas", "external", externalRanges)}
-          {renderRangesTable("Simples (rangos generales, precios por ruta)", "simple_package", simpleRanges)}
+          {renderExternalPricing()}
         </div>
       )}
       {renderFooter()}

@@ -203,6 +203,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const config = escalationConfigs.find(
       (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "external"
     );
+    const matrix = config?.external_pricing;
+    if (matrix) {
+      return roundCurrency(Number(packageSize === "grande" ? matrix.large_price : matrix.small_price) || 0);
+    }
     const ranges = Array.isArray(config?.ranges) && config.ranges.length ? config.ranges : escalationRanges;
     const safeCount = Math.max(MIN_PACKAGES, Number(position || MIN_PACKAGES));
     const range =

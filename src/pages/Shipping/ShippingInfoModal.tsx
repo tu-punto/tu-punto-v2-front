@@ -232,6 +232,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
     );
     const simplePackageLatePickupFee = useMemo(() => {
         if (!isSimplePackageOrder) return 0;
+        if (shipping?.pricing_version === "package-pricing-v2") return 0;
         if (shipping?.estado_pedido === "En camino") return 0;
         if (shipping?.estado_pedido === "Entregado") {
             return Number(shipping?.late_pickup_fee || 0);
