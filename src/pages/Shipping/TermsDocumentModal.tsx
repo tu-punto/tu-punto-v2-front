@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Modal, Upload, message } from "antd";
 import type { UploadFile } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
@@ -8,6 +8,7 @@ export default function TermsDocumentModal({ visible, onClose }: { visible: bool
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const selectedFileRef = useRef<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -16,13 +17,15 @@ export default function TermsDocumentModal({ visible, onClose }: { visible: bool
   }, [visible]);
 
   const save = async () => {
-    if (!file) return message.warning("Selecciona un archivo PDF");
+    const selectedFile = file || selectedFileRef.current;
+    if (!selectedFile) return message.warning("Debes seleccionar un archivo PDF");
     setLoading(true);
     try {
-      const res = await replaceTermsDocumentAPI(file);
+      const res = await replaceTermsDocumentAPI(selectedFile);
       setUrl(String(res?.data?.url || ""));
       setFile(null);
       setFileList([]);
+      selectedFileRef.current = null;
       message.success("Documento actualizado");
     } catch (error: any) {
       message.error(error?.response?.data?.message || "No se pudo actualizar el documento");
@@ -36,13 +39,19 @@ export default function TermsDocumentModal({ visible, onClose }: { visible: bool
       accept="application/pdf"
       maxCount={1}
       fileList={fileList}
-      beforeUpload={() => false}
+      beforeUpload={(next) => {
+        selectedFileRef.current = next;
+        setFile(next);
+        return false;
+      }}
       onChange={({ fileList: nextFileList }) => {
         const next = nextFileList.slice(-1);
         setFileList(next);
-        setFile((next[0]?.originFileObj as File | undefined) || null);
+        const selected = (next[0]?.originFileObj as File | undefined) || null;
+        setFile(selected);
+        if (selected) selectedFileRef.current = selected;
       }}
-      onRemove={() => { setFile(null); setFileList([]); }}
+      onRemove={() => { setFile(null); setFileList([]); selectedFileRef.current = null; }}
     >
       <Button icon={<UploadOutlined />}>Seleccionar PDF</Button>
     </Upload>
