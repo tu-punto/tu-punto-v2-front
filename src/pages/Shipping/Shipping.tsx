@@ -7,6 +7,7 @@ import ShippingTable from "./ShippingTable";
 import ShippingQRScannerModal from "./ShippingQRScannerModal.tsx";
 import PackageEscalationControlModal from "./PackageEscalationControlModal";
 import TrackingFreezeControlModal from "./TrackingFreezeControlModal";
+import TermsDocumentModal from "./TermsDocumentModal";
 import "./ShippingTable.css";
 import { isSuperadminUser } from "../../utils/role";
 
@@ -25,6 +26,7 @@ const Shipping = () => {
 	const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 	const [isEscalationControlVisible, setIsEscalationControlVisible] = useState(false);
 	const [isTrackingFreezeVisible, setIsTrackingFreezeVisible] = useState(false);
+	const [isTermsDocumentVisible, setIsTermsDocumentVisible] = useState(false);
 	const [headerAction, setHeaderAction] = useState<ShippingHeaderAction | null>(null);
 
 	const { user }: any = useContext(UserContext);
@@ -79,6 +81,9 @@ const Shipping = () => {
 						</Button>
 					)}
 					{isSuperadmin && (
+						<Button type="default" onClick={() => setIsTermsDocumentVisible(true)} style={{ height: 42, borderRadius: 10, fontWeight: 700 }}>T&C</Button>
+					)}
+					{isSuperadmin && (
 						<Tooltip title="Control de Escalonamiento">
 							<Button
 								type="default"
@@ -109,6 +114,7 @@ const Shipping = () => {
 				visible={isTrackingFreezeVisible}
 				onClose={() => setIsTrackingFreezeVisible(false)}
 			/>
+			<TermsDocumentModal visible={isTermsDocumentVisible} onClose={() => setIsTermsDocumentVisible(false)} />
 		</div >
 	);
 };
