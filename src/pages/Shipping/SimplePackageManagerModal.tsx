@@ -1777,7 +1777,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
                   </div>
                   <Space wrap>
                     <Button
-                      disabled
+                      disabled={savingGeneralPayment || !unlockedRows.length}
                       type={!generalPaymentMethod ? "primary" : "default"}
                       onClick={() => applyGeneralPaymentMethod("")}
                     >
