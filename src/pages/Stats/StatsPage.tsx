@@ -12,6 +12,7 @@ import { UserContext } from "../../context/userContext";
 import { isSuperadminUser } from "../../utils/role";
 import "../Service/ServicePanelPage.css";
 import FarmerDiscountRulesCard from "./FarmerDiscountRulesCard";
+import ContractDocumentsCard from "./ContractDocumentsCard";
 
 const StatsPage = () => {
   const navigate = useNavigate();
@@ -69,6 +70,7 @@ const StatsPage = () => {
       <StatisticsDashboard />
       <div className="p-2 space-y-2">
         <FarmerDiscountRulesCard />
+        <ContractDocumentsCard />
         <Card className="service-announcement-card" title="Resumen administrativo">
           {loadingSummary ? (
             <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>

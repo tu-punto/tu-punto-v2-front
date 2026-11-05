@@ -59,6 +59,7 @@ import {
   getSellerHistorySimplePackagesAPI,
 } from "../../../api/simplePackage";
 import { resetSellerPasswordAPI } from "../../../api/user";
+import { generateContractAPI, generateServiceOrderAPI, getContractGenerationDownloadAPI, getSellerContractHistoryAPI, getSellerSendDocumentsAPI } from "../../../api/contractDocuments";
 
 import { UserContext } from "../../../context/userContext";
 
@@ -167,9 +168,21 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
   );
   const [qrFileList, setQrFileList] = useState<any[]>([]);
   const [recoveryChargeForm] = Form.useForm();
+  const [contractForm] = Form.useForm();
+  const [serviceOrderForm] = Form.useForm();
+  const [contractModalOpen, setContractModalOpen] = useState(false);
+  const [serviceOrderModalOpen, setServiceOrderModalOpen] = useState(false);
+  const [sendDocumentsModalOpen, setSendDocumentsModalOpen] = useState(false);
+  const [sendDocuments, setSendDocuments] = useState<any[]>([]);
+  const [selectedSendDocumentIds, setSelectedSendDocumentIds] = useState<string[]>([]);
+  const [contractLoading, setContractLoading] = useState(false);
+  const [contractHistoryOpen, setContractHistoryOpen] = useState(false);
+  const [contractHistory, setContractHistory] = useState<any[]>([]);
+  const [contractHistoryLoading, setContractHistoryLoading] = useState(false);
 
   const { user } = useContext(UserContext);
   const isSeller = user?.role === "seller";
+  const canManageContracts = user?.role === "admin" || user?.role === "operator";
   const isSuperadmin = user?.is_superadmin === true;
   const [serviceFlags, setServiceFlags] = useState({
     hasCommissionService: false,
@@ -645,6 +658,79 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
     }
   };
 
+  const downloadGeneratedDocument = (blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = fileName; link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateContract = async () => {
+    try {
+      const values = await contractForm.validateFields();
+      setContractLoading(true);
+      const response = await generateContractAPI(String(seller?._id || seller?.id), {
+        city: values.city,
+        signatureDate: values.signatureDate.format("DD/MM/YYYY"),
+      });
+      downloadGeneratedDocument(response.data, "contrato.pdf");
+      setContractModalOpen(false); message.success("Contrato generado");
+    } catch (error: any) { message.error(error?.response?.data?.message || "No se pudo generar el contrato"); }
+    finally { setContractLoading(false); }
+  };
+
+  const handleGenerateServiceOrder = async () => {
+    try {
+      const values = await serviceOrderForm.validateFields();
+      setContractLoading(true);
+      const response = await generateServiceOrderAPI(String(seller?._id || seller?.id), {
+        activationDate: values.activationDate.format("DD/MM/YYYY"),
+        promotion: values.promotion || "",
+        promotionStart: values.promotion ? values.promotionStart?.format("DD/MM/YYYY") : "",
+        promotionEnd: values.promotion ? values.promotionEnd?.format("DD/MM/YYYY") : "",
+      });
+      downloadGeneratedDocument(response.data, "orden-de-servicio.docx");
+      setServiceOrderModalOpen(false); message.success("Orden de servicio generada");
+    } catch (error: any) { message.error(error?.response?.data?.message || "No se pudo generar la Orden de Servicio"); }
+    finally { setContractLoading(false); }
+  };
+
+  const openSendDocuments = async () => {
+    try {
+      const response = await getSellerSendDocumentsAPI(String(seller?._id || seller?.id));
+      setSendDocuments(Array.isArray(response?.data) ? response.data : []);
+      setSelectedSendDocumentIds([]);
+      setSendDocumentsModalOpen(true);
+    } catch (error: any) { message.error(error?.response?.data?.message || "No se pudieron cargar los documentos vigentes"); }
+  };
+
+  const openContractHistory = async () => {
+    setContractHistoryOpen(true); setContractHistoryLoading(true);
+    try {
+      const response = await getSellerContractHistoryAPI(String(seller?._id || seller?.id));
+      setContractHistory(Array.isArray(response?.data) ? response.data : []);
+    } catch { message.error("No se pudo cargar el historial documental"); }
+    finally { setContractHistoryLoading(false); }
+  };
+
+  const downloadFromContractHistory = async (generation: any) => {
+    try {
+      const response = await getContractGenerationDownloadAPI(generation._id);
+      if (!response?.url) throw new Error();
+      window.open(response.url, "_blank", "noopener,noreferrer");
+    } catch { message.warning("Este archivo fue generado antes de habilitar el almacenamiento privado o ya no está disponible"); }
+  };
+
+  const openSellerChatWithDocuments = () => {
+    const selected = sendDocuments.filter((document) => selectedSendDocumentIds.includes(document._id));
+    if (!selected.length) return message.warning("Selecciona al menos un documento");
+    const phone = String(seller?.telefono || "").replace(/\D/g, "");
+    if (!phone) return message.warning("El vendedor no tiene teléfono registrado");
+    const body = ["Hola, te compartimos los siguientes documentos de Tu Punto:", ...selected.map((document) => `• ${document.label} (${document.version}): ${document.url}`)].join("\n");
+    window.open(`https://wa.me/${phone.startsWith("591") ? phone : `591${phone}`}?text=${encodeURIComponent(body)}`, "_blank", "noopener,noreferrer");
+    setSendDocumentsModalOpen(false);
+  };
+
   const handleSavePickupInfo = async () => {
     if (!seller?.key) return;
 
@@ -1037,6 +1123,16 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
           <Button onClick={() => setRecoveryChargeModalOpen(true)}>
             Cobro recuperacion
           </Button>
+          {canManageContracts && <>
+            <Button type="primary" onClick={() => { contractForm.setFieldsValue({ signatureDate: dayjs() }); setContractModalOpen(true); }}>
+              Generar contrato
+            </Button>
+            <Button onClick={openSendDocuments}>Enviar documentos</Button>
+            <Button onClick={() => { serviceOrderForm.setFieldsValue({ activationDate: dayjs() }); setServiceOrderModalOpen(true); }}>
+              Orden de servicio
+            </Button>
+            <Button type="text" onClick={openContractHistory}>Historial documental</Button>
+          </>}
           {declineServiceDate ? (
             <Button loading={declineServiceLoading} onClick={handleCancelDeclineService}>
               Anular declinacion
@@ -1085,6 +1181,43 @@ const SellerInfoPage = ({ visible, onSuccess, onCancel, onRefresh, seller }: any
             <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal title="Generar contrato" open={contractModalOpen} onCancel={() => setContractModalOpen(false)} onOk={handleGenerateContract} okText="Generar PDF" confirmLoading={contractLoading}>
+        <p className="mb-4 text-slate-500">Se usará la información actual del vendedor y los documentos vigentes.</p>
+        <Form form={contractForm} layout="vertical">
+          <Form.Item name="city" label="Ciudad de firma" rules={[{ required: true, message: "Ingresa la ciudad" }]}><Input placeholder="Ej. La Paz" /></Form.Item>
+          <Form.Item name="signatureDate" label="Fecha de firma" rules={[{ required: true }]}><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="Orden de servicio" open={serviceOrderModalOpen} onCancel={() => setServiceOrderModalOpen(false)} onOk={handleGenerateServiceOrder} okText="Generar Word" confirmLoading={contractLoading}>
+        <p className="mb-4 text-slate-500">Solo se incluirán las sucursales activas del vendedor.</p>
+        <Form form={serviceOrderForm} layout="vertical">
+          <Form.Item name="activationDate" label="Fecha de activación" rules={[{ required: true }]}><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item>
+          <Form.Item name="promotion" label="Promoción o descuento"><Input placeholder="Déjalo vacío si no aplica" /></Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, next) => prev.promotion !== next.promotion}>
+            {({ getFieldValue }) => getFieldValue("promotion") ? <Row gutter={12}><Col span={12}><Form.Item name="promotionStart" label="Inicio de promoción" rules={[{ required: true }]}><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item></Col><Col span={12}><Form.Item name="promotionEnd" label="Fin de promoción" rules={[{ required: true }]}><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item></Col></Row> : null}
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="Enviar documentos" open={sendDocumentsModalOpen} onCancel={() => setSendDocumentsModalOpen(false)} footer={<Space><Button onClick={() => setSendDocumentsModalOpen(false)}>Cancelar</Button><Button type="primary" onClick={openSellerChatWithDocuments}>Abrir chat para enviar</Button></Space>}>
+        <p className="text-slate-500">Selecciona los documentos. Se abrirá el chat con el texto preparado; el envío sigue siendo manual.</p>
+        <Space direction="vertical" style={{ width: "100%" }}>
+          {sendDocuments.map((document) => <Card size="small" key={document._id} title={`${document.label} · ${document.version}`} extra={<a href={document.url} target="_blank" rel="noreferrer">Ver</a>}><Checkbox checked={selectedSendDocumentIds.includes(document._id)} onChange={(event) => setSelectedSendDocumentIds((current) => event.target.checked ? [...current, document._id] : current.filter((id) => id !== document._id))}>Incluir en el mensaje</Checkbox></Card>)}
+          {!sendDocuments.length && <Alert type="warning" showIcon message="No hay documentos vigentes para enviar" />}
+        </Space>
+      </Modal>
+
+      <Modal title="Historial documental" open={contractHistoryOpen} onCancel={() => setContractHistoryOpen(false)} footer={<Button onClick={() => setContractHistoryOpen(false)}>Cerrar</Button>} width={720}>
+        <Table size="small" rowKey="_id" loading={contractHistoryLoading} pagination={{ pageSize: 6 }} dataSource={contractHistory} columns={[
+          { title: "Documento", dataIndex: "kind", render: (kind) => kind === "contract" ? "Contrato" : "Orden de servicio" },
+          { title: "Archivo", dataIndex: "fileName" },
+          { title: "Generado", dataIndex: "createdAt", render: (value) => value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "-" },
+          { title: "Por", dataIndex: ["generatedBy", "email"], render: (value) => value || "-" },
+          { title: "", render: (_, row) => <Button type="link" disabled={!row.s3Key} onClick={() => downloadFromContractHistory(row)}>Descargar</Button> },
+        ]} />
       </Modal>
 
       <Modal
