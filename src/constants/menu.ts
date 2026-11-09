@@ -42,6 +42,7 @@ export const menu = [
     icon: shippingIcon,
     roles: getAllowedRoles("/shipping"),
   },
+  { path: "/paqueteria", label: "Mis paquetes", icon: shippingIcon, roles: getAllowedRoles("/paqueteria") },
   {
     path: "/financeFlux",
     label: "Flujo Financiero",

@@ -3,4 +3,5 @@ export const roles = {
   ADMIN: "admin",
   OPERATOR: "operator",
   FARMER: "farmer",
+  PAQUETERIA: "paqueteria",
 };

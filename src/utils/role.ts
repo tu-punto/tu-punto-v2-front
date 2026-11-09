@@ -1,4 +1,4 @@
-export const normalizeRole = (role?: string): "admin" | "operator" | "seller" | "farmer" | "" => {
+export const normalizeRole = (role?: string): "admin" | "operator" | "seller" | "farmer" | "paqueteria" | "" => {
   const value = String(role || "").trim().toLowerCase();
 
   if (value === "admin") return "admin";
@@ -6,6 +6,7 @@ export const normalizeRole = (role?: string): "admin" | "operator" | "seller" | 
   if (value === "operator") return "operator";
   if (value === "farmer" || value === "granjero") return "farmer";
   if (value === "seller" || value === "vendedor") return "seller";
+  if (value === "paqueteria") return "paqueteria";
 
   return "";
 };

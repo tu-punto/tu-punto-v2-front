@@ -1,6 +1,6 @@
 import { roles } from "./roles";
 
-const { ADMIN, OPERATOR, SELLER, FARMER } = roles;
+const { ADMIN, OPERATOR, SELLER, FARMER, PAQUETERIA } = roles;
 
 export const routeRoleMap: Record<string, string[]> = {
   "/product": [ADMIN],
@@ -33,6 +33,7 @@ export const routeRoleMap: Record<string, string[]> = {
   "/superadmin-variants": [ADMIN],
   "/inventory-audit": [ADMIN],
   "/dynamic-qr": [ADMIN],
+  "/paqueteria": [PAQUETERIA],
 };
 
 export const getAllowedRoles = (path: string): string[] => routeRoleMap[path] || [];
