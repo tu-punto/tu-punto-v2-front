@@ -43,7 +43,7 @@ interface OperacionAdicional {
   concepto?: string;
   categoria?: string;
   cliente?: string;
-  metodo: Metodo;
+  metodo?: Metodo;
   monto: number;
   afecta_empresa?: boolean;
   fecha?: string;
@@ -65,7 +65,8 @@ const tipoLabel = (tipo: string) => {
   return "Ingresos (Entradas)";
 };
 
-const metodoLabel = (metodo: string) => (metodo === "qr" ? "QR/Bancario" : "Efectivo");
+const metodoLabel = (metodo?: string) =>
+  metodo === "qr" ? "QR/Bancario" : metodo === "efectivo" ? "Efectivo" : "Pendiente";
 
 const buildOperationSourceKey = (branchId: string, businessDate: string) =>
   `boxclose-${branchId}-${businessDate}-${window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`;
@@ -97,6 +98,7 @@ const BoxCloseForm = ({
   const [admins, setAdmins] = useState<{ _id: string; name: string }[]>([]);
   const [operations, setOperations] = useState<OperacionAdicional[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingOperationIndex, setEditingOperationIndex] = useState<number | null>(null);
   const [operationForm] = Form.useForm();
   const operationAffectsCompany = Form.useWatch("afecta_empresa", operationForm);
   const { user } = useContext(UserContext) || {};
@@ -120,6 +122,7 @@ const BoxCloseForm = ({
     let cambiosExternos = 0;
 
     for (const operation of ops) {
+      if (!operation.metodo) continue;
       const delta = getOperationSign(operation.tipo) * operation.monto;
 
       if (operation.metodo === "efectivo") deltaEf += delta;
@@ -379,6 +382,7 @@ const BoxCloseForm = ({
   }, [coinTotals, billTotals, Form.useWatch("bancario_real", form), Form.useWatch("bancario_esperado", form)]);
 
   const openOperationModal = () => {
+    setEditingOperationIndex(null);
     operationForm.setFieldsValue({
       afecta_empresa: true,
       tipo: "ingreso",
@@ -393,7 +397,21 @@ const BoxCloseForm = ({
 
   const closeOperationModal = () => {
     setModalVisible(false);
+    setEditingOperationIndex(null);
     operationForm.resetFields();
+  };
+
+  const openEditOperationModal = (index: number) => {
+    const operation = operations[index];
+    if (!operation) return;
+
+    setEditingOperationIndex(index);
+    operationForm.setFieldsValue({
+      ...operation,
+      concepto: operation.concepto || operation.descripcion,
+      fecha: operation.fecha ? dayjs(operation.fecha) : selectedDate || dayjs(),
+    });
+    setModalVisible(true);
   };
 
   const handleAddOperation = async () => {
@@ -404,8 +422,10 @@ const BoxCloseForm = ({
         return;
       }
       const businessDate = (selectedDate || dayjs()).format("YYYY-MM-DD");
-      const sourceKey = buildOperationSourceKey(currentSucursalId, businessDate);
+      const existingOperation = editingOperationIndex === null ? undefined : operations[editingOperationIndex];
+      const sourceKey = existingOperation?.source_key || buildOperationSourceKey(currentSucursalId, businessDate);
       const op: OperacionAdicional = {
+        ...existingOperation,
         ...newOp,
         tipo: newOp.tipo || "ingreso",
         categoria: getDefaultOperationCategory(newOp.tipo || "ingreso"),
@@ -429,7 +449,9 @@ const BoxCloseForm = ({
         return;
       }
 
-      const updatedOperations = [...operations, op];
+      const updatedOperations = editingOperationIndex === null
+        ? [...operations, op]
+        : operations.map((item, index) => index === editingOperationIndex ? op : item);
       setOperations(updatedOperations);
 
       // recalcular campos derivados
@@ -567,7 +589,7 @@ const BoxCloseForm = ({
                 dataSource={operations}
                 columns={[
                   { title: "Tipo", dataIndex: "tipo", key: "tipo", render: (v) => tipoLabel(String(v || "")) },
-                  { title: "Método", dataIndex: "metodo", key: "metodo", render: (v) => metodoLabel(String(v || "")) },
+                  { title: "Método", dataIndex: "metodo", key: "metodo", render: (v) => metodoLabel(v) },
                   { title: "Empresa", dataIndex: "afecta_empresa", key: "afecta_empresa", render: (v) => (v === false ? "No" : "Si") },
                   { title: "Categoria", dataIndex: "categoria", key: "categoria", render: (v) => v || "-" },
                   { title: "Descripción", dataIndex: "descripcion", key: "descripcion" },
@@ -576,9 +598,14 @@ const BoxCloseForm = ({
                     title: "Acciones",
                     key: "acciones",
                     render: (_, __, index) => (
+                      <div className="flex gap-2">
+                        <Button size="small" onClick={() => openEditOperationModal(index)}>
+                          Editar
+                        </Button>
                         <Button danger size="small" onClick={() => handleDeleteOperation(index)}>
                           Eliminar
                         </Button>
+                      </div>
                     )
                   }
                 ]}
@@ -589,7 +616,7 @@ const BoxCloseForm = ({
             />
         )}
         <Modal
-            title="Nueva operación"
+            title={editingOperationIndex === null ? "Nueva operación" : "Editar operación"}
             open={modalVisible}
             onOk={handleAddOperation}
             onCancel={closeOperationModal}
