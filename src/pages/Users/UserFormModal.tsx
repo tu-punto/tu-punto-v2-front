@@ -2,6 +2,7 @@ import { Modal, Form, Input, Select, Checkbox, Switch, TimePicker, Typography } 
 import { useEffect, useState } from "react";
 import { getSucursalsAPI } from "../../api/sucursal";
 import { getSellersBasicAPI } from "../../api/seller";
+import { getPaqueteriasAPI } from "../../api/paqueterias";
 import dayjs from "dayjs";
 
 const DEFAULT_SYSTEM_ACCESS_HOURS = {
@@ -86,6 +87,7 @@ const UserFormModal = ({
   const [changePassword, setChangePassword] = useState(false);
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [sellers, setSellers] = useState<any[]>([]);
+  const [paqueterias, setPaqueterias] = useState<any[]>([]);
   const selectedRole = Form.useWatch("role", form);
   const weekdaysEnabled = Form.useWatch(["system_access_hours", "weekdays", "enabled"], form);
   const saturdayEnabled = Form.useWatch(["system_access_hours", "saturday", "enabled"], form);
@@ -100,6 +102,7 @@ const UserFormModal = ({
     getSellersBasicAPI()
       .then((data) => setSellers(Array.isArray(data) ? data : []))
       .catch(() => setSellers([]));
+    getPaqueteriasAPI().then((data) => setPaqueterias(Array.isArray(data?.data) ? data.data : [])).catch(() => setPaqueterias([]));
   }, [visible]);
 
   useEffect(() => {
@@ -110,6 +113,7 @@ const UserFormModal = ({
           email: editingUser.email,
           role: editingUser.role,
           sucursal: editingUser.sucursal?._id || editingUser.sucursal || editingUser.sucursalId,
+          paqueteria: editingUser.paqueteria?._id || editingUser.paqueteria,
           vendedores_autorizados: Array.isArray(editingUser.vendedores_autorizados)
             ? editingUser.vendedores_autorizados.map((seller: any) => seller?._id || seller)
             : [],
@@ -168,6 +172,7 @@ const UserFormModal = ({
     } else {
       delete submitData.system_access_hours;
     }
+    if (submitData.role !== "paqueteria") delete submitData.paqueteria;
 
     if (editingUser && !changePassword) {
       delete submitData.password;
@@ -227,6 +232,7 @@ const UserFormModal = ({
             <Select.Option value="operator">Operador</Select.Option>
             <Select.Option value="seller">Vendedor</Select.Option>
             <Select.Option value="farmer">Granjero</Select.Option>
+            <Select.Option value="paqueteria">Paquetería</Select.Option>
           </Select>
         </Form.Item>
 
@@ -245,6 +251,12 @@ const UserFormModal = ({
                 value: sucursal._id,
               }))}
             />
+          </Form.Item>
+        )}
+
+        {selectedRole === "paqueteria" && (
+          <Form.Item name="paqueteria" label="Paquetería asignada" rules={[{ required: true, message: "Selecciona una paquetería" }]}>
+            <Select size="large" options={paqueterias.filter((item) => item.activo !== false).map((item) => ({ label: item.nombre, value: item._id }))} />
           </Form.Item>
         )}
 

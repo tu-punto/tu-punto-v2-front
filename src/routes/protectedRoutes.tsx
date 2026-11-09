@@ -31,6 +31,7 @@ import DynamicQRPage from "../pages/DynamicQR/DynamicQRPage";
 import PersonalInventoryPage from "../pages/PersonalInventory/PersonalInventoryPage";
 import FarmerProfilePage from "../pages/Farmer/FarmerProfilePage";
 import PaqueteriaPage from "../pages/Paqueteria/PaqueteriaPage";
+import PaqueteriasPage from "../pages/Paqueterias/PaqueteriasPage";
 import { getAllowedRoles } from "../constants/accessControl";
 import { UserContext } from "../context/userContext";
 import { canAccessSellerProductInfo } from "../constants/sellerProductInfoAccess";
@@ -180,6 +181,7 @@ const protectedRoutes = [
         element: guard("/shipping", <SellerNormalRoute><Shipping /></SellerNormalRoute>),
       },
       { path: "/paqueteria", element: guard("/paqueteria", <PaqueteriaPage />) },
+      { path: "/paqueterias", element: guard("/paqueterias", <PaqueteriasPage />) },
       {
         path: "/find-shipping",
         element: guard("/find-shipping", <FindShipping />),

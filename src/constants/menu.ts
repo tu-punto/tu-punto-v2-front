@@ -43,6 +43,7 @@ export const menu = [
     roles: getAllowedRoles("/shipping"),
   },
   { path: "/paqueteria", label: "Mis paquetes", icon: shippingIcon, roles: getAllowedRoles("/paqueteria") },
+  { path: "/paqueterias", label: "Paqueterías", icon: shippingIcon, roles: getAllowedRoles("/paqueterias"), requiresSuperadmin: true },
   {
     path: "/financeFlux",
     label: "Flujo Financiero",
