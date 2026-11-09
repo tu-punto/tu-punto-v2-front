@@ -1,4 +1,4 @@
-import { Button, Card, Form, Input, Modal, Select, Table, Tag, message } from "antd";
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Table, Tag, message } from "antd";
 import { useEffect, useState } from "react";
 import { annulCourierOrderAPI, createCourierOrderAPI, getCourierOrdersAPI, getMyCourierAPI } from "../../api/paqueteriaPortal";
 
@@ -8,6 +8,7 @@ export default function PaqueteriaPage() {
   useEffect(() => { void load(); }, []);
   const create = async (values: any) => { setLoading(true); try { await createCourierOrderAPI(values); message.success("Paquete registrado"); setOpen(false); form.resetFields(); await load(); } catch (e: any) { message.error(e?.response?.data?.msg || "No se pudo registrar"); } finally { setLoading(false); } };
   const annul = async (row: any) => { try { await annulCourierOrderAPI(row._id); message.success("Pedido anulado"); await load(); } catch (e: any) { message.error(e?.response?.data?.msg || "No se pudo anular"); } };
+  const paymentMode = Form.useWatch("esta_pagado", form);
   const primary = company?.color_primario || "#1677ff";
   return <div className="p-4 space-y-4" style={{ "--courier-primary": primary } as any}>
     <Card bordered={false} style={{ borderTop: `4px solid ${primary}` }} title={company?.nombre || "Paquetería"} extra={<Button type="primary" onClick={() => setOpen(true)}>Crear paquete</Button>}>
@@ -22,6 +23,7 @@ export default function PaqueteriaPage() {
       <Form.Item name="comprador" label="Comprador"><Input /></Form.Item><Form.Item name="telefono_comprador" label="Celular"><Input /></Form.Item>
       <Form.Item name="descripcion_paquete" label="Descripción" rules={[{ required: true }]}><Input.TextArea /></Form.Item>
       <Form.Item name="esta_pagado" label="Quién paga" rules={[{ required: true }]}><Select options={[{ value: "no", label: "Comprador" }, { value: "si", label: "Paquetería" }, { value: "mixto", label: "Ambos" }]} /></Form.Item>
+      {paymentMode === "mixto" && <Form.Item name="monto_paga_vendedor" label="Aporta la paquetería (Bs.)" rules={[{ required: true }]}><InputNumber min={0.01} precision={2} style={{ width: "100%" }} /></Form.Item>}
       <Button htmlType="submit" type="primary" loading={loading}>Guardar</Button></Form></Modal>
   </div>;
 }
