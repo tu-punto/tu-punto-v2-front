@@ -29,11 +29,31 @@ interface ProductTableProps {
     sellersVigentes: any[];
 }
 
+type SortField = "name" | "price" | null;
+type SortDirection = "asc" | "desc" | null;
+type ProductSort = { field: SortField; direction: SortDirection };
+
+const noProductSort: ProductSort = { field: null, direction: null };
+
+const nextProductSort = (current: ProductSort, field: Exclude<SortField, null>): ProductSort => {
+    if (current.field !== field) return { field, direction: "asc" };
+    if (current.direction === "asc") return { field, direction: "desc" };
+    return noProductSort;
+};
+
+const sortLabel = (field: Exclude<SortField, null>, sort: ProductSort) => {
+    if (sort.field !== field || !sort.direction) return field === "name" ? "Nombre ↕" : "Precio ↕";
+    if (field === "name") return sort.direction === "asc" ? "Nombre A-Z" : "Nombre Z-A";
+    return sort.direction === "asc" ? "Precio ↑" : "Precio ↓";
+};
+
 const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListForConfirmModal, resetSignal, searchText, setSearchText, selectedCategory, setSelectedCategory, selectedSeller, onShowVariantModal, sellersVigentes}: ProductTableProps) => {
     const [incomeDraft, setIncomeDraft] = useState<Record<string, any>>({});
     const [searcher, setSearcher] = useState<any>({});
     const [tableGroup, setTableGroup] = useState<any[]>([]);
     const [updatedProductsList, setUpdatedProductsList] = useState<any[]>([]);
+    const [globalSort, setGlobalSort] = useState<ProductSort>(noProductSort);
+    const [groupSortOverrides, setGroupSortOverrides] = useState<Record<string, ProductSort>>({});
 
     const { user }: any = useContext(UserContext);
     const isSeller = user?.role === 'seller';
@@ -266,6 +286,50 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
         return Object.values(groups);
     };
 
+    const sortGroupedProducts = (products: any[], sort: ProductSort) => {
+        if (!sort.field || !sort.direction) return products;
+
+        const direction = sort.direction === "asc" ? 1 : -1;
+        const getMinimumPrice = (product: any) => {
+            const prices = (Array.isArray(product.children) ? product.children : [])
+                .map((child: any) => Number(child?.precio))
+                .filter((price: number) => Number.isFinite(price) && price > 0);
+            return prices.length ? Math.min(...prices) : null;
+        };
+
+        return [...products].sort((left: any, right: any) => {
+            if (sort.field === "name") {
+                return direction * String(left.nombre_producto || "").localeCompare(String(right.nombre_producto || ""), "es", {
+                    sensitivity: "base"
+                });
+            }
+
+            const leftPrice = getMinimumPrice(left);
+            const rightPrice = getMinimumPrice(right);
+            if (leftPrice === null && rightPrice === null) return 0;
+            if (leftPrice === null) return 1;
+            if (rightPrice === null) return -1;
+            if (leftPrice === rightPrice) {
+                return String(left.nombre_producto || "").localeCompare(String(right.nombre_producto || ""), "es", {
+                    sensitivity: "base"
+                });
+            }
+            return direction * (leftPrice - rightPrice);
+        });
+    };
+
+    const applySortToAll = (field: Exclude<SortField, null>) => {
+        setGlobalSort((current) => nextProductSort(current, field));
+        setGroupSortOverrides({});
+    };
+
+    const applySortToGroup = (groupId: string, field: Exclude<SortField, null>) => {
+        setGroupSortOverrides((current) => {
+            const effectiveSort = current[groupId] || globalSort;
+            return { ...current, [groupId]: nextProductSort(effectiveSort, field) };
+        });
+    };
+
 
     const columns = [
         {
@@ -472,6 +536,23 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
     const loading = updatedProductsList.length === 0;
     return (
         <Spin spinning={loading} tip="Cargando productos...">
+            {!isSeller && tableGroup.length > 0 && (
+                <div
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                    style={{ marginBottom: 16 }}
+                >
+                    <span className="mr-1 text-sm font-semibold text-slate-700">Aplicar a todos:</span>
+                    <Button size="small" onClick={() => applySortToAll("name")}>
+                        {sortLabel("name", globalSort)}
+                    </Button>
+                    <Button size="small" onClick={() => applySortToAll("price")}>
+                        {sortLabel("price", globalSort)}
+                    </Button>
+                    {globalSort.field && (
+                        <span className="text-xs text-slate-500">Cada tabla conserva sus productos y su paginaciÃ³n.</span>
+                    )}
+                </div>
+            )}
             {/*<ProductSearcher applySearcher={changeSearcher} />
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <Input
@@ -498,7 +579,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             {tableGroup
                 .filter(group => group.products && group.products.length > 0)
                 .map((group, i) => {
-                    const groupedProducts = groupProductsByBaseName(group.products);
+                    const groupSort = groupSortOverrides[group.name] || globalSort;
+                    const groupedProducts = sortGroupedProducts(groupProductsByBaseName(group.products), groupSort);
 
                     if (groupedProducts.length === 0) return null;
 
@@ -515,6 +597,15 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                                 }} data-testid="stock-group-total">
             {group.products.reduce((sum, p) => sum + (p.stock ?? 0), 0)}
           </span>
+                                <span className="ml-auto flex flex-wrap items-center gap-2" style={{ fontSize: 12, fontWeight: 400 }}>
+                                    <span className="text-slate-500">Ordenar:</span>
+                                    <Button size="small" onClick={() => applySortToGroup(group.name, "name")}>
+                                        {sortLabel("name", groupSort)}
+                                    </Button>
+                                    <Button size="small" onClick={() => applySortToGroup(group.name, "price")}>
+                                        {sortLabel("price", groupSort)}
+                                    </Button>
+                                </span>
                             </h2>
 
                             <div data-testid="stock-group-table">
