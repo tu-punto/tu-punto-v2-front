@@ -56,7 +56,12 @@ export default function LoginForm({
         navigate("/change-password", { replace: true });
         return;
       }
-      navigate(normalizeRole(userRes.data?.role) === "farmer" ? "/sales" : redirectTo);
+      const role = normalizeRole(userRes.data?.role);
+      if (role === "paqueteria") {
+        navigate("/paqueteria", { replace: true });
+        return;
+      }
+      navigate(role === "farmer" ? "/sales" : redirectTo);
     } catch {
       message.error("Error en el proceso de login");
     } finally {
