@@ -1,10 +1,11 @@
 import { Button, Card, Form, Input, InputNumber, Modal, Select, Table, Tag, message } from "antd";
 import { useEffect, useState } from "react";
 import { annulCourierOrderAPI, createCourierOrderAPI, getCourierOrdersAPI, getMyCourierAPI, updateCourierOrderAPI } from "../../api/paqueteriaPortal";
+import PaqueteriaExternaPortal from "./PaqueteriaExternaPortal";
 
 export default function PaqueteriaPage() {
   const [company, setCompany] = useState<any>(null); const [rows, setRows] = useState<any[]>([]); const [open, setOpen] = useState(false); const [editing, setEditing] = useState<any>(null); const [loading, setLoading] = useState(false); const [form] = Form.useForm();
-  const load = async () => { try { const [c, o] = await Promise.all([getMyCourierAPI(), getCourierOrdersAPI()]); setCompany(c.data); setRows(o.data || []); } catch { message.error("No se pudieron cargar los paquetes"); } };
+  const load = async () => { try { const c = await getMyCourierAPI(); setCompany(c.data); if (c.data?.tipo === "externa") return; const o = await getCourierOrdersAPI(); setRows(o.data || []); } catch { message.error("No se pudieron cargar los paquetes"); } };
   useEffect(() => { void load(); }, []);
   const save = async (values: any) => { setLoading(true); try { if (editing?._id) await updateCourierOrderAPI(editing._id, values); else await createCourierOrderAPI(values); message.success(editing ? "Paquete actualizado" : "Paquete registrado"); setOpen(false); setEditing(null); form.resetFields(); await load(); } catch (e: any) { message.error(e?.response?.data?.msg || "No se pudo guardar"); } finally { setLoading(false); } };
   const showCreate = () => { setEditing(null); form.resetFields(); form.setFieldsValue({ esta_pagado: "no" }); setOpen(true); };
@@ -12,6 +13,7 @@ export default function PaqueteriaPage() {
   const annul = async (row: any) => { try { await annulCourierOrderAPI(row._id); message.success("Pedido anulado"); await load(); } catch (e: any) { message.error(e?.response?.data?.msg || "No se pudo anular"); } };
   const paymentMode = Form.useWatch("esta_pagado", form);
   const primary = company?.color_primario || "#1677ff";
+  if (company?.tipo === "externa") return <PaqueteriaExternaPortal company={company} />;
   return <div className="p-4 space-y-4" style={{ "--courier-primary": primary } as any}>
     <Card bordered={false} style={{ borderTop: `4px solid ${primary}` }} title={<span className="flex items-center gap-3">{company?.logo_url ? <img src={company.logo_url} alt="" className="w-8 h-8 object-contain" /> : null}<span>{company?.nombre || "Paquetería"}</span></span>} extra={<Button type="primary" style={{ background: primary, borderColor: primary }} onClick={showCreate}>Crear paquete</Button>}>
       <div>Tarifa por paquete: Bs. {Number(company?.tarifa_fija || 0).toFixed(2)} · Multa: Bs. {Number(company?.monto_multa || 0).toFixed(2)} cada {company?.multa_cada_dias || 0} días</div>

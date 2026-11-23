@@ -1,5 +1,5 @@
 import { UploadOutlined } from "@ant-design/icons";
-import { Button, ColorPicker, Form, Image, Input, InputNumber, Modal, Space, Switch, Table, Tag, Upload, message } from "antd";
+import { Button, ColorPicker, Form, Image, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Upload, message } from "antd";
 import type { UploadFile } from "antd";
 import { useEffect, useState } from "react";
 import { checkPaqueteriaGuideCodeAPI, createPaqueteriaAPI, getPaqueteriasAPI, updatePaqueteriaAPI, uploadPaqueteriaLogoAPI } from "../../api/paqueterias";
@@ -21,6 +21,8 @@ export default function PaqueteriasPage() {
   const guideCode = Number(Form.useWatch("codigo_guia", form) || 3);
   const primaryColor = String(Form.useWatch("color_primario", form) || DEFAULT_PRIMARY);
   const secondaryColor = String(Form.useWatch("color_secundario", form) || DEFAULT_SECONDARY);
+  const companyType = String(Form.useWatch("tipo", form) || "operativa");
+  const guideFormat = String(Form.useWatch("formato_guia", form) || "libre");
 
   const load = async () => {
     try {
@@ -33,7 +35,7 @@ export default function PaqueteriasPage() {
   useEffect(() => { void load(); }, []);
 
   const edit = (row?: any) => {
-    const next = row || { activo: true, multa_cada_dias: 7, monto_multa: 0, tarifa_fija: 0, color_primario: DEFAULT_PRIMARY, color_secundario: DEFAULT_SECONDARY };
+    const next = row || { tipo: "operativa", activo: true, multa_cada_dias: 7, monto_multa: 0, tarifa_fija: 0, formato_guia: "libre", color_primario: DEFAULT_PRIMARY, color_secundario: DEFAULT_SECONDARY };
     setSelected(row || null);
     form.setFieldsValue({ ...next, color_primario: next.color_primario || DEFAULT_PRIMARY, color_secundario: next.color_secundario || DEFAULT_SECONDARY });
     setPreviewUrl(next.logo_url || "");
@@ -78,7 +80,7 @@ export default function PaqueteriasPage() {
   };
 
   const save = async (values: any) => {
-    const codeIsAvailable = await checkCode(values.codigo_guia);
+    const codeIsAvailable = values.tipo === "externa" || await checkCode(values.codigo_guia);
     if (!codeIsAvailable) return;
     setSaving(true);
     try {
@@ -124,6 +126,9 @@ export default function PaqueteriasPage() {
           <Form.Item name="nombre" label="Nombre comercial" rules={[{ required: true, message: "Ingresa el nombre comercial" }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="tipo" label="Tipo de paquetería" rules={[{ required: true }]}><Select options={[{ value: "operativa", label: "Operativa Tu Punto" }, { value: "externa", label: "Externa (portal aislado)" }]} /></Form.Item>
+          {companyType === "externa" && <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4"><Form.Item name="slug" label="URL de acceso" rules={[{ required: true }]} extra="Ejemplo: /paqueteria/mi-paqueteria"><Input addonBefore="/paqueteria/" /></Form.Item><Form.Item name="formato_guia" label="Formato de guía propia"><Select options={[{ value: "libre", label: "Guía libre" }, { value: "tupunto", label: "Formato Tu Punto: EXT-000001" }, { value: "personalizado", label: "Formato personalizado" }]} /></Form.Item>{guideFormat === "personalizado" && <Form.Item name="prefijo_guia" label="Prefijo obligatorio" rules={[{ required: true }]}><Input placeholder="Ej. RAP-" /></Form.Item>}</div>}
+          {companyType !== "externa" && <>
           <Form.Item name="codigo_guia" label="Código de guía (desde 2)" rules={[{ required: true, message: "Ingresa un código" }, { type: "number", min: 2, message: "El código debe ser 2 o mayor" }]}>
             <InputNumber min={2} precision={0} style={{ width: "100%" }} onBlur={(event) => void checkCode(Number(event.target.value))} status={checkingCode ? "warning" : undefined} />
           </Form.Item>
@@ -140,6 +145,7 @@ export default function PaqueteriasPage() {
             <Form.Item name="monto_multa" label="Monto de multa (Bs.)" rules={[{ required: true, message: "Ingresa el monto" }]}><InputNumber min={0} precision={2} style={{ width: "100%" }} /></Form.Item>
             <Form.Item name="activo" label="Activa" valuePropName="checked"><Switch /></Form.Item>
           </div>
+          </>}
           <div className="mb-5 rounded-lg border border-slate-200 p-4">
             <div className="mb-3 text-sm font-semibold text-slate-700">Identidad visual</div>
             <Space align="start" size={16} wrap>
