@@ -4,9 +4,13 @@ import { UserContextProvider } from "./context/userContext";
 
 import "./App.css";
 import RouterGuard from "./routes/RouterGuard";
+import PaqueteriaExternalLanding from "./pages/Paqueteria/PaqueteriaExternalLanding";
 
 
 export const App = () => {
+  const match = window.location.pathname.match(/^\/paqueteria\/([^/]+)\/?$/);
+  const externalSlug = match ? decodeURIComponent(match[1]) : null;
+
   return (
     <AntdApp>
       <UserContextProvider>
@@ -20,7 +24,7 @@ export const App = () => {
             },
           }}
         >
-          <RouterGuard />
+          {externalSlug ? <PaqueteriaExternalLanding slug={externalSlug} /> : <RouterGuard />}
         </ConfigProvider>
       </UserContextProvider>
     </AntdApp>
