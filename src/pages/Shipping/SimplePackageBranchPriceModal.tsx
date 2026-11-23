@@ -1,7 +1,8 @@
-import { Button, Empty, Modal, Select, Space, Spin, Typography, message } from "antd";
+import { Button, Empty, Modal, Select, Space, Spin, Tag, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { getSimplePackageBranchPricesAPI, upsertSimplePackageBranchPriceAPI } from "../../api/simplePackage";
 import { getSucursalsAPI } from "../../api/sucursal";
+import { getPaqueteriasAPI } from "../../api/paqueterias";
 
 interface SimplePackageBranchPriceModalProps {
   visible: boolean;
@@ -12,18 +13,21 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
+  const [couriers, setCouriers] = useState<any[]>([]);
   const [rows, setRows] = useState<any[]>([]);
   const [newOriginId, setNewOriginId] = useState("");
-  const [newDestinationId, setNewDestinationId] = useState("");
+  const [newDestination, setNewDestination] = useState("");
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [branchResponse, pricesResponse] = await Promise.all([
+      const [branchResponse, pricesResponse, courierResponse] = await Promise.all([
         getSucursalsAPI(),
         getSimplePackageBranchPricesAPI(),
+        getPaqueteriasAPI(),
       ]);
       setBranches(Array.isArray(branchResponse) ? branchResponse : []);
+      setCouriers(Array.isArray(courierResponse?.data) ? courierResponse.data : []);
       const nextRows = Array.isArray(pricesResponse?.rows) ? pricesResponse.rows : [];
       setRows(nextRows);
     } catch (error) {
@@ -53,21 +57,41 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
     const usedDestinations = new Set(
       rows
         .filter((row: any) => String(row?.origen_sucursal?._id || row?.origen_sucursal || "") === String(newOriginId))
-        .map((row: any) => String(row?.destino_sucursal?._id || row?.destino_sucursal || ""))
+        .map((row: any) => {
+          const isCourier = row?.destino_tipo === "paqueteria";
+          const id = isCourier
+            ? row?.destino_paqueteria?._id || row?.destino_paqueteria
+            : row?.destino_sucursal?._id || row?.destino_sucursal;
+          return `${isCourier ? "paqueteria" : "sucursal"}:${String(id || "")}`;
+        })
     );
 
-    return branches
+    const branchOptions = branches
       .filter((branch: any) => {
         const branchId = String(branch?._id || "");
-        return branchId && !usedDestinations.has(branchId);
+        return branchId && !usedDestinations.has(`sucursal:${branchId}`);
       })
       .map((branch: any) => ({
-        value: String(branch?._id || ""),
+        value: `sucursal:${String(branch?._id || "")}`,
         label: String(branch?.nombre || "Sucursal"),
       }));
-  }, [branches, newOriginId, rows]);
+    const courierOptions = couriers
+      .filter((courier: any) => {
+        const courierId = String(courier?._id || "");
+        return courier?.activo !== false && courierId && !usedDestinations.has(`paqueteria:${courierId}`);
+      })
+      .map((courier: any) => ({
+        value: `paqueteria:${String(courier?._id || "")}`,
+        label: String(courier?.nombre || "Paquetería"),
+      }));
 
-  const handleUpsert = async (payload: { originBranchId: string; destinationBranchId: string }) => {
+    return [
+      ...(branchOptions.length ? [{ label: "Sucursales", options: branchOptions }] : []),
+      ...(courierOptions.length ? [{ label: "Paqueterías", options: courierOptions }] : []),
+    ];
+  }, [branches, couriers, newOriginId, rows]);
+
+  const handleUpsert = async (payload: { originBranchId: string; destinationId: string; destinationType: "sucursal" | "paqueteria" }) => {
     setSaving(true);
     try {
       const response = await upsertSimplePackageBranchPriceAPI(payload);
@@ -104,7 +128,7 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
                 value={newOriginId || undefined}
                 onChange={(value) => {
                   setNewOriginId(String(value || ""));
-                  setNewDestinationId("");
+                  setNewDestination("");
                 }}
                 options={addOriginOptions}
                 placeholder="Sucursal origen"
@@ -113,10 +137,10 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
               />
               <div style={{ textAlign: "center", fontSize: 22, color: "#6b7280" }}>→</div>
               <Select
-                value={newDestinationId || undefined}
-                onChange={(value) => setNewDestinationId(String(value || ""))}
+                value={newDestination || undefined}
+                onChange={(value) => setNewDestination(String(value || ""))}
                 options={addDestinationOptions}
-                placeholder="Sucursal destino"
+                placeholder="Destino"
                 disabled={!newOriginId}
                 showSearch
                 optionFilterProp="label"
@@ -124,14 +148,17 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
               <Button
                 type="primary"
                 loading={saving}
-                disabled={!newOriginId || !newDestinationId}
+                disabled={!newOriginId || !newDestination}
                 onClick={async () => {
+                  const [destinationType, destinationId] = newDestination.split(":");
+                  if (destinationType !== "sucursal" && destinationType !== "paqueteria") return;
                   const ok = await handleUpsert({
                     originBranchId: newOriginId,
-                    destinationBranchId: newDestinationId,
+                    destinationId,
+                    destinationType,
                   });
                   if (ok) {
-                    setNewDestinationId("");
+                    setNewDestination("");
                   }
                 }}
               >
@@ -162,7 +189,10 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
                   >
                     <div style={{ fontWeight: 600 }}>{row?.origen_sucursal?.nombre || "Origen"}</div>
                     <div style={{ textAlign: "center", fontSize: 22, color: "#6b7280" }}>→</div>
-                    <div style={{ fontWeight: 600 }}>{row?.destino_sucursal?.nombre || "Destino"}</div>
+                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>{row?.destino_tipo === "paqueteria" ? row?.destino_paqueteria?.nombre || "Paquetería" : row?.destino_sucursal?.nombre || "Destino"}</span>
+                      {row?.destino_tipo === "paqueteria" && <Tag color="blue">Paquetería</Tag>}
+                    </div>
                   </div>
                 );
               })}

@@ -70,7 +70,10 @@ export const getSellerHistorySimplePackagesAPI = async (params?: { sellerId?: st
 
 export const upsertSimplePackageBranchPriceAPI = async (payload: {
   originBranchId: string;
-  destinationBranchId: string;
+  destinationId?: string;
+  destinationType?: "sucursal" | "paqueteria";
+  /** @deprecated Use destinationId. Kept for existing branch-to-branch callers. */
+  destinationBranchId?: string;
   precio?: number;
 }) => {
   try {
