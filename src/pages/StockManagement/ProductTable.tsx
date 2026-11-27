@@ -265,12 +265,13 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             if (selectedCategory !== 'all' && product.id_categoria !== selectedCategory) return;
 
             const baseName = product.nombre_producto;
+            const productId = String(product._id?.$oid || product._id || baseName);
 
             if (searchText && !matchesAllSearchWords(`${baseName} ${product.variant || ""}`, searchText)) return;
 
-            if (!groups[baseName]) {
-                groups[baseName] = {
-                    key: baseName,
+            if (!groups[productId]) {
+                groups[productId] = {
+                    key: productId,
                     nombre_producto: baseName,
                     children: [],
                     totalStock: 0,
@@ -279,8 +280,8 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
                 };
             }
 
-            groups[baseName].children.push(product);
-            groups[baseName].totalStock += product.stock;
+            groups[productId].children.push(product);
+            groups[productId].totalStock += product.stock;
         });
 
         return Object.values(groups);
@@ -297,7 +298,22 @@ const ProductTable = ({ productsList, groupList, onUpdateProducts, setStockListF
             return prices.length ? Math.min(...prices) : null;
         };
 
-        return [...products].sort((left: any, right: any) => {
+        const sortedProducts = products.map((product) => ({
+            ...product,
+            children: [...product.children].sort((left: any, right: any) => {
+                const compareName = () => String(left.variant || "").localeCompare(String(right.variant || ""), "es", {
+                    sensitivity: "base", numeric: true
+                });
+                if (sort.field === "name") return direction * compareName();
+                const leftPrice = Number(left.precio);
+                const rightPrice = Number(right.precio);
+                const leftValid = Number.isFinite(leftPrice) && leftPrice > 0;
+                const rightValid = Number.isFinite(rightPrice) && rightPrice > 0;
+                if (!leftValid || !rightValid) return leftValid ? -1 : rightValid ? 1 : compareName();
+                return direction * (leftPrice - rightPrice) || compareName();
+            })
+        }));
+        return sortedProducts.sort((left: any, right: any) => {
             if (sort.field === "name") {
                 return direction * String(left.nombre_producto || "").localeCompare(String(right.nombre_producto || ""), "es", {
                     sensitivity: "base"

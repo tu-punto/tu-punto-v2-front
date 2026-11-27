@@ -307,11 +307,8 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
     if (!rows.length) return "";
     const editableRows = rows.filter((row) => !isQrPrintedRow(row) && !isDeliveryEditLockedAfterFiveDays(row));
     const targetRows = editableRows.length ? editableRows : rows;
-    const rowsWithMethod = targetRows.filter((row) => String(row.metodo_pago || ""));
-    if (!rowsWithMethod.length) return "efectivo";
-    const firstMethod = String(rowsWithMethod[0]?.metodo_pago || "");
-    if (!firstMethod) return "";
-    return rowsWithMethod.every((row) => String(row.metodo_pago || "") === firstMethod) ? firstMethod : "mixed";
+    const firstMethod = String(targetRows[0]?.metodo_pago || "");
+    return targetRows.every((row) => String(row.metodo_pago || "") === firstMethod) ? firstMethod : "mixed";
   }, [rows]);
 
   const pendingRows = useMemo(() => rows.filter((row) => !row?.is_external), [rows]);
@@ -959,7 +956,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
 
     const previousRows = rows;
     const optimisticRows = rows.map((row) =>
-      isQrPrintedRow(row)
+      isQrPrintedRow(row) || isDeliveryEditLockedAfterFiveDays(row)
         ? row
         : applyPackagePatch(
             row,
@@ -995,7 +992,7 @@ const SimplePackageManagerModal = ({ visible, onClose, onChanged }: SimplePackag
         targetRows.map((row, index) => [String(row._id), responses[index]?.data || row])
       );
       setRows(optimisticRows.map((row) => responseById.get(String(row._id)) || row));
-      message.success(method ? `Pago general marcado como ${method}` : "Pago general limpiado");
+      message.success(method ? `Pago general marcado como ${method}` : "Pago general marcado como no pagado");
     } catch (error) {
       console.error(error);
       setRows(previousRows);
