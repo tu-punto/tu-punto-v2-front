@@ -200,6 +200,8 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   ).trim();
 
   const getEscalatedPackagePrice = (position = packageCount, packageSize = "estandar", routeId = "") => {
+    const courierRoute = branchPrices.find((row: any) => String(row?._id || "") === String(routeId) && row?.destino_tipo === "paqueteria");
+    if (courierRoute) return Number(courierRoute?.destino_paqueteria?.tarifa_fija || 0);
     const config = escalationConfigs.find(
       (row: any) => String(row?.route?._id || row?.route || "") === String(routeId) && row?.service_origin === "external"
     );
@@ -248,6 +250,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
   const getDeliveryRoutePrice = (originId?: string, destinationId?: string, spaces = 1, escalationSpaces = spaces) => {
     if (String(originId || "") === String(destinationId || "")) return 0;
     const routeId = getRouteId(originId, destinationId);
+    if (branchPrices.some((row: any) => String(row?._id || "") === routeId && row?.destino_tipo === "paqueteria")) return 0;
     const config = escalationConfigs.find(
       (row: any) =>
         row?.service_origin === "delivery" &&
@@ -351,7 +354,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const map = new Map<string, number>();
     branchPrices.forEach((row: any) => {
       const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
-      const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
+      const destinationId = String(row?.destino_tipo === "paqueteria" ? row?.destino_paqueteria?._id || row?.destino_paqueteria || "" : row?.destino_sucursal?._id || row?.destino_sucursal || "");
       if (!originId || !destinationId) return;
       map.set(`${originId}::${destinationId}`, Number(row?.precio || 0));
     });
@@ -362,7 +365,7 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const map = new Map<string, string>();
     branchPrices.forEach((row: any) => {
       const originId = String(row?.origen_sucursal?._id || row?.origen_sucursal || "");
-      const destinationId = String(row?.destino_sucursal?._id || row?.destino_sucursal || "");
+      const destinationId = String(row?.destino_tipo === "paqueteria" ? row?.destino_paqueteria?._id || row?.destino_paqueteria || "" : row?.destino_sucursal?._id || row?.destino_sucursal || "");
       if (!originId || !destinationId) return;
       map.set(`${originId}::${destinationId}`, String(row?._id || ""));
     });
@@ -373,10 +376,10 @@ const ExternalPackagesFormModal = ({ visible, onClose, onCreated, currentSucursa
     const originId = String(watchedOriginBranchId || "");
     if (!originId) return [];
     const pricedOptions = branchPrices
-      .filter((row: any) => String(row?.origen_sucursal?._id || row?.origen_sucursal || "") === originId)
+      .filter((row: any) => String(row?.origen_sucursal?._id || row?.origen_sucursal || "") === originId && (row?.destino_tipo !== "paqueteria" || (row?.destino_paqueteria?.activo !== false && row?.destino_paqueteria?.tipo !== "externa")))
       .map((row: any) => ({
-        value: String(row?.destino_sucursal?._id || row?.destino_sucursal || ""),
-        label: String(row?.destino_sucursal?.nombre || "Sucursal destino"),
+        value: String(row?.destino_tipo === "paqueteria" ? row?.destino_paqueteria?._id || "" : row?.destino_sucursal?._id || row?.destino_sucursal || ""),
+        label: row?.destino_tipo === "paqueteria" ? `${row?.destino_paqueteria?.nombre || "Paquetería"} (paquetería)` : String(row?.destino_sucursal?.nombre || "Sucursal destino"),
       }))
       .filter((option) => option.value);
 

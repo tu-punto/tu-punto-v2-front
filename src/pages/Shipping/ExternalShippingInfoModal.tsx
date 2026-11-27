@@ -200,6 +200,13 @@ const ExternalShippingInfoModal = ({
   );
   const latePickupFee = useMemo(
     () => {
+      if (chargeSource?.paqueteria_pricing_snapshot) {
+        if (chargeSource?.estado_pedido === "Entregado") return roundCurrency(Number(chargeSource?.late_pickup_fee || 0));
+        if (!chargeSource?.pickup_fee_started_at || chargeSource?.estado_pedido !== "LISTO PARA RECOGER") return 0;
+        const snapshot = chargeSource.paqueteria_pricing_snapshot;
+        const days = Math.max(0, moment().diff(moment(chargeSource.pickup_fee_started_at), "days"));
+        return roundCurrency(Math.floor(days / Math.max(1, Number(snapshot.fine_every_days || 1))) * Number(snapshot.fine_amount || 0));
+      }
       const v2Fee = calculateV2PickupFee(chargeSource);
       if (v2Fee !== null) return chargeSource?.estado_pedido === "Entregado" ? roundCurrency(Number(chargeSource?.late_pickup_fee || v2Fee)) : v2Fee;
       if (chargeSource?.pricing_version === "package-pricing-v2") return 0;
@@ -769,7 +776,7 @@ const ExternalShippingInfoModal = ({
       const deliveredLikeStatus = isDeliveredLikeStatus(values.estado_pedido);
       const payload = {
         ...(canEditBuyerName ? { comprador: String(values.comprador || "").trim() } : {}),
-        ...(canEditDestination && nextDestinationBranchId && nextDestinationBranchId !== currentDestinationBranchId
+        ...(canEditDestination && !externalShipping?.destino_paqueteria && nextDestinationBranchId && nextDestinationBranchId !== currentDestinationBranchId
           ? { destino_sucursal_id: nextDestinationBranchId }
           : {}),
         estado_pedido: deliveredLikeStatus ? "Entregado" : values.estado_pedido,
@@ -949,7 +956,7 @@ const ExternalShippingInfoModal = ({
           </Row>
         </Card>
 
-        {canEditDestination && (
+        {canEditDestination && !externalShipping?.destino_paqueteria && (
           <Card title="Sucursal destino" bordered={false} style={{ marginTop: 16 }}>
             <Row gutter={16}>
               <Col span={24}>
@@ -1102,6 +1109,7 @@ const ExternalShippingInfoModal = ({
             <Col span={24}>
               <Form.Item name="estado_pedido" label="Estado del pedido" rules={[{ required: true }]}>
                 <Radio.Group disabled={!canEditDelivery}>
+                  {externalShipping?.destino_paqueteria && <Radio.Button value="PARA ENVIAR A OTRA SUCURSAL">Por enviar</Radio.Button>}
                   <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
                   <Radio.Button value="En camino">En camino</Radio.Button>
                   <Radio.Button value="Entregado">Entregado</Radio.Button>

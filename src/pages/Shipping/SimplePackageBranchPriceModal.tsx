@@ -78,7 +78,7 @@ const SimplePackageBranchPriceModal = ({ visible, onClose }: SimplePackageBranch
     const courierOptions = couriers
       .filter((courier: any) => {
         const courierId = String(courier?._id || "");
-        return courier?.activo !== false && courierId && !usedDestinations.has(`paqueteria:${courierId}`);
+        return courier?.activo !== false && courier?.tipo !== "externa" && courierId && !usedDestinations.has(`paqueteria:${courierId}`);
       })
       .map((courier: any) => ({
         value: `paqueteria:${String(courier?._id || "")}`,
