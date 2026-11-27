@@ -848,6 +848,29 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
         }
     };
 
+    const handlePaidOrderDelivery = async () => {
+        if (!shipping?._id || !canMarkAsDelivered || isDeliveryLocked || estadoPedido !== "Entregado") return;
+        setLoading(true);
+        try {
+            const response = await updateShippingAPI({
+                estado_pedido: "Entregado",
+                hora_entrega_real: moment().tz("America/La_Paz").format("YYYY-MM-DD HH:mm:ss"),
+                solo_entrega_pagada: true,
+            }, shipping._id);
+            if (!response?.success) {
+                message.error(response?.msg || response?.error?.message || "No se pudo actualizar el pedido");
+                return;
+            }
+            message.success("Pedido actualizado con éxito");
+            onSave();
+            onClose();
+        } catch {
+            message.error("Ocurrió un error al guardar los cambios");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleChatClient = () => {
         const phoneNumber = shipping.telefono_cliente;
 
@@ -966,7 +989,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                 form={internalForm}
                 layout="vertical"
                 onFinish={handleSave}
-                disabled={!canEditShipping}
+                disabled={!canEditShipping || isPaidToSeller}
             >
                 <DeliveryDateMetadata
                     createdAt={shipping?.fecha_pedido}
@@ -1136,7 +1159,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 rules={[{ required: true }]}
                             >
                                 <Radio.Group
-                                    disabled={!canEditShipping}
+                                    disabled={!canEditShipping || isPaidToSeller}
                                     onChange={(e) => {
                                         const nextType = e.target.value;
                                         if (nextType === "otro_lugar") {
@@ -1173,7 +1196,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     rules={[{ required: true, message: "Selecciona la sucursal destino" }]}
                                 >
                                     <Select
-                                        disabled={!canEditShipping}
+                                        disabled={!canEditShipping || isPaidToSeller}
                                         placeholder="Seleccione la sucursal destino"
                                         allowClear
                                         style={{ width: '100%' }}
@@ -1365,6 +1388,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                 trigger="onStatusChange"
                             >
                                 <Radio.Group
+                                    disabled={!canEditShipping}
                                     onChange={(e) => {
                                         const nextStatus = e.target.value.toString();
                                         if (nextStatus === PICKED_UP_BY_VENDOR_LABEL && isSimplePackageOrder && !productCoveredByVendorPickup) {
@@ -1390,10 +1414,10 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                     }}
                                     value={estadoPedido || "LISTO PARA RECOGER"}
                                 >
-                                    <Radio.Button value="LISTO PARA RECOGER">Listo para recoger</Radio.Button>
-                                    <Radio.Button value="En camino">En camino</Radio.Button>
-                                    <Radio.Button value="Entregado" disabled={!canMarkAsDelivered}>Entregado</Radio.Button>
-                                    {isSimplePackageOrder && (
+                                    <Radio.Button value="LISTO PARA RECOGER" disabled={isPaidToSeller}>Listo para recoger</Radio.Button>
+                                    <Radio.Button value="En camino" disabled={isPaidToSeller}>En camino</Radio.Button>
+                                    <Radio.Button value="Entregado" disabled={!canMarkAsDelivered || (isPaidToSeller && (isSimplePackageOrder || isDeliveredLikeStatus(estadoInicialPedido)))}>Entregado</Radio.Button>
+                                    {isSimplePackageOrder && !isPaidToSeller && (
                                         <Radio.Button value={PICKED_UP_BY_VENDOR_LABEL} disabled={!canMarkAsDelivered}>{PICKED_UP_BY_VENDOR_LABEL}</Radio.Button>
                                     )}
                                 </Radio.Group>
@@ -1401,6 +1425,11 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                             {!canMarkAsDelivered && (
                                 <div style={{ marginTop: -8, marginBottom: 8, color: "#b45309", fontSize: 12 }}>
                                     Solo la sucursal destino puede marcar este pedido como entregado.
+                                </div>
+                            )}
+                            {isPaidToSeller && isSimplePackageOrder && (
+                                <div style={{ marginTop: -8, marginBottom: 8, color: "#b45309", fontSize: 12 }}>
+                                    La entrega de paquetes simples debe procesarse por su flujo habitual.
                                 </div>
                             )}
                         </Col>
@@ -1419,7 +1448,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                                         <Radio.Group
                                             value={quienPagaDelivery} //  esto lo hace controlado
                                             onChange={e => internalForm.setFieldValue("quien_paga_delivery", normalizeDeliveryPayer(e.target.value))}
-                                            disabled={!canEditShipping}
+                                            disabled={!canEditShipping || isPaidToSeller}
                                         >
                                             <Radio.Button value="comprador">COMPRADOR</Radio.Button>
                                             <Radio.Button value="vendedor">VENDEDOR</Radio.Button>
@@ -1604,7 +1633,7 @@ const ShippingInfoModal = ({ visible, onClose, shipping, onSave, sucursals = [],
                     <Button style={{ marginRight: 8 }} onClick={handleCancelChanges}>
                         Cancelar
                     </Button>
-                    <Button type="primary" loading={loading} disabled={isPaidToSeller || isDeliveryLocked} onClick={() => internalForm.submit()}>
+                    <Button type="primary" loading={loading} disabled={isDeliveryLocked || (isPaidToSeller && (isSimplePackageOrder || estadoPedido !== "Entregado" || isDeliveredLikeStatus(estadoInicialPedido) || !canMarkAsDelivered))} onClick={() => isPaidToSeller ? handlePaidOrderDelivery() : internalForm.submit()}>
                         Guardar Cambios
                     </Button>
                 </div>
